@@ -1,24 +1,43 @@
-version: '3.7'
-
+version: "3.8"
 services:
-  db:
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8080:8080"
+    networks:
+      - mes-network
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=mes-db
+      - DB_USER=mes
+      - DB_PASSWORD=ctech2015
+      - DB_NAME=mes
+    networks:
+      - mes-network
+    depends_on:
+      - mes-db
+
+  mes-db:
     image: mysql:8
     environment:
       MYSQL_ROOT_PASSWORD: ctech2015
       MYSQL_DATABASE: mes
       MYSQL_USER: mes
       MYSQL_PASSWORD: ctech2015
-    ports:
-      - "3306:3306"
-  backend:
-    build:
-      context: ./backend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - db
-  frontend:
-    build:
-      context: ./frontend
-    ports:
-      - "8080:8080"
+    volumes:
+      - mes-db-data:/var/lib/mysql
+    networks:
+      - mes-network
+
+networks:
+  mes-network:
+    driver: bridge
+
+volumes:
+  mes-db-data:

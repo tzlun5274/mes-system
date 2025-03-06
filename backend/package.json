@@ -1,0 +1,12 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "^4.17.1",
+    "mysql2": "^2.3.3",
+    "dotenv": "^10.0.0"
+  },
+  "scripts": {
+    "start": "node src/app.js"
+  }
+}
