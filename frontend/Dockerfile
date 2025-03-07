@@ -1,4 +1,4 @@
-# 使用 Node.js 官方映像檔
+# 使用 Node.js 官方映像
 FROM node:18
 
 # 設定工作目錄
@@ -8,15 +8,13 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install
 
-# 複製其他程式碼
-COPY . .
+# 確保 react-scripts 存在
+RUN npm install react-scripts
 
-# 構建 React 專案
+# 複製其餘檔案並建置前端
+COPY . .
 RUN npm run build
 
 # 使用 serve 提供靜態檔案
 RUN npm install -g serve
-CMD ["serve", "-s", "build"]
-
-# 監聽 3000 端口
-EXPOSE 3000
+CMD ["serve", "-s", "build", "-l", "3000"]
