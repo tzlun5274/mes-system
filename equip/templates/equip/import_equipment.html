@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "匯入設備 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "匯入設備" %}</h2>
+    <hr>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    <div class="card">
+        <div class="card-body">
+            <!-- 中文說明：只需四個欄位，並給小學生也懂的範例 -->
+            <p>請上傳一個 Excel 檔案（.xlsx 格式），內容必須包含以下四個欄位：</p>
+            <ul>
+                <li><b>name</b>：設備名稱（例如：SMT-001）</li>
+                <li><b>model</b>：型號（例如：SMT-2023）</li>
+                <li><b>status</b>：狀態（只能填「idle」=閒置、「running」=運轉中、「maintenance」=維修）</li>
+                <li><b>production_line</b>：所屬產線名稱（例如：A產線）</li>
+            </ul>
+            <p>範例 Excel 內容：</p>
+            <pre style="background:#f8f9fa;border:1px solid #ddd;padding:8px;">
+name,model,status,production_line
+SMT-001,SMT-2023,idle,A產線
+SMT-002,SMT-2024,running,B產線
+</pre>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="file">{% trans "選擇 Excel 檔案" %}</label>
+                    <input type="file" name="file" id="file" class="form-control" accept=".xlsx" required>
+                </div>
+                <button type="submit" class="btn btn-primary">{% trans "上傳並匯入" %}</button>
+                <a href="{% url 'equip:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

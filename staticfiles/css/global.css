@@ -1,0 +1,34 @@
+/* 全局樣式 */
+body {
+    background: #f5f5f5;
+}
+
+h2, h3 {
+    color: #333;
+}
+
+.card {
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    background: #333;
+    color: #ffffff;
+}
+
+.card-header a {
+    color: #ffffff !important;
+}
+
+.card-header a:hover {
+    color: #ddd !important;
+}
+
+.table th {
+    background: #555;
+    color: #ffffff;
+}
+
+.table tbody tr:hover {
+    background: #f1f1f1;
+}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 添加作業員技能" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 添加作業員技能" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="operator" class="form-label">{% trans "作業員" %}</label>
+                    <input type="text" class="form-control" id="operator" value="{{ operator.name }}" readonly>
+                </div>
+                <div class="mb-3">
+                    <label for="process_name_id" class="form-label">{% trans "工序名稱" %}</label>
+                    <select class="form-control" id="process_name_id" name="process_name_id" required>
+                        <option value="">{% trans "選擇工序" %}</option>
+                        {% for process in process_names %}
+                            <option value="{{ process.id }}">{{ process.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="priority" class="form-label">{% trans "技能優先順序" %}</label>
+                    <input type="number" class="form-control" id="priority" name="priority" min="1" value="1" required>
+                </div>
+                <button type="submit" class="btn btn-primary">{% trans "提交" %}</button>
+                <a href="{% url 'process:operators' %}" class="btn btn-secondary">{% trans "取消" %}</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

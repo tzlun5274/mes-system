@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}報工管理{% endblock %}
+
+{% block extra_head %}
+<style>
+    .report-container {
+        padding: 20px;
+    }
+    
+    .report-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .report-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .report-card .card-header {
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+    }
+    
+    .report-stats {
+        display: flex;
+        justify-content: space-around;
+        margin-bottom: 20px;
+    }
+    
+    .stat-card {
+        text-align: center;
+        padding: 15px;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+    }
+    
+    .stat-number {
+        font-size: 2em;
+        font-weight: bold;
+        color: #007bff;
+    }
+    
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    
+    .report-table {
+        margin-top: 20px;
+    }
+    
+    .report-table th {
+        background-color: #f8f9fa;
+        border-top: none;
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+    }
+    
+    .status-pending {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-in-progress {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .status-completed {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    /* 響應式設計 */
+    @media (max-width: 768px) {
+        .report-stats {
+            flex-direction: column;
+        }
+        
+        .stat-card {
+            margin-bottom: 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-clipboard-check text-warning"></i>
+                    報工管理
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">報工管理</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計資訊卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-number text-primary">0</div>
+                <div class="stat-label">今日報工數</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-number text-success">0</div>
+                <div class="stat-label">本月報工數</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-number text-info">0</div>
+                <div class="stat-label">待審核報工</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-number text-warning">0</div>
+                <div class="stat-label">異常報工</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 功能卡片 -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card report-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user-tie"></i> 管理者報工
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        管理者報工記錄管理，包含審核、統計、分析等功能。
+                    </p>
+                    <a href="{% url 'workorder:manager_report_index' %}" class="btn btn-primary">
+                        <i class="fas fa-users-cog"></i> 進入管理
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card report-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user"></i> 作業員報工
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        作業員報工記錄管理，包含新增、查詢、修改等功能。
+                    </p>
+                    <a href="{% url 'workorder:operator_report_index' %}" class="btn btn-success">
+                        <i class="fas fa-user-edit"></i> 進入報工
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card report-card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-microchip"></i> SMT報工
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        SMT設備報工記錄管理，包含設備狀態、產能分析等。
+                    </p>
+                    <a href="{% url 'workorder:smt_report_index' %}" class="btn btn-info">
+                        <i class="fas fa-cogs"></i> 進入SMT
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 最近報工記錄 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card report-card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock"></i> 最近報工記錄
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover report-table">
+                            <thead>
+                                <tr>
+                                    <th>報工時間</th>
+                                    <th>作業員</th>
+                                    <th>工單號</th>
+                                    <th>工序</th>
+                                    <th>報工數量</th>
+                                    <th>工時</th>
+                                    <th>狀態</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted">
+                                        <i class="fas fa-inbox fa-2x mb-2"></i>
+                                        <br>
+                                        目前沒有報工記錄
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 報工管理專用 JavaScript
+    $(document).ready(function() {
+        // 卡片懸停效果
+        $('.report-card').hover(
+            function() {
+                $(this).addClass('shadow-lg');
+            },
+            function() {
+                $(this).removeClass('shadow-lg');
+            }
+        );
+        
+        // 自動隱藏訊息提示
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                if (alert.classList.contains('alert-success') || alert.classList.contains('alert-info')) {
+                    setTimeout(function() {
+                        alert.style.opacity = '0';
+                        setTimeout(function() {
+                            alert.remove();
+                        }, 300);
+                    }, 3000);
+                }
+            });
+        }, 1000);
+    });
+    
+    // 確認刪除函數
+    function confirmDelete(message) {
+        return confirm(message || '確定要刪除嗎？');
+    }
+    
+    // 顯示載入中
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 處理中...</div>';
+        loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.2);z-index:9999;';
+        document.body.appendChild(loadingDiv);
+    }
+    
+    // 隱藏載入中
+    function hideLoading() {
+        const loadingDiv = document.getElementById('loading');
+        if (loadingDiv) {
+            loadingDiv.remove();
+        }
+    }
+</script>
+{% endblock %} 

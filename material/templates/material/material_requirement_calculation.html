@@ -1,0 +1,371 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}物料需求估算 - MES 系統{% endblock %}
+
+{% block extra_css %}
+<style>
+    .requirement-card {
+        border-left: 4px solid #007bff;
+        margin-bottom: 15px;
+    }
+    .requirement-card.high-priority {
+        border-left-color: #dc3545;
+    }
+    .requirement-card.medium-priority {
+        border-left-color: #ffc107;
+    }
+    .requirement-card.low-priority {
+        border-left-color: #28a745;
+    }
+    .calculation-form {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .result-section {
+        display: none;
+    }
+    .loading {
+        text-align: center;
+        padding: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-calculator"></i> 物料需求估算</h2>
+                <a href="{% url 'material:requirement_estimation' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-list"></i> 需求估算清單
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 計算表單 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="calculation-form">
+                <h5><i class="fas fa-cog"></i> 需求計算設定</h5>
+                <form id="requirementForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="productSelect">選擇產品：</label>
+                                <select class="form-control" id="productSelect" multiple>
+                                    {% for product in products %}
+                                    <option value="{{ product.id }}">{{ product.code }} - {{ product.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="form-text text-muted">可按住 Ctrl 鍵選擇多個產品</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="dateRange">需求日期範圍：</label>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <input type="date" class="form-control" id="startDate" required>
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="date" class="form-control" id="endDate" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-calculator"></i> 計算物料需求
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearForm()">
+                                <i class="fas fa-eraser"></i> 清除
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 載入中 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="loading" id="loadingSection" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">計算中...</span>
+                </div>
+                <p class="mt-2">正在計算物料需求，請稍候...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 計算結果 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="result-section" id="resultSection">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-bar"></i> 物料需求計算結果</h5>
+                        <div class="float-right">
+                            <button class="btn btn-sm btn-outline-success" onclick="exportToExcel()">
+                                <i class="fas fa-file-excel"></i> 匯出 Excel
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body text-center">
+                                        <h6>總需求項目</h6>
+                                        <h4 id="totalItems">0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-warning text-white">
+                                    <div class="card-body text-center">
+                                        <h6>高優先級</h6>
+                                        <h4 id="highPriorityCount">0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-danger text-white">
+                                    <div class="card-body text-center">
+                                        <h6>短缺項目</h6>
+                                        <h4 id="shortageCount">0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body text-center">
+                                        <h6>庫存充足</h6>
+                                        <h4 id="sufficientCount">0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="requirementsList">
+                            <!-- 需求項目將在這裡動態顯示 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 訂單資訊 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-clipboard-list"></i> 相關訂單資訊</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>產品編號</th>
+                                    <th>產品名稱</th>
+                                    <th>訂單數量</th>
+                                    <th>交期</th>
+                                    <th>狀態</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in orders %}
+                                <tr>
+                                    <td>{{ order.product.code }}</td>
+                                    <td>{{ order.product.name }}</td>
+                                    <td>{{ order.quantity }}</td>
+                                    <td>{{ order.due_date }}</td>
+                                    <td>
+                                        <span class="badge badge-{% if order.status == 'pending' %}warning{% elif order.status == 'in_progress' %}info{% elif order.status == 'completed' %}success{% else %}secondary{% endif %}">
+                                            {{ order.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">目前沒有相關訂單</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 設定預設日期範圍（未來30天）
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date();
+    const endDate = new Date();
+    endDate.setDate(today.getDate() + 30);
+    
+    document.getElementById('startDate').value = today.toISOString().split('T')[0];
+    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+});
+
+// 表單提交處理
+document.getElementById('requirementForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    calculateRequirements();
+});
+
+function calculateRequirements() {
+    const productSelect = document.getElementById('productSelect');
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    
+    if (!startDate || !endDate) {
+        alert('請選擇日期範圍');
+        return;
+    }
+    
+    const selectedProducts = Array.from(productSelect.selectedOptions).map(option => option.value);
+    if (selectedProducts.length === 0) {
+        alert('請至少選擇一個產品');
+        return;
+    }
+    
+    // 顯示載入中
+    document.getElementById('loadingSection').style.display = 'block';
+    document.getElementById('resultSection').style.display = 'none';
+    
+    // 發送請求
+    fetch('{% url "material:requirement_calculation" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            product_ids: selectedProducts,
+            start_date: startDate,
+            end_date: endDate
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('loadingSection').style.display = 'none';
+        
+        if (data.success) {
+            displayResults(data.requirements);
+        } else {
+            alert('計算失敗：' + data.error);
+        }
+    })
+    .catch(error => {
+        document.getElementById('loadingSection').style.display = 'none';
+        alert('發生錯誤：' + error.message);
+    });
+}
+
+function displayResults(requirements) {
+    const resultSection = document.getElementById('resultSection');
+    const requirementsList = document.getElementById('requirementsList');
+    
+    // 更新統計資料
+    document.getElementById('totalItems').textContent = requirements.length;
+    
+    let highPriorityCount = 0;
+    let shortageCount = 0;
+    let sufficientCount = 0;
+    
+    // 生成需求項目 HTML
+    let html = '';
+    requirements.forEach(req => {
+        const priorityClass = req.priority === '高' ? 'high-priority' : 
+                            req.priority === '中' ? 'medium-priority' : 'low-priority';
+        
+        if (req.priority === '高') highPriorityCount++;
+        if (req.shortage_quantity > 0) shortageCount++;
+        else sufficientCount++;
+        
+        html += `
+            <div class="card requirement-card ${priorityClass}">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>物料編號：</strong> ${req.material_code}<br>
+                            <strong>物料名稱：</strong> ${req.material_name}
+                        </div>
+                        <div class="col-md-2">
+                            <strong>需求數量：</strong> ${req.required_quantity}<br>
+                            <strong>當前庫存：</strong> ${req.current_stock}
+                        </div>
+                        <div class="col-md-2">
+                            <strong>短缺數量：</strong> 
+                            <span class="text-danger">${req.shortage_quantity}</span><br>
+                            <strong>建議訂購：</strong> 
+                            <span class="text-success">${req.order_quantity}</span>
+                        </div>
+                        <div class="col-md-2">
+                            <strong>優先級：</strong> 
+                            <span class="badge badge-${req.priority === '高' ? 'danger' : req.priority === '中' ? 'warning' : 'success'}">${req.priority}</span><br>
+                            <strong>供應商：</strong> ${req.supplier || '未設定'}
+                        </div>
+                        <div class="col-md-2">
+                            <strong>前置時間：</strong> ${req.lead_time} 天<br>
+                            <strong>產品：</strong> ${req.product_code}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    requirementsList.innerHTML = html;
+    
+    // 更新統計數字
+    document.getElementById('highPriorityCount').textContent = highPriorityCount;
+    document.getElementById('shortageCount').textContent = shortageCount;
+    document.getElementById('sufficientCount').textContent = sufficientCount;
+    
+    // 顯示結果區域
+    resultSection.style.display = 'block';
+}
+
+function clearForm() {
+    document.getElementById('productSelect').selectedIndex = -1;
+    document.getElementById('resultSection').style.display = 'none';
+}
+
+function exportToExcel() {
+    // 這裡可以實作 Excel 匯出功能
+    alert('Excel 匯出功能開發中...');
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "設備狀態看板 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "設備狀態看板" %}</h2>
+    <hr>
+
+    <!-- 過濾表單 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="d-flex align-items-center mb-2">
+                <div class="me-2">
+                    <label for="line_filter" class="me-2">{% trans "生產線：" %}</label>
+                    <select name="line" id="line_filter" class="form-control me-2">
+                        <option value="">{% trans "全部" %}</option>
+                        {% for choice in line_choices %}
+                        <option value="{{ choice.0 }}" {% if selected_line == choice.0 %}selected{% endif %}>{{ choice.1 }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary mb-2">{% trans "過濾" %}</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 設備狀態表格 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "設備名稱" %}</th>
+                        <th>{% trans "生產線" %}</th>
+                        <th>{% trans "狀態" %}</th>
+                        <th>{% trans "最後更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for equipment in equipment_status %}
+                    <tr>
+                        <td>{{ equipment.equipment_name }}</td>
+                        <td>{{ equipment.line }}</td>
+                        <td>{{ equipment.status }}</td>
+                        <td>{{ equipment.last_updated|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">{% trans "無設備狀態數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{% url 'kanban:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "品質監控看板 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "品質監控看板" %}</h2>
+    <hr>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "不合格率 (%)" %}</th>
+                        <th>{% trans "總檢驗數量" %}</th>
+                        <th>{% trans "不合格數量" %}</th>
+                        <th>{% trans "最後更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for quality in quality_monitoring %}
+                    <tr>
+                        <td>{{ quality.product_name }}</td>
+                        <td>{{ quality.defect_rate }}%</td>
+                        <td>{{ quality.total_inspected }}</td>
+                        <td>{{ quality.defective_count }}</td>
+                        <td>{{ quality.last_updated|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">{% trans "無品質監控數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{% url 'kanban:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

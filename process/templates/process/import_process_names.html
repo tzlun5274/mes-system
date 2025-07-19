@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 匯入工序工藝名稱" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 匯入工序工藝名稱" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if duplicate_names %}
+        <div class="alert alert-warning">
+            <p>{% trans "以下工序名稱已存在於資料庫中：" %}</p>
+            <ul>
+                {% for name in duplicate_names %}
+                    <li>{{ name }}</li>
+                {% endfor %}
+            </ul>
+            <p>{% trans "是否要覆蓋這些記錄？" %}</p>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="dataset" value="{{ dataset|escape }}">
+                <button type="submit" name="action" value="overwrite" class="btn btn-danger">{% trans "覆蓋" %}</button>
+                <button type="submit" name="action" value="cancel" class="btn btn-secondary">{% trans "取消" %}</button>
+            </form>
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="file" class="form-label">{% trans "上傳 Excel 文件" %}</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".xlsx" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">{% trans "匯入" %}</button>
+                    <a href="{% url 'process:process_names' %}" class="btn btn-secondary">{% trans "取消" %}</a>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

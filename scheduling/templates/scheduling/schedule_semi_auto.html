@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}半自動排程{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>半自動排程</h2>
+    <div class="mb-3">
+        <a href="{% url 'scheduling:schedule_management' %}" class="btn btn-secondary">返回</a>
+    </div>
+    <form id="semiAutoScheduleForm">
+            <div class="mb-3">
+            <label for="order_id" class="form-label">選擇訂單</label>
+            <select class="form-select" id="order_id" name="order_id" multiple required size="6">
+                        {% for order in orders %}
+                    <option value="{{ order.id }}">{{ order.company_name }} {{ order.product_id }} (未出數量: {{ order.qty_remain }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                    <div id="tasksContainer">
+                        {% for task in tasks %}
+            <div class="card mb-3 task-card" data-task-index="{{ forloop.counter0 }}" data-capacity="{{ task.process.capacity }}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">工序 (步驟 {{ task.step_order }}) - {{ task.process.name }}</h5>
+                    <div>
+                        <input type="checkbox" class="form-check-input me-2 process-overtime" id="overtime_{{ forloop.counter0 }}" name="tasks[{{ forloop.counter0 }}][overtime]" {% if task.overtime %}checked{% endif %}>
+                        <label class="form-check-label mb-0" for="overtime_{{ forloop.counter0 }}">工序加班</label>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-2">
+                        <div class="col-md-4"><b>單位：</b>{{ task.unit_name }}</div>
+                        <div class="col-md-4"><b>每小時產能：</b>{{ task.process.capacity }} pcs/hr</div>
+                        <div class="col-md-4"><b>工序加班：</b><span class="process-overtime-status">{% if task.overtime %}是{% else %}否{% endif %}</span></div>
+                    </div>
+                    <div class="split-table-container mt-2">
+                        <table class="table table-bordered table-sm mb-2 split-table">
+                            <thead>
+                                <tr>
+                                    <th>分批</th>
+                                    <th>分攤數量</th>
+                                    <th>開始時間</th>
+                                    <th>結束時間</th>
+                                    <th>加班</th>
+                                    <th>作業員</th>
+                                    <th>設備</th>
+                                    <th>刪除</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for split in task.splits %}
+                                <tr>
+                                    <td class="split-index">{{ forloop.counter }}</td>
+                                    <td><input type="number" class="form-control form-control-sm split-qty split-qty-input" name="tasks[{{ forloop.parentloop.counter0 }}][splits][{{ forloop.counter0 }}][split_qty]" value="{{ split.split_qty }}" min="1" required></td>
+                                    <td><input type="datetime-local" class="form-control form-control-sm" name="tasks[{{ forloop.parentloop.counter0 }}][splits][{{ forloop.counter0 }}][start_time]" value="{{ split.start_time }}"></td>
+                                    <td><input type="datetime-local" class="form-control form-control-sm" name="tasks[{{ forloop.parentloop.counter0 }}][splits][{{ forloop.counter0 }}][end_time]" value="{{ split.end_time }}"></td>
+                                    <td><input type="checkbox" class="form-check-input split-overtime" name="tasks[{{ forloop.parentloop.counter0 }}][splits][{{ forloop.counter0 }}][overtime]" {% if split.overtime %}checked{% endif %}></td>
+                                    <td><select class="form-select form-select-sm" name="tasks[{{ forloop.parentloop.counter0 }}][splits][{{ forloop.counter0 }}][operator_id]">
+                                        <option value="">無作業員</option>
+                                {% for operator in operators %}
+                                            <option value="{{ operator.id }}" {% if operator.id == split.operator_id %}selected{% endif %}>{{ operator.name }}</option>
+                                {% endfor %}
+                                    </select></td>
+                                    <td><select class="form-select form-select-sm" name="tasks[{{ forloop.parentloop.counter0 }}][splits][{{ forloop.counter0 }}][equipment_id]">
+                                        <option value="">無設備</option>
+                                {% for equipment in equipments %}
+                                            <option value="{{ equipment.id }}" {% if equipment.id == split.equipment_id %}selected{% endif %}>{{ equipment.name }}</option>
+                                {% endfor %}
+                                    </select></td>
+                                    <td><button type="button" class="btn btn-danger btn-sm delete-split-btn"><i class="bi bi-trash"></i></button></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <button type="button" class="btn btn-secondary btn-sm add-split-row">新增分批</button>
+                        <button type="button" class="btn btn-info btn-sm avg-split-row ms-2">一鍵平均分配</button>
+                        <span class="split-warn text-danger ms-2" style="display:none;"></span>
+                    </div>
+                    <div class="mt-2">
+                        <span>本工序天數：<span class="proc-days"></span></span>
+                        <span class="ms-3">工時：<span class="proc-hours"></span></span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="mt-3">
+            <button type="submit" class="btn btn-primary">送出排程</button>
+        </div>
+        <div class="mt-3">
+            <b>全部工序總天數：</b><span id="totalDays"></span>
+            <b class="ms-3">總工時：</b><span id="totalHours"></span>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 工具函式
+    function autoDistributeSplits(card, totalQty) {
+        const rows = Array.from(card.querySelectorAll('.split-table tbody tr'));
+        if (rows.length === 0) return;
+        const avg = Math.floor(totalQty / rows.length);
+        let remain = totalQty;
+        rows.forEach((row, idx) => {
+            const qtyInput = row.querySelector('input[name$="[split_qty]"]');
+            if (idx === rows.length - 1) {
+                qtyInput.value = remain;
+            } else {
+                qtyInput.value = avg;
+                remain -= avg;
+            }
+        });
+    }
+    function updateSplitIndexes(card) {
+        card.querySelectorAll('.split-table tbody tr').forEach((row, idx) => {
+            row.querySelector('.split-index').textContent = idx + 1;
+        });
+    }
+    function checkSplitTotal(card) {
+        const qtyInputs = card.querySelectorAll('.split-qty');
+        let sum = 0;
+        qtyInputs.forEach(input => sum += parseInt(input.value) || 0);
+        const mainQty = card.querySelector('.split-qty-input');
+        const totalQty = mainQty ? parseInt(mainQty.value) : 0;
+        const warn = card.querySelector('.split-warn');
+        if (sum !== totalQty) {
+            warn.textContent = `分批數量加總 ${sum} ≠ 工序數量 ${totalQty}`;
+            warn.style.display = '';
+        } else {
+            warn.textContent = '';
+            warn.style.display = 'none';
+        }
+    }
+    function calcProcTime(card) {
+        const capacity = parseFloat(card.getAttribute('data-capacity')) || 1;
+        let totalQty = 0;
+        card.querySelectorAll('.split-qty').forEach(input => {
+            totalQty += parseInt(input.value) || 0;
+        });
+        const hours = totalQty / capacity;
+        card.querySelector('.proc-hours').textContent = hours.toFixed(2);
+        card.querySelector('.proc-days').textContent = (hours / 24).toFixed(2);
+    }
+    function calcTotal() {
+        let totalDays = 0, totalHours = 0;
+        document.querySelectorAll('.task-card').forEach(card => {
+            totalDays += parseFloat(card.querySelector('.proc-days').textContent) || 0;
+            totalHours += parseFloat(card.querySelector('.proc-hours').textContent) || 0;
+        });
+        document.getElementById('totalDays').textContent = totalDays.toFixed(2);
+        document.getElementById('totalHours').textContent = totalHours.toFixed(2);
+    }
+
+    // 事件代理與初始化
+    document.querySelectorAll('.task-card').forEach(card => {
+        // 新增分批
+        card.querySelector('.add-split-row').addEventListener('click', function() {
+            const tbody = card.querySelector('.split-table tbody');
+            const splitIndex = tbody.querySelectorAll('tr').length;
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="split-index">${splitIndex + 1}</td>
+                <td><input type="number" class="form-control form-control-sm split-qty split-qty-input" name="split_qty" value="0" min="1" required></td>
+                <td><input type="datetime-local" class="form-control form-control-sm" name="start_time"></td>
+                <td><input type="datetime-local" class="form-control form-control-sm" name="end_time"></td>
+                <td><input type="checkbox" class="form-check-input split-overtime"></td>
+                <td><select class="form-select form-select-sm"><option>無作業員</option></select></td>
+                <td><select class="form-select form-select-sm"><option>無設備</option></select></td>
+                <td><button type="button" class="btn btn-danger btn-sm delete-split-btn"><i class="bi bi-trash"></i></button></td>
+            `;
+            tbody.appendChild(row);
+            autoDistributeSplits(card, parseInt(card.querySelector('.split-qty-input').value) || 0);
+            updateSplitIndexes(card);
+            checkSplitTotal(card);
+            calcProcTime(card);
+            calcTotal();
+        });
+        // 一鍵平均分配
+        card.querySelector('.avg-split-row').addEventListener('click', function() {
+            autoDistributeSplits(card, parseInt(card.querySelector('.split-qty-input').value) || 0);
+            checkSplitTotal(card);
+            calcProcTime(card);
+            calcTotal();
+        });
+        // 刪除分批
+        card.querySelector('.split-table tbody').addEventListener('click', function(e) {
+            if (e.target.closest('.delete-split-btn')) {
+                e.target.closest('tr').remove();
+                autoDistributeSplits(card, parseInt(card.querySelector('.split-qty-input').value) || 0);
+                updateSplitIndexes(card);
+                checkSplitTotal(card);
+                calcProcTime(card);
+                calcTotal();
+            }
+        });
+        // 分批數量手動調整即時驗證
+        card.querySelector('.split-table tbody').addEventListener('input', function(e) {
+            if (e.target.classList.contains('split-qty')) {
+                checkSplitTotal(card);
+                calcProcTime(card);
+                calcTotal();
+            }
+        });
+        // 初始化工序天數/工時
+        calcProcTime(card);
+    });
+    // 初始化全局統計
+    calcTotal();
+});
+</script>
+{% endblock %}

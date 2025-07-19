@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+ERP 整合 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>ERP 整合模組</h2>
+    <hr>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- 功能入口 -->
+    <div class="mb-4">
+        <a href="{% url 'erp_integration:config' %}" class="btn btn-primary mr-2">連線設定</a>
+        <a href="{% url 'erp_integration:company_config' %}" class="btn btn-primary mr-2">公司設定</a>
+        <a href="{% url 'erp_integration:table_search' %}" class="btn btn-primary mr-2">資料搜尋</a>
+    </div>
+
+    <!-- 連線設定概覽 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="mb-0">連線設定</h3>
+        </div>
+        <div class="card-body">
+            {% if config %}
+                <p><strong>服務器地址：</strong>{{ config.server|default:"未設置" }}</p>
+                <p><strong>使用者名稱：</strong>{{ config.username|default:"未設置" }}</p>
+                <p><strong>最後更新時間：</strong>{{ config.last_updated|date:"Y-m-d H:i:s" }}</p>
+            {% else %}
+                <p>尚未配置連線設定，請點擊「連線設定」進行配置。</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 公司設定概覽 -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="mb-0">公司設定</h3>
+        </div>
+        <div class="card-body">
+            {% if companies %}
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>公司名稱</th>
+                            <th>MSSQL 資料庫</th>
+                            <th>MES 資料庫</th>
+                            <th>備註</th>
+                            <th>同步資料表</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for company in companies %}
+                            <tr>
+                                <td>{{ company.company_name }}</td>
+                                <td>{{ company.mssql_database|default:"未設置" }}</td>
+                                <td>{{ company.mes_database|default:"未設置" }}</td>
+                                <td>{{ company.notes|default:"未設置" }}</td>
+                                <td>{{ company.sync_tables|default:"未設置" }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5">無公司設定</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>尚未配置任何公司，請點擊「公司設定」進行配置。</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

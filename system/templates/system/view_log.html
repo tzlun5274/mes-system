@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}查看日誌 - {{ filename }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .log-content {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 15px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        line-height: 1.4;
+        max-height: 600px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+    
+    .log-info {
+        background-color: #e3f2fd;
+        border: 1px solid #bbdefb;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .log-actions {
+        margin-bottom: 15px;
+    }
+    
+    .log-line {
+        margin: 0;
+        padding: 2px 0;
+    }
+    
+    .log-line:hover {
+        background-color: #e9ecef;
+    }
+    
+    .log-error {
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    .log-warning {
+        color: #ffc107;
+        font-weight: bold;
+    }
+    
+    .log-info {
+        color: #17a2b8;
+    }
+    
+    .log-debug {
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="card-title">
+                            <i class="fas fa-file-alt"></i> 查看日誌檔案
+                        </h4>
+                        <div>
+                            <a href="{% url 'system:download_log_file' filename %}" class="btn btn-success btn-sm">
+                                <i class="fas fa-download"></i> 下載
+                            </a>
+                            <a href="{% url 'system:environment_management' %}" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-arrow-left"></i> 返回
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- 日誌檔案信息 -->
+                    <div class="log-info">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>檔案名稱：</strong>{{ filename }}
+                            </div>
+                            <div class="col-md-3">
+                                <strong>檔案大小：</strong>{{ file_size_mb }} MB
+                            </div>
+                            <div class="col-md-3">
+                                <strong>檔案大小（位元組）：</strong>{{ file_size }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 日誌內容 -->
+                    <div class="log-actions">
+                        <button class="btn btn-primary btn-sm" onclick="scrollToBottom()">
+                            <i class="fas fa-arrow-down"></i> 滾動到底部
+                        </button>
+                        <button class="btn btn-info btn-sm" onclick="copyToClipboard()">
+                            <i class="fas fa-copy"></i> 複製內容
+                        </button>
+                        <button class="btn btn-warning btn-sm" onclick="refreshLog()">
+                            <i class="fas fa-sync-alt"></i> 重新載入
+                        </button>
+                    </div>
+
+                    <div class="log-content" id="logContent">
+                        {% if content %}
+                            {% for line in content.splitlines %}
+                                <div class="log-line {% if 'ERROR' in line %}log-error{% elif 'WARNING' in line %}log-warning{% elif 'INFO' in line %}log-info{% else %}log-debug{% endif %}">
+                                    {{ line }}
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-muted">日誌檔案為空或無法讀取</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- 日誌統計 -->
+                    {% if content %}
+                    <div class="mt-3">
+                        <h6><i class="fas fa-chart-bar"></i> 日誌統計</h6>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h5 class="card-title text-danger">{{ content.splitlines|length }}</h5>
+                                        <p class="card-text">總行數</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h5 class="card-title text-danger">{{ content|length }}</h5>
+                                        <p class="card-text">總字元數</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h5 class="card-title text-danger">{{ content|length|add:"-1"|divisibleby:1024|yesno:"是,否" }}</h5>
+                                        <p class="card-text">是否超過 1KB</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h5 class="card-title text-danger">{{ content|length|add:"-1"|divisibleby:1048576|yesno:"是,否" }}</h5>
+                                        <p class="card-text">是否超過 1MB</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function scrollToBottom() {
+    var logContent = document.getElementById('logContent');
+    logContent.scrollTop = logContent.scrollHeight;
+}
+
+function copyToClipboard() {
+    var logContent = document.getElementById('logContent');
+    var text = logContent.innerText;
+    
+    navigator.clipboard.writeText(text).then(function() {
+        alert('日誌內容已複製到剪貼簿');
+    }).catch(function(err) {
+        console.error('複製失敗: ', err);
+        // 備用方法
+        var textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('日誌內容已複製到剪貼簿');
+    });
+}
+
+function refreshLog() {
+    if (confirm('確定要重新載入日誌內容嗎？')) {
+        location.reload();
+    }
+}
+
+// 自動滾動到底部
+$(document).ready(function() {
+    setTimeout(function() {
+        scrollToBottom();
+    }, 100);
+});
+
+// 鍵盤快捷鍵
+$(document).keydown(function(e) {
+    // Ctrl + End 滾動到底部
+    if (e.ctrlKey && e.keyCode === 35) {
+        e.preventDefault();
+        scrollToBottom();
+    }
+    // Ctrl + R 重新載入
+    if (e.ctrlKey && e.keyCode === 82) {
+        e.preventDefault();
+        refreshLog();
+    }
+    // Ctrl + C 複製內容
+    if (e.ctrlKey && e.keyCode === 67) {
+        copyToClipboard();
+    }
+});
+</script>
+{% endblock %} 

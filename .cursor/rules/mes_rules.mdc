@@ -1,0 +1,131 @@
+---
+description: 這是一套為「MES 製造執行系統」專案量身打造的開發規則。核心要求是：全程使用繁體中文、解釋力求簡單、高度自動化、並確保所有相關程式碼同步更新。
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# 📜 第一章：溝通與回應總則
+
+## 規則 1.1：溝通語言與風格
+- **唯一語言**：所有回應、說明、註解、文件，**必須且只能**使用**繁體中文**。
+- **超級白話文**：解釋任何概念時，都要想像正在對一位完全不懂程式的小學生說話。用詞必須極度簡單，嚴禁使用任何專業術語或行話。
+
+# 💻 第二章：程式碼生成與自動化
+
+## 規則 2.1：完全自主開發
+- **自動生成**：收到需求後，直接生成所有需要的完整程式碼，無需等待我的確認或修改。
+- **自動修復**：如果生成的程式碼在執行時發生任何錯誤，請直接分析錯誤原因並完成修復，不需要徵求我的同意。
+- **自動整理**：所有產出的程式碼都必須是整潔的。
+    - Python 程式碼：自動使用 **Black** 格式化。
+    - HTML/CSS/JavaScript：自動使用 **Prettier** 格式化。
+- **自動運行**：程式碼生成後，自動執行必要的指令（例如 `pip install -r requirements.txt`）。
+
+## 規則 2.2：檔案與註解規範
+- **檔案說明**：每個新生成的檔案，開頭都必須加上一段繁體中文註解，清楚說明這個檔案的用途。
+- **程式碼註解**：程式碼中所有重要的類別（Class）、函式（Function）以及複雜的邏輯區塊，都必須有詳盡的繁體中文 `docstring` 或註解。
+
+## 規則 2.3：相依套件與靜態檔案
+- **後端套件**：若程式碼需要 `requirements.txt` 中的套件，請自動檢查並安裝。
+- **前端函式庫**：若前端功能需要，請自動將 Bootstrap 5、Chart.js、dhtmlxgantt 等靜態資源下載到對應的 `static/` 目錄下。
+
+# ✨ 第三章：黃金同步規則 (最重要！)
+
+## 規則 3.1：所有變更，全面同步
+這是本專案的最高指導原則。當任何一個功能或欄位發生變動時，必須**自動、立即、且完整地**修改所有相關聯的檔案。絕不允許出現前後端或資料庫定義不一致的情況。
+
+同步範圍包括（但不限於）：
+1.  **Django 核心**：`models.py` (資料庫模型), `forms.py` (表單), `views.py` (邏輯), `templates/` (前端畫面)。
+2.  **資料格式**：Excel/CSV 的匯入、匯出格式與檢查邏輯。
+3.  **API 介面**：`serializers.py` 的輸入與輸出格式。
+4.  **測試程式**：`tests.py` 的單元測試與整合測試。
+5.  **說明文件**：`README.md`、操作說明、欄位定義等。
+6.  **所有相關腳本**：任何與該欄位/屬性有關的自動化腳本或批次處理。
+
+**範例情境**：如果我在 `workorder/models.py` 的工單模型中增加一個 `priority` (優先級) 欄位，你必須自動完成以下所有工作：
+- 在 `WorkOrder` 模型中加入 `priority` 欄位。
+- 在 `WorkOrderForm` 表單中顯示 `priority` 欄位。
+- 在 `WorkOrderCreateView` 和 `WorkOrderUpdateView` 中處理 `priority` 的儲存邏輯。
+- 在 `workorder_list.html` 和 `workorder_detail.html` 樣板中顯示 `priority`。
+- 在 `WorkOrderSerializer` 中加入 `priority`。
+- 在 `tests.py` 中新增測試案例，確保 `priority` 正常運作。
+- 如果有匯出工單的功能，要將 `priority` 加入到匯出的 Excel/CSV 檔案中。
+
+# 🏛️ 第四章：專案架構與設計規範
+
+## 規則 4.1：技術堆疊
+- **後端**：Python 3.10+, Django 5.1.8
+- **資料庫**：PostgreSQL
+- **前端**：Bootstrap 5, Chart.js
+- **背景任務**：Celery, Redis
+- **AI/ML**：TensorFlow, Scikit-learn
+
+## 規則 4.2：目錄結構
+專案必須遵循以下目錄結構。特別注意：`smt_equipment` 模組的功能已整合至 `equip` 模組，**禁止**再建立獨立的 `smt_equipment` 目錄。
+/var/www/mes/
+├── mes_config/         # Django 全局設定檔
+├── ai/                 # AI 功能模組
+├── equip/              # 設備管理模組 (包含 SMT 設備)
+├── erp_integration/    # ERP 整合模組 (禁止修改)
+├── kanban/             # 看板模組
+├── material/           # 物料管理模組
+├── process/            # 製程管理模組
+├── quality/            # 品質管理模組
+├── reporting/          # 報表模組
+├── scheduling/         # 排程管理模組
+├── system/             # 系統管理模組
+├── workorder/          # 工單管理模組
+├── static/             # 全域靜態檔案
+├── templates/          # 全域模板
+├── requirements.txt
+└── manage.py
+
+
+## 規則 4.3：資料庫設計
+- **命名**：資料表名稱用單數（`equipment`），欄位名稱用底線分隔（`created_at`）。
+- **主鍵**：永遠使用 `id`。
+- **外鍵**：格式為 `關聯表名_id`（例如：`workorder_id`）。
+- **多公司架構**：所有與 ERP 相關或需要區分公司的資料，都必須透過 `CompanyConfig` 模型進行查找。這是系統的基礎，必須遵守。
+    ```python
+    # erp_integration/models.py
+    
+    class CompanyConfig(models.Model):
+        """公司配置表，ERP 資料來源的基礎"""
+        company_code = models.CharField(max_length=10, unique=True, verbose_name="公司代號")
+        company_name = models.CharField(max_length=100, verbose_name="公司名稱")
+        database = models.CharField(max_length=100, verbose_name="資料庫名稱")
+    
+        class Meta:
+            verbose_name = "公司設定"
+            verbose_name_plural = "公司設定"
+            db_table = 'erp_company_config'
+    ```
+
+# 🔒 第五章：特定模組規則與限制
+
+## 規則 5.1：ERP 整合模組 (`erp_integration`)
+- **嚴格禁止修改**：此模組已全面開發與測試完畢，視為「唯讀」狀態。你不可以變更此模組內的任何程式碼。
+- **資料來源**：當其他模組需要從 ERP 取得資料時，唯一的途徑是查詢 `CompanyConfig` 模型。
+
+## 規則 5.2：設備管理模組 (`equip`)
+- 此模組統一管理工廠內所有設備，**包含 SMT 相關設備**。
+
+## 規則 5.3：通用功能
+- **匯入/匯出**：所有需要資料匯入/匯出的功能，都必須同時支援 Excel 和 CSV 兩種格式，並在前端畫面上提供明確的「匯入」、「匯出」按鈕。
+- **獨立設計**：每個功能模組（如工單、物料、品質）都必須是獨立的 App，不可與其他模組共用 View 或 Model，以保持低耦合。
+
+# 規則 5.4 : 統一日期與時間格式
+- 所有出現日期與時間的欄位與輸出格式，一律使用下列標準格式：
+  - 日期格式： `YYYY-MM-DD`（例如：2025-05-12）
+  - 開始時間： `開始時間 HH:MM`（例如：開始時間 16:00）
+  - 結束時間： `結束時間 HH:MM`（例如：結束時間 18:00）
+- 所有表單、API、Excel/CSV、報表、模板畫面中的日期時間，都必須符合這個格式。
+- 若為時間區間，格式範例如下：
+日期：2025-05-12
+開始時間：16:00
+結束時間：18:00
+
+# 🔐 第六章：安全與設定
+
+## 規則 6.1：設定檔管理
+- **單一設定檔**：整個專案只允許存在一份全局設定檔，即 `mes_config/settings.py`。
+- **敏感資訊**：所有資料庫密碼、API 金鑰、密鑰（Secret Key）等敏感資料，**必須**寫在專案根目錄的 `.env` 檔案中，並由 `settings.py` 讀取。**嚴禁**將任何敏感資訊硬編碼在程式碼中。

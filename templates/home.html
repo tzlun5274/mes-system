@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統首頁" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- 頂部歡迎信息 -->
+    <div class="row">
+        <div class="col-12 text-center">
+            <h2 class="mb-3">{% trans "MES 系統首頁" %}</h2>
+            <div class="alert alert-info" role="alert">
+                {% trans "歡迎使用製造執行系統（MES）！這裡是您的系統總覽，快速查看各模組的關鍵數據和功能入口。" %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 模組導航卡片 -->
+    <h3 class="mb-3">{% trans "模組導航" %}</h3>
+    <div class="row mb-4">
+        <!-- 看板功能 -->
+        <div class="col-md-4 col-lg-3 mb-3">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <h5 class="card-title">{% trans "看板功能" %}</h5>
+                    <p class="card-text">{% trans "查看生產進度、設備狀態、品質數據等看板" %}</p>
+                    <a href="{% url 'kanban:index' %}" class="btn btn-primary">{% trans "進入" %}</a>
+                </div>
+            </div>
+        </div>
+        <!-- 工序管理 -->
+        <div class="col-md-4 col-lg-3 mb-3">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <h5 class="card-title">{% trans "工序管理" %}</h5>
+                    <p class="card-text">{% trans "管理工序步驟和執行進度" %}</p>
+                    <a href="{% url 'process:index' %}" class="btn btn-primary">{% trans "進入" %}</a>
+                </div>
+            </div>
+        </div>
+        <!-- 品質管理 -->
+        <div class="col-md-4 col-lg-3 mb-3">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <h5 class="card-title">{% trans "品質管理" %}</h5>
+                    <p class="card-text">{% trans "監控檢驗記錄和不合格品數據" %}</p>
+                    <a href="{% url 'quality:index' %}" class="btn btn-primary">{% trans "進入" %}</a>
+                </div>
+            </div>
+        </div>
+        <!-- 物料管理 -->
+        <div class="col-md-4 col-lg-3 mb-3">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <h5 class="card-title">{% trans "物料管理" %}</h5>
+                    <p class="card-text">{% trans "查看物料存量和需求" %}</p>
+                    <a href="{% url 'material:index' %}" class="btn btn-primary">{% trans "進入" %}</a>
+                </div>
+            </div>
+        </div>
+
+		<!-- 工單管理 -->
+		{#
+		<div class="col-md-4 col-lg-3 mb-3">
+			<div class="card h-100 text-center">
+				<div class="card-body">
+					<h5 class="card-title">{% trans "工單管理" %}</h5>
+					<p class="card-text">{% trans "管理工單創建和執行進度" %}</p>
+					
+				</div>
+			</div>
+		</div>
+		#}
+
+        <!-- 報表模組 -->
+        <div class="col-md-4 col-lg-3 mb-3">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <h5 class="card-title">{% trans "報表模組" %}</h5>
+                    <p class="card-text">{% trans "生成和查看各種報表數據" %}</p>
+                    <a href="{% url 'reporting:index' %}" class="btn btn-primary">{% trans "進入" %}</a>
+                </div>
+            </div>
+        </div>
+        <!-- 工時單查詢 -->
+        <div class="col-md-4 col-lg-3 mb-3">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <h5 class="card-title">{% trans "工時單查詢" %}</h5>
+                    <p class="card-text">{% trans "查詢和分析製造工時單數據" %}</p>
+                    <a href="{% url 'reporting:manufacturing_workhour_list' %}" class="btn btn-info">{% trans "查詢" %}</a>
+                </div>
+            </div>
+        </div>
+        <!-- 設備管理 -->
+        <div class="col-md-4 col-lg-3 mb-3">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <h5 class="card-title">{% trans "設備管理" %}</h5>
+                    <p class="card-text">{% trans "管理設備信息和運行數據" %}</p>
+                    <a href="{% url 'equip:index' %}" class="btn btn-primary">{% trans "進入" %}</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 數據摘要 -->
+    <h3 class="mb-3">{% trans "數據摘要" %}</h3>
+    <div class="row">
+        <!-- 生產進度摘要 -->
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">{% trans "生產進度" %}</h5>
+                </div>
+                <div class="card-body">
+                    {% for progress in production_progress %}
+                    <div class="mb-3">
+                        <p class="mb-1"><strong>{% trans "工單" %}: {{ progress.work_order_number }}</strong></p>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ progress.progress }}%;" aria-valuenow="{{ progress.progress }}" aria-valuemin="0" aria-valuemax="100">
+                                {{ progress.progress }}%
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p>{% trans "無生產進度數據" %}</p>
+                    {% endfor %}
+                    <a href="{% url 'kanban:production_progress' %}" class="btn btn-sm btn-outline-primary">{% trans "查看更多" %}</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 設備狀態摘要 -->
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">{% trans "設備狀態" %}</h5>
+                </div>
+                <div class="card-body">
+                    {% for equipment in equipment_status %}
+                    <div class="mb-3">
+                        <p class="mb-1"><strong>{{ equipment.equipment_name }} ({{ equipment.line }})</strong></p>
+                        <span class="badge {% if equipment.status == 'running' %}bg-success{% elif equipment.status == 'stopped' %}bg-warning{% else %}bg-danger{% endif %}">
+                            {{ equipment.status }}
+                        </span>
+                    </div>
+                    {% empty %}
+                    <p>{% trans "無設備狀態數據" %}</p>
+                    {% endfor %}
+                    <a href="{% url 'kanban:equipment_status' %}" class="btn btn-sm btn-outline-primary">{% trans "查看更多" %}</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 品質監控摘要 -->
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">{% trans "品質監控" %}</h5>
+                </div>
+                <div class="card-body">
+                    {% for quality in quality_monitoring %}
+                    <div class="mb-3">
+                        <p class="mb-1"><strong>{{ quality.product_name }}</strong></p>
+                        <p class="mb-1">{% trans "不合格率" %}: {{ quality.defect_rate }}%</p>
+                    </div>
+                    {% empty %}
+                    <p>{% trans "無品質監控數據" %}</p>
+                    {% endfor %}
+                    <a href="{% url 'kanban:quality_monitoring' %}" class="btn btn-sm btn-outline-primary">{% trans "查看更多" %}</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}產品產能檢視{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>產品產能檢視</h2>
+    <p>這個頁面可以讓你查詢每個產品的訂單數量、公益路線，並模擬加班或增加並行工序對完工天數的影響。</p>
+    <form id="capacity-form" class="row g-3">
+        <div class="col-md-4">
+            <label for="product" class="form-label">選擇產品</label>
+            <select id="product" name="product" class="form-select">
+                {% for product in products %}
+                <option value="{{ product.id }}">{{ product.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label for="quantity" class="form-label">訂單數量</label>
+            <input type="number" id="quantity" name="quantity" class="form-control" value="100">
+        </div>
+        <div class="col-md-2">
+            <label for="overtime" class="form-label">加班時數/天</label>
+            <input type="number" id="overtime" name="overtime" class="form-control" value="0">
+        </div>
+        <div class="col-md-2">
+            <label for="parallel" class="form-label">並行工序數</label>
+            <input type="number" id="parallel" name="parallel" class="form-control" value="1">
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="button" class="btn btn-primary w-100" id="calc-btn">計算產能</button>
+        </div>
+    </form>
+    <div class="mt-4" id="result-area">
+        <h4>預估結果</h4>
+        <div id="result-content">請輸入參數並點擊「計算產能」</div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+document.getElementById('calc-btn').onclick = function() {
+    const product_id = document.getElementById('product').value;
+    const quantity = document.getElementById('quantity').value;
+    const overtime = document.getElementById('overtime').value;
+    const parallel = document.getElementById('parallel').value;
+    axios.post("{% url 'material:calculate_capacity' %}", {
+        product_id, quantity, overtime, parallel
+    }).then(function(res) {
+        const data = res.data;
+        let html = `<ul>`;
+        data.process_days.forEach(function(p) {
+            html += `<li>${p.process}：${p.hours.toFixed(2)}小時，約${p.days}天</li>`;
+        });
+        html += `</ul><b>總預估完工天數：${data.total_days} 天</b>`;
+        document.getElementById('result-content').innerHTML = html;
+    }).catch(function(err) {
+        document.getElementById('result-content').innerHTML = '計算失敗，請檢查輸入';
+    });
+}
+</script>
+{% endblock %} 

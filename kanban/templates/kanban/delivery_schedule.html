@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "預交貨日看板 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "預交貨日看板" %}</h2>
+    <hr>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "訂單編號" %}</th>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "訂單數量" %}</th>
+                        <th>{% trans "預定交貨日期" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for schedule in delivery_schedule %}
+                    <tr>
+                        <td>{{ schedule.order_number }}</td>
+                        <td>{{ schedule.product_name }}</td>
+                        <td>{{ schedule.quantity }}</td>
+                        <td>{{ schedule.due_date }}</td>
+                        <td>{{ schedule.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">{% trans "無預交貨日數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{% url 'kanban:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

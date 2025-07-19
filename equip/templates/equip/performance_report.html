@@ -1,0 +1,457 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}設備效能報表{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet">
+<style>
+    .metric-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+    .metric-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .performance-table th {
+        background-color: #f8f9fa;
+        border-top: none;
+        font-weight: 600;
+    }
+    
+    .efficiency-high { color: #28a745; }
+    .efficiency-medium { color: #ffc107; }
+    .efficiency-low { color: #dc3545; }
+    
+    .ranking-badge {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+    }
+    .ranking-1 { background: linear-gradient(135deg, #ffd700, #ffed4e); }
+    .ranking-2 { background: linear-gradient(135deg, #c0c0c0, #e5e5e5); }
+    .ranking-3 { background: linear-gradient(135deg, #cd7f32, #daa520); }
+    .ranking-other { background: #6c757d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-chart-line text-primary"></i>
+            設備效能報表
+        </h1>
+        <div>
+            <button class="btn btn-success" onclick="exportReport()">
+                <i class="fas fa-download"></i>
+                匯出報表
+            </button>
+        </div>
+    </div>
+
+    <!-- 篩選器 -->
+    <div class="filter-card">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="start_date" class="form-label">開始日期</label>
+                <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date }}">
+            </div>
+            <div class="col-md-3">
+                <label for="end_date" class="form-label">結束日期</label>
+                <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date }}">
+            </div>
+            <div class="col-md-3">
+                <label for="equipment_id" class="form-label">設備</label>
+                <select name="equipment_id" id="equipment_id" class="form-select">
+                    <option value="">全部設備</option>
+                    {% for equipment in equipments %}
+                    <option value="{{ equipment.id }}" {% if equipment_id == equipment.id|stringformat:"s" %}selected{% endif %}>{{ equipment.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fas fa-search"></i>
+                    查詢
+                </button>
+                <a href="{% url 'equip:performance_report' %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i>
+                    清除
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- 統計指標 -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="metric-value text-primary">
+                            {{ total_runtime|floatformat:1 }}
+                        </div>
+                        <div class="metric-label">總運行時數</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x text-primary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="metric-value text-success">
+                            {{ total_production }}
+                        </div>
+                        <div class="metric-label">總生產數量</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-boxes fa-2x text-success"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="metric-value text-info">
+                            {{ avg_efficiency|floatformat:1 }}%
+                        </div>
+                        <div class="metric-label">平均效率率</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-chart-line fa-2x text-info"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="metric-value text-warning">
+                            {{ total_downtime|floatformat:1 }}
+                        </div>
+                        <div class="metric-label">總停機時數</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-exclamation-triangle fa-2x text-warning"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 設備效能排行 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-trophy text-warning"></i>
+                        設備效能排行
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if equipment_ranking %}
+                    <div class="table-responsive">
+                        <table class="table table-hover performance-table">
+                            <thead>
+                                <tr>
+                                    <th>排名</th>
+                                    <th>設備名稱</th>
+                                    <th>總運行時數</th>
+                                    <th>總生產數量</th>
+                                    <th>平均效率率</th>
+                                    <th>總停機時數</th>
+                                    <th>效能評分</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in equipment_ranking %}
+                                <tr>
+                                    <td>
+                                        <div class="ranking-badge {% if forloop.counter == 1 %}ranking-1{% elif forloop.counter == 2 %}ranking-2{% elif forloop.counter == 3 %}ranking-3{% else %}ranking-other{% endif %}">
+                                            {{ forloop.counter }}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <strong>{{ item.equipment__name }}</strong>
+                                    </td>
+                                    <td>{{ item.total_runtime|floatformat:1 }}小時</td>
+                                    <td>{{ item.total_production }}</td>
+                                    <td>
+                                        <span class="fw-bold {% if item.avg_efficiency >= 90 %}efficiency-high{% elif item.avg_efficiency >= 70 %}efficiency-medium{% else %}efficiency-low{% endif %}">
+                                            {{ item.avg_efficiency|floatformat:1 }}%
+                                        </span>
+                                    </td>
+                                    <td>{{ item.total_downtime|floatformat:1 }}小時</td>
+                                    <td>
+                                        {% if item.avg_efficiency >= 90 %}
+                                        <span class="badge bg-success">優秀</span>
+                                        {% elif item.avg_efficiency >= 70 %}
+                                        <span class="badge bg-warning">良好</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">需改善</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-chart-bar fa-2x mb-2"></i>
+                        <p>目前沒有效能數據</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細效能數據 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-table"></i>
+                        詳細效能數據
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if performances %}
+                    <div class="table-responsive">
+                        <table class="table table-hover performance-table">
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>設備名稱</th>
+                                    <th>運行時數</th>
+                                    <th>生產數量</th>
+                                    <th>每小時產能</th>
+                                    <th>效率率</th>
+                                    <th>不良品數量</th>
+                                    <th>不良率</th>
+                                    <th>停機時數</th>
+                                    <th>能耗(kWh)</th>
+                                    <th>維護成本</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for performance in performances %}
+                                <tr>
+                                    <td>{{ performance.date|date:"Y-m-d" }}</td>
+                                    <td>
+                                        <a href="{% url 'equip:equipment_detail' performance.equipment.id %}" class="text-decoration-none">
+                                            {{ performance.equipment.name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ performance.total_runtime_hours|floatformat:1 }}小時</td>
+                                    <td>{{ performance.total_production_count }}</td>
+                                    <td>{{ performance.actual_capacity_per_hour|floatformat:1 }}</td>
+                                    <td>
+                                        <span class="fw-bold {% if performance.efficiency_rate >= 90 %}efficiency-high{% elif performance.efficiency_rate >= 70 %}efficiency-medium{% else %}efficiency-low{% endif %}">
+                                            {{ performance.efficiency_rate|floatformat:1 }}%
+                                        </span>
+                                    </td>
+                                    <td>{{ performance.defect_count }}</td>
+                                    <td>{{ performance.defect_rate|floatformat:2 }}%</td>
+                                    <td>{{ performance.downtime_hours|floatformat:1 }}小時</td>
+                                    <td>{{ performance.energy_consumption|default:"-" }}</td>
+                                    <td>${{ performance.maintenance_cost|floatformat:2 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 分頁 -->
+                    {% if performances.has_other_pages %}
+                    <div class="d-flex justify-content-center mt-3">
+                        <nav aria-label="效能數據分頁">
+                            <ul class="pagination">
+                                {% if performances.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ performances.previous_page_number }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                </li>
+                                {% endif %}
+                                
+                                {% for num in performances.paginator.page_range %}
+                                {% if performances.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                                {% elif num > performances.number|add:'-3' and num < performances.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}">{{ num }}</a>
+                                </li>
+                                {% endif %}
+                                {% endfor %}
+                                
+                                {% if performances.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ performances.next_page_number }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    </div>
+                    {% endif %}
+                    
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-chart-line fa-2x mb-2"></i>
+                        <p>目前沒有效能數據</p>
+                        <p class="small">請選擇不同的日期範圍或設備</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 效能圖表 -->
+    <div class="row mt-4">
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i>
+                        效率率分布
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="efficiencyChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar"></i>
+                        設備產能比較
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="capacityChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+// 匯出報表功能
+function exportReport() {
+    // 這裡可以添加匯出 Excel 或 PDF 的功能
+    alert('報表匯出功能開發中...');
+}
+
+// 效能圖表
+document.addEventListener('DOMContentLoaded', function() {
+    // 效率率分布圖
+    const efficiencyCtx = document.getElementById('efficiencyChart').getContext('2d');
+    const efficiencyChart = new Chart(efficiencyCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['優秀 (≥90%)', '良好 (70-89%)', '需改善 (<70%)'],
+            datasets: [{
+                data: [30, 45, 25], // 這裡應該從後端獲取實際數據
+                backgroundColor: [
+                    '#28a745',
+                    '#ffc107',
+                    '#dc3545'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // 設備產能比較圖
+    const capacityCtx = document.getElementById('capacityChart').getContext('2d');
+    const capacityChart = new Chart(capacityCtx, {
+        type: 'bar',
+        data: {
+            labels: ['設備A', '設備B', '設備C', '設備D', '設備E'], // 這裡應該從後端獲取實際數據
+            datasets: [{
+                label: '平均每小時產能',
+                data: [120, 95, 150, 80, 110], // 這裡應該從後端獲取實際數據
+                backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '產能 (件/小時)'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+});
+
+// 自動刷新頁面（每10分鐘）
+setInterval(function() {
+    location.reload();
+}, 600000);
+</script>
+{% endblock %} 

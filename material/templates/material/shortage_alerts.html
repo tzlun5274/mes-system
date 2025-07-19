@@ -1,0 +1,529 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}缺料警告管理 - MES 系統{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    .alert-card {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        transition: transform 0.3s ease;
+    }
+    
+    .alert-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .warning-card {
+        background: linear-gradient(135deg, #ffa726 0%, #ff9800 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        transition: transform 0.3s ease;
+    }
+    
+    .warning-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .info-card {
+        background: linear-gradient(135deg, #42a5f5 0%, #1976d2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        transition: transform 0.3s ease;
+    }
+    
+    .info-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .success-card {
+        background: linear-gradient(135deg, #66bb6a 0%, #388e3c 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        transition: transform 0.3s ease;
+    }
+    
+    .success-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .alert-item {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border-left: 4px solid #ff6b6b;
+        transition: all 0.3s ease;
+    }
+    
+    .alert-item:hover {
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    .alert-item.warning {
+        border-left-color: #ffa726;
+    }
+    
+    .alert-item.info {
+        border-left-color: #42a5f5;
+    }
+    
+    .alert-item.success {
+        border-left-color: #66bb6a;
+    }
+    
+    .priority-badge {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-weight: bold;
+    }
+    
+    .priority-critical {
+        background-color: #f44336;
+        color: white;
+    }
+    
+    .priority-high {
+        background-color: #ff9800;
+        color: white;
+    }
+    
+    .priority-medium {
+        background-color: #ffc107;
+        color: black;
+    }
+    
+    .priority-low {
+        background-color: #4caf50;
+        color: white;
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .filter-section {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5 fw-bold text-primary">
+                <i class="bi bi-exclamation-triangle"></i> 缺料警告管理
+            </h1>
+            <p class="lead text-muted">監控和管理物料短缺狀況，確保生產順暢進行</p>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="alert-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">{{ critical_alerts|default:0 }}</div>
+                        <div class="stat-label">緊急警告</div>
+                    </div>
+                    <i class="bi bi-exclamation-triangle-fill fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="warning-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">{{ high_alerts|default:0 }}</div>
+                        <div class="stat-label">高優先級</div>
+                    </div>
+                    <i class="bi bi-exclamation-triangle fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="info-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">{{ medium_alerts|default:0 }}</div>
+                        <div class="stat-label">中優先級</div>
+                    </div>
+                    <i class="bi bi-info-circle fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="success-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">{{ resolved_alerts|default:0 }}</div>
+                        <div class="stat-label">已解決</div>
+                    </div>
+                    <i class="bi bi-check-circle fs-1"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 篩選功能 -->
+    <div class="filter-section">
+        <div class="row">
+            <div class="col-md-3">
+                <label for="priority-filter" class="form-label">優先級篩選</label>
+                <select class="form-select" id="priority-filter">
+                    <option value="">全部優先級</option>
+                    <option value="critical">緊急</option>
+                    <option value="high">高</option>
+                    <option value="medium">中</option>
+                    <option value="low">低</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="status-filter" class="form-label">狀態篩選</label>
+                <select class="form-select" id="status-filter">
+                    <option value="">全部狀態</option>
+                    <option value="active">活動中</option>
+                    <option value="resolved">已解決</option>
+                    <option value="pending">待處理</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="material-filter" class="form-label">材料篩選</label>
+                <input type="text" class="form-control" id="material-filter" placeholder="輸入材料名稱或編號">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button class="btn btn-primary" onclick="applyFilters()">
+                        <i class="bi bi-funnel"></i> 套用篩選
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearFilters()">
+                        <i class="bi bi-x-circle"></i> 清除
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 缺料警告列表 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-list-ul"></i> 缺料警告清單
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if shortage_alerts %}
+                        {% for alert in shortage_alerts %}
+                        <div class="alert-item {% if alert.priority == 'critical' %}alert{% elif alert.priority == 'high' %}warning{% elif alert.priority == 'medium' %}info{% else %}success{% endif %}">
+                            <div class="row align-items-center">
+                                <div class="col-md-2">
+                                    <span class="priority-badge priority-{{ alert.priority }}">
+                                        {% if alert.priority == 'critical' %}緊急
+                                        {% elif alert.priority == 'high' %}高
+                                        {% elif alert.priority == 'medium' %}中
+                                        {% else %}低{% endif %}
+                                    </span>
+                                </div>
+                                <div class="col-md-3">
+                                    <h6 class="mb-1">{{ alert.material_name|default:"未知材料" }}</h6>
+                                    <small class="text-muted">{{ alert.material_code|default:"無編號" }}</small>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="text-center">
+                                        <div class="fw-bold text-danger">{{ alert.shortage_quantity|default:0 }}</div>
+                                        <small class="text-muted">短缺數量</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="text-center">
+                                        <div class="fw-bold">{{ alert.current_stock|default:0 }}</div>
+                                        <small class="text-muted">目前庫存</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="text-center">
+                                        <div class="fw-bold">{{ alert.required_quantity|default:0 }}</div>
+                                        <small class="text-muted">需求數量</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-1">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            <i class="bi bi-three-dots"></i>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" href="#" onclick="viewAlertDetail({{ alert.id }})">
+                                                <i class="bi bi-eye"></i> 查看詳情
+                                            </a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="resolveAlert({{ alert.id }})">
+                                                <i class="bi bi-check-circle"></i> 標記解決
+                                            </a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="createSupplyPlan({{ alert.id }})">
+                                                <i class="bi bi-plus-circle"></i> 建立供應計劃
+                                            </a></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            {% if alert.notes %}
+                            <div class="row mt-2">
+                                <div class="col-12">
+                                    <small class="text-muted">
+                                        <i class="bi bi-chat-text"></i> {{ alert.notes }}
+                                    </small>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+                            <h5 class="mt-3 text-muted">目前沒有缺料警告</h5>
+                            <p class="text-muted">所有材料庫存充足，生產可以正常進行</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="{% url 'material:index' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> 返回物料管理
+            </a>
+            <button class="btn btn-primary" onclick="refreshAlerts()">
+                <i class="bi bi-arrow-clockwise"></i> 重新整理
+            </button>
+            <button class="btn btn-success" onclick="exportAlerts()">
+                <i class="bi bi-download"></i> 匯出報告
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 詳情模態框 -->
+<div class="modal fade" id="alertDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">缺料警告詳情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="alertDetailContent">
+                <!-- 動態載入內容 -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+                <button type="button" class="btn btn-primary" onclick="resolveAlertFromModal()">標記解決</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// 篩選功能
+function applyFilters() {
+    const priority = document.getElementById('priority-filter').value;
+    const status = document.getElementById('status-filter').value;
+    const material = document.getElementById('material-filter').value;
+    
+    // 這裡可以發送 AJAX 請求到後端進行篩選
+    console.log('套用篩選:', { priority, status, material });
+    
+    // 暫時使用前端篩選（實際應該發送 AJAX 請求）
+    filterAlerts(priority, status, material);
+}
+
+function clearFilters() {
+    document.getElementById('priority-filter').value = '';
+    document.getElementById('status-filter').value = '';
+    document.getElementById('material-filter').value = '';
+    
+    // 顯示所有警告
+    showAllAlerts();
+}
+
+function filterAlerts(priority, status, material) {
+    const alerts = document.querySelectorAll('.alert-item');
+    
+    alerts.forEach(alert => {
+        let show = true;
+        
+        // 根據篩選條件決定是否顯示
+        if (priority && !alert.classList.contains(`priority-${priority}`)) {
+            show = false;
+        }
+        
+        if (material) {
+            const materialName = alert.querySelector('h6').textContent.toLowerCase();
+            const materialCode = alert.querySelector('small').textContent.toLowerCase();
+            if (!materialName.includes(material.toLowerCase()) && !materialCode.includes(material.toLowerCase())) {
+                show = false;
+            }
+        }
+        
+        alert.style.display = show ? 'block' : 'none';
+    });
+}
+
+function showAllAlerts() {
+    const alerts = document.querySelectorAll('.alert-item');
+    alerts.forEach(alert => {
+        alert.style.display = 'block';
+    });
+}
+
+// 查看警告詳情
+function viewAlertDetail(alertId) {
+    // 這裡應該發送 AJAX 請求獲取詳細資訊
+    console.log('查看警告詳情:', alertId);
+    
+    // 暫時顯示模擬內容
+    document.getElementById('alertDetailContent').innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>材料資訊</h6>
+                <p><strong>名稱:</strong> 示例材料</p>
+                <p><strong>編號:</strong> MAT001</p>
+                <p><strong>規格:</strong> 標準規格</p>
+            </div>
+            <div class="col-md-6">
+                <h6>庫存資訊</h6>
+                <p><strong>目前庫存:</strong> 100</p>
+                <p><strong>需求數量:</strong> 500</p>
+                <p><strong>短缺數量:</strong> 400</p>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6>影響分析</h6>
+                <p>此材料短缺可能影響以下生產線：</p>
+                <ul>
+                    <li>生產線 A - 預計影響 2 天</li>
+                    <li>生產線 B - 預計影響 1 天</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    new bootstrap.Modal(document.getElementById('alertDetailModal')).show();
+}
+
+// 標記警告為已解決
+function resolveAlert(alertId) {
+    if (confirm('確定要將此警告標記為已解決嗎？')) {
+        // 這裡應該發送 AJAX 請求到後端
+        console.log('標記解決:', alertId);
+        
+        // 暫時隱藏該警告項目
+        const alertElement = document.querySelector(`[data-alert-id="${alertId}"]`);
+        if (alertElement) {
+            alertElement.style.display = 'none';
+        }
+        
+        // 顯示成功訊息
+        showMessage('警告已標記為已解決', 'success');
+    }
+}
+
+function resolveAlertFromModal() {
+    // 從模態框標記解決
+    const modal = bootstrap.Modal.getInstance(document.getElementById('alertDetailModal'));
+    modal.hide();
+    
+    // 這裡應該發送 AJAX 請求
+    showMessage('警告已標記為已解決', 'success');
+}
+
+// 建立供應計劃
+function createSupplyPlan(alertId) {
+    console.log('建立供應計劃:', alertId);
+    
+    // 這裡應該導向供應計劃建立頁面
+    window.location.href = `/material/supply_plan/create/?alert_id=${alertId}`;
+}
+
+// 重新整理警告
+function refreshAlerts() {
+    console.log('重新整理警告');
+    location.reload();
+}
+
+// 匯出報告
+function exportAlerts() {
+    console.log('匯出警告報告');
+    
+    // 這裡應該發送 AJAX 請求匯出 Excel 或 PDF
+    showMessage('報告匯出中，請稍候...', 'info');
+}
+
+// 顯示訊息
+function showMessage(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // 3 秒後自動移除
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.parentNode.removeChild(alertDiv);
+        }
+    }, 3000);
+}
+
+// 頁面載入完成後的初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('缺料警告管理頁面已載入');
+    
+    // 可以添加一些初始化邏輯
+    // 例如：載入預設篩選條件、設定自動重新整理等
+});
+</script>
+{% endblock %} 

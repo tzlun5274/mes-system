@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}MES 系統 - 甘特圖排程{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'scheduling/gantt/dhtmlxgantt.css' %}">
+<style>
+  #gantt_here { width: 100%; height: 600px; }
+  .gantt-container { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #eee; padding: 24px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 gantt-container">
+  <h2>MES 系統 - 甘特圖排程</h2>
+  <div class="mb-3">
+    <button type="button" class="btn btn-secondary me-2" onclick="window.history.back();">返回</button>
+    <a href="{% url 'scheduling:view_schedule' %}" class="btn btn-secondary">返回檢視排程</a>
+  </div>
+  <hr>
+  <div id="gantt_here"></div>
+  <div id="gantt-warning" class="alert alert-danger mt-3 d-none"></div>
+</div>
+<script src="{% static 'scheduling/gantt/dhtmlxgantt.js' %}"></script>
+<script src="{% static 'scheduling/js/gantt.js' %}"></script>
+{% endblock %} 

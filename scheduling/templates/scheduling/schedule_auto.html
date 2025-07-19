@@ -1,0 +1,427 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 全自動排程" %}
+{% endblock title %}
+
+{% block extra_head %}
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<style>
+    .table th, .table td { vertical-align: middle; }
+    .btn-primary, .btn-secondary, .btn-success { font-size: 0.9rem; }
+    
+    .optimization-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .config-section {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+    }
+    
+    .config-section h5 {
+        color: #333;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 8px;
+    }
+    
+    .form-check-input:checked {
+        background-color: #667eea;
+        border-color: #667eea;
+    }
+    
+    .btn-optimized {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: 2.5px solid #764ba2;
+        color: white;
+        padding: 14px 36px;
+        border-radius: 8px;
+        font-weight: 800;
+        font-size: 1.15em;
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.18), 0 1.5px 0 #fff inset;
+        transition: all 0.25s cubic-bezier(.4,2,.6,1);
+        letter-spacing: 1px;
+        outline: none;
+    }
+    
+    .btn-optimized:hover, .btn-optimized:focus {
+        background: linear-gradient(135deg, #7c3aed 0%, #667eea 100%);
+        border-color: #7c3aed;
+        color: #fff;
+        box-shadow: 0 6px 24px rgba(124, 58, 237, 0.25), 0 2px 0 #fff inset;
+        transform: scale(1.04) translateY(-2px);
+        text-shadow: 0 1px 8px #7c3aed;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .stat-item {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 2em;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        font-size: 0.9em;
+        opacity: 0.9;
+    }
+    
+    .progress-container {
+        display: none;
+        margin: 20px 0;
+    }
+    
+    .progress-bar {
+        height: 8px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        transition: width 0.3s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2><i class="fas fa-cogs"></i> {% trans "MES 系統 - 全自動排程" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}danger{% endif %} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% if '產品工藝路線' in message or '請在工序管理中設定產品工藝路線' in message %}
+            <div class="alert alert-info mt-2">
+                <i class="fas fa-info-circle"></i> 如遇「無產品路線，請設定產品路線」錯誤，請至「工序管理」>「產品工藝路線」設定對應產品的工序路線，否則無法自動排程。
+            </div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    <!-- 統計信息 -->
+    <div class="optimization-card">
+        <h4 class="mb-3"><i class="fas fa-chart-bar"></i> 排程統計</h4>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-number">{{ total_orders|default:0 }}</div>
+                <div class="stat-label">有效訂單數</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{ safety_days|default:3 }}</div>
+                <div class="stat-label">安全天數</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">2</div>
+                <div class="stat-label">算法選項</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 排程配置 -->
+    <div class="config-section">
+        <h5><i class="fas fa-sliders-h"></i> 排程配置</h5>
+        <form method="post" id="autoScheduleForm">
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="use_optimized" name="use_optimized" value="true" checked>
+                        <label class="form-check-label" for="use_optimized">
+                            <i class="fas fa-rocket text-primary"></i> 使用優化算法
+                        </label>
+                        <div class="form-text">啟用智能優先級排序和資源優化分配</div>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="clear_old_schedule" name="clear_old_schedule" value="true">
+                        <label class="form-check-label" for="clear_old_schedule">
+                            <i class="fas fa-trash-alt text-danger"></i> 清理舊的排程事件
+                        </label>
+                        <div class="form-text">刪除之前創建的排程事件，避免重複</div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="max_orders" class="form-label">最大訂單數量 (可選)</label>
+                    <input type="number" class="form-control" id="max_orders" name="max_orders" 
+                           value="" min="1" placeholder="留空表示處理所有訂單">
+                    <div class="form-text">限制處理的訂單數量，建議從較小數量開始測試</div>
+                </div>
+            </div>
+            
+            <div class="text-center mt-4">
+                <button type="submit" class="btn btn-optimized">
+                    <i class="fas fa-play"></i> 執行全自動排程
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 進度條 -->
+    <div class="progress-container" id="progressContainer">
+        <div class="progress">
+            <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+        </div>
+        <div class="text-center mt-2">
+            <span id="progressText">準備中...</span>
+        </div>
+    </div>
+
+    <!-- 導航按鈕 -->
+    <div class="config-section">
+        <h5><i class="fas fa-navigation"></i> 導航</h5>
+        <a href="{% url 'scheduling:schedule_management' %}" class="btn btn-secondary me-2">
+            <i class="fas fa-arrow-left"></i> {% trans "返回排程管理" %}
+        </a>
+        <a href="{% url 'scheduling:view_schedule' %}" class="btn btn-info">
+            <i class="fas fa-calendar"></i> {% trans "檢視排程" %}
+        </a>
+    </div>
+
+    <!-- 訂單列表 -->
+    <div class="config-section">
+        <h5><i class="fas fa-list"></i> {% trans "有效訂單列表" %}</h5>
+        {% if orders %}
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>{% trans "公司名稱" %}</th>
+                            <th>{% trans "產品編號" %}</th>
+                            <th>{% trans "產品名稱" %}</th>
+                            <th>{% trans "未出貨數量" %}</th>
+                            <th>{% trans "出貨日期" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                            <tr>
+                                <td>{{ order.company_name|default_if_none:"" }}</td>
+                                <td>{{ order.product_id|default_if_none:"" }}</td>
+                                <td>{{ order.product_name|default_if_none:"" }}</td>
+                                <td>{{ order.qty_remain }}</td>
+                                <td>{{ order.pre_in_date|default_if_none:"" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-muted">{% trans "無有效訂單，請先同步訂單數據。" %}</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 放假日衝突確認模態框 -->
+<div class="modal fade" id="holidayConflictModal" tabindex="-1" aria-labelledby="holidayConflictModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="holidayConflictModalLabel">{% trans "放假日衝突警告" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="holidayConflictMessage"></p>
+                <ul id="holidayConflictList"></ul>
+                <p>{% trans "是否確定要安排這些任務？" %}</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="confirmHolidayBtn">{% trans "確定安排" %}</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "取消" %}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const autoScheduleForm = document.getElementById('autoScheduleForm');
+    const holidayConflictModal = new bootstrap.Modal(document.getElementById('holidayConflictModal'));
+    const holidayConflictMessage = document.getElementById('holidayConflictMessage');
+    const holidayConflictList = document.getElementById('holidayConflictList');
+    const confirmHolidayBtn = document.getElementById('confirmHolidayBtn');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+
+    function getCsrfToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+    }
+
+    function showProgress() {
+        progressContainer.style.display = 'block';
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 10;
+            if (progress > 90) progress = 90;
+            progressBar.style.width = progress + '%';
+            progressText.textContent = `排程中... ${Math.round(progress)}%`;
+        }, 500);
+        return progressInterval;
+    }
+
+    function hideProgress() {
+        progressContainer.style.display = 'none';
+    }
+
+    if (autoScheduleForm) {
+        autoScheduleForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const progressInterval = showProgress();
+            
+            fetch('{% url "scheduling:schedule_auto" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': getCsrfToken() },
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                progressText.textContent = '完成！';
+                
+                setTimeout(() => {
+                    hideProgress();
+                    
+                    if (data.status === 'success' || data.status === 'partial_success') {
+                        let message = data.message;
+                        if (data.algorithm_used) {
+                            message += ` (使用${data.algorithm_used})`;
+                        }
+                        if (data.failed_orders && data.failed_orders.length > 0) {
+                            let failedMsg = '【以下產品未能排程】\n';
+                            let hasRouteHint = false;
+                            let failedHtml = '';
+                            data.failed_orders.forEach(item => {
+                                failedMsg += `產品編號: ${item.product_id}  原因: ${item.reason}`;
+                                if (item.suggestion) failedMsg += `  建議: ${item.suggestion}`;
+                                failedMsg += '\n';
+                                failedHtml += `<div class='mb-2'><b>產品編號:</b> ${item.product_id}<br><b>原因:</b> ${item.reason}<br><b>建議:</b> ${item.suggestion || ''}<br>` +
+                                    `<button class='btn btn-sm btn-warning me-2' onclick='raisePriority("${item.product_id}")'>一鍵調高優先級</button>` +
+                                    `<button class='btn btn-sm btn-info' onclick='simulateAddResource("${item.product_id}")'>模擬增加資源</button></div>`;
+                                if (item.suggestion && item.suggestion.includes('工藝路線')) hasRouteHint = true;
+                            });
+                            message += '\n';
+                            // 顯示可複製區塊與互動按鈕
+                            const modalHtml = `
+                                <div class=\"modal fade\" id=\"failedOrdersModal\" tabindex=\"-1\" aria-labelledby=\"failedOrdersModalLabel\" aria-hidden=\"true\">
+                                  <div class=\"modal-dialog\">
+                                    <div class=\"modal-content\">
+                                      <div class=\"modal-header\">
+                                        <h5 class=\"modal-title\" id=\"failedOrdersModalLabel\">未能排程產品清單</h5>
+                                        <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"modal\" aria-label=\"Close\"></button>
+                                      </div>
+                                      <div class=\"modal-body\">
+                                        <textarea class=\"form-control mb-3\" rows=\"8\" readonly style=\"font-family:monospace;\">${failedMsg}</textarea>
+                                        <div>${failedHtml}</div>
+                                      </div>
+                                      <div class=\"modal-footer\">
+                                        <button type=\"button\" class=\"btn btn-secondary\" data-bs-dismiss=\"modal\">關閉</button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>`;
+                            document.body.insertAdjacentHTML('beforeend', modalHtml);
+                            const failedModal = new bootstrap.Modal(document.getElementById('failedOrdersModal'));
+                            failedModal.show();
+                            // 顯示藍色提示
+                            if (hasRouteHint) {
+                                const infoDiv = document.createElement('div');
+                                infoDiv.className = 'alert alert-info mt-2';
+                                infoDiv.innerHTML = '<i class=\"fas fa-info-circle\"></i> 有產品未設定工藝路線，請至「工序管理」>「產品工藝路線」設定對應產品的工序路線，否則無法自動排程。';
+                                document.querySelector('.container.mt-4').prepend(infoDiv);
+                            }
+                            return; // 不自動跳轉
+                        }
+                        alert(message);
+                        window.location.href = '{% url "scheduling:view_schedule" %}';
+                    } else if (data.status === 'holiday_conflict') {
+                        holidayConflictMessage.textContent = data.message;
+                        holidayConflictList.innerHTML = data.conflicts.map(conflict => 
+                            `<li>{% trans "任務" %} (${conflict.task_start} - ${conflict.task_end}): {% trans "與以下放假日衝突" %}: ${conflict.holiday_title} (${conflict.holiday_start} - ${conflict.holiday_end})</li>`
+                        ).join('');
+                        holidayConflictModal.show();
+
+                        confirmHolidayBtn.onclick = function() {
+                            formData.append('confirm_holiday', 'true');
+                            formData.append('order_id', data.order_id);
+                            const retryProgressInterval = showProgress();
+                            
+                            fetch('{% url "scheduling:schedule_auto" %}', {
+                                method: 'POST',
+                                body: formData,
+                                headers: { 'X-CSRFToken': getCsrfToken() },
+                                credentials: 'include'
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                clearInterval(retryProgressInterval);
+                                hideProgress();
+                                
+                                if (data.status === 'success' || data.status === 'partial_success') {
+                                    alert(data.message);
+                                    window.location.href = '{% url "scheduling:view_schedule" %}';
+                                } else {
+                                    alert('{% trans "提交失敗：" %}' + data.message);
+                                }
+                            })
+                            .catch(error => {
+                                clearInterval(retryProgressInterval);
+                                hideProgress();
+                                alert('{% trans "提交排程失敗，請檢查網絡連接或聯繫管理員。" %}');
+                            });
+                            holidayConflictModal.hide();
+                        };
+                    } else {
+                        alert('{% trans "提交失敗：" %}' + data.message);
+                    }
+                }, 1000);
+            })
+            .catch(error => {
+                clearInterval(progressInterval);
+                hideProgress();
+                alert('{% trans "提交排程失敗，請檢查網絡連接或聯繫管理員。" %}');
+            });
+        });
+    }
+});
+
+function raisePriority(productId) {
+    alert('（示範）已將產品 ' + productId + ' 的所有訂單優先級調高！\n（實際功能請串接後端 API）');
+    // TODO: 可發送 AJAX 請求到後端，批次調高該產品所有訂單的優先級
+}
+function simulateAddResource(productId) {
+    alert('（示範）已模擬為產品 ' + productId + ' 增加資源！\n（實際功能請串接後端資源模擬 API）');
+    // TODO: 可發送 AJAX 請求到後端，模擬增加設備/人員後的排程結果
+}
+</script>
+{% endblock content %}

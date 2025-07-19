@@ -1,0 +1,199 @@
+{# 這個檔案是產線詳細資訊頁面，顯示產線的完整資訊和最近的排程記錄 #}
+{# 使用 Bootstrap 美化，包含詳細資訊表格和排程記錄列表 #}
+
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- 頁面標題 -->
+  <div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">
+      <i class="fas fa-industry"></i> 產線詳細資訊
+    </h1>
+    <div>
+      <a href="{% url 'production:line_edit' production_line.pk %}" class="btn btn-warning btn-sm">
+        <i class="fas fa-edit"></i> 編輯
+      </a>
+      <a href="{% url 'production:line_list' %}" class="btn btn-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i> 返回列表
+      </a>
+    </div>
+  </div>
+
+  <!-- 產線基本資訊 -->
+  <div class="row">
+    <div class="col-lg-8">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-primary">基本資訊</h6>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <table class="table table-borderless">
+                <tr>
+                  <th width="120">產線代號：</th>
+                  <td>{{ production_line.line_code }}</td>
+                </tr>
+                <tr>
+                  <th>產線名稱：</th>
+                  <td>{{ production_line.line_name }}</td>
+                </tr>
+                <tr>
+                  <th>產線類型：</th>
+                  <td>{{ production_line.line_type.type_name }}</td>
+                </tr>
+                <tr>
+                  <th>狀態：</th>
+                  <td>
+                    {% if production_line.is_active %}
+                      <span class="badge bg-success">啟用</span>
+                    {% else %}
+                      <span class="badge bg-secondary">停用</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <table class="table table-borderless">
+                <tr>
+                  <th width="120">工作時間：</th>
+                  <td>{{ production_line.work_start_time|time:"H:i" }} - {{ production_line.work_end_time|time:"H:i" }}</td>
+                </tr>
+                <tr>
+                  <th>午休時間：</th>
+                  <td>
+                    {% if production_line.lunch_start_time and production_line.lunch_end_time %}
+                      {{ production_line.lunch_start_time|time:"H:i" }} - {{ production_line.lunch_end_time|time:"H:i" }}
+                    {% else %}
+                      <span class="text-muted">無午休時間</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <th>加班時間：</th>
+                  <td>
+                    {% if production_line.overtime_start_time and production_line.overtime_end_time %}
+                      {{ production_line.overtime_start_time|time:"H:i" }} - {{ production_line.overtime_end_time|time:"H:i" }}
+                    {% else %}
+                      <span class="text-muted">無加班時間</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <th>工作日：</th>
+                  <td>
+                    {% for day in production_line.get_work_days_list %}
+                      {% if day == '1' %}週一{% elif day == '2' %}週二{% elif day == '3' %}週三{% elif day == '4' %}週四{% elif day == '5' %}週五{% elif day == '6' %}週六{% elif day == '7' %}週日{% endif %}
+                      {% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                  </td>
+                </tr>
+                <tr>
+                  <th>建立時間：</th>
+                  <td>{{ production_line.created_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+          
+          {% if production_line.description %}
+          <div class="mt-3">
+            <h6>描述：</h6>
+            <p class="text-muted">{{ production_line.description }}</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="col-lg-4">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3">
+          <h6 class="m-0 font-weight-bold text-primary">統計資訊</h6>
+        </div>
+        <div class="card-body">
+          <div class="row text-center">
+            <div class="col-6">
+              <div class="border-right">
+                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                  總排程天數
+                </div>
+                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                  {{ recent_schedules.count }}
+                </div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                工作天數
+              </div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">
+                {{ recent_schedules.count }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 最近排程記錄 -->
+  <div class="card shadow mb-4">
+    <div class="card-header py-3">
+      <h6 class="m-0 font-weight-bold text-primary">最近排程記錄</h6>
+    </div>
+    <div class="card-body">
+      {% if recent_schedules %}
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>排程日期</th>
+                <th>工作時間</th>
+                <th>午休時間</th>
+                <th>加班時間</th>
+                <th>是否假日</th>
+                <th>假日原因</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for schedule in recent_schedules %}
+              <tr>
+                <td>{{ schedule.schedule_date|date:"Y-m-d" }}</td>
+                <td>{{ schedule.work_start_time|time:"H:i" }} - {{ schedule.work_end_time|time:"H:i" }}</td>
+                <td>
+                  {% if schedule.lunch_start_time and schedule.lunch_end_time %}
+                    {{ schedule.lunch_start_time|time:"H:i" }} - {{ schedule.lunch_end_time|time:"H:i" }}
+                  {% else %}
+                    <span class="text-muted">無午休時間</span>
+                  {% endif %}
+                </td>
+                <td>{{ schedule.overtime_start_time|time:"H:i" }} - {{ schedule.overtime_end_time|time:"H:i" }}</td>
+                <td>
+                  {% if schedule.is_holiday %}
+                    <span class="badge bg-warning">是</span>
+                  {% else %}
+                    <span class="badge bg-success">否</span>
+                  {% endif %}
+                </td>
+                <td>{{ schedule.holiday_reason|default:"-" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center py-4">
+          <i class="fas fa-calendar fa-3x text-gray-300 mb-3"></i>
+          <h5 class="text-gray-500">尚無排程記錄</h5>
+          <p class="text-gray-400">此產線目前沒有任何排程記錄</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %} 

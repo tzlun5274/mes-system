@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "設備詳情 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "設備詳情" %} - {{ equipment.name }}</h2>
+    <hr>
+    <div class="card">
+        <div class="card-body">
+            <p><strong>設備名稱：</strong> {{ equipment.name }}</p>
+            <p><strong>型號：</strong> {{ equipment.model }}</p>
+            <p><strong>狀態：</strong> {{ equipment.get_status_display }}</p>
+            <p><strong>所屬產線：</strong> {% if equipment.production_line %}{{ equipment.production_line.line_name }} ({{ equipment.production_line.line_code }}){% else %}未指定{% endif %}</p>
+            <p><strong>創建時間：</strong> {{ equipment.created_at|date:"Y-m-d H:i:s" }}</p>
+            <p><strong>更新時間：</strong> {{ equipment.updated_at|date:"Y-m-d H:i:s" }}</p>
+        </div>
+    </div>
+    <div class="mt-4">
+        <a href="{% url 'equip:index' %}" class="btn btn-secondary">返回</a>
+        <a href="{% url 'equip:edit_equipment' equipment.id %}" class="btn btn-primary">編輯</a>
+    </div>
+</div>
+{% endblock %}

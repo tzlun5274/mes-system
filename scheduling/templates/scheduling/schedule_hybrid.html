@@ -1,0 +1,869 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}混合式排程 - MES系統{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'scheduling/css/scheduling.css' %}">
+<style>
+    .hybrid-scheduling-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .group-stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .group-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .group-stat-item {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+    }
+    
+    .group-stat-number {
+        font-size: 2em;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .group-stat-label {
+        font-size: 0.9em;
+        opacity: 0.9;
+    }
+    
+    .scheduling-form {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+    }
+    
+    .form-section {
+        margin-bottom: 25px;
+    }
+    
+    .form-section h4 {
+        color: #333;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 8px;
+    }
+    
+    .checkbox-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .checkbox-item:hover {
+        background: #e9ecef;
+        border-color: #667eea;
+    }
+    
+    .checkbox-item input[type="checkbox"] {
+        transform: scale(1.2);
+    }
+    
+    .form-control {
+        border-radius: 6px;
+        border: 1px solid #ced4da;
+        padding: 10px 15px;
+        transition: border-color 0.3s ease;
+    }
+    
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    
+    .btn-hybrid {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: 2.5px solid #764ba2;
+        color: white;
+        padding: 14px 36px;
+        border-radius: 8px;
+        font-weight: 800;
+        font-size: 1.15em;
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.18), 0 1.5px 0 #fff inset;
+        transition: all 0.25s cubic-bezier(.4,2,.6,1);
+        margin-right: 10px;
+        letter-spacing: 1px;
+        outline: none;
+    }
+    
+    .btn-hybrid:hover, .btn-hybrid:focus {
+        background: linear-gradient(135deg, #7c3aed 0%, #667eea 100%);
+        border-color: #7c3aed;
+        color: #fff;
+        box-shadow: 0 6px 24px rgba(124, 58, 237, 0.25), 0 2px 0 #fff inset;
+        transform: scale(1.04) translateY(-2px);
+        text-shadow: 0 1px 8px #7c3aed;
+    }
+    
+    .btn-preview {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        border: 2.5px solid #20c997;
+        color: white;
+        padding: 14px 36px;
+        border-radius: 8px;
+        font-weight: 800;
+        font-size: 1.15em;
+        box-shadow: 0 4px 16px rgba(40, 167, 69, 0.18), 0 1.5px 0 #fff inset;
+        transition: all 0.25s cubic-bezier(.4,2,.6,1);
+        letter-spacing: 1px;
+        outline: none;
+    }
+    
+    .btn-preview:hover, .btn-preview:focus {
+        background: linear-gradient(135deg, #10b981 0%, #28a745 100%);
+        border-color: #10b981;
+        color: #fff;
+        box-shadow: 0 6px 24px rgba(16, 185, 129, 0.25), 0 2px 0 #fff inset;
+        transform: scale(1.04) translateY(-2px);
+        text-shadow: 0 1px 8px #10b981;
+    }
+    
+    .btn-view-schedule {
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        border: 2.5px solid #138496;
+        color: white;
+        padding: 14px 36px;
+        border-radius: 8px;
+        font-weight: 800;
+        font-size: 1.15em;
+        box-shadow: 0 4px 16px rgba(23, 162, 184, 0.18), 0 1.5px 0 #fff inset;
+        transition: all 0.25s cubic-bezier(.4,2,.6,1);
+        margin-left: 10px;
+        letter-spacing: 1px;
+        outline: none;
+    }
+    
+    .btn-view-schedule:hover, .btn-view-schedule:focus {
+        background: linear-gradient(135deg, #20e3b2 0%, #17a2b8 100%);
+        border-color: #20e3b2;
+        color: #fff;
+        box-shadow: 0 6px 24px rgba(32, 227, 178, 0.25), 0 2px 0 #fff inset;
+        transform: scale(1.04) translateY(-2px);
+        text-shadow: 0 1px 8px #20e3b2;
+    }
+    
+    .progress-container {
+        display: none;
+        margin: 20px 0;
+    }
+    
+    .progress-bar {
+        height: 8px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        transition: width 0.3s ease;
+    }
+    
+    .result-container {
+        display: none;
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-top: 20px;
+    }
+    
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .stat-item {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+        border-left: 4px solid #667eea;
+    }
+    
+    .stat-number {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #667eea;
+    }
+    
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9em;
+        margin-top: 5px;
+    }
+    
+    .alert {
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border: none;
+    }
+    
+    .alert-success {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        color: #155724;
+        border-left: 4px solid #28a745;
+    }
+    
+    .alert-danger {
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        color: #721c24;
+        border-left: 4px solid #dc3545;
+    }
+    
+    .alert-warning {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        color: #856404;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .preview-container {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .task-preview {
+        background: white;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-left: 4px solid #667eea;
+    }
+    
+    .task-title {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 8px;
+    }
+    
+    .task-details {
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    
+    .result-actions {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #dee2e6;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hybrid-scheduling-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-cogs"></i> 混合式排程</h2>
+        <div>
+            <button type="button" class="btn btn-outline-info" onclick="showHelp()">
+                <i class="fas fa-question-circle"></i> 說明
+            </button>
+        </div>
+    </div>
+
+    <!-- 訂單統計 -->
+    <div class="group-stats-card">
+        <h4 class="mb-3"><i class="fas fa-chart-bar"></i> 訂單分組統計</h4>
+        <div class="group-stats-grid">
+            <div class="group-stat-item">
+                <div class="group-stat-number">{{ group_stats.urgent.count|default:0 }}</div>
+                <div class="group-stat-label">緊急訂單<br><small>(交貨期 ≤ 7天)</small></div>
+            </div>
+            <div class="group-stat-item">
+                <div class="group-stat-number">{{ group_stats.normal.count|default:0 }}</div>
+                <div class="group-stat-label">一般訂單<br><small>(交貨期 7-30天)</small></div>
+            </div>
+            <div class="group-stat-item">
+                <div class="group-stat-number">{{ group_stats.flexible.count|default:0 }}</div>
+                <div class="group-stat-label">靈活訂單<br><small>(交貨期 > 30天)</small></div>
+            </div>
+            <div class="group-stat-item">
+                <div class="group-stat-number">{{ total_orders }}</div>
+                <div class="group-stat-label">總訂單數</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計卡片下方：訂單預覽表格 -->
+    <div class="card mb-4">
+        <div class="card-header bg-gradient text-white" style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);">
+            <i class="fas fa-list"></i> 本次排程訂單預覽
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>分組</th>
+                        <th>公司</th>
+                        <th>產品編號</th>
+                        <th>產品名稱</th>
+                        <th>未交貨數量</th>
+                        <th>預交貨日</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group, group_orders in group_orders.items %}
+                        {% for order in group_orders %}
+                        <tr style="background: {% if group == 'urgent' %}#fff3cd{% elif group == 'normal' %}#e3f2fd{% else %}#e8f5e9{% endif %};">
+                            <td><i class="fas {% if group == 'urgent' %}fa-bolt text-warning{% elif group == 'normal' %}fa-clock text-info{% else %}fa-leaf text-success{% endif %}"></i> 
+                                {% if group == 'urgent' %}緊急訂單{% elif group == 'normal' %}一般訂單{% else %}彈性訂單{% endif %}
+                            </td>
+                            <td>{{ order.company_name }}</td>
+                            <td>{{ order.product_id }}</td>
+                            <td>{{ order.product_name }}</td>
+                            <td>{{ order.qty_remain }}</td>
+                            <td>{{ order.pre_in_date }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% empty %}
+                        <tr><td colspan="6" class="text-center text-muted">無訂單</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <!-- 總訂單數移到這裡 -->
+    <div class="text-end text-secondary mb-4" style="font-size:1.1em;">
+        總訂單數：{{ total_orders }}
+    </div>
+
+    <!-- 排程表單 -->
+    <div class="scheduling-form">
+        <form id="hybridSchedulingForm">
+            {% csrf_token %}
+            <div class="form-section">
+                <h4><i class="fas fa-filter"></i> 訂單選擇</h4>
+                <div class="checkbox-group">
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="include_urgent" value="true" checked>
+                        <span>包含緊急訂單</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="include_normal" value="true" checked>
+                        <span>包含一般訂單</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="include_flexible" value="true" checked>
+                        <span>包含靈活訂單</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4><i class="fas fa-sliders-h"></i> 排程參數</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label for="max_orders" class="form-label">最大訂單數量 (可選)</label>
+                        <input type="number" class="form-control" id="max_orders" name="max_orders" 
+                               value="" min="1" placeholder="留空表示處理所有訂單">
+                        <div class="form-text">留空將處理所有符合條件的訂單，設置數值可限制處理數量</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" id="clear_old_schedule" name="clear_old_schedule" value="true">
+                            <label class="form-check-label" for="clear_old_schedule">
+                                <i class="fas fa-trash-alt text-danger"></i> 清理舊的混合排程
+                            </label>
+                            <div class="form-text">勾選後會刪除之前創建的混合排程事件，避免重複排程</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4><i class="fas fa-info-circle"></i> 系統資源</h4>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="stat-item">
+                            <div class="stat-number">{{ processes_count }}</div>
+                            <div class="stat-label">工序</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-item">
+                            <div class="stat-number">{{ operators_count }}</div>
+                            <div class="stat-label">作業員</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-item">
+                            <div class="stat-number">{{ equipments_count }}</div>
+                            <div class="stat-label">設備</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <button type="button" class="btn btn-preview" onclick="previewSchedule()">
+                    <i class="fas fa-eye"></i> 預覽排程
+                </button>
+                <button type="submit" class="btn btn-hybrid">
+                    <i class="fas fa-play"></i> 開始混合排程
+                </button>
+                <!-- 新增：一鍵自動優化按鈕 -->
+                <button type="button" class="btn btn-success ms-2" id="btnAutoOptimize">
+                    <i class="fas fa-magic"></i> 一鍵自動優化
+                </button>
+                <span class="ms-2 text-muted">（自動減少所有衝突，讓排程更完美）</span>
+            </div>
+            <!-- 優化結果顯示區塊，會由 JS 動態更新 -->
+            <div id="autoOptimizeResult" class="mt-4"></div>
+        </form>
+    </div>
+
+    <!-- 進度條動畫 -->
+    <div class="progress-container" id="progressContainer" style="display:none;">
+        <div class="progress-bar" id="progressBar" style="width:0%"></div>
+        <div class="text-center mt-2" id="progressText">排程執行中...</div>
+    </div>
+
+    <!-- 預覽結果 -->
+    <div class="preview-container" id="previewContainer" style="display: none;">
+        <h5><i class="fas fa-eye"></i> 排程預覽</h5>
+        <div id="previewContent"></div>
+    </div>
+
+    <!-- 排程結果甘特圖（條狀圖模擬） -->
+    <div class="result-container" id="resultContainer" style="display:none;">
+        <h5><i class="fas fa-chart-bar text-success"></i> 排程結果預覽</h5>
+        <div id="ganttChart" style="overflow-x:auto;"></div>
+        <div id="resultContent"></div>
+        <div class="result-actions mt-4 text-center">
+            <a href="/scheduling/view_schedule/" class="btn btn-view-schedule" id="viewScheduleBtn">
+                <i class="fas fa-calendar-alt"></i> 檢視排程事件
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 說明模態框 -->
+<div class="modal fade" id="helpModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-question-circle"></i> 混合式排程說明</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6>什麼是混合式排程？</h6>
+                <p>混合式排程結合了全局排程和順序排程的優點，通過以下步驟實現：</p>
+                <ol>
+                    <li><strong>訂單分組</strong>：按交貨期將訂單分為緊急、一般、靈活三組</li>
+                    <li><strong>組內全局排程</strong>：對每個組內的訂單進行全局優化</li>
+                    <li><strong>組間順序排程</strong>：按組優先級順序進行排程</li>
+                </ol>
+                
+                <h6>優勢</h6>
+                <ul>
+                    <li>平衡排程效率與優化效果</li>
+                    <li>確保緊急訂單優先處理</li>
+                    <li>減少計算複雜度</li>
+                    <li>提供靈活的訂單選擇</li>
+                </ul>
+                
+                <h6>使用建議</h6>
+                <ul>
+                    <li>緊急訂單：建議包含，確保及時交貨</li>
+                    <li>一般訂單：可根據產能情況調整</li>
+                    <li>靈活訂單：可選擇性包含</li>
+                    <li>訂單數量：建議從較小數量開始測試</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'scheduling/js/scheduling.js' %}"></script>
+<script>
+let isProcessing = false;
+
+function showHelp() {
+    new bootstrap.Modal(document.getElementById('helpModal')).show();
+}
+
+function previewSchedule() {
+    if (isProcessing) return;
+    
+    const formData = new FormData(document.getElementById('hybridSchedulingForm'));
+    const params = new URLSearchParams();
+    
+    for (let [key, value] of formData.entries()) {
+        params.append(key, value);
+    }
+    
+    fetch(`/scheduling/hybrid/preview/?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                displayPreview(data.preview_data);
+            } else {
+                showAlert('預覽失敗: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('預覽錯誤:', error);
+            showAlert('預覽請求失敗', 'danger');
+        });
+}
+
+function displayPreview(previewData) {
+    const container = document.getElementById('previewContainer');
+    const content = document.getElementById('previewContent');
+    
+    let html = `
+        <div class="row">
+            <div class="col-md-4">
+                <div class="stat-item">
+                    <div class="stat-number">${previewData.tasks_count}</div>
+                    <div class="stat-label">預估任務數</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-item">
+                    <div class="stat-number">${previewData.orders_count}</div>
+                    <div class="stat-label">參與訂單數</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-item">
+                    <div class="stat-number">${previewData.statistics.total_orders || 0}</div>
+                    <div class="stat-label">實際訂單數</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (previewData.sample_tasks.length > 0) {
+        html += '<h6 class="mt-3">任務預覽：</h6>';
+        previewData.sample_tasks.forEach(task => {
+            html += `
+                <div class="task-preview">
+                    <div class="task-title">${task.process.name} - 訂單 ${task.order_id}</div>
+                    <div class="task-details">
+                        時間: ${task.start_time} ~ ${task.end_time}<br>
+                        作業員: ${task.selected_operator ? task.selected_operator.name : '未分配'}<br>
+                        設備: ${task.selected_equipment ? task.selected_equipment.name : '未分配'}
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    content.innerHTML = html;
+    container.style.display = 'block';
+}
+
+document.getElementById('hybridSchedulingForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (isProcessing) return;
+    
+    isProcessing = true;
+    const formData = new FormData(this);
+    
+    // 顯示進度條
+    document.getElementById('progressContainer').style.display = 'block';
+    document.getElementById('resultContainer').style.display = 'none';
+    document.getElementById('previewContainer').style.display = 'none';
+    
+    // 隱藏檢視排程按鈕
+    const viewButton = document.querySelector('.btn-view-schedule');
+    if (viewButton) {
+        viewButton.style.display = 'none';
+    }
+    
+    // 模擬進度更新
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 10;
+        if (progress > 90) progress = 90;
+        document.getElementById('progressBar').style.width = progress + '%';
+        document.getElementById('progressText').textContent = `排程中... ${Math.round(progress)}%`;
+    }, 500);
+    
+    fetch('/scheduling/hybrid/', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        clearInterval(progressInterval);
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('progressText').textContent = '完成！';
+        
+        setTimeout(() => {
+            document.getElementById('progressContainer').style.display = 'none';
+            
+            if (data.status === 'success') {
+                displayResult(data);
+                showAlert(data.message, 'success');
+            } else if (data.status === 'partial_success' && data.failed_orders && data.failed_orders.length > 0) {
+                // 顯示可複製失敗產品清單與互動按鈕
+                let failedMsg = '【以下產品未能排程】\n';
+                let hasRouteHint = false;
+                let failedHtml = '';
+                data.failed_orders.forEach(item => {
+                    failedMsg += `產品編號: ${item.product_id}  原因: ${item.reason}`;
+                    if (item.suggestion) failedMsg += `  建議: ${item.suggestion}`;
+                    failedMsg += '\n';
+                    failedHtml += `<div class='mb-2'><b>產品編號:</b> ${item.product_id}<br><b>原因:</b> ${item.reason}<br><b>建議:</b> ${item.suggestion || ''}<br>` +
+                        `<button class='btn btn-sm btn-warning me-2' onclick='raisePriority("${item.product_id}")'>一鍵調高優先級</button>` +
+                        `<button class='btn btn-sm btn-info' onclick='simulateAddResource("${item.product_id}")'>模擬增加資源</button></div>`;
+                    if (item.suggestion && item.suggestion.includes('工藝路線')) hasRouteHint = true;
+                });
+                const modalHtml = `
+                    <div class=\"modal fade\" id=\"failedOrdersModal\" tabindex=\"-1\" aria-labelledby=\"failedOrdersModalLabel\" aria-hidden=\"true\">
+                      <div class=\"modal-dialog\">
+                        <div class=\"modal-content\">
+                          <div class=\"modal-header\">
+                            <h5 class=\"modal-title\" id=\"failedOrdersModalLabel\">未能排程產品清單</h5>
+                            <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"modal\" aria-label=\"Close\"></button>
+                          </div>
+                          <div class=\"modal-body\">
+                            <textarea class=\"form-control mb-3\" rows=\"8\" readonly style=\"font-family:monospace;\">${failedMsg}</textarea>
+                            <div>${failedHtml}</div>
+                          </div>
+                          <div class=\"modal-footer\">
+                            <button type=\"button\" class=\"btn btn-secondary\" data-bs-dismiss=\"modal\">關閉</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>`;
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                const failedModal = new bootstrap.Modal(document.getElementById('failedOrdersModal'));
+                failedModal.show();
+                if (hasRouteHint) {
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'alert alert-info mt-2';
+                    infoDiv.innerHTML = '<i class=\"fas fa-info-circle\"></i> 有產品未設定工藝路線，請至「工序管理」>「產品工藝路線」設定對應產品的工序路線，否則無法自動排程。';
+                    document.querySelector('.hybrid-scheduling-container').prepend(infoDiv);
+                }
+                isProcessing = false;
+                return;
+            } else {
+                showAlert(data.message, 'danger');
+            }
+            
+            isProcessing = false;
+        }, 1000);
+    })
+    .catch(error => {
+        clearInterval(progressInterval);
+        document.getElementById('progressContainer').style.display = 'none';
+        console.error('排程錯誤:', error);
+        showAlert('排程請求失敗', 'danger');
+        isProcessing = false;
+    });
+});
+
+function displayResult(data) {
+    const container = document.getElementById('resultContainer');
+    const content = document.getElementById('resultContent');
+    
+    let html = `
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> ${data.message}
+        </div>
+    `;
+    
+    // 顯示清理信息
+    if (data.clear_old_schedule && data.deleted_events_count > 0) {
+        html += `
+            <div class="alert alert-info">
+                <i class="fas fa-trash-alt"></i> 
+                已清理 ${data.deleted_events_count} 個舊的混合排程事件
+            </div>
+        `;
+    }
+    
+    html += `
+        <div class="stat-grid">
+            <div class="stat-item">
+                <div class="stat-number">${data.statistics.total_tasks}</div>
+                <div class="stat-label">總任務數</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">${data.statistics.total_orders}</div>
+                <div class="stat-label">總訂單數</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">${data.created_events_count}</div>
+                <div class="stat-label">創建事件數</div>
+            </div>
+        </div>
+    `;
+    
+    if (data.statistics.group_statistics) {
+        html += '<h6>分組統計：</h6><div class="row">';
+        for (const [groupName, stats] of Object.entries(data.statistics.group_statistics)) {
+            html += `
+                <div class="col-md-4">
+                    <div class="stat-item">
+                        <div class="stat-number">${stats.count}</div>
+                        <div class="stat-label">${groupName}</div>
+                        <small class="text-muted">${stats.total_duration.toFixed(1)} 小時</small>
+                    </div>
+                </div>
+            `;
+        }
+        html += '</div>';
+    }
+    
+    if (data.validation_errors && data.validation_errors.length > 0) {
+        html += `
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle"></i> 
+                發現 ${data.validation_errors.length} 個驗證警告，請檢查排程結果
+            </div>
+        `;
+    }
+    
+    content.innerHTML = html;
+    container.style.display = 'block';
+    
+    // 顯示檢視排程按鈕
+    const viewButton = container.querySelector('.btn-view-schedule');
+    if (viewButton) {
+        viewButton.style.display = 'inline-block';
+        viewButton.onclick = function() {
+            // 跳轉到日曆視圖
+            window.location.href = '/scheduling/calendar/';
+        };
+    }
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.querySelector('.hybrid-scheduling-container').insertBefore(
+        alertDiv, 
+        document.querySelector('.group-stats-card')
+    );
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+// 分組訂單資料（需後端 context 提供 group_orders: {'urgent': [...], 'normal': [...], 'flexible': [...]})
+// 進度條動畫
+function showProgressBar() {
+    document.getElementById('progressContainer').style.display = '';
+    let bar = document.getElementById('progressBar');
+    let text = document.getElementById('progressText');
+    bar.style.width = '0%';
+    let percent = 0;
+    let interval = setInterval(function() {
+        percent += Math.random() * 10;
+        if (percent >= 100) {
+            percent = 100;
+            clearInterval(interval);
+            text.innerText = '排程完成！';
+        }
+        bar.style.width = percent + '%';
+    }, 200);
+}
+// 排程完成後顯示甘特圖
+function showGanttChart(tasks) {
+    let container = document.getElementById('ganttChart');
+    container.innerHTML = '';
+    if (!tasks || tasks.length === 0) {
+        container.innerHTML = '<div class="text-muted">無任務資料</div>';
+        return;
+    }
+    let minStart = Math.min(...tasks.map(t => new Date(t.start_time).getTime()));
+    let maxEnd = Math.max(...tasks.map(t => new Date(t.end_time).getTime()));
+    let totalMs = maxEnd - minStart;
+    tasks.forEach(function(task) {
+        let left = ((new Date(task.start_time).getTime() - minStart) / totalMs) * 100;
+        let width = ((new Date(task.end_time).getTime() - new Date(task.start_time).getTime()) / totalMs) * 100;
+        let color = '#667eea';
+        if (task.group_name === 'urgent') color = '#ffc107';
+        else if (task.group_name === 'normal') color = '#17a2b8';
+        else if (task.group_name === 'flexible') color = '#28a745';
+        let bar = document.createElement('div');
+        bar.style.position = 'relative';
+        bar.style.height = '32px';
+        bar.style.marginBottom = '8px';
+        bar.innerHTML = `<span style='position:absolute;left:0;top:0;font-size:0.9em;'>${task.process_name} (${task.group_name})</span>`;
+        let barInner = document.createElement('div');
+        barInner.style.position = 'absolute';
+        barInner.style.left = left + '%';
+        barInner.style.width = width + '%';
+        barInner.style.height = '100%';
+        barInner.style.background = color;
+        barInner.style.borderRadius = '6px';
+        barInner.style.opacity = '0.85';
+        barInner.title = `${task.process_name} (${task.group_name})\n${task.start_time} ~ ${task.end_time}`;
+        bar.appendChild(barInner);
+        container.appendChild(bar);
+    });
+}
+// 提交時觸發動畫與結果顯示（需配合後端回傳 tasks）
+function onScheduleSubmit(tasks) {
+    showProgressBar();
+    setTimeout(function() {
+        document.getElementById('progressContainer').style.display = 'none';
+        document.getElementById('resultContainer').style.display = '';
+        showGanttChart(tasks);
+    }, 3000);
+}
+
+function raisePriority(productId) {
+    alert('（示範）已將產品 ' + productId + ' 的所有訂單優先級調高！\n（實際功能請串接後端 API）');
+    // TODO: 可發送 AJAX 請求到後端，批次調高該產品所有訂單的優先級
+}
+function simulateAddResource(productId) {
+    alert('（示範）已模擬為產品 ' + productId + ' 增加資源！\n（實際功能請串接後端資源模擬 API）');
+    // TODO: 可發送 AJAX 請求到後端，模擬增加設備/人員後的排程結果
+}
+</script>
+{% endblock %} 

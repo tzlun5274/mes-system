@@ -1,0 +1,6 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+專案使用 Django 建立，所有設計方案必須嚴格按照 Django 的規範實行跟設計。

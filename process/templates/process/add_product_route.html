@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 添加產品工藝路線" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 添加產品工藝路線" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% elif message.tags == 'info' %}info{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="post" id="productRouteForm">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="product_id" class="form-label">{% trans "產品編號" %}</label>
+                    <input type="text" class="form-control" id="product_id" name="product_id" value="{{ product_id|default_if_none:'' }}" required>
+                </div>
+                <div id="routeFields">
+                    <div class="route-entry mb-3">
+                        <div class="row">
+                            <input type="hidden" name="route_id[]" value="">
+                            <div class="col-md-2">
+                                <label for="process_name_0" class="form-label">{% trans "工序名稱" %}</label>
+                                <select class="form-control process-name" id="process_name_0" name="process_name[]" required>
+                                    <option value="">{% trans "選擇工序" %}</option>
+                                    {% for process in process_names %}
+                                        <option value="{{ process.id }}">{{ process.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="step_order_0" class="form-label">{% trans "工序順序" %}</label>
+                                <input type="number" class="form-control step-order" id="step_order_0" name="step_order[]" min="1" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="usable_equipment_ids_0" class="form-label">{% trans "指定可用設備" %}</label>
+                                <select multiple class="form-control usable-equipment" id="usable_equipment_ids_0" name="usable_equipment_ids_0[]">
+                                    {% for equip in equipments %}
+                                        <option value="{{ equip.id }}">{{ equip.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="dependent_semi_product_0" class="form-label">{% trans "依賴半成品" %}</label>
+                                <select class="form-control dependent-semi-product" id="dependent_semi_product_0" name="dependent_semi_product[]">
+                                    <option value="">{% trans "無" %}</option>
+                                    {% for psp in psp_product_ids %}
+                                        <option value="{{ psp.product_id }}">{{ psp.product_id }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="button" class="btn btn-danger remove-route-btn">{% trans "移除" %}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary mb-3" id="addRouteBtn">{% trans "添加更多工序" %}</button>
+                <button type="submit" class="btn btn-primary">{% trans "提交" %}</button>
+                <a href="{% url 'process:product_routes' %}" class="btn btn-secondary">{% trans "取消" %}</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM fully loaded, initializing add_product_route script');
+
+    let routeIndex = 1;
+
+    function checkStepOrderDuplicates() {
+        console.log('checkStepOrderDuplicates called');
+        const stepOrders = document.querySelectorAll('.step-order');
+        const values = Array.from(stepOrders).map(input => input.value.trim());
+        const uniqueValues = new Set(values.filter(v => v));
+        const submitButton = document.querySelector('button[type="submit"]');
+        if (uniqueValues.size !== values.filter(v => v).length) {
+            submitButton.disabled = true;
+            alert('工序順序不能重複，請檢查！');
+        } else {
+            submitButton.disabled = false;
+        }
+    }
+
+    // 添加更多工序
+    const addRouteBtn = document.getElementById('addRouteBtn');
+    if (addRouteBtn) {
+        addRouteBtn.addEventListener('click', function() {
+            const routeFields = document.getElementById('routeFields');
+            const newRouteDiv = document.createElement('div');
+            newRouteDiv.className = 'route-entry mb-3';
+            newRouteDiv.innerHTML = `
+                <div class="row">
+                    <input type="hidden" name="route_id[]" value="">
+                    <div class="col-md-2">
+                        <label for="process_name_${routeIndex}" class="form-label">{% trans "工序名稱" %}</label>
+                        <select class="form-control process-name" id="process_name_${routeIndex}" name="process_name[]" required>
+                            <option value="">{% trans "選擇工序" %}</option>
+                            {% for process in process_names %}
+                                <option value="{{ process.id }}">{{ process.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="step_order_${routeIndex}" class="form-label">{% trans "工序順序" %}</label>
+                        <input type="number" class="form-control step-order" id="step_order_${routeIndex}" name="step_order[]" min="1" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="usable_equipment_ids_${routeIndex}" class="form-label">{% trans "指定可用設備" %}</label>
+                        <select multiple class="form-control usable-equipment" id="usable_equipment_ids_${routeIndex}" name="usable_equipment_ids_${routeIndex}[]">
+                            {% for equip in equipments %}
+                                <option value="{{ equip.id }}">{{ equip.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="dependent_semi_product_${routeIndex}" class="form-label">{% trans "依賴半成品" %}</label>
+                        <select class="form-control dependent-semi-product" id="dependent_semi_product_${routeIndex}" name="dependent_semi_product[]">
+                            <option value="">{% trans "無" %}</option>
+                            {% for psp in psp_product_ids %}
+                                <option value="{{ psp.product_id }}">{{ psp.product_id }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="button" class="btn btn-danger remove-route-btn">{% trans "移除" %}</button>
+                    </div>
+                </div>
+            `;
+            routeFields.appendChild(newRouteDiv);
+            const newSelect = newRouteDiv.querySelector('.process-name');
+            const newStepOrder = newRouteDiv.querySelector('.step-order');
+            const newRemoveBtn = newRouteDiv.querySelector('.remove-route-btn');
+            newRemoveBtn.addEventListener('click', function() {
+                newRouteDiv.remove();
+                checkStepOrderDuplicates();
+            });
+            routeIndex++;
+            checkStepOrderDuplicates();
+        });
+    }
+
+    // 移除工序
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-route-btn')) {
+            e.target.closest('.route-entry').remove();
+            checkStepOrderDuplicates();
+        }
+    });
+
+    // 表單提交前驗證
+    document.getElementById('productRouteForm').addEventListener('submit', function(e) {
+        console.log('表單提交，驗證資料');
+        const processNames = document.querySelectorAll('.process-name');
+        const stepOrders = document.querySelectorAll('.step-order');
+        if (processNames.length !== stepOrders.length) {
+            e.preventDefault();
+            alert('工序名稱和工序順序不匹配！');
+            return;
+        }
+        for (let i = 0; i < processNames.length; i++) {
+            if (!processNames[i].value) {
+                e.preventDefault();
+                alert(`工序 ${i+1} 的工序名稱不能為空！`);
+                return;
+            }
+            if (!stepOrders[i].value || stepOrders[i].value.trim() === '') {
+                e.preventDefault();
+                alert(`工序 ${i+1} 的工序順序不能為空！`);
+                return;
+            }
+        }
+    });
+});
+</script>
+<style>
+.usable-equipment {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+}
+.usable-equipment option:checked {
+    background-color: #007bff;
+    color: white;
+}
+</style>
+{% endblock %}

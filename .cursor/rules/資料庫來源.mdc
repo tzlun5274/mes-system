@@ -1,0 +1,114 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+1. 客戶資料表 (comCustomer)
+表名: comCustomer
+
+關鍵欄位:
+
+ID (客戶編號)
+
+ShortName (客戶簡稱)
+
+2. 國內訂單表頭 (ordBillMain)
+表名: ordBillMain
+
+關鍵欄位:
+
+BillNO (單號)
+
+CustomerID (客戶編號): 應參考 comCustomer.ID。
+
+BillStatus (單況): 預期值為 0 表示「未結案」。
+
+BillDate (單號日期)
+
+3. 國內訂單表身 (ordBillSub)
+表名: ordBillSub
+
+關鍵欄位:
+
+BillNO (單號): 應參考 ordBillMain.BillNO。
+
+CustomerID (客戶編號): 應參考 comCustomer.ID。
+
+ProdID (產品編號)
+
+ProdName (產品名稱)
+
+Quantity (訂購數量)
+
+PreInDate (預交貨日期)
+
+QtyRemain (未出數量)
+
+BillDate (單號日期)
+
+4. 國外訂單表頭 (TraBillMain)
+表名: TraBillMain
+
+關鍵欄位:
+
+BillNo (單號)
+
+CustID (客戶編號): 應參考 comCustomer.ID。
+
+BillStatus (單況): 預期值為 0 或「空白」表示「未結案」。
+
+BillDate (單號日期)
+
+5. 國外訂單表身 (TraBillSub)
+表名: TraBillSub
+
+關鍵欄位:
+
+BillNo (單號): 應參考 TraBillMain.BillNo。
+
+ItemNo (產品編號)
+
+Description (產品名稱)
+
+Quantity (訂購數量)
+
+OnBoardDay (預交貨日期)
+
+QtyRemainQtyRemain (未交貨數量)
+
+BillDate (單號日期)
+
+6. 生產管理製令表頭 (prdMKOrdMain)
+表名: prdMKOrdMain
+
+關鍵欄位:
+
+製令單號 (通常是主鍵或唯一識別碼)
+
+產品編號
+
+訂單單號 (可能參考 ordBillMain.BillNO 或 TraBillMain.BillNo)
+
+預計開工日期
+
+預計完工日期
+
+製令狀態 (例如：已開立、生產中、已完工等)
+
+7. 生產管理製令表身 (prdMkOrdMats)
+表名: prdMkOrdMats
+
+關鍵欄位:
+
+製令單號 (應參考 prdMKOrdMain.製令單號)
+
+料件編號 (構成產品的材料)
+
+需求數量
+
+領料數量
+
+單位
+
+參考 CompanyConfig
+要查詢 CompanyConfig 的相關資訊，通常會涉及系統的設定檔、資料庫中的參數表，或是應用程式的配置介面。

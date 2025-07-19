@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+作業員生產報表 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>作業員生產報表</h2>
+    <hr>
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <a href="?download=true" class="btn btn-success mb-3">下載 Excel 報表</a>
+                    <button id="manualSyncBtn" class="btn btn-warning mb-3" onclick="manualSyncOperator()">手動同步</button>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">同步間隔設定</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="input-group">
+                                <input type="number" id="operatorSyncInterval" class="form-control" 
+                                       placeholder="同步間隔（小時）" min="1" max="168" value="24">
+                                <button class="btn btn-primary" onclick="updateOperatorInterval()">儲存設定</button>
+                            </div>
+                            <small class="form-text text-muted">設定範圍：1-168小時（1小時到7天）</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            // 載入同步間隔設定
+            function loadSyncSettings() {
+                fetch('/reporting/api/get_sync_settings/')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            document.getElementById('operatorSyncInterval').value = data.settings.operator.sync_interval_hours;
+                        }
+                    })
+                    .catch(err => console.error('載入設定失敗:', err));
+            }
+            
+            // 更新作業員同步間隔
+            function updateOperatorInterval() {
+                const interval = document.getElementById('operatorSyncInterval').value;
+                const btn = event.target;
+                const originalText = btn.innerText;
+                
+                btn.disabled = true;
+                btn.innerText = '儲存中...';
+                
+                const formData = new FormData();
+                formData.append('report_type', 'operator');
+                formData.append('sync_interval_hours', interval);
+                
+                fetch('/reporting/api/update_sync_interval/', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                    } else {
+                        alert('設定失敗：' + data.message);
+                    }
+                })
+                .catch(err => {
+                    alert('設定失敗：' + err.message);
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                });
+            }
+            
+            function manualSyncOperator() {
+                var btn = document.getElementById('manualSyncBtn');
+                btn.disabled = true;
+                btn.innerText = '同步中...';
+                fetch('/reporting/api/manual_sync_operator_performance/', {method: 'POST', credentials: 'same-origin'})
+                  .then(r => r.json())
+                  .then(data => {
+                    alert(data.message);
+                    location.reload();
+                  })
+                  .catch(() => { alert('同步失敗'); location.reload(); });
+            }
+            
+            // 頁面載入時取得設定
+            document.addEventListener('DOMContentLoaded', loadSyncSettings);
+            </script>
+            
+            <!-- 顯示詳細欄位 -->
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>作業員名稱</th>
+                        <th>工單</th>
+                        <th>產品名稱</th>
+                        <th>生產數量</th>
+                        <th>開始時間</th>
+                        <th>結束時間</th>
+                        <th>日期</th>
+                        <th>工序</th>
+                        <th>設備名稱</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in operator_reports %}
+                    <tr>
+                        <td>{{ report.operator_name }}</td>
+                        <td>{{ report.work_order }}</td>
+                        <td>{{ report.product_name }}</td>
+                        <td>{{ report.production_quantity }}</td>
+                        <td>{{ report.start_time|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ report.end_time|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ report.date }}</td>
+                        <td>{{ report.process_name }}</td>
+                        <td>{{ report.equipment_name }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9">無作業員生產報表數據</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{% url 'reporting:index' %}" class="btn btn-secondary">返回</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

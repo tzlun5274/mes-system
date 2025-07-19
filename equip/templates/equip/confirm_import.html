@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "確認匯入 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "確認匯入" %}</h2>
+    <hr>
+    <div class="alert alert-warning">
+        <p>{% trans "以下設備名稱已存在於數據庫中：" %}</p>
+        <ul>
+            {% for name in duplicate_names %}
+                <li>{{ name }}</li>
+            {% endfor %}
+        </ul>
+        <p>{% trans "您希望覆蓋這些現有記錄，還是取消匯入操作？" %}</p>
+    </div>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="dataset" value="{{ dataset|escape }}">
+        <button type="submit" name="action" value="overwrite" class="btn btn-warning">{% trans "覆蓋並繼續" %}</button>
+        <button type="submit" name="action" value="cancel" class="btn btn-secondary">{% trans "取消" %}</button>
+        <a href="{% url 'equip:index' %}" class="btn btn-link">{% trans "返回設備列表" %}</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{# 這個檔案是產線類型新增/編輯的表單頁面，讓管理者可以輸入產線類型資料 #}
+{# 使用 Bootstrap 美化，所有欄位都有中文提示，適合完全不懂程式的人 #}
+
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">產線類型管理 - 新增/編輯</h2>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="mb-3">
+      <label for="id_type_code" class="form-label">類型代號 <span class="text-danger">*</span></label>
+      {{ form.type_code }}
+      <div class="form-text">請輸入產線類型代號，例如：SMT、ASSY、TEST</div>
+      {{ form.type_code.errors }}
+    </div>
+    <div class="mb-3">
+      <label for="id_type_name" class="form-label">類型名稱 <span class="text-danger">*</span></label>
+      {{ form.type_name }}
+      <div class="form-text">請輸入產線類型的中文名稱</div>
+      {{ form.type_name.errors }}
+    </div>
+    <div class="mb-3">
+      <label for="id_description" class="form-label">類型描述</label>
+      {{ form.description }}
+      <div class="form-text">可填寫產線類型的詳細說明（選填）</div>
+      {{ form.description.errors }}
+    </div>
+    <div class="mb-3">
+      <label for="id_is_active" class="form-label">啟用狀態</label>
+      {{ form.is_active }}
+      <div class="form-text">勾選代表此產線類型啟用</div>
+      {{ form.is_active.errors }}
+    </div>
+    <button type="submit" class="btn btn-primary">儲存</button>
+    <a href="{% url 'production:line_type_list' %}" class="btn btn-secondary ms-2">返回列表</a>
+  </form>
+</div>
+{% endblock %}
+
+{# 小提醒：所有欄位都有中文說明，表單送出後會自動檢查必填欄位 #} 

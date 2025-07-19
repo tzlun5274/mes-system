@@ -1,0 +1,215 @@
+<!--
+這是作業員日報表的佔位頁面，未來會顯示每日作業員生產數據。
+-->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}作業員日報表{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>作業員日報表</span>
+                    <a href="/reporting/" class="btn btn-primary"><i class="fas fa-arrow-left"></i> 返回</a>
+                    <div class="card-tools">
+                        <a href="?download=1{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if operator_name %}&operator_name={{ operator_name }}{% endif %}{% if department %}&department={{ department }}{% endif %}" 
+                           class="btn btn-success btn-sm">
+                            <i class="fas fa-download"></i> 匯出 Excel
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- 查詢表單 -->
+                    <form method="get" class="mb-4">
+                        <div class="row">
+                            <div class="col-md-2">
+                                <label for="date_from">開始日期</label>
+                                <input type="date" class="form-control" id="date_from" name="date_from" 
+                                       value="{{ date_from }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="date_to">結束日期</label>
+                                <input type="date" class="form-control" id="date_to" name="date_to" 
+                                       value="{{ date_to }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="operator_name">作業員姓名</label>
+                                <input type="text" class="form-control" id="operator_name" name="operator_name" 
+                                       value="{{ operator_name }}" placeholder="輸入作業員姓名">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="department">部門</label>
+                                <input type="text" class="form-control" id="department" name="department" 
+                                       value="{{ department }}" placeholder="輸入部門名稱">
+                            </div>
+                            <div class="col-md-2">
+                                <label>&nbsp;</label>
+                                <div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search"></i> 查詢
+                                    </button>
+                                    <a href="{% url 'reporting:operator_daily_report' %}" class="btn btn-secondary">
+                                        <i class="fas fa-redo"></i> 重置
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- 統計資訊 -->
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <div class="info-box bg-info">
+                                <span class="info-box-icon"><i class="fas fa-users"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">總記錄數</span>
+                                    <span class="info-box-number">{{ reports.count }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="info-box bg-success">
+                                <span class="info-box-icon"><i class="fas fa-check-circle"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">平均完成率</span>
+                                    <span class="info-box-number">
+                                        {% if reports %}
+                                            {{ reports|length|floatformat:1 }}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="info-box bg-warning">
+                                <span class="info-box-icon"><i class="fas fa-clock"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">平均效率</span>
+                                    <span class="info-box-number">
+                                        {% if reports %}
+                                            {{ reports|length|floatformat:1 }}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="info-box bg-danger">
+                                <span class="info-box-icon"><i class="fas fa-exclamation-triangle"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">平均品質率</span>
+                                    <span class="info-box-number">
+                                        {% if reports %}
+                                            {{ reports|length|floatformat:1 }}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 資料表格 -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>日期</th>
+                                    <th>作業員姓名</th>
+                                    <th>部門</th>
+                                    <th>處理工單數</th>
+                                    <th>總生產數量</th>
+                                    <th>完成數量</th>
+                                    <th>不良品數量</th>
+                                    <th>工作時數</th>
+                                    <th>加班時數</th>
+                                    <th>實際工作時數</th>
+                                    <th>效率 (%)</th>
+                                    <th>完成率 (%)</th>
+                                    <th>品質率 (%)</th>
+                                    <th>生產力 (件/小時)</th>
+                                    <th>使用設備</th>
+                                    <th>設備使用率 (%)</th>
+                                    <th>備註</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for report in reports %}
+                                <tr>
+                                    <td>{{ report.date|date:"Y-m-d" }}</td>
+                                    <td>{{ report.operator_name }}</td>
+                                    <td>{{ report.department|default:"-" }}</td>
+                                    <td>{{ report.work_order_count }}</td>
+                                    <td>{{ report.total_quantity }}</td>
+                                    <td>{{ report.completed_quantity }}</td>
+                                    <td>{{ report.defect_quantity }}</td>
+                                    <td>{{ report.work_hours }}</td>
+                                    <td>{{ report.overtime_hours }}</td>
+                                    <td>{{ report.actual_work_hours }}</td>
+                                    <td>
+                                        <span class="badge badge-{% if report.efficiency_rate >= 90 %}success{% elif report.efficiency_rate >= 80 %}warning{% else %}danger{% endif %}">
+                                            {{ report.efficiency_rate }}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-{% if report.completion_rate >= 90 %}success{% elif report.completion_rate >= 80 %}warning{% else %}danger{% endif %}">
+                                            {{ report.completion_rate }}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-{% if report.quality_rate >= 95 %}success{% elif report.quality_rate >= 90 %}warning{% else %}danger{% endif %}">
+                                            {{ report.quality_rate }}%
+                                        </span>
+                                    </td>
+                                    <td>{{ report.productivity_rate }}</td>
+                                    <td>{{ report.equipment_name|default:"-" }}</td>
+                                    <td>{{ report.equipment_usage_rate }}%</td>
+                                    <td>{{ report.notes|default:"-"|truncatechars:20 }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="17" class="text-center text-muted">
+                                        <i class="fas fa-info-circle"></i> 目前沒有作業員日報表資料
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 初始化日期選擇器
+    $('#date_from, #date_to').datepicker({
+        format: 'yyyy-mm-dd',
+        autoclose: true,
+        todayHighlight: true
+    });
+    
+    // 表格排序功能
+    $('table').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Chinese-traditional.json"
+        },
+        "pageLength": 25,
+        "order": [[0, "desc"]]
+    });
+});
+</script>
+{% endblock %} 

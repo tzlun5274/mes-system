@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}新增需求估算 - MES 系統{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    .form-card {
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .method-card {
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .method-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .method-card.active {
+        border-color: #007bff;
+        background-color: #f8f9fa;
+    }
+    
+    .method-historical {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .method-trend {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .method-seasonal {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .method-manual {
+        background-color: #e2e3e5;
+        color: #383d41;
+    }
+    
+    .method-ai {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="display-6 fw-bold text-primary">
+                        <i class="bi bi-plus-circle"></i> 新增需求估算
+                    </h1>
+                    <p class="lead text-muted">根據生產計劃和歷史數據建立物料需求估算</p>
+                </div>
+                <div>
+                    <a href="{% url 'material:requirement_estimation' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card form-card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> 估算資訊</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <!-- 材料選擇 -->
+                        <div class="mb-4">
+                            <label for="material_id" class="form-label">材料 *</label>
+                            <select class="form-select" id="material_id" name="material_id" required>
+                                <option value="">請選擇材料</option>
+                                {% for material in materials %}
+                                <option value="{{ material.id }}">{{ material.name }} ({{ material.code }}) - {{ material.unit }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- 估算期間 -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="period_start" class="form-label">期間開始 *</label>
+                                <input type="date" class="form-control" id="period_start" name="period_start" 
+                                       value="{{ default_start|date:'Y-m-d' }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="period_end" class="form-label">期間結束 *</label>
+                                <input type="date" class="form-control" id="period_end" name="period_end" 
+                                       value="{{ default_end|date:'Y-m-d' }}" required>
+                            </div>
+                        </div>
+
+                        <!-- 估算方法選擇 -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">估算方法 *</label>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="method-card method-historical text-center" data-method="historical">
+                                        <i class="bi bi-bar-chart fs-3"></i>
+                                        <div class="mt-2 fw-bold">歷史平均</div>
+                                        <small>根據歷史數據平均值</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="method-card method-trend text-center" data-method="trend">
+                                        <i class="bi bi-graph-up fs-3"></i>
+                                        <div class="mt-2 fw-bold">趨勢分析</div>
+                                        <small>根據歷史趨勢預測</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="method-card method-seasonal text-center" data-method="seasonal">
+                                        <i class="bi bi-calendar-event fs-3"></i>
+                                        <div class="mt-2 fw-bold">季節性分析</div>
+                                        <small>考慮季節性因素</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-4">
+                                    <div class="method-card method-manual text-center" data-method="manual">
+                                        <i class="bi bi-pencil-square fs-3"></i>
+                                        <div class="mt-2 fw-bold">手動估算</div>
+                                        <small>人工經驗判斷</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="method-card method-ai text-center" data-method="ai">
+                                        <i class="bi bi-cpu fs-3"></i>
+                                        <div class="mt-2 fw-bold">AI預測</div>
+                                        <small>機器學習算法</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="estimation_method" id="estimation_method" required>
+                        </div>
+
+                        <!-- 估算需求 -->
+                        <div class="mb-4">
+                            <label for="estimated_demand" class="form-label">估算需求 *</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="estimated_demand" name="estimated_demand" 
+                                       step="0.01" min="0" required placeholder="請輸入估算需求數量">
+                                <span class="input-group-text" id="unit_display">單位</span>
+                            </div>
+                        </div>
+
+                        <!-- 計劃供應 -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="planned_supply" class="form-label">計劃供應</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="planned_supply" name="planned_supply" 
+                                           step="0.01" min="0" placeholder="請輸入計劃供應數量">
+                                    <span class="input-group-text" id="unit_display_planned">單位</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="beginning_stock" class="form-label">期初庫存</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="beginning_stock" name="beginning_stock" 
+                                           step="0.01" min="0" placeholder="請輸入期初庫存">
+                                    <span class="input-group-text" id="unit_display_beginning">單位</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 備註 -->
+                        <div class="mb-4">
+                            <label for="notes" class="form-label">備註</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                      placeholder="估算說明、假設條件或特殊考量"></textarea>
+                        </div>
+
+                        <!-- 提交按鈕 -->
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
+                                <i class="bi bi-arrow-left"></i> 取消
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> 確認建立
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// 估算方法選擇
+document.querySelectorAll('.method-card').forEach(card => {
+    card.addEventListener('click', function() {
+        // 移除所有活動狀態
+        document.querySelectorAll('.method-card').forEach(c => c.classList.remove('active'));
+        // 添加活動狀態
+        this.classList.add('active');
+        // 設置隱藏欄位值
+        document.getElementById('estimation_method').value = this.dataset.method;
+    });
+});
+
+// 材料選擇時更新單位顯示
+document.getElementById('material_id').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const unitText = selectedOption.text.split(' - ')[2] || '單位';
+    
+    // 更新所有單位顯示
+    document.getElementById('unit_display').textContent = unitText;
+    document.getElementById('unit_display_planned').textContent = unitText;
+    document.getElementById('unit_display_beginning').textContent = unitText;
+});
+
+// 期間驗證
+document.getElementById('period_end').addEventListener('change', function() {
+    const startDate = document.getElementById('period_start').value;
+    const endDate = this.value;
+    
+    if (startDate && endDate && startDate > endDate) {
+        alert('期間結束日期不能早於開始日期');
+        this.value = '';
+    }
+});
+
+// 表單驗證
+document.querySelector('form').addEventListener('submit', function(e) {
+    const estimationMethod = document.getElementById('estimation_method').value;
+    if (!estimationMethod) {
+        e.preventDefault();
+        alert('請選擇估算方法');
+        return;
+    }
+    
+    const startDate = document.getElementById('period_start').value;
+    const endDate = document.getElementById('period_end').value;
+    if (startDate >= endDate) {
+        e.preventDefault();
+        alert('期間結束日期必須晚於開始日期');
+        return;
+    }
+});
+</script>
+{% endblock %} 

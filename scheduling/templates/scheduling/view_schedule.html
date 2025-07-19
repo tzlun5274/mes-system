@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 檢視排程" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 檢視排程" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- 導航按鈕 -->
+    <div class="mb-3">
+        <a href="{% url 'scheduling:index' %}" class="btn btn-secondary me-2">{% trans "返回首頁" %}</a>
+        <a href="{% url 'scheduling:calendar' %}" class="btn btn-primary me-2">{% trans "返回行事曆" %}</a>
+        <a href="{% url 'scheduling:gantt' %}" class="btn btn-success">{% trans "甘特圖" %}</a>
+    </div>
+
+    <!-- 篩選區域 -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="productIdFilter" class="form-label">{% trans "產品編號" %}</label>
+                    <select id="productIdFilter" class="form-select" multiple onchange="filterEvents()" size="5">
+                        {% for choice in product_id_choices %}
+                            <option value="{{ choice.product_id }}" data-order-id="{{ choice.order_id }}">
+                                {{ choice.product_id }} (訂單: {{ choice.order_id }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn btn-sm btn-secondary mt-2" onclick="clearProductSelection()">{% trans "清除選項" %}</button>
+                </div>
+                <div class="col-md-4">
+                    <label for="unitFilter" class="form-label">{% trans "單位" %}</label>
+                    <select id="unitFilter" class="form-select" onchange="filterEvents()">
+                        <option value="">{% trans "所有單位" %}</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="eventCategoryFilter" class="form-label">{% trans "分類" %}</label>
+                    <select id="eventCategoryFilter" class="form-select" onchange="filterEvents()">
+                        <option value="">{% trans "全部分類" %}</option>
+                        <option value="general">{% trans "一般" %}</option>
+                        <option value="urgent">{% trans "緊急" %}</option>
+                        <option value="routine">{% trans "例行" %}</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 排程列表 -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5>{% trans "排程列表" %}</h5>
+            <button class="btn btn-danger btn-sm" onclick="deleteAllEvents()">
+                <i class="fas fa-trash-alt"></i> 刪除全部事件
+            </button>
+        </div>
+        <div class="card-body">
+            {% if event_data %}
+                <table class="table table-striped table-bordered">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>{% trans "訂單編號" %}</th>
+                            <th>{% trans "產品編號" %}</th>
+                            <th>{% trans "工序名稱" %}</th>
+                            <th>{% trans "單位" %}</th>
+                            <th>{% trans "開始時間" %}</th>
+                            <th>{% trans "結束時間" %}</th>
+                            <th>{% trans "天數" %}</th>
+                            <th>{% trans "工時 (小時)" %}</th>
+                            <th>{% trans "分類" %}</th>
+                            <th>{% trans "描述" %}</th>
+                            <th>{% trans "創建者" %}</th>
+                            <th>{% trans "創建時間" %}</th>
+                            <th>{% trans "出貨日期" %}</th>
+                            <th>{% trans "操作" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody id="eventTableBody">
+                        {% for data in event_data %}
+                            <tr data-event-id="{{ data.event.id }}"
+                                data-order-id="{{ data.event.order_id|default:'N/A' }}"
+                                data-product-id="{{ data.product_id|default:'N/A' }}"
+                                data-unit-id="{{ data.event.unit_id|default:'' }}"
+                                data-type="{{ data.event.type }}"
+                                data-category="{{ data.event.category }}">
+                                <td>{{ data.event.order_id|default:"N/A" }}</td>
+                                <td>{{ data.product_id|default:"N/A" }}</td>
+                                <td>{{ data.process_name|default:"N/A" }}</td>
+                                <td>{{ data.event.unit.name|default:"無單位" }}</td>
+                                <td>{{ data.event.start|date:"Y-m-d H:i" }}</td>
+                                <td>{{ data.event.end|date:"Y-m-d H:i" }}</td>
+                                <td>{{ data.days_span }}</td>
+                                <td>{{ data.duration_hours }}</td>
+                                <td>{{ data.event.get_category_display }}</td>
+                                <td>{{ data.event.description|default:"無描述" }}</td>
+                                <td>{{ data.event.created_by|default:"未知" }}</td>
+                                <td>{{ data.event.created_at|date:"Y-m-d H:i"|default:"N/A" }}</td>
+                                <td>{{ data.pre_in_date|default:"N/A" }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" onclick="editEvent({{ data.event.id }})">{% trans "編輯" %}</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteEvent({{ data.event.id }})">{% trans "刪除" %}</button>
+                                    <button class="btn btn-sm btn-warning ms-1" onclick="deleteOrderEvents('{{ data.event.order_id }}')">
+                                        <i class="fas fa-trash"></i> 刪除此訂單所有事件
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted">{% trans "暫無排程事件。" %}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 編輯事件模態框 -->
+<div class="modal fade" id="editEventModal" tabindex="-1" aria-labelledby="editEventModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editEventModalLabel">{% trans "編輯排程事件" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editEventForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="editEventUnit" class="form-label">{% trans "單位" %}</label>
+                        <select class="form-select" id="editEventUnit" name="unit_id">
+                            <option value="">{% trans "無單位" %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventTitle" class="form-label">{% trans "標題" %} <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="editEventTitle" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventStart" class="form-label">{% trans "開始日期時間" %} <span class="text-danger">*</span></label>
+                        <input type="datetime-local" class="form-control" id="editEventStart" name="start" required step="60">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventEnd" class="form-label">{% trans "結束日期時間" %} <span class="text-danger">*</span></label>
+                        <input type="datetime-local" class="form-control" id="editEventEnd" name="end" required step="60">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventCategory" class="form-label">{% trans "分類" %}</label>
+                        <select class="form-select" id="editEventCategory" name="category">
+                            <option value="general">{% trans "一般" %}</option>
+                            <option value="urgent">{% trans "緊急" %}</option>
+                            <option value="routine">{% trans "例行" %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventDescription" class="form-label">{% trans "描述" %}</label>
+                        <textarea class="form-control" id="editEventDescription" name="description" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">{% trans "保存" %}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 全局變量存儲單位列表
+let units = [];
+
+function populateUnitSelect(selectElement, units) {
+    units.forEach(unit => {
+        const option = document.createElement('option');
+        option.value = unit.id;
+        option.textContent = unit.name;
+        selectElement.appendChild(option);
+    });
+}
+
+function clearProductSelection() {
+    const select = document.getElementById('productIdFilter');
+    for (let option of select.options) {
+        option.selected = false;
+    }
+    filterEvents();
+}
+
+function filterEvents() {
+    const productSelect = document.getElementById('productIdFilter');
+    const selectedProducts = Array.from(productSelect.options).filter(opt => opt.selected).map(opt => opt.value);
+    const selectedOrders = Array.from(productSelect.options).filter(opt => opt.selected).map(opt => opt.getAttribute('data-order-id'));
+    const unitFilter = document.getElementById('unitFilter').value;
+    const categoryFilter = document.getElementById('eventCategoryFilter').value;
+
+    const rows = document.querySelectorAll('#eventTableBody tr');
+    rows.forEach(row => {
+        const productId = row.getAttribute('data-product-id').trim();
+        const orderId = row.getAttribute('data-order-id').trim();
+        const unitId = row.getAttribute('data-unit-id').trim();
+        const category = row.getAttribute('data-category').trim();
+
+        const matchesProductId = selectedProducts.length === 0 || selectedProducts.includes(productId);
+        const matchesOrderId = selectedOrders.length === 0 || selectedOrders.includes(orderId);
+        const matchesUnit = !unitFilter || unitId === unitFilter;
+        const matchesCategory = !categoryFilter || category === categoryFilter;
+
+        row.style.display = (matchesProductId && matchesOrderId && matchesUnit && matchesCategory) ? '' : 'none';
+    });
+}
+
+function editEvent(eventId) {
+    const editModal = new bootstrap.Modal(document.getElementById('editEventModal'));
+    fetch(`{% url 'scheduling:events' %}?id=${eventId}`)
+        .then(response => response.json())
+        .then(data => {
+            const event = data[0];
+            document.getElementById('editEventUnit').value = event.extendedProps.unit_id || '';
+            document.getElementById('editEventTitle').value = event.title;
+            document.getElementById('editEventStart').value = event.start.slice(0, 16);
+            document.getElementById('editEventEnd').value = event.end.slice(0, 16);
+            document.getElementById('editEventCategory').value = event.extendedProps.category;
+            document.getElementById('editEventDescription').value = event.extendedProps.description;
+            editModal.show();
+        });
+}
+
+function deleteEvent(eventId) {
+    if (confirm('{% trans "確定要刪除此事件？" %}')) {
+        fetch(`/scheduling/delete_event/${eventId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('{% trans "事件刪除成功！" %}');
+                location.reload();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('刪除事件失敗:', error);
+            alert('{% trans "刪除事件失敗，請檢查網絡連接或聯繫管理員。" %}');
+        });
+    }
+}
+
+function deleteAllEvents() {
+    if (!confirm('確定要刪除所有排程事件嗎？此操作無法復原！')) return;
+    fetch('/scheduling/delete_all_production_events/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('已刪除 ' + data.deleted_count + ' 筆事件');
+            location.reload();
+        } else {
+            alert('刪除失敗：' + data.message);
+        }
+    })
+    .catch(err => alert('請求失敗：' + err));
+}
+
+function deleteOrderEvents(orderId) {
+    if (!orderId || !confirm('確定要刪除此訂單的所有排程事件嗎？')) return;
+    const formData = new FormData();
+    formData.append('order_id', orderId);
+    fetch('/scheduling/delete_order_production_events/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('已刪除 ' + data.deleted_count + ' 筆事件');
+            location.reload();
+        } else {
+            alert('刪除失敗：' + data.message);
+        }
+    })
+    .catch(err => alert('請求失敗：' + err));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 加載單位列表
+    fetch('{% url 'scheduling:units' %}')
+        .then(response => response.json())
+        .then(data => {
+            units = data;
+            const unitFilter = document.getElementById('unitFilter');
+            const editUnitSelect = document.getElementById('editEventUnit');
+            populateUnitSelect(unitFilter, units);
+            populateUnitSelect(editUnitSelect, units);
+        })
+        .catch(error => {
+            console.error('無法加載單位列表:', error);
+            alert('{% trans "無法加載單位列表，請檢查網絡連接或聯繫管理員。" %}');
+        });
+
+    // 編輯事件表單提交
+    document.getElementById('editEventForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const formData = new FormData(this);
+        const editModal = bootstrap.Modal.getInstance(document.getElementById('editEventModal'));
+        const eventId = formData.get('event_id') || document.querySelector('#eventTableBody tr[data-event-id]:not([style*="display: none"])')?.getAttribute('data-event-id');
+        
+        if (!eventId) {
+            alert('{% trans "未選擇事件，請先選擇一個事件進行編輯。" %}');
+            return;
+        }
+        
+        fetch(`/scheduling/edit_event/${eventId}/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('{% trans "事件編輯成功！" %}');
+                editModal.hide();
+                location.reload();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('編輯事件失敗:', error);
+            alert('{% trans "編輯事件失敗，請檢查網絡連接或聯繫管理員。" %}');
+        });
+    });
+
+    // 初始過濾，確保表格與下拉選單同步
+    filterEvents();
+});
+</script>
+
+<style>
+.table th, .table td {
+    vertical-align: middle;
+}
+.table th {
+    background-color: #343a40;
+    color: white;
+}
+</style>
+
+{% endblock %}

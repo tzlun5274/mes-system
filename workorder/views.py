@@ -1,0 +1,2921 @@
+import logging
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
+from .models import (
+    WorkOrder,
+    PrdMKOrdMain,
+    SystemConfig,
+    CompanyOrder,
+    WorkOrderProcess,
+    WorkOrderProcessLog,
+    WorkOrderAssignment,
+    DispatchLog,
+)
+from .tasks import get_standard_processes
+from .forms import WorkOrderForm
+from django.contrib import messages
+from reporting.models import ProductionDailyReport
+from datetime import datetime, timedelta, timezone as dt_timezone, date
+from django.db import models
+import psycopg2
+from django.core.management.base import BaseCommand
+from django.core.management import call_command
+from django.core.serializers.json import DjangoJSONEncoder
+from django.http import JsonResponse
+from django.utils import timezone
+
+from process.models import (
+    ProductProcessRoute,
+    ProcessEquipment,
+    Operator,
+    OperatorSkill,
+    ProcessName,
+    ProductProcessStandardCapacity,
+)
+from django.views.decorators.http import require_GET
+from django.views.decorators.csrf import csrf_exempt
+from equip.models import Equipment
+from django.contrib.auth.decorators import login_required, user_passes_test
+from collections import defaultdict
+from django.views.decorators.http import require_POST
+from django import forms
+from django.conf import settings
+from django.db.models import Q
+from django.utils.decorators import method_decorator
+from django.views import View
+import json
+from django.views.decorators.csrf import ensure_csrf_cookie
+
+# 設定工單管理模組的日誌記錄器
+workorder_logger = logging.getLogger("workorder")
+workorder_handler = logging.FileHandler("/var/log/mes/workorder.log")
+workorder_handler.setFormatter(
+    logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
+)
+workorder_logger.addHandler(workorder_handler)
+workorder_logger.setLevel(logging.INFO)
+
+# Create your views here.
+
+
+# 工單列表
+def index(request):
+    workorders = WorkOrder.objects.all().order_by("-created_at")
+    context = {
+        "workorders": workorders,
+        "is_debug": settings.DEBUG,  # 傳遞是否為測試環境
+    }
+    return render(request, "workorder/workorder/workorder_list.html", context)
+
+
+# 新增工單
+def create(request):
+    error = None
+    if request.method == "POST":
+        form = WorkOrderForm(request.POST)
+        if form.is_valid():
+            company_code = form.cleaned_data["company_code"]
+            order_number = form.cleaned_data["order_number"]
+            # 檢查公司代號+工單編號是否重複
+            if WorkOrder.objects.filter(
+                company_code=company_code, order_number=order_number
+            ).exists():
+                error = "公司代號＋工單編號已存在，不能重複新增！"
+            else:
+                workorder = form.save()
+                # 新增成功後自動導向工序明細頁面
+                return redirect(
+                    reverse("workorder:workorder_process_detail", args=[workorder.id])
+                )
+    else:
+        form = WorkOrderForm()
+    return render(
+        request, "workorder/workorder/workorder_form.html", {"form": form, "error": error}
+    )
+
+
+@csrf_exempt
+@require_GET
+def get_company_order_info(request):
+    """
+    AJAX 視圖：根據產品編號取得公司製令單資訊
+    回傳工單號與數量
+    """
+    product_id = request.GET.get("product_id")
+    company_code = request.GET.get("company_code")
+
+    if not product_id:
+        return JsonResponse({"status": "error", "message": "請提供產品編號"})
+
+    try:
+        # 查詢公司製令單
+        query = CompanyOrder.objects.filter(product_id=product_id, is_converted=False)
+        if company_code:
+            query = query.filter(company_code=company_code)
+
+        company_order = query.first()
+
+        if company_order:
+            return JsonResponse(
+                {
+                    "status": "success",
+                    "data": {
+                        "mkordno": company_order.mkordno,
+                        "prodt_qty": company_order.prodt_qty,
+                        "company_code": company_order.company_code,
+                    },
+                }
+            )
+        else:
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": f"找不到產品編號 {product_id} 的未轉換製令單",
+                }
+            )
+
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": f"查詢失敗：{str(e)}"})
+
+
+# 編輯工單
+def edit(request, pk):
+    workorder = get_object_or_404(WorkOrder, pk=pk)
+    if request.method == "POST":
+        form = WorkOrderForm(request.POST, instance=workorder)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("workorder:index"))
+    else:
+        form = WorkOrderForm(instance=workorder)
+    return render(
+        request, "workorder/workorder/workorder_form.html", {"form": form, "edit_mode": True}
+    )
+
+
+# 刪除工單
+def delete(request, pk):
+    workorder = get_object_or_404(WorkOrder, pk=pk)
+    if request.method == "POST":
+        try:
+            # 直接刪除工單（會自動刪除相關的工序）
+            workorder.delete()
+            messages.success(request, "工單刪除成功！")
+            return redirect(reverse("workorder:index"))
+            
+        except Exception as e:
+            messages.error(request, f"刪除工單時發生錯誤：{str(e)}")
+            return redirect(reverse("workorder:index"))
+            
+    return render(
+        request, "workorder/workorder_confirm_delete.html", {"workorder": workorder}
+    )
+
+
+# 刪除所有未派工工單（支援 all=1 參數時同時刪除已派工工單）
+def delete_pending_workorders(request):
+    """
+    刪除所有未派工工單（狀態為 pending）
+    若帶有 ?all=1 參數，則同時刪除已派工工單（狀態為 in_progress）
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "只有管理員可以執行此操作")
+        return redirect("workorder:index")
+
+    delete_all = request.GET.get("all") == "1"
+
+    if request.method == "POST":
+        try:
+            if delete_all:
+                # 同時刪除 pending 和 in_progress
+                pending_count = WorkOrder.objects.filter(status="pending").count()
+                in_progress_count = WorkOrder.objects.filter(status="in_progress").count()
+                
+                # 刪除工單
+                WorkOrder.objects.filter(status__in=["pending", "in_progress"]).delete()
+                
+                messages.success(
+                    request,
+                    f"成功刪除所有工單！共刪除 {pending_count + in_progress_count} 個工單（待生產：{pending_count}，生產中：{in_progress_count}）"
+                )
+            else:
+                # 只刪除 pending
+                pending_count = WorkOrder.objects.filter(status="pending").count()
+                
+                # 刪除工單
+                WorkOrder.objects.filter(status="pending").delete()
+                
+                messages.success(
+                    request, 
+                    f"成功刪除所有未派工工單！共刪除 {pending_count} 個工單"
+                )
+            return redirect("workorder:dispatch_list")
+        except Exception as e:
+            messages.error(request, f"刪除工單時發生錯誤：{str(e)}")
+            return redirect("workorder:dispatch_list")
+
+    # GET 請求顯示確認頁面
+    pending_count = WorkOrder.objects.filter(status="pending").count()
+    in_progress_count = (
+        WorkOrder.objects.filter(status="in_progress").count() if delete_all else 0
+    )
+    return render(
+        request,
+        "workorder/delete_pending_confirm.html",
+        {
+            "pending_count": pending_count,
+            "in_progress_count": in_progress_count,
+            "delete_all": delete_all,
+        },
+    )
+
+
+# 刪除所有已派工工單
+def delete_in_progress_workorders(request):
+    """
+    刪除所有已派工工單（狀態為 in_progress），支援 AJAX 回傳 JSON
+    """
+    is_ajax = (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or request.content_type == "application/json"
+        or request.headers.get("Accept") == "application/json"
+    )
+    if not (request.user.is_staff or request.user.is_superuser):
+        msg = "只有管理員可以執行此操作"
+        if is_ajax:
+            return JsonResponse({"status": "danger", "message": msg})
+        messages.error(request, msg)
+        return redirect("workorder:index")
+
+    if request.method == "POST":
+        try:
+            in_progress_count = WorkOrder.objects.filter(status="in_progress").count()
+            WorkOrder.objects.filter(status="in_progress").update(status="pending")
+            msg = f"成功停止所有生產中工單！共處理 {in_progress_count} 個工單"
+            if is_ajax:
+                return JsonResponse({"status": "success", "message": msg})
+            messages.success(request, msg)
+            return redirect("workorder:dispatch_list")
+        except Exception as e:
+            msg = f"停止所有生產中工單時發生錯誤：{str(e)}"
+            if is_ajax:
+                return JsonResponse({"status": "danger", "message": msg})
+            messages.error(request, msg)
+            return redirect("workorder:dispatch_list")
+
+    # GET 請求顯示確認頁面
+    in_progress_count = WorkOrder.objects.filter(status="in_progress").count()
+    return render(
+        request,
+        "workorder/delete_in_progress_confirm.html",
+        {"in_progress_count": in_progress_count},
+    )
+
+
+
+
+
+# 派工單管理頁（可重用原本工單列表）
+def dispatch_list(request):
+    """
+    派工單管理頁：分成待生產（pending）和已派工（in_progress）兩個區塊
+    並提供每個工單的補登記錄數量與待核准數量
+    """
+    from process.models import ProductProcessRoute
+
+    pending_orders = WorkOrder.objects.filter(status="pending").order_by("-created_at")
+    in_progress_orders = WorkOrder.objects.filter(status="in_progress").order_by(
+        "-created_at"
+    )
+
+    # 計算統計數據
+    total_workorders = WorkOrder.objects.count()
+    pending_count = pending_orders.count()
+    in_progress_count = in_progress_orders.count()
+    
+    # 計算工藝路線已設定總數
+    process_route_set_count = 0
+    # 計算分配資訊已分配總數
+    assignment_set_count = 0
+    
+    # 檢查所有工單的工藝路線和分配狀態
+    all_workorders = WorkOrder.objects.all()
+    for workorder in all_workorders:
+        # 檢查工藝路線設定
+        has_process_route = ProductProcessRoute.objects.filter(
+            product_id=workorder.product_code
+        ).exists()
+        if has_process_route:
+            process_route_set_count += 1
+            
+        # 檢查分配資訊
+        has_assignment = (
+            WorkOrderProcess.objects.filter(workorder=workorder)
+            .filter(
+                models.Q(assigned_operator__isnull=False, assigned_operator__gt="")
+                | models.Q(assigned_equipment__isnull=False, assigned_equipment__gt="")
+            )
+            .exists()
+        )
+        if has_assignment:
+            assignment_set_count += 1
+
+    # 檢查每個工單的工序設定狀態和分配資訊
+    for order in list(pending_orders) + list(in_progress_orders):
+        order.has_process_route = ProductProcessRoute.objects.filter(
+            product_id=order.product_code
+        ).exists()
+        # 新增：檢查工序明細裡有沒有分配作業員或設備
+        order.has_assignment = (
+            WorkOrderProcess.objects.filter(workorder=order)
+            .filter(
+                models.Q(assigned_operator__isnull=False, assigned_operator__gt="")
+                | models.Q(assigned_equipment__isnull=False, assigned_equipment__gt="")
+            )
+            .exists()
+        )
+        # 移除 has_process_detail 與 process_configured 判斷，回復只看 has_process_route
+        # 只有同時有工藝路線且有工序明細才算「已設定」
+        # order.process_configured = order.has_process_route and order.has_process_detail
+        # 預載入分配資訊
+        order.workorderassignment_set.all()
+
+        # 計算作業員工作負載
+        for assignment in order.workorderassignment_set.all():
+            if assignment.operator_id:
+                assignment.operator_current_load = WorkOrderAssignment.objects.filter(
+                    operator_id=assignment.operator_id, workorder__status="in_progress"
+                ).count()
+
+            # 添加設備名稱屬性
+            if assignment.equipment_id:
+                try:
+                    equipment = Equipment.objects.get(id=assignment.equipment_id)
+                    assignment.equipment_name = equipment.name
+                except (Equipment.DoesNotExist, ValueError):
+                    assignment.equipment_name = f"未知設備({assignment.equipment_id})"
+            else:
+                assignment.equipment_name = "未分配"
+
+    return render(
+        request,
+        "workorder/dispatch/dispatch_list.html",
+        {
+            "pending_orders": pending_orders,
+            "in_progress_orders": in_progress_orders,
+            "total_workorders": total_workorders,
+            "pending_count": pending_count,
+            "in_progress_count": in_progress_count,
+            "process_route_set_count": process_route_set_count,
+            "assignment_set_count": assignment_set_count,
+        },
+    )
+
+
+# 公司製令單列表（依公司分群）
+def company_orders(request):
+    """
+    公司製令單列表：顯示所有公司 MES 資料庫的 ERP 製令單，工單號前加公司代號，不分公司顯示
+    只顯示未結案的製令單（BillStatus=1）
+    """
+    from erp_integration.models import CompanyConfig
+
+    companies = CompanyConfig.objects.all()
+    search = request.GET.get("search", "").strip()
+    sort = request.GET.get("sort", "")
+    status = request.GET.get("status", "")
+
+    # 讀取目前自動轉換工單間隔設定（預設 30 分鐘）
+    auto_convert_interval = 30
+    try:
+        config = SystemConfig.objects.get(key="auto_convert_interval")
+        auto_convert_interval = int(config.value)
+    except SystemConfig.DoesNotExist:
+        pass
+    # 讀取自動同步製令間隔（預設 30 分鐘）
+    auto_sync_companyorder_interval = 30
+    try:
+        config = SystemConfig.objects.get(key="auto_sync_companyorder_interval")
+        auto_sync_companyorder_interval = int(config.value)
+    except SystemConfig.DoesNotExist:
+        pass
+
+    # 讀取不分攤關鍵字設定（預設：只計算最後一天,不分攤,不分配）
+    no_distribute_keywords = "只計算最後一天,不分攤,不分配"
+    try:
+        config = SystemConfig.objects.get(key="no_distribute_keywords")
+        no_distribute_keywords = config.value
+    except SystemConfig.DoesNotExist:
+        pass
+
+    # 管理員可設定自動轉換工單間隔與自動同步製令間隔
+    if request.method == "POST" and (
+        request.user.is_staff or request.user.is_superuser
+    ):
+        if "no_distribute_keywords" in request.POST:
+            new_no_distribute_keywords = request.POST.get("no_distribute_keywords")
+            if new_no_distribute_keywords:
+                old_value = no_distribute_keywords
+                SystemConfig.objects.update_or_create(
+                    key="no_distribute_keywords",
+                    defaults={"value": new_no_distribute_keywords},
+                )
+                workorder_logger.info(
+                    f"管理員 {request.user} 變更不分攤關鍵字設定，原值：{old_value}，新值：{new_no_distribute_keywords}。IP: {request.META.get('REMOTE_ADDR')}"
+                )
+            return redirect(request.path)
+        else:
+            # 原本的自動轉換/同步間隔設定
+            new_convert_interval = request.POST.get("auto_convert_interval")
+            if (
+                new_convert_interval
+                and new_convert_interval.isdigit()
+                and int(new_convert_interval) > 0
+            ):
+                old_value = auto_convert_interval
+                SystemConfig.objects.update_or_create(
+                    key="auto_convert_interval",
+                    defaults={"value": new_convert_interval},
+                )
+                workorder_logger.info(
+                    f"管理員 {request.user} 變更自動轉換工單間隔，原值：{old_value} 分鐘，新值：{new_convert_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
+                )
+                auto_convert_interval = int(new_convert_interval)
+            new_sync_interval = request.POST.get("auto_sync_companyorder_interval")
+            if (
+                new_sync_interval
+                and new_sync_interval.isdigit()
+                and int(new_sync_interval) > 0
+            ):
+                old_value = auto_sync_companyorder_interval
+                SystemConfig.objects.update_or_create(
+                    key="auto_sync_companyorder_interval",
+                    defaults={"value": new_sync_interval},
+                )
+                workorder_logger.info(
+                    f"管理員 {request.user} 變更自動同步製令間隔，原值：{old_value} 分鐘，新值：{new_sync_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
+                )
+                auto_sync_companyorder_interval = int(new_sync_interval)
+    # POST 處理完後，重新查詢最新關鍵字設定
+    try:
+        config = SystemConfig.objects.get(key="no_distribute_keywords")
+        no_distribute_keywords = config.value
+    except SystemConfig.DoesNotExist:
+        no_distribute_keywords = "只計算最後一天,不分攤,不分配"
+
+    # 查詢本地 CompanyOrder 表
+    workorders = CompanyOrder.objects.all()
+
+    # 搜尋條件
+    if search:
+        workorders = workorders.filter(
+            models.Q(company_code__icontains=search)
+            | models.Q(mkordno__icontains=search)
+            | models.Q(product_id__icontains=search)
+        )
+
+    # 排序條件
+    if sort == "est_stock_out_date_asc":
+        workorders = workorders.order_by("est_stock_out_date")
+    elif sort == "est_stock_out_date_desc":
+        workorders = workorders.order_by("-est_stock_out_date")
+    else:
+        workorders = workorders.order_by("-sync_time")
+
+    # 計算統計數據
+    total_orders = workorders.count()
+    converted_orders = workorders.filter(is_converted=True).count()
+    unconverted_orders = workorders.filter(is_converted=False).count()
+
+    # 轉換成字典格式，保持與原本模板的相容性
+    workorders_list = []
+    for order in workorders:
+        workorder_dict = {
+            "MKOrdNO": f"{order.company_code}_{order.mkordno}",
+            "ProductID": order.product_id,
+            "ProdtQty": order.prodt_qty,
+            "EstTakeMatDate": order.est_take_mat_date,
+            "EstStockOutDate": order.est_stock_out_date,
+            "is_converted": order.is_converted,
+            "conversion_status": "已轉換" if order.is_converted else "未轉換",
+        }
+        workorders_list.append(workorder_dict)
+
+    workorder_logger.info(
+        f"使用者 {request.user} 檢視公司製令單列表。IP: {request.META.get('REMOTE_ADDR')}"
+    )
+    return render(
+        request,
+        "workorder/dispatch/company_orders.html",
+        {
+            "workorders": workorders_list,
+            "companies": companies,
+            "auto_convert_interval": auto_convert_interval,
+            "auto_sync_companyorder_interval": auto_sync_companyorder_interval,
+            "no_distribute_keywords": no_distribute_keywords,
+            "total_orders": total_orders,
+            "converted_orders": converted_orders,
+            "unconverted_orders": unconverted_orders,
+        },
+    )
+
+
+# 手動同步製令單
+def manual_sync_orders(request):
+    """
+    手動同步各公司製令單到 CompanyOrder 表
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        workorder_logger.warning(
+            f"非管理員 {request.user} 嘗試手動同步製令單，已拒絕。IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        messages.error(request, "只有管理員可以執行此操作")
+        return redirect("workorder:company_orders")
+
+    if request.method != "POST":
+        return redirect("workorder:company_orders")
+
+    try:
+        # 執行同步命令
+        call_command("sync_pending_workorders")
+        workorder_logger.info(
+            f"管理員 {request.user} 手動同步公司製令單成功。IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        messages.success(request, "手動同步製令單完成！")
+    except Exception as e:
+        workorder_logger.error(
+            f"管理員 {request.user} 手動同步公司製令單失敗：{e}。IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        messages.error(request, f"同步失敗：{e}")
+
+    return redirect("workorder:company_orders")
+
+
+# 手動轉換工單
+def manual_convert_orders(request):
+    """
+    手動轉換製令單為 MES 工單
+    支援 AJAX 請求，回傳 JSON。
+    新增：在轉換時自動分配作業員和設備
+    """
+    from process.models import ProductProcessRoute, ProductProcessStandardCapacity, Operator, OperatorSkill, ProcessEquipment
+    from equip.models import Equipment
+
+    is_ajax = (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or request.content_type == "application/json"
+        or request.headers.get("Accept") == "application/json"
+    )
+    if request.method != "POST":
+        msg = "請用 POST 方式呼叫手動轉換"
+        if is_ajax:
+            return JsonResponse({"status": "danger", "message": msg})
+        messages.error(request, msg)
+        return redirect("workorder:company_orders")
+
+    try:
+        # 取得未轉換的製令單
+        pending_orders = CompanyOrder.objects.filter(is_converted=False)
+        if not pending_orders.exists():
+            msg = "沒有需要轉換的製令單！"
+            if is_ajax:
+                return JsonResponse({"status": "warning", "message": msg})
+            messages.warning(request, msg)
+            return redirect("workorder:company_orders")
+
+        count_converted = 0
+        count_processes_created = 0
+        count_auto_assigned = 0
+
+        for company_order in pending_orders:
+            # 檢查工單是否已存在
+            existing_workorder = WorkOrder.objects.filter(
+                company_code=company_order.company_code,
+                order_number=company_order.mkordno
+            ).first()
+            
+            if existing_workorder:
+                # 如果工單已存在，跳過並標記為已轉換
+                company_order.is_converted = True
+                company_order.save()
+                print(f"⚠️ 工單已存在，跳過轉換：{company_order.mkordno}")
+                continue
+            
+            # 建立工單
+            workorder = WorkOrder.objects.create(
+                order_number=company_order.mkordno,  # 使用 mkordno 作為工單號
+                product_code=company_order.product_id,  # 使用 product_id
+                quantity=company_order.prodt_qty,  # 使用 prodt_qty
+                status="pending",
+                company_code=company_order.company_code,
+            )
+            count_converted += 1
+
+            # 建立工序明細
+            try:
+                # 從產品工藝路線取得工序資料
+                routes = ProductProcessRoute.objects.filter(
+                    product_id=workorder.product_code
+                ).order_by("step_order")
+
+                if routes.exists():
+                    # 使用產品工藝路線建立工序明細
+                    for route in routes:
+                        # 查詢標準產能資料
+                        capacity_data = ProductProcessStandardCapacity.objects.filter(
+                            product_code=workorder.product_code,
+                            process_name=route.process_name.name,
+                            is_active=True
+                        ).order_by('-version').first()
+                        
+                        # 使用標準產能或預設值
+                        target_hourly_output = (
+                            capacity_data.standard_capacity_per_hour 
+                            if capacity_data else 1000
+                        )
+                        
+                        # 建立工序明細
+                        process = WorkOrderProcess.objects.create(
+                            workorder=workorder,
+                            process_name=route.process_name.name,
+                            step_order=route.step_order,
+                            planned_quantity=workorder.quantity,
+                            target_hourly_output=target_hourly_output,
+                        )
+                        count_processes_created += 1
+
+                        # ====== 自動分配作業員和設備 ======
+                        assigned_operator = None
+                        assigned_equipment = None
+
+                        # 1. 自動分配作業員：根據工序名稱找到有對應技能的作業員
+                        try:
+                            # 找到有該工序技能的作業員
+                            skilled_operators = Operator.objects.filter(
+                                skills__process_name__name=route.process_name.name
+                            ).distinct()
+                            
+                            if skilled_operators.exists():
+                                # 選擇工作負載最輕的作業員
+                                operator_loads = {}
+                                for op in skilled_operators:
+                                    # 計算該作業員目前的工作負載（進行中的工序數量）
+                                    current_load = WorkOrderProcess.objects.filter(
+                                        assigned_operator=op.name,
+                                        status='in_progress'
+                                    ).count()
+                                    operator_loads[op] = current_load
+                                
+                                # 選擇負載最輕的作業員
+                                assigned_operator = min(operator_loads.items(), key=lambda x: x[1])[0]
+                                process.assigned_operator = assigned_operator.name
+                                print(f"✅ 自動分配作業員：{assigned_operator.name} (工序：{route.process_name.name})")
+                            else:
+                                print(f"⚠️ 找不到有 {route.process_name.name} 技能的作業員")
+                        except Exception as e:
+                            print(f"⚠️ 分配作業員失敗：{str(e)}")
+
+                        # 2. 自動分配設備：根據工序名稱找到可用的設備
+                        try:
+                            # 檢查工序是否有指定可用設備
+                            if route.usable_equipment_ids:
+                                # 解析可用設備ID列表
+                                equipment_ids = [
+                                    int(eid.strip()) 
+                                    for eid in route.usable_equipment_ids.split(',') 
+                                    if eid.strip().isdigit()
+                                ]
+                                
+                                if equipment_ids:
+                                    # 找到可用且狀態為閒置的設備
+                                    available_equipments = Equipment.objects.filter(
+                                        id__in=equipment_ids,
+                                        status='idle'
+                                    )
+                                    
+                                    if available_equipments.exists():
+                                        # 選擇第一個可用設備
+                                        assigned_equipment = available_equipments.first()
+                                        process.assigned_equipment = assigned_equipment.name
+                                        print(f"✅ 自動分配設備：{assigned_equipment.name} (工序：{route.process_name.name})")
+                                    else:
+                                        print(f"⚠️ 工序 {route.process_name.name} 的指定設備都不可用")
+                                else:
+                                    print(f"⚠️ 工序 {route.process_name.name} 的可用設備ID格式錯誤")
+                            else:
+                                # 如果沒有指定設備，嘗試從工序設備對應表找
+                                process_equipments = ProcessEquipment.objects.filter(
+                                    process_name__name=route.process_name.name
+                                )
+                                
+                                if process_equipments.exists():
+                                    equipment_ids = [pe.equipment_id for pe in process_equipments]
+                                    available_equipments = Equipment.objects.filter(
+                                        id__in=equipment_ids,
+                                        status='idle'
+                                    )
+                                    
+                                    if available_equipments.exists():
+                                        assigned_equipment = available_equipments.first()
+                                        process.assigned_equipment = assigned_equipment.name
+                                        print(f"✅ 自動分配設備：{assigned_equipment.name} (工序：{route.process_name.name})")
+                                    else:
+                                        print(f"⚠️ 工序 {route.process_name.name} 的對應設備都不可用")
+                                else:
+                                    print(f"⚠️ 工序 {route.process_name.name} 沒有對應的設備設定")
+                        except Exception as e:
+                            print(f"⚠️ 分配設備失敗：{str(e)}")
+
+                        # 3. 如果有分配到作業員或設備，更新狀態並記錄
+                        if assigned_operator or assigned_equipment:
+                            process.save()
+                            count_auto_assigned += 1
+                            
+                            # 記錄分配日誌
+                            try:
+                                WorkOrderProcessLog.objects.create(
+                                    workorder_process=process,
+                                    action='auto_assignment',
+                                    operator=assigned_operator.name if assigned_operator else None,
+                                    equipment=assigned_equipment.name if assigned_equipment else None,
+                                    notes=f"製令轉工單時自動分配 - 工序：{route.process_name.name}",
+                                    quantity_before=0,
+                                    quantity_after=0,
+                                )
+                            except Exception as e:
+                                print(f"⚠️ 記錄分配日誌失敗：{str(e)}")
+
+                else:
+                    # 使用標準工序建立工序明細
+                    standard_processes = [
+                        {"name": "SMT 貼片", "target_hourly_output": 1000},
+                        {"name": "測試", "target_hourly_output": 500},
+                        {"name": "包裝", "target_hourly_output": 200},
+                    ]
+
+                    for step_order, process_info in enumerate(
+                        standard_processes, 1
+                    ):
+                        WorkOrderProcess.objects.create(
+                            workorder=workorder,
+                            process_name=process_info["name"],
+                            step_order=step_order,
+                            planned_quantity=workorder.quantity,
+                            target_hourly_output=process_info[
+                                "target_hourly_output"
+                            ],
+                        )
+                        count_processes_created += 1
+            except Exception as e:
+                # 如果建立工序明細失敗，記錄錯誤但不影響工單轉換
+                print(f"建立工序明細失敗 (工單: {workorder.order_number}): {e}")
+
+        # 更新 CompanyOrder 的轉換狀態
+        if count_converted > 0:
+            CompanyOrder.objects.filter(is_converted=False).update(is_converted=True)
+            
+            # 更新成功訊息，包含自動分配資訊
+            auto_assignment_msg = f"，並自動分配 {count_auto_assigned} 個工序的作業員和設備" if count_auto_assigned > 0 else ""
+            
+            messages.success(
+                request,
+                f"手動轉換完成！共轉換 {count_converted} 筆製令單為 MES 工單，並自動建立 {count_processes_created} 個工序明細{auto_assignment_msg}",
+            )
+        else:
+            messages.info(request, "沒有需要轉換的製令單")
+
+        workorder_logger.info(
+            f"管理員 {request.user} 手動轉換工單成功，轉換 {count_converted} 筆，建立工序 {count_processes_created} 筆，自動分配 {count_auto_assigned} 筆。IP: {request.META.get('REMOTE_ADDR')}"
+        )
+    except Exception as e:
+        workorder_logger.error(
+            f"管理員 {request.user} 手動轉換工單失敗：{e}。IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        messages.error(request, f"轉換失敗：{e}")
+
+    return redirect("workorder:company_orders")
+
+
+# 派工單工序明細管理
+def workorder_process_detail(request, workorder_id):
+    """
+    派工單工序明細頁面：顯示工單的所有工序及執行狀況
+    """
+    workorder = get_object_or_404(WorkOrder, pk=workorder_id)
+    processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by(
+        "step_order"
+    )
+
+    # 計算整體進度
+    total_planned = sum(p.planned_quantity for p in processes)
+    total_completed = sum(p.completed_quantity for p in processes)
+    overall_progress = round(
+        (total_completed / total_planned * 100) if total_planned > 0 else 0, 2
+    )
+
+    # 檢查產品是否有工藝路線設定
+    from process.models import ProductProcessRoute
+
+    has_process_route = ProductProcessRoute.objects.filter(
+        product_id=workorder.product_code
+    ).exists()
+
+    # 取得所有工序名稱供下拉選單使用
+    from process.models import ProcessName
+    process_names = ProcessName.objects.all().order_by('name')
+
+    return render(
+        request,
+        "workorder/process/workorder_process_detail.html",
+        {
+            "workorder": workorder,
+            "processes": processes,
+            "total_planned": total_planned,
+            "total_completed": total_completed,
+            "overall_progress": overall_progress,
+            "has_process_route": has_process_route,
+            "process_names": process_names,
+        },
+    )
+
+
+def create_workorder_processes(request, workorder_id):
+    """
+    為指定工單建立工序明細
+    支援 AJAX 請求，回傳 JSON。
+    新增：在建立工序時自動分配作業員和設備
+    """
+    from process.models import ProductProcessRoute, ProductProcessStandardCapacity, Operator, OperatorSkill, ProcessEquipment
+    from equip.models import Equipment
+
+    is_ajax = (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or request.content_type == "application/json"
+        or request.headers.get("Accept") == "application/json"
+    )
+
+    try:
+        workorder = WorkOrder.objects.get(id=workorder_id)
+    except WorkOrder.DoesNotExist:
+        msg = "工單不存在！"
+        if is_ajax:
+            return JsonResponse({"status": "danger", "message": msg})
+        messages.error(request, msg)
+        return redirect("workorder:workorder_list")
+
+    try:
+        # 檢查是否已有工序明細
+        existing_processes = WorkOrderProcess.objects.filter(workorder=workorder)
+        if existing_processes.exists():
+            msg = "此工單已有工序明細，無法重複建立！"
+            if is_ajax:
+                return JsonResponse({"status": "warning", "message": msg})
+            messages.warning(request, msg)
+            return redirect("workorder:workorder_process_detail", workorder_id=workorder_id)
+
+        created_count = 0
+        auto_assigned_count = 0
+
+        # 從產品工藝路線取得工序資料
+        routes = ProductProcessRoute.objects.filter(
+            product_id=workorder.product_code
+        ).order_by("step_order")
+
+        if routes.exists():
+            # 使用產品工藝路線建立工序明細
+            for route in routes:
+                # 查詢標準產能資料
+                capacity_data = ProductProcessStandardCapacity.objects.filter(
+                    product_code=workorder.product_code,
+                    process_name=route.process_name.name,
+                    is_active=True
+                ).order_by('-version').first()
+                
+                # 使用標準產能或預設值
+                target_hourly_output = (
+                    capacity_data.standard_capacity_per_hour 
+                    if capacity_data else 1000
+                )
+                
+                # 建立工序明細
+                process = WorkOrderProcess.objects.create(
+                    workorder=workorder,
+                    process_name=route.process_name.name,
+                    step_order=route.step_order,
+                    planned_quantity=workorder.quantity,
+                    target_hourly_output=target_hourly_output,
+                )
+                created_count += 1
+
+                # ====== 自動分配作業員和設備 ======
+                assigned_operator = None
+                assigned_equipment = None
+
+                # 1. 自動分配作業員：根據工序名稱找到有對應技能的作業員
+                try:
+                    # 找到有該工序技能的作業員
+                    skilled_operators = Operator.objects.filter(
+                        skills__process_name__name=route.process_name.name
+                    ).distinct()
+                    
+                    if skilled_operators.exists():
+                        # 選擇工作負載最輕的作業員
+                        operator_loads = {}
+                        for op in skilled_operators:
+                            # 計算該作業員目前的工作負載（進行中的工序數量）
+                            current_load = WorkOrderProcess.objects.filter(
+                                assigned_operator=op.name,
+                                status='in_progress'
+                            ).count()
+                            operator_loads[op] = current_load
+                        
+                        # 選擇負載最輕的作業員
+                        assigned_operator = min(operator_loads.items(), key=lambda x: x[1])[0]
+                        process.assigned_operator = assigned_operator.name
+                        print(f"✅ 自動分配作業員：{assigned_operator.name} (工序：{route.process_name.name})")
+                    else:
+                        print(f"⚠️ 找不到有 {route.process_name.name} 技能的作業員")
+                except Exception as e:
+                    print(f"⚠️ 分配作業員失敗：{str(e)}")
+
+                # 2. 自動分配設備：根據工序名稱找到可用的設備
+                try:
+                    # 檢查工序是否有指定可用設備
+                    if route.usable_equipment_ids:
+                        # 解析可用設備ID列表
+                        equipment_ids = [
+                            int(eid.strip()) 
+                            for eid in route.usable_equipment_ids.split(',') 
+                            if eid.strip().isdigit()
+                        ]
+                        
+                        if equipment_ids:
+                            # 找到可用且狀態為閒置的設備
+                            available_equipments = Equipment.objects.filter(
+                                id__in=equipment_ids,
+                                status='idle'
+                            )
+                            
+                            if available_equipments.exists():
+                                # 選擇第一個可用設備
+                                assigned_equipment = available_equipments.first()
+                                process.assigned_equipment = assigned_equipment.name
+                                print(f"✅ 自動分配設備：{assigned_equipment.name} (工序：{route.process_name.name})")
+                            else:
+                                print(f"⚠️ 工序 {route.process_name.name} 的指定設備都不可用")
+                        else:
+                            print(f"⚠️ 工序 {route.process_name.name} 的可用設備ID格式錯誤")
+                    else:
+                        # 如果沒有指定設備，嘗試從工序設備對應表找
+                        process_equipments = ProcessEquipment.objects.filter(
+                            process_name__name=route.process_name.name
+                        )
+                        
+                        if process_equipments.exists():
+                            equipment_ids = [pe.equipment_id for pe in process_equipments]
+                            available_equipments = Equipment.objects.filter(
+                                id__in=equipment_ids,
+                                status='idle'
+                            )
+                            
+                            if available_equipments.exists():
+                                assigned_equipment = available_equipments.first()
+                                process.assigned_equipment = assigned_equipment.name
+                                print(f"✅ 自動分配設備：{assigned_equipment.name} (工序：{route.process_name.name})")
+                            else:
+                                print(f"⚠️ 工序 {route.process_name.name} 的對應設備都不可用")
+                        else:
+                            print(f"⚠️ 工序 {route.process_name.name} 沒有對應的設備設定")
+                except Exception as e:
+                    print(f"⚠️ 分配設備失敗：{str(e)}")
+
+                # 3. 如果有分配到作業員或設備，更新狀態並記錄
+                if assigned_operator or assigned_equipment:
+                    process.save()
+                    auto_assigned_count += 1
+                    
+                    # 記錄分配日誌
+                    try:
+                        WorkOrderProcessLog.objects.create(
+                            workorder_process=process,
+                            action='auto_assignment',
+                            operator=assigned_operator.name if assigned_operator else None,
+                            equipment=assigned_equipment.name if assigned_equipment else None,
+                            notes=f"建立工序時自動分配 - 工序：{route.process_name.name}",
+                            quantity_before=0,
+                            quantity_after=0,
+                        )
+                    except Exception as e:
+                        print(f"⚠️ 記錄分配日誌失敗：{str(e)}")
+
+            # 更新成功訊息，包含自動分配資訊
+            auto_assignment_msg = f"，並自動分配 {auto_assigned_count} 個工序的作業員和設備" if auto_assigned_count > 0 else ""
+            messages.success(
+                request, f"成功建立 {created_count} 個工序明細（使用產品工藝路線）{auto_assignment_msg}"
+            )
+        else:
+            # 使用標準工序建立工序明細
+            standard_processes = get_standard_processes(workorder.product_code)
+
+            for step_order, process_info in enumerate(standard_processes, 1):
+                WorkOrderProcess.objects.create(
+                    workorder=workorder,
+                    process_name=process_info["name"],
+                    step_order=step_order,
+                    planned_quantity=workorder.quantity,
+                    target_hourly_output=process_info["target_hourly_output"],
+                )
+                created_count += 1
+
+            messages.success(
+                request, f"成功建立 {created_count} 個工序明細（使用標準工序）"
+            )
+
+    except Exception as e:
+        messages.error(request, f"建立工序明細失敗：{e}")
+
+    return redirect("workorder:workorder_process_detail", workorder_id=workorder_id)
+
+
+@require_GET
+@csrf_exempt
+def get_processes_only(request):
+    """
+    API：根據工單ID或工單編號回傳該工單所有工序（JSON格式），給前端 AJAX 用
+    支援傳入數字型工單 id 或字串型工單編號（order_number）
+    """
+    workorder_id = request.GET.get("workorder_id")
+    if not workorder_id:
+        return JsonResponse({"success": False, "message": "缺少工單ID"})
+
+    # 判斷傳入的是數字 id 還是工單編號
+    workorder = None
+    if workorder_id.isdigit():
+        # 如果是數字，直接用 id 查
+        try:
+            workorder = WorkOrder.objects.get(id=int(workorder_id))
+        except WorkOrder.DoesNotExist:
+            return JsonResponse({"success": False, "message": "查無此工單"})
+    else:
+        # 如果是字串，改用工單編號查
+        try:
+            workorder = WorkOrder.objects.get(order_number=workorder_id)
+        except WorkOrder.DoesNotExist:
+            return JsonResponse({"success": False, "message": "查無此工單編號"})
+
+    # 查詢該工單的所有工序
+    processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by(
+        "step_order"
+    )
+    process_list = [
+        {
+            "id": p.id,
+            "process_name": p.process_name,
+            "step_order": p.step_order,
+        }
+        for p in processes
+    ]
+    return JsonResponse({"success": True, "processes": process_list})
+
+
+def completed_workorders(request):
+    """
+    完工工單列表頁面：顯示所有狀態為 completed 的工單
+    支援查詢、檢視、匯出功能
+    """
+    # 取得所有完工工單，按完工時間倒序排列
+    completed_workorders = WorkOrder.objects.filter(status="completed").order_by(
+        "-updated_at"
+    )
+
+    # 支援搜尋功能
+    search_query = request.GET.get("search", "")
+    if search_query:
+        completed_workorders = completed_workorders.filter(
+            Q(order_number__icontains=search_query)
+            | Q(product_code__icontains=search_query)
+            | Q(product_name__icontains=search_query)
+            | Q(company_code__icontains=search_query)
+        )
+
+    # 分頁功能
+    from django.core.paginator import Paginator
+
+    paginator = Paginator(completed_workorders, 20)  # 每頁顯示20筆
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "page_obj": page_obj,
+        "search_query": search_query,
+        "total_count": completed_workorders.count(),
+    }
+
+    return render(request, "workorder/dispatch/completed_workorders.html", context)
+
+
+def clear_completed_workorders(request):
+    """
+    清除完工工單確認頁面：確認是否要刪除所有完工工單
+    只有管理員可以執行此操作
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "只有管理員可以執行此操作")
+        return redirect("workorder:completed_workorders")
+
+    if request.method == "POST":
+        try:
+            # 取得要刪除的完工工單數量
+            completed_count = WorkOrder.objects.filter(status="completed").count()
+
+            # 刪除所有完工工單
+            WorkOrder.objects.filter(status="completed").delete()
+
+            messages.success(
+                request, f"成功清除所有完工工單！共刪除 {completed_count} 個工單"
+            )
+            return redirect("workorder:index")
+
+        except Exception as e:
+            messages.error(request, f"清除完工工單失敗：{str(e)}")
+            return redirect("workorder:completed_workorders")
+
+    # GET 請求顯示確認頁面
+    completed_count = WorkOrder.objects.filter(status="completed").count()
+    context = {
+        "completed_count": completed_count,
+    }
+
+    return render(request, "workorder/clear_completed_confirm.html", context)
+
+
+def clear_data(request):
+    """
+    清除數據頁面：清除派工單、完工工單、公司製令單等數據
+    只有管理員可以執行此操作，需要確認頁面
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "只有管理員可以執行此操作")
+        return redirect("workorder:index")
+
+    if request.method == "POST":
+        try:
+            # 取得要清除的數據統計
+            workorder_count = WorkOrder.objects.count()
+            company_order_count = CompanyOrder.objects.count()
+            dispatch_log_count = DispatchLog.objects.count()
+
+            # 清除所有數據
+            WorkOrder.objects.all().delete()
+            CompanyOrder.objects.all().delete()
+            DispatchLog.objects.all().delete()
+
+            messages.success(
+                request,
+                f"成功清除所有數據！共清除：工單 {workorder_count} 筆、公司製令單 {company_order_count} 筆、"
+                f"派工記錄 {dispatch_log_count} 筆",
+            )
+            return redirect("workorder:index")
+
+        except Exception as e:
+            messages.error(request, f"清除數據失敗：{str(e)}")
+            return redirect("workorder:clear_data")
+
+    # GET 請求顯示確認頁面
+    context = {
+        "workorder_count": WorkOrder.objects.count(),
+        "company_order_count": CompanyOrder.objects.count(),
+        "dispatch_log_count": DispatchLog.objects.count(),
+    }
+
+    return render(request, "workorder/clear_data_confirm.html", context)
+
+
+def start_production(request, pk):
+    """
+    開始生產：將工單狀態從 pending 轉換為 in_progress
+    只有管理員可以執行此操作
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "只有管理員可以執行此操作")
+        return redirect("workorder:dispatch_list")
+
+    if request.method != "POST":
+        messages.error(request, "無效的請求方法")
+        return redirect("workorder:dispatch_list")
+
+    try:
+        # 取得工單
+        workorder = WorkOrder.objects.get(pk=pk)
+
+        # 檢查工單狀態
+        if workorder.status != "pending":
+            messages.error(
+                request, f"工單 {workorder.order_number} 狀態不是待生產，無法開始生產"
+            )
+            return redirect("workorder:dispatch_list")
+
+        # 檢查是否有工序路線
+        from process.models import ProductProcessRoute
+
+        has_process_route = ProductProcessRoute.objects.filter(
+            product_id=workorder.product_code
+        ).exists()
+
+        if not has_process_route:
+            messages.error(
+                request, f"工單 {workorder.order_number} 尚未設定工序路線，無法開始生產"
+            )
+            return redirect("workorder:dispatch_list")
+
+        # 更新工單狀態
+        workorder.status = "in_progress"
+        workorder.updated_at = timezone.now()
+        workorder.save()
+
+        # 記錄派工日誌
+        # 注意：DispatchLog 模型沒有 action 欄位，所以我們只記錄基本資訊
+        # 如果需要記錄動作類型，可以考慮使用 WorkOrderProcessLog 或添加 action 欄位到 DispatchLog
+        DispatchLog.objects.create(
+            workorder=workorder,
+            process=workorder.processes.first(),  # 使用第一個工序作為記錄
+            operator=None,  # 暫時設為 None，因為需要 Operator 對象
+            quantity=workorder.quantity,
+            created_by=request.user.username,
+        )
+
+        messages.success(request, f"工單 {workorder.order_number} 已成功開始生產")
+
+    except WorkOrder.DoesNotExist:
+        messages.error(request, "工單不存在")
+    except Exception as e:
+        messages.error(request, f"開始生產失敗：{str(e)}")
+
+    return redirect("workorder:dispatch_list")
+
+
+def stop_production(request, pk):
+    """
+    停止生產：將工單狀態從 in_progress 轉換為 pending
+    只有管理員可以執行此操作
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "只有管理員可以執行此操作")
+        return redirect("workorder:dispatch_list")
+
+    if request.method != "POST":
+        messages.error(request, "無效的請求方法")
+        return redirect("workorder:dispatch_list")
+
+    try:
+        # 取得工單
+        workorder = WorkOrder.objects.get(pk=pk)
+
+        # 檢查工單狀態
+        if workorder.status != "in_progress":
+            messages.error(
+                request, f"工單 {workorder.order_number} 狀態不是生產中，無法停止生產"
+            )
+            return redirect("workorder:dispatch_list")
+
+        # 更新工單狀態
+        workorder.status = "pending"
+        workorder.updated_at = timezone.now()
+        workorder.save()
+
+        # 記錄派工日誌
+        # 注意：DispatchLog 模型沒有 action 欄位，所以我們只記錄基本資訊
+        DispatchLog.objects.create(
+            workorder=workorder,
+            process=workorder.processes.first(),  # 使用第一個工序作為記錄
+            operator=None,  # 暫時設為 None，因為需要 Operator 對象
+            quantity=workorder.quantity,
+            created_by=request.user.username,
+        )
+
+        messages.success(request, f"工單 {workorder.order_number} 已成功停止生產")
+
+    except WorkOrder.DoesNotExist:
+        messages.error(request, "工單不存在")
+    except Exception as e:
+        messages.error(request, f"停止生產失敗：{str(e)}")
+
+    return redirect("workorder:dispatch_list")
+
+
+def selective_revert_orders(request):
+    """
+    選擇性將已轉換的公司製令單退回（is_converted 設回 False）
+    只有管理員可操作。
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "只有管理員可以執行此操作")
+        return redirect("workorder:company_orders")
+
+    from .models import CompanyOrder
+
+    if request.method == "POST":
+        ids = request.POST.getlist("order_ids")
+        if ids:
+            updated = CompanyOrder.objects.filter(id__in=ids, is_converted=True).update(
+                is_converted=False
+            )
+            workorder_logger.info(
+                f"管理員 {request.user} 選擇性退回 {updated} 筆製令單。IP: {request.META.get('REMOTE_ADDR')}"
+            )
+            messages.success(request, f"已成功退回 {updated} 筆製令單！")
+        else:
+            messages.warning(request, "請至少選擇一筆要退回的製令單！")
+        return redirect("workorder:company_orders")
+
+    # GET 顯示所有已轉換的製令單
+    orders = CompanyOrder.objects.filter(is_converted=True).order_by("-sync_time")
+    return render(request, "workorder/selective_revert_orders.html", {"orders": orders})
+
+
+
+
+
+def user_supplement_form(request, workorder_id):
+    """
+    使用者補登表單 - 只能補登，不能核准
+    """
+    from django.shortcuts import get_object_or_404, redirect
+    from datetime import datetime
+
+    workorder = get_object_or_404(WorkOrder, id=workorder_id)
+    processes = workorder.processes.all()
+    # 取得所有作業員與設備
+    operators = list(Operator.objects.all())
+    equipments = list(Equipment.objects.all())
+    error_msgs = []
+    
+    if request.method == "POST":
+        for process in processes:
+            completed_quantity = request.POST.get(f"completed_quantity_{process.id}")
+            work_date = request.POST.get(f"work_date_{process.id}")
+            start_time = request.POST.get(f"start_time_{process.id}")
+            end_time = request.POST.get(f"end_time_{process.id}")
+            operator_id = request.POST.get(f"operator_{process.id}")
+            equipment_id = request.POST.get(f"equipment_{process.id}")
+            notes = request.POST.get(f"notes_{process.id}")
+            completed_flag = request.POST.get(f"completed_flag_{process.id}")
+
+            # 判斷工序類型
+            is_smt = (
+                "SMT" in process.process_name
+                or "smt" in process.process_name
+                or "貼片" in process.process_name
+            )
+            # 驗證必填欄位
+            if not is_smt and not operator_id:
+                error_msgs.append(f"工序「{process.process_name}」作業員必填！")
+            if is_smt and not equipment_id:
+                error_msgs.append(f"工序「{process.process_name}」設備必填！")
+
+            # 組合日期和時間為 datetime
+            supplement_datetime = None
+            end_datetime = None
+
+            if work_date and start_time:
+                try:
+                    supplement_datetime = datetime.strptime(
+                        f"{work_date} {start_time}", "%Y-%m-%d %H:%M"
+                    )
+                    supplement_datetime = timezone.make_aware(supplement_datetime)
+                except ValueError:
+                    error_msgs.append(
+                        f"工序「{process.process_name}」開始時間格式錯誤！"
+                    )
+
+            if work_date and end_time:
+                try:
+                    end_datetime = datetime.strptime(
+                        f"{work_date} {end_time}", "%Y-%m-%d %H:%M"
+                    )
+                    end_datetime = timezone.make_aware(end_datetime)
+                except ValueError:
+                    error_msgs.append(
+                        f"工序「{process.process_name}」結束時間格式錯誤！"
+                    )
+
+            # 驗證時間邏輯
+            if supplement_datetime and end_datetime:
+                if supplement_datetime >= end_datetime:
+                    error_msgs.append(
+                        f"工序「{process.process_name}」結束時間必須晚於開始時間！"
+                    )
+                if (
+                    supplement_datetime > timezone.now()
+                    or end_datetime > timezone.now()
+                ):
+                    error_msgs.append(
+                        f"工序「{process.process_name}」補登時間不能超過現在時間！"
+                    )
+
+            # 只要有填寫完成數量才儲存
+            if completed_quantity:
+                # 取得作業員/設備物件
+                operator_obj = (
+                    Operator.objects.filter(id=operator_id).first()
+                    if operator_id
+                    else None
+                )
+                equipment_name = None
+                if equipment_id:
+                    eq_obj = Equipment.objects.filter(id=equipment_id).first()
+                    equipment_name = eq_obj.name if eq_obj else None
+                # 儲存補登紀錄
+                QuickSupplementLog.objects.create(
+                    product_code=workorder.product_code,
+                    workorder=workorder,
+                    process=process,
+                    action_type="complete",
+                    supplement_time=supplement_datetime or timezone.now(),
+                    end_time=end_datetime,
+                    completed_quantity=completed_quantity or 0,
+                    defect_qty=0,  # 預設不良品數量為 0
+                    notes=notes,
+                    created_by=request.user.username,
+                    operator=operator_obj.name if operator_obj else None,
+                    equipment=equipment_name,
+                )
+                # 若勾選已完工，直接設工序狀態為已完成
+                if completed_flag:
+                    process.status = "completed"
+                    process.save()
+        if error_msgs:
+            messages.error(request, "；".join(error_msgs))
+        else:
+            messages.success(request, "補登資料已提交，等待管理員核准")
+            return redirect("workorder:user_supplement_index")
+    
+    return render(
+        request,
+        "workorder/user_supplement_form.html",
+        {
+            "workorder": workorder,
+            "processes": processes,
+            "operators": operators,
+            "equipments": equipments,
+            "today": datetime.now().date(),
+        },
+    )
+
+
+def edit_my_supplement(request, supplement_id):
+    """
+    編輯自己的補登記錄 - 只能編輯未核准的記錄
+    """
+    from django.shortcuts import get_object_or_404, redirect
+    from datetime import datetime
+    
+    supplement = get_object_or_404(QuickSupplementLog, id=supplement_id)
+    
+    # 檢查權限 - 只能編輯自己的未核准記錄
+    if supplement.created_by != request.user.username:
+        messages.error(request, "您只能編輯自己的補登記錄")
+        return redirect('workorder:user_supplement_index')
+    
+    if supplement.is_approved:
+        messages.error(request, "已核准的記錄無法修改")
+        return redirect('workorder:user_supplement_index')
+    
+    if request.method == "POST":
+        # 更新補登記錄
+        supplement.completed_quantity = request.POST.get('completed_quantity', 0)
+        supplement.defect_qty = request.POST.get('defect_qty', 0)
+        supplement.notes = request.POST.get('notes', '')
+        
+        # 更新時間
+        work_date = request.POST.get('work_date')
+        start_time = request.POST.get('start_time')
+        if work_date and start_time:
+            try:
+                supplement_datetime = datetime.strptime(
+                    f"{work_date} {start_time}", "%Y-%m-%d %H:%M"
+                )
+                supplement.supplement_time = timezone.make_aware(supplement_datetime)
+            except ValueError:
+                messages.error(request, "時間格式錯誤")
+                return redirect('workorder:edit_my_supplement', supplement_id=supplement_id)
+        
+        supplement.save()
+        messages.success(request, "補登記錄已更新")
+        return redirect('workorder:user_supplement_index')
+    
+    return render(
+        request,
+        "workorder/edit_my_supplement.html",
+        {
+            "supplement": supplement,
+            "today": datetime.now().date(),
+        },
+    )
+
+
+def delete_my_supplement(request, supplement_id):
+    """
+    刪除自己的補登記錄 - 只能刪除未核准的記錄
+    """
+    from django.shortcuts import get_object_or_404, redirect
+    
+    supplement = get_object_or_404(QuickSupplementLog, id=supplement_id)
+    
+    # 檢查權限 - 只能刪除自己的未核准記錄
+    if supplement.created_by != request.user.username:
+        messages.error(request, "您只能刪除自己的補登記錄")
+        return redirect('workorder:user_supplement_index')
+    
+    if supplement.is_approved:
+        messages.error(request, "已核准的記錄無法刪除")
+        return redirect('workorder:user_supplement_index')
+    
+    supplement.delete()
+    messages.success(request, "補登記錄已刪除")
+    return redirect('workorder:user_supplement_index')
+
+
+def process_logs(request, process_id):
+    """
+    顯示工序日誌頁面
+    """
+    from django.shortcuts import get_object_or_404
+
+    process = get_object_or_404(WorkOrderProcess, pk=process_id)
+    logs = DispatchLog.objects.filter(workorder_process=process).order_by("-created_at")
+
+    return render(
+        request,
+        "workorder/process/process_logs.html",
+        {
+            "process": process,
+            "logs": logs,
+        },
+    )
+
+
+def edit_supplement_mobile(request):
+    """
+    行動裝置補登編輯頁面
+    """
+    log_id = request.GET.get("log_id")
+    if log_id:
+        log = get_object_or_404(QuickSupplementLog, pk=log_id)
+        return render(request, "workorder/edit_supplement_mobile.html", {"log": log})
+    else:
+        messages.error(request, "缺少日誌ID")
+        return redirect("workorder:index")
+
+
+def pending_approval_list(request):
+    """
+    待審核補登列表頁面
+    """
+    pending_logs = QuickSupplementLog.objects.filter(is_approved=False).order_by(
+        "-created_at"
+    )
+    
+    # 統計資料
+    total_pending = pending_logs.count()
+    total_by_workorder = pending_logs.values_list('workorder', flat=True).distinct()
+
+    return render(
+        request,
+        "workorder/pending_approval_list.html",
+        {
+            "pending_logs": pending_logs,
+            "total_pending": total_pending,
+            "total_by_workorder": total_by_workorder,
+        },
+    )
+
+
+@csrf_exempt
+def get_operators_and_equipments(request):
+    """
+    API：取得所有作業員和設備資料，供前端 AJAX 使用
+    """
+    try:
+        from process.models import Operator
+        from equip.models import Equipment
+        # 取得作業員資料，包含技能
+        operators = []
+        for op in Operator.objects.all():
+            skills = list(op.skills.all().values_list('process_name__name', flat=True))
+            operators.append({
+                "id": op.id,
+                "name": op.name,
+                "skills": skills,
+            })
+        # 取得設備資料，包含型別和狀態
+        equipments = []
+        for eq in Equipment.objects.all():
+            equipments.append({
+                "id": eq.id,
+                "name": eq.name,
+                "model": getattr(eq, 'model', ''),
+                "type": getattr(eq, 'type', ''),
+                "status": getattr(eq, 'status', ''),
+            })
+        return JsonResponse({
+            "success": True,
+            "operators": operators,
+            "equipments": equipments,
+        })
+    except Exception as e:
+        return JsonResponse({"success": False, "message": f"取得資料失敗：{str(e)}"})
+
+
+@require_GET
+@csrf_exempt
+def get_operators_only(request):
+    """
+    API：取得所有作業員資料，包含技能清單，供前端 AJAX 使用
+    作業員沒有指定技能就不顯示
+    """
+    try:
+        from process.models import Operator, OperatorSkill, ProcessName
+        
+        # 取得工序名稱參數（可選）
+        process_name = request.GET.get('process_name', '').strip()
+        
+        operators = []
+        
+        if process_name:
+            # 查詢有該工序技能的作業員
+            skilled_operators = Operator.objects.filter(
+                skills__process_name__name=process_name
+            ).distinct()
+            
+            for op in skilled_operators:
+                # 取得技能清單
+                skills = list(op.skills.all().values_list('process_name__name', flat=True))
+                operators.append({
+                    "id": op.id,
+                    "name": op.name,
+                    "skills": skills,
+                })
+            # 如果沒有作業員有該技能，operators 保持空列表，不顯示任何作業員
+        else:
+            # 如果沒有指定工序名稱，顯示所有作業員（用於一般查詢）
+            for op in Operator.objects.all():
+                skills = list(op.skills.all().values_list('process_name__name', flat=True))
+                operators.append({
+                    "id": op.id,
+                    "name": op.name,
+                    "skills": skills,
+                })
+        
+        return JsonResponse({
+            "success": True,
+            "operators": operators,
+        })
+    except Exception as e:
+        return JsonResponse({"success": False, "message": f"取得作業員資料失敗：{str(e)}"})
+
+
+@require_GET
+@csrf_exempt
+def get_equipments_only(request):
+    """
+    API：取得所有設備資料，供前端 AJAX 使用
+    工序沒有指定設備就不顯示
+    """
+    try:
+        from equip.models import Equipment
+        from process.models import ProcessEquipment, ProcessName
+        
+        # 取得工序名稱參數（可選）
+        process_name = request.GET.get('process_name', '').strip()
+        
+        equipments = []
+        
+        if process_name:
+            # 查詢工序是否有指定設備
+            suitable_equipment_ids = ProcessEquipment.objects.filter(
+                process_name__name=process_name
+            ).values_list('equipment_id', flat=True)
+            
+            # 如果工序有指定設備，才顯示這些設備
+            if suitable_equipment_ids:
+                suitable_equipments = Equipment.objects.filter(id__in=suitable_equipment_ids)
+                for eq in suitable_equipments:
+                    equipments.append({
+                        "id": eq.id,
+                        "name": eq.name,
+                        "model": getattr(eq, 'model', ''),
+                        "status": getattr(eq, 'status', ''),
+                    })
+            # 如果工序沒有指定設備，equipments 保持空列表，不顯示任何設備
+        
+        return JsonResponse({
+            "success": True,
+            "equipments": equipments,
+        })
+    except Exception as e:
+        return JsonResponse({"success": False, "message": f"取得設備資料失敗：{str(e)}"})
+
+
+# ==================== 行動裝置補登管理作業 ====================
+
+
+def mobile_quick_supplement_index(request):
+    """
+    行動裝置補登管理作業主頁
+    針對行動裝置設計的簡潔介面，讓使用者依產品編號查詢工單進行補登
+    """
+    workorders = None
+    product_code = request.GET.get("product_code")
+    if product_code:
+        workorders = WorkOrder.objects.filter(product_code__icontains=product_code)
+        # 轉成列表並加上產品名稱欄位
+        workorders = [
+            {
+                "id": wo.id,
+                "order_number": wo.order_number,
+                "product_name": wo.product_code,
+                "quantity": wo.quantity,
+                "status": wo.status,
+                "get_status_display": wo.get_status_display(),
+            }
+            for wo in workorders
+        ]
+    return render(
+        request,
+        "workorder/mobile_quick_supplement_index.html",
+        {"workorders": workorders, "product_code": product_code},
+    )
+
+
+def mobile_quick_supplement_form(request, workorder_id):
+    """
+    行動裝置補登管理作業表單
+    針對行動裝置設計的表單，簡化操作流程，適合觸控操作
+    """
+    from django.shortcuts import get_object_or_404, redirect
+    from datetime import datetime
+
+    workorder = get_object_or_404(WorkOrder, id=workorder_id)
+    processes = workorder.processes.all()
+    # 取得所有作業員與設備
+    operators = list(Operator.objects.all())
+    equipments = list(Equipment.objects.all())
+    error_msgs = []
+
+    if request.method == "POST":
+        for process in processes:
+            completed_quantity = request.POST.get(f"completed_quantity_{process.id}")
+            work_date = request.POST.get(f"work_date_{process.id}")
+            start_time = request.POST.get(f"start_time_{process.id}")
+            end_time = request.POST.get(f"end_time_{process.id}")
+            operator_id = request.POST.get(f"operator_{process.id}")
+            equipment_id = request.POST.get(f"equipment_{process.id}")
+            notes = request.POST.get(f"notes_{process.id}")
+            completed_flag = request.POST.get(f"completed_flag_{process.id}")
+
+            # 判斷工序類型
+            is_smt = (
+                "SMT" in process.process_name
+                or "smt" in process.process_name
+                or "貼片" in process.process_name
+            )
+
+            # 驗證必填欄位
+            if not is_smt and not operator_id:
+                error_msgs.append(f"工序「{process.process_name}」作業員必填！")
+            if is_smt and not equipment_id:
+                error_msgs.append(f"工序「{process.process_name}」設備必填！")
+
+            # 組合日期和時間為 datetime
+            supplement_datetime = None
+            end_datetime = None
+
+            if work_date and start_time:
+                try:
+                    supplement_datetime = datetime.strptime(
+                        f"{work_date} {start_time}", "%Y-%m-%d %H:%M"
+                    )
+                    supplement_datetime = timezone.make_aware(supplement_datetime)
+                except ValueError:
+                    error_msgs.append(
+                        f"工序「{process.process_name}」開始時間格式錯誤！"
+                    )
+
+            if work_date and end_time:
+                try:
+                    end_datetime = datetime.strptime(
+                        f"{work_date} {end_time}", "%Y-%m-%d %H:%M"
+                    )
+                    end_datetime = timezone.make_aware(end_datetime)
+                except ValueError:
+                    error_msgs.append(
+                        f"工序「{process.process_name}」結束時間格式錯誤！"
+                    )
+
+            # 驗證時間邏輯
+            if supplement_datetime and end_datetime:
+                if supplement_datetime >= end_datetime:
+                    error_msgs.append(
+                        f"工序「{process.process_name}」結束時間必須晚於開始時間！"
+                    )
+                if (
+                    supplement_datetime > timezone.now()
+                    or end_datetime > timezone.now()
+                ):
+                    error_msgs.append(
+                        f"工序「{process.process_name}」補登時間不能超過現在時間！"
+                    )
+
+            # 只要有填寫完成數量才儲存
+            if completed_quantity:
+                # 取得作業員/設備物件
+                operator_obj = (
+                    Operator.objects.filter(id=operator_id).first()
+                    if operator_id
+                    else None
+                )
+                equipment_name = None
+                if equipment_id:
+                    eq_obj = Equipment.objects.filter(id=equipment_id).first()
+                    equipment_name = eq_obj.name if eq_obj else None
+
+                # 儲存補登紀錄
+                QuickSupplementLog.objects.create(
+                    product_code=workorder.product_code,
+                    workorder=workorder,
+                    process=process,
+                    action_type="complete",
+                    supplement_time=supplement_datetime or timezone.now(),
+                    end_time=end_datetime,
+                    completed_quantity=completed_quantity or 0,
+                    notes=notes,
+                    created_by=request.user.username,
+                    operator=operator_obj.name if operator_obj else None,
+                    equipment=equipment_name,
+                )
+
+                # 若勾選已完工，直接設工序狀態為已完成
+                if completed_flag:
+                    process.status = "completed"
+                    process.save()
+
+        if error_msgs:
+            messages.error(request, "；".join(error_msgs))
+        else:
+            messages.success(request, "補登資料已成功儲存！")
+            return redirect("workorder:mobile_quick_supplement_index")
+
+    return render(
+        request,
+        "workorder/mobile_quick_supplement_form.html",
+        {
+            "workorder": workorder,
+            "processes": processes,
+            "operators": operators,
+            "equipments": equipments,
+        },
+    )
+
+
+@require_GET
+@csrf_exempt
+def mobile_get_workorder_info(request):
+    """
+    行動裝置 API：根據產品編號取得工單資訊
+    """
+    product_code = request.GET.get("product_code")
+    if not product_code:
+        return JsonResponse({"success": False, "message": "請提供產品編號"})
+
+    try:
+        workorders = WorkOrder.objects.filter(product_code__icontains=product_code)
+        workorder_list = []
+
+        for wo in workorders:
+            workorder_list.append(
+                {
+                    "id": wo.id,
+                    "order_number": wo.order_number,
+                    "product_code": wo.product_code,
+                    "quantity": wo.quantity,
+                    "status": wo.status,
+                    "status_display": wo.get_status_display(),
+                    "created_at": (
+                        wo.created_at.strftime("%Y-%m-%d %H:%M")
+                        if wo.created_at
+                        else ""
+                    ),
+                }
+            )
+
+        return JsonResponse(
+            {
+                "success": True,
+                "workorders": workorder_list,
+                "count": len(workorder_list),
+            }
+        )
+
+    except Exception as e:
+        return JsonResponse({"success": False, "message": f"查詢失敗：{str(e)}"})
+
+
+@require_GET
+@csrf_exempt
+def mobile_get_process_info(request):
+    """
+    行動裝置 API：取得指定工單的工序資訊
+    """
+    workorder_id = request.GET.get("workorder_id")
+    if not workorder_id:
+        return JsonResponse({"success": False, "message": "請提供工單ID"})
+
+    try:
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        processes = workorder.processes.all()
+        process_list = []
+
+        for process in processes:
+            process_list.append(
+                {
+                    "id": process.id,
+                    "process_name": process.process_name,
+                    "status": process.status,
+                    "status_display": process.get_status_display(),
+                    "is_smt": "SMT" in process.process_name
+                    or "smt" in process.process_name
+                    or "貼片" in process.process_name,
+                }
+            )
+
+        return JsonResponse(
+            {
+                "success": True,
+                "workorder": {
+                    "id": workorder.id,
+                    "order_number": workorder.order_number,
+                    "product_code": workorder.product_code,
+                    "quantity": workorder.quantity,
+                    "status": workorder.status,
+                    "status_display": workorder.get_status_display(),
+                },
+                "processes": process_list,
+            }
+        )
+
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({"success": False, "message": "找不到指定的工單"})
+    except Exception as e:
+        return JsonResponse({"success": False, "message": f"查詢失敗：{str(e)}"})
+
+
+@require_POST
+@csrf_exempt
+def mobile_submit_supplement(request):
+    """
+    行動裝置 API：提交補登資料
+    """
+    try:
+        from datetime import datetime
+
+        workorder_id = request.POST.get("workorder_id")
+        process_id = request.POST.get("process_id")
+        completed_quantity = request.POST.get("completed_quantity", 0)
+        work_date = request.POST.get("work_date")
+        start_time = request.POST.get("start_time")
+        end_time = request.POST.get("end_time")
+        operator_id = request.POST.get("operator_id")
+        equipment_id = request.POST.get("equipment_id")
+        notes = request.POST.get("notes", "")
+        completed_flag = request.POST.get("completed_flag") == "true"
+
+        # 驗證必填欄位
+        if not workorder_id or not process_id:
+            return JsonResponse({"success": False, "message": "缺少必要參數"})
+
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        process = WorkOrderProcess.objects.get(id=process_id)
+
+        # 判斷工序類型並驗證
+        is_smt = (
+            "SMT" in process.process_name
+            or "smt" in process.process_name
+            or "貼片" in process.process_name
+        )
+
+        if not is_smt and not operator_id:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"工序「{process.process_name}」作業員必填！",
+                }
+            )
+
+        if is_smt and not equipment_id:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"工序「{process.process_name}」設備必填！",
+                }
+            )
+
+        # 組合日期和時間為 datetime
+        supplement_datetime = None
+        end_datetime = None
+
+        if work_date and start_time:
+            try:
+                supplement_datetime = datetime.strptime(
+                    f"{work_date} {start_time}", "%Y-%m-%d %H:%M"
+                )
+                supplement_datetime = timezone.make_aware(supplement_datetime)
+            except ValueError:
+                return JsonResponse({"success": False, "message": "開始時間格式錯誤！"})
+
+        if work_date and end_time:
+            try:
+                end_datetime = datetime.strptime(
+                    f"{work_date} {end_time}", "%Y-%m-%d %H:%M"
+                )
+                end_datetime = timezone.make_aware(end_datetime)
+            except ValueError:
+                return JsonResponse({"success": False, "message": "結束時間格式錯誤！"})
+
+        # 驗證時間邏輯
+        if supplement_datetime and end_datetime:
+            if supplement_datetime >= end_datetime:
+                return JsonResponse(
+                    {"success": False, "message": "結束時間必須晚於開始時間！"}
+                )
+            if supplement_datetime > timezone.now() or end_datetime > timezone.now():
+                return JsonResponse(
+                    {"success": False, "message": "補登時間不能超過現在時間！"}
+                )
+
+        # 取得作業員/設備物件
+        operator_obj = (
+            Operator.objects.filter(id=operator_id).first() if operator_id else None
+        )
+        equipment_name = None
+        if equipment_id:
+            eq_obj = Equipment.objects.filter(id=equipment_id).first()
+            equipment_name = eq_obj.name if eq_obj else None
+
+        # 儲存補登紀錄
+        QuickSupplementLog.objects.create(
+            product_code=workorder.product_code,
+            workorder=workorder,
+            process=process,
+            action_type="complete",
+            supplement_time=supplement_datetime or timezone.now(),
+            end_time=end_datetime,
+            completed_quantity=completed_quantity or 0,
+            notes=notes,
+            created_by=request.user.username,
+            operator=operator_obj.name if operator_obj else None,
+            equipment=equipment_name,
+        )
+
+        # 若勾選已完工，直接設工序狀態為已完成
+        if completed_flag:
+            process.status = "completed"
+            process.save()
+
+        return JsonResponse({"success": True, "message": "補登資料已成功儲存！"})
+
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({"success": False, "message": "找不到指定的工單"})
+    except WorkOrderProcess.DoesNotExist:
+        return JsonResponse({"success": False, "message": "找不到指定的工序"})
+    except Exception as e:
+        return JsonResponse({"success": False, "message": f"儲存失敗：{str(e)}"})
+
+
+def mobile_api_test(request):
+    """
+    行動裝置 API 測試頁面
+    用於測試行動裝置快速補登的 API 功能，方便開發和除錯
+    """
+    return render(request, "workorder/mobile_api_test.html")
+
+
+@require_GET
+@csrf_exempt
+def quick_get_product_codes(request):
+    """
+    一般快速補登 API：取得所有有工單的產品編號清單
+    """
+    try:
+        codes = WorkOrder.objects.values_list("product_code", flat=True).distinct()
+        codes = sorted(set(codes))
+        return JsonResponse({"success": True, "product_codes": list(codes)})
+    except Exception as e:
+        return JsonResponse({"success": False, "message": f"查詢失敗：{str(e)}"})
+
+
+@require_GET
+@csrf_exempt
+def get_product_codes(request):
+    """
+    行動裝置 API：取得所有有工單的產品編號清單（去重、排序）
+    """
+    try:
+        product_codes = (
+            WorkOrder.objects.values_list("product_code", flat=True)
+            .distinct()
+            .order_by("product_code")
+        )
+        return JsonResponse(
+            {
+                "success": True,
+                "product_codes": list(product_codes),
+                "count": len(product_codes),
+            }
+        )
+    except Exception as e:
+        return JsonResponse({"success": False, "message": f"查詢失敗：{str(e)}"})
+
+
+@require_POST
+@csrf_exempt
+def move_process(request):
+    """
+    移動工序順序（上下移動）
+    修正：移動時使用臨時值避免唯一性約束衝突。
+    """
+    try:
+        process_id = request.POST.get("process_id")
+        direction = request.POST.get("direction")  # 'up' 或 'down'
+        
+        if not process_id or not direction:
+            return JsonResponse({"success": False, "message": "缺少必要參數"})
+        
+        # 取得當前工序
+        current_process = WorkOrderProcess.objects.get(id=process_id)
+        current_order = current_process.step_order
+        
+        # 取得同工單的所有工序，按順序排序
+        all_processes = WorkOrderProcess.objects.filter(
+            workorder=current_process.workorder
+        ).order_by("step_order")
+        
+        if direction == "up":
+            # 向上移動：與前一個工序交換順序
+            if current_order > 1:
+                prev_process = all_processes.filter(step_order=current_order - 1).first()
+                if prev_process:
+                    # 使用臨時值避免唯一性約束衝突
+                    temp_order = 999999
+                    # 先將當前工序移到臨時位置
+                    current_process.step_order = temp_order
+                    current_process.save()
+                    # 將前一個工序移到當前位置
+                    prev_process.step_order = current_order
+                    prev_process.save()
+                    # 將當前工序移到前一個位置
+                    current_process.step_order = current_order - 1
+                    current_process.save()
+                    workorder_logger.info(
+                        f"使用者 {request.user} 將工序「{current_process.process_name}」向上移動。IP: {request.META.get('REMOTE_ADDR')}"
+                    )
+                    return JsonResponse({"success": True, "message": "工序順序已更新"})
+        elif direction == "down":
+            # 向下移動：與後一個工序交換順序
+            max_order = all_processes.count()
+            if current_order < max_order:
+                next_process = all_processes.filter(step_order=current_order + 1).first()
+                if next_process:
+                    # 使用臨時值避免唯一性約束衝突
+                    temp_order = 999999
+                    # 先將當前工序移到臨時位置
+                    current_process.step_order = temp_order
+                    current_process.save()
+                    # 將後一個工序移到當前位置
+                    next_process.step_order = current_order
+                    next_process.save()
+                    # 將當前工序移到後一個位置
+                    current_process.step_order = current_order + 1
+                    current_process.save()
+                    workorder_logger.info(
+                        f"使用者 {request.user} 將工序「{current_process.process_name}」向下移動。IP: {request.META.get('REMOTE_ADDR')}"
+                    )
+                    return JsonResponse({"success": True, "message": "工序順序已更新"})
+        
+        return JsonResponse({"success": False, "message": "無法移動工序順序"})
+        
+    except WorkOrderProcess.DoesNotExist:
+        return JsonResponse({"success": False, "message": "找不到指定的工序"})
+    except Exception as e:
+        workorder_logger.error(f"移動工序失敗：{str(e)}")
+        return JsonResponse({"success": False, "message": f"移動失敗：{str(e)}"})
+
+
+@require_POST
+@csrf_exempt
+def add_process(request, workorder_id):
+    """
+    新增工序到工單
+    """
+    try:
+        # 取得工單
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        
+        # 取得表單資料
+        process_name = request.POST.get("process_name")
+        step_order = request.POST.get("step_order")
+        planned_quantity = request.POST.get("planned_quantity")
+        target_hourly_output = request.POST.get("target_hourly_output")
+        
+        # 驗證必填欄位
+        if not process_name or not step_order:
+            return JsonResponse({"status": "error", "message": "工序名稱和順序為必填欄位"})
+        
+        try:
+            step_order = int(step_order)
+            planned_quantity = int(planned_quantity) if planned_quantity else workorder.quantity
+            target_hourly_output = int(target_hourly_output) if target_hourly_output else 100
+        except ValueError:
+            return JsonResponse({"status": "error", "message": "數值欄位格式錯誤"})
+        
+        # 檢查工序順序是否重複
+        if WorkOrderProcess.objects.filter(workorder=workorder, step_order=step_order).exists():
+            return JsonResponse({"status": "error", "message": f"工序順序 {step_order} 已存在"})
+        
+        # 調整後續工序的順序（使用臨時值避免唯一性約束衝突）
+        existing_processes = WorkOrderProcess.objects.filter(
+            workorder=workorder, 
+            step_order__gte=step_order
+        ).order_by("-step_order")
+        
+        # 先將所有需要調整的工序移到臨時位置
+        temp_start = 999999
+        for i, process in enumerate(existing_processes):
+            process.step_order = temp_start + i
+            process.save()
+        
+        # 再將工序移到正確的位置
+        for i, process in enumerate(existing_processes):
+            process.step_order = step_order + 1 + i
+            process.save()
+        
+        # 建立新工序
+        new_process = WorkOrderProcess.objects.create(
+            workorder=workorder,
+            process_name=process_name,
+            step_order=step_order,
+            planned_quantity=planned_quantity,
+            target_hourly_output=target_hourly_output,
+            status="pending"
+        )
+        
+        # 計算預計工時
+        if target_hourly_output > 0:
+            estimated_hours = planned_quantity / target_hourly_output
+            new_process.estimated_hours = round(estimated_hours, 2)
+            new_process.save()
+        
+        workorder_logger.info(
+            f"使用者 {request.user} 為工單 {workorder.order_number} 新增工序「{process_name}」。IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        
+        return JsonResponse({
+            "status": "success", 
+            "message": f"工序「{process_name}」新增成功"
+        })
+        
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "找不到指定的工單"})
+    except Exception as e:
+        workorder_logger.error(f"新增工序失敗：{str(e)}")
+        return JsonResponse({"status": "error", "message": f"新增失敗：{str(e)}"})
+
+
+@require_POST
+@csrf_exempt
+def edit_process(request, process_id):
+    """
+    編輯工序
+    """
+    try:
+        # 取得工序
+        process = WorkOrderProcess.objects.get(id=process_id)
+        
+        # 取得表單資料
+        process_name = request.POST.get("process_name")
+        step_order = request.POST.get("step_order")
+        planned_quantity = request.POST.get("planned_quantity")
+        target_hourly_output = request.POST.get("target_hourly_output")
+        
+        # 驗證必填欄位
+        if not process_name or not step_order:
+            return JsonResponse({"status": "error", "message": "工序名稱和順序為必填欄位"})
+        
+        try:
+            step_order = int(step_order)
+            planned_quantity = int(planned_quantity) if planned_quantity else process.planned_quantity
+            target_hourly_output = int(target_hourly_output) if target_hourly_output else process.target_hourly_output
+        except ValueError:
+            return JsonResponse({"status": "error", "message": "數值欄位格式錯誤"})
+        
+        # 檢查工序順序是否重複（排除自己）
+        if WorkOrderProcess.objects.filter(
+            workorder=process.workorder, 
+            step_order=step_order
+        ).exclude(id=process_id).exists():
+            return JsonResponse({"status": "error", "message": f"工序順序 {step_order} 已存在"})
+        
+        # 如果工序順序有變更，需要重新排序
+        old_step_order = process.step_order
+        if step_order != old_step_order:
+            # 先將當前工序移到臨時位置
+            temp_order = 999999
+            process.step_order = temp_order
+            process.save()
+            
+            # 調整其他工序的順序
+            if step_order > old_step_order:
+                # 向下移動：將中間的工序向上移動
+                processes_to_move = WorkOrderProcess.objects.filter(
+                    workorder=process.workorder,
+                    step_order__gt=old_step_order,
+                    step_order__lte=step_order
+                ).exclude(id=process_id).order_by('step_order')
+                
+                for proc in processes_to_move:
+                    proc.step_order -= 1
+                    proc.save()
+            else:
+                # 向上移動：將中間的工序向下移動
+                processes_to_move = WorkOrderProcess.objects.filter(
+                    workorder=process.workorder,
+                    step_order__gte=step_order,
+                    step_order__lt=old_step_order
+                ).exclude(id=process_id).order_by('-step_order')
+                
+                for proc in processes_to_move:
+                    proc.step_order += 1
+                    proc.save()
+        
+        # 更新工序資料
+        process.process_name = process_name
+        process.step_order = step_order
+        process.planned_quantity = planned_quantity
+        process.target_hourly_output = target_hourly_output
+        
+        # 計算預計工時
+        if target_hourly_output > 0:
+            estimated_hours = planned_quantity / target_hourly_output
+            process.estimated_hours = round(estimated_hours, 2)
+        
+        process.save()
+        
+        workorder_logger.info(
+            f"使用者 {request.user} 編輯工序「{process_name}」。IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        
+        return JsonResponse({
+            "status": "success", 
+            "message": f"工序「{process_name}」更新成功"
+        })
+        
+    except WorkOrderProcess.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "找不到指定的工序"})
+    except Exception as e:
+        workorder_logger.error(f"編輯工序失敗：{str(e)}")
+        return JsonResponse({"status": "error", "message": f"編輯失敗：{str(e)}"})
+
+
+@require_POST
+@csrf_exempt
+def delete_process(request, process_id):
+    """
+    刪除工序
+    """
+    try:
+        # 取得工序
+        process = WorkOrderProcess.objects.get(id=process_id)
+        
+        # 檢查工序狀態
+        if process.status != "pending":
+            return JsonResponse({"status": "error", "message": "只有待生產狀態的工序才能刪除"})
+        
+        process_name = process.process_name
+        workorder = process.workorder
+        
+        # 刪除工序
+        process.delete()
+        
+        # 重新排序剩餘工序
+        remaining_processes = WorkOrderProcess.objects.filter(
+            workorder=workorder
+        ).order_by("step_order")
+        
+        for i, proc in enumerate(remaining_processes, 1):
+            proc.step_order = i
+            proc.save()
+        
+        workorder_logger.info(
+            f"使用者 {request.user} 刪除工序「{process_name}」。IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        
+        return JsonResponse({
+            "status": "success", 
+            "message": f"工序「{process_name}」刪除成功"
+        })
+        
+    except WorkOrderProcess.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "找不到指定的工序"})
+    except Exception as e:
+        workorder_logger.error(f"刪除工序失敗：{str(e)}")
+        return JsonResponse({"status": "error", "message": f"刪除失敗：{str(e)}"})
+
+
+@require_POST
+@csrf_exempt
+def batch_approve_supplements(request):
+    """
+    批量核准補登記錄 API
+    """
+    try:
+        workorder_ids = request.POST.getlist('workorder_ids[]')
+        if not workorder_ids:
+            return JsonResponse({
+                'success': False,
+                'message': '請選擇要核准的工單'
+            })
+        
+        approved_count = 0
+        for workorder_id in workorder_ids:
+            # 核准該工單的所有待核准補登記錄
+            supplements = QuickSupplementLog.objects.filter(
+                workorder_id=workorder_id,
+                is_approved=False
+            )
+            supplements.update(
+                is_approved=True,
+                approved_at=timezone.now(),
+                approved_by=request.user.username
+            )
+            approved_count += supplements.count()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'成功核准 {approved_count} 筆補登記錄',
+            'approved_count': approved_count
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'核准失敗：{str(e)}'
+        })
+
+
+@require_POST
+@csrf_exempt
+def quick_approve_workorder(request, workorder_id):
+    """
+    快速核准指定工單的所有待核准補登記錄
+    """
+    try:
+        workorder = get_object_or_404(WorkOrder, id=workorder_id)
+        
+        # 核准該工單的所有待核准補登記錄
+        supplements = QuickSupplementLog.objects.filter(
+            workorder=workorder,
+            is_approved=False
+        )
+        
+        if not supplements.exists():
+            return JsonResponse({
+                'success': False,
+                'message': '該工單沒有待核准的補登記錄'
+            })
+        
+        supplements.update(
+            is_approved=True,
+            approved_at=timezone.now(),
+            approved_by=request.user.username
+        )
+        
+        approved_count = supplements.count()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'成功核准工單 {workorder.order_number} 的 {approved_count} 筆補登記錄',
+            'approved_count': approved_count
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'核准失敗：{str(e)}'
+        })
+
+
+@require_GET
+@csrf_exempt
+def supplement_statistics(request):
+    """
+    補登統計資料 API
+    """
+    from datetime import datetime, timedelta
+    from django.db.models import Q, Count, Sum
+    
+    try:
+        # 取得查詢參數
+        period = request.GET.get('period', 'today')  # today, week, month
+        product_code = request.GET.get('product_code', '')
+        
+        # 設定時間範圍
+        today = datetime.now().date()
+        if period == 'today':
+            start_date = today
+            end_date = today
+        elif period == 'week':
+            start_date = today - timedelta(days=today.weekday())
+            end_date = today
+        elif period == 'month':
+            start_date = today.replace(day=1)
+            end_date = today
+        else:
+            start_date = today
+            end_date = today
+        
+        # 建立查詢條件
+        query = Q(supplement_time__date__gte=start_date, supplement_time__date__lte=end_date)
+        if product_code:
+            query &= Q(product_code__icontains=product_code)
+        
+        # 統計資料
+        supplements = QuickSupplementLog.objects.filter(query)
+        
+        stats = supplements.aggregate(
+            total_records=Count('id'),
+            pending_records=Count('id', filter=Q(is_approved=False)),
+            approved_records=Count('id', filter=Q(is_approved=True)),
+            total_completed=Sum('completed_quantity'),
+            total_defect=Sum('defect_qty'),
+            total_workorders=Count('workorder', distinct=True)
+        )
+        
+        # 按日期分組統計
+        daily_stats = supplements.values('supplement_time__date').annotate(
+            daily_records=Count('id'),
+            daily_completed=Sum('completed_quantity'),
+            daily_defect=Sum('defect_qty')
+        ).order_by('supplement_time__date')
+        
+        return JsonResponse({
+            'success': True,
+            'data': {
+                'period': period,
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'summary': stats,
+                'daily_stats': list(daily_stats)
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'統計失敗：{str(e)}'
+        })
+
+
+
+
+
+@require_GET
+@csrf_exempt
+def get_process_capacity_info(request, process_id):
+    """
+    取得工序產能資訊 API
+    回傳工序的標準產能、當前產能倍數、額外作業員和設備清單
+    """
+    from .models import WorkOrderProcess
+    try:
+        process = WorkOrderProcess.objects.get(id=process_id)
+        # 取得標準產能（從產品工序標準產能表）
+        from process.models import ProductProcessStandardCapacity
+        capacity_data = ProductProcessStandardCapacity.objects.filter(
+            product_code=process.workorder.product_code,
+            process_name=process.process_name,
+            is_active=True
+        ).order_by('-version').first()
+        standard_capacity = capacity_data.standard_capacity_per_hour if capacity_data else 1000
+        # 取得額外作業員和設備清單
+        additional_operators = process.get_additional_operators_list()
+        additional_equipments = process.get_additional_equipments_list()
+        # 取得所有可用作業員和設備供選擇
+        from system.models import Operator
+        from equip.models import Equipment
+        all_operators = list(Operator.objects.values('id', 'name'))
+        all_equipments = list(Equipment.objects.values('id', 'name'))
+        return JsonResponse({
+            'success': True,
+            'capacity_info': {
+                'standard_capacity': standard_capacity,
+                'current_multiplier': process.capacity_multiplier,
+                'current_target_hourly_output': process.target_hourly_output,
+                'additional_operators': additional_operators,
+                'additional_equipments': additional_equipments,
+                'all_operators': all_operators,
+                'all_equipments': all_equipments,
+            }
+        })
+    except WorkOrderProcess.DoesNotExist:
+        return JsonResponse({'success': False, 'message': '工序不存在'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'取得產能資訊失敗：{str(e)}'}, status=500)
+
+@require_POST
+@csrf_exempt
+def update_process_capacity(request, process_id):
+    """
+    更新工序產能設定 API
+    更新產能倍數、目標每小時產出、額外作業員和設備
+    """
+    from .models import WorkOrderProcess
+    try:
+        process = WorkOrderProcess.objects.get(id=process_id)
+        # 取得表單資料
+        capacity_multiplier = int(request.POST.get('capacity_multiplier', 1))
+        target_hourly_output = int(request.POST.get('target_hourly_output', 0))
+        additional_operators = request.POST.get('additional_operators', '')
+        additional_equipments = request.POST.get('additional_equipments', '')
+        # 驗證產能倍數
+        if capacity_multiplier < 1 or capacity_multiplier > 10:
+            return JsonResponse({'success': False, 'message': '產能倍數必須在 1-10 之間'}, status=400)
+        # 更新工序資料
+        process.capacity_multiplier = capacity_multiplier
+        process.target_hourly_output = target_hourly_output
+        process.additional_operators = additional_operators
+        process.additional_equipments = additional_equipments
+        # 重新計算預計工時
+        process.estimated_hours = process.calculate_estimated_hours()
+        process.save()
+        # 記錄操作日誌（如有 WorkOrderProcessLog 模型）
+        try:
+            from .models import WorkOrderProcessLog
+            WorkOrderProcessLog.objects.create(
+                workorder_process=process,
+                action='capacity_update',
+                description=f'更新產能設定：倍數={capacity_multiplier}x，目標產能={target_hourly_output}pcs/hr',
+                created_by=request.user.username if request.user.is_authenticated else 'system'
+            )
+        except Exception:
+            pass
+        return JsonResponse({
+            'success': True,
+            'message': '產能設定更新成功',
+            'updated_data': {
+                'capacity_multiplier': capacity_multiplier,
+                'target_hourly_output': target_hourly_output,
+                'estimated_hours': float(process.estimated_hours),
+                'completion_rate': process.completion_rate,
+            }
+        })
+    except WorkOrderProcess.DoesNotExist:
+        return JsonResponse({'success': False, 'message': '工序不存在'}, status=404)
+    except ValueError as e:
+        return JsonResponse({'success': False, 'message': f'資料格式錯誤：{str(e)}'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'更新產能設定失敗：{str(e)}'}, status=500)
+
+@require_GET
+@csrf_exempt
+def get_capacity_calculation_info(request, process_id):
+    """
+    取得產能計算資訊 API
+    用於產能計算器的詳細資訊
+    """
+    from .models import WorkOrderProcess
+    try:
+        process = WorkOrderProcess.objects.get(id=process_id)
+        # 取得標準產能資料
+        from process.models import ProductProcessStandardCapacity
+        capacity_data = ProductProcessStandardCapacity.objects.filter(
+            product_code=process.workorder.product_code,
+            process_name=process.process_name,
+            is_active=True
+        ).order_by('-version').first()
+        if capacity_data:
+            calculation_info = {
+                'standard_capacity': capacity_data.standard_capacity_per_hour,
+                'efficiency_factor': float(capacity_data.efficiency_factor),
+                'learning_curve_factor': float(capacity_data.learning_curve_factor),
+                'setup_time_minutes': capacity_data.setup_time_minutes,
+                'teardown_time_minutes': capacity_data.teardown_time_minutes,
+                'cycle_time_seconds': float(capacity_data.cycle_time_seconds),
+                'optimal_batch_size': capacity_data.optimal_batch_size,
+                'expected_defect_rate': float(capacity_data.expected_defect_rate),
+                'rework_time_factor': float(capacity_data.rework_time_factor),
+            }
+        else:
+            # 使用預設值
+            calculation_info = {
+                'standard_capacity': 1000,
+                'efficiency_factor': 1.0,
+                'learning_curve_factor': 1.0,
+                'setup_time_minutes': 30,
+                'teardown_time_minutes': 15,
+                'cycle_time_seconds': 3.6,
+                'optimal_batch_size': 100,
+                'expected_defect_rate': 0.02,
+                'rework_time_factor': 1.05,
+            }
+        # 加入當前工序資訊
+        calculation_info.update({
+            'current_multiplier': process.capacity_multiplier,
+            'planned_quantity': process.planned_quantity,
+            'completed_quantity': process.completed_quantity,
+            'remaining_quantity': process.remaining_quantity,
+        })
+        return JsonResponse({'success': True, 'calculation_info': calculation_info})
+    except WorkOrderProcess.DoesNotExist:
+        return JsonResponse({'success': False, 'message': '工序不存在'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'取得計算資訊失敗：{str(e)}'}, status=500)
+
+@require_POST
+@csrf_exempt
+def update_process_status(request, process_id):
+    """
+    API：更新工序分配（作業員、設備、備註），並變更狀態為生產中
+    純手動分配，不進行自動規範檢查
+    """
+    from workorder.models import WorkOrderProcess
+    from equip.models import Equipment
+    
+    try:
+        process = WorkOrderProcess.objects.get(id=process_id)
+        operator_name = request.POST.get('operator', '').strip()
+        equipment_name = request.POST.get('equipment', '').strip()
+        notes = request.POST.get('notes', '').strip()
+        
+        # 除錯資訊
+        print(f"=== 手動分配 ===")
+        print(f"工序ID: {process_id}")
+        print(f"工序名稱: {process.process_name}")
+        print(f"產品編號: {process.workorder.product_code}")
+        print(f"收到的作業員: '{operator_name}'")
+        print(f"收到的設備: '{equipment_name}'")
+        
+        # 基本驗證
+        if not operator_name and not equipment_name:
+            return JsonResponse({
+                "status": "error", 
+                "message": "請至少選擇作業員或設備其中一項"
+            })
+        
+        # ====== 純手動分配，不進行自動檢查 ======
+        print(f"✅ 執行手動分配")
+        
+        # 更新欄位
+        process.assigned_operator = operator_name
+        process.assigned_equipment = equipment_name
+        process.status = 'in_progress'
+        process.actual_start_time = timezone.now()
+        process.save()
+        
+        # 如果有分配設備，更新設備狀態
+        if equipment_name:
+            try:
+                equipment = Equipment.objects.get(name=equipment_name)
+                equipment.status = 'running'
+                equipment.save()
+                print(f"✅ 設備狀態更新為運轉中：{equipment_name}")
+            except Exception as e:
+                print(f"⚠️ 設備狀態更新失敗：{str(e)}")
+        
+        # 重新讀取確認儲存
+        process.refresh_from_db()
+        print(f"✅ 分配完成")
+        print(f"更新後的作業員: {process.assigned_operator}")
+        print(f"更新後的設備: {process.assigned_equipment}")
+        print(f"更新後的狀態: {process.status}")
+        print(f"=== 手動分配結束 ===")
+        
+        # 記錄操作日誌
+        try:
+            from workorder.models import WorkOrderProcessLog
+            WorkOrderProcessLog.objects.create(
+                workorder_process=process,
+                action='manual_assignment',
+                operator=operator_name,
+                equipment=equipment_name,
+                notes=f"手動分配 - {notes}" if notes else "手動分配",
+                quantity_before=process.completed_quantity,
+                quantity_after=process.completed_quantity,
+            )
+            print(f"✅ 操作日誌記錄完成")
+        except Exception as e:
+            print(f"⚠️ 操作日誌記錄失敗：{str(e)}")
+        
+        return JsonResponse({
+            "status": "success", 
+            "message": "手動分配成功",
+            "assigned_operator": operator_name,
+            "assigned_equipment": equipment_name,
+            "process_status": process.status
+        })
+        
+    except WorkOrderProcess.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "找不到工序資料"})
+    except Exception as e:
+        print(f"❌ 分配過程發生錯誤：{str(e)}")
+        return JsonResponse({"status": "error", "message": f"更新失敗：{str(e)}"})
+
+def report_index(request):
+    """
+    報工管理首頁視圖
+    顯示報工管理的主要功能卡片和統計資訊
+    """
+    from django.contrib.auth.decorators import login_required
+    
+    # 檢查用戶權限
+    if not request.user.is_authenticated:
+        return redirect('login')
+    
+    # 準備統計資料（目前都是 0，因為還沒有實際的報工功能）
+    context = {
+        'today_reports': 0,
+        'month_reports': 0,
+        'pending_reports': 0,
+        'abnormal_reports': 0,
+        'recent_reports': [],  # 最近報工記錄列表
+    }
+    
+    return render(request, 'workorder/report/index.html', context)
+
+def manager_report_index(request):
+    """
+    管理者報工首頁視圖
+    顯示管理者報工的主要功能卡片和統計資訊
+    """
+    # 準備統計資料（目前都是 0，因為還沒有實際的報工功能）
+    context = {
+        'pending_reviews': 0,
+        'today_reviews': 0,
+        'month_reviews': 0,
+        'abnormal_reports': 0,
+        'recent_reviews': [],  # 最近審核記錄列表
+    }
+    
+    return render(request, 'workorder/report/manager/index.html', context)
+
+def operator_report_index(request):
+    """
+    作業員報工首頁視圖
+    顯示作業員報工的主要功能卡片和統計資訊
+    """
+    # 準備統計資料（目前都是 0，因為還沒有實際的報工功能）
+    context = {
+        'today_reports': 0,
+        'month_reports': 0,
+        'pending_reviews': 0,
+        'approved_reports': 0,
+        'recent_reports': [],  # 最近報工記錄列表
+    }
+    
+    return render(request, 'workorder/report/operator/index.html', context)
+
+def smt_report_index(request):
+    """
+    SMT報工首頁視圖
+    顯示SMT報工的主要功能卡片和統計資訊
+    """
+    # 準備統計資料（目前都是 0，因為還沒有實際的報工功能）
+    context = {
+        'running_equipment': 0,
+        'today_output': 0,
+        'equipment_efficiency': 0,
+        'abnormal_equipment': 0,
+        'equipment_list': [],  # SMT設備列表
+        'recent_reports': [],  # 最近SMT報工記錄列表
+    }
+    
+    return render(request, 'workorder/report/smt/index.html', context)
+
+def smt_on_site_report(request):
+    """
+    SMT現場報工首頁視圖
+    顯示SMT現場報工的主要功能，包含即時報工表單和設備狀態
+    """
+    # 準備統計資料（目前都是 0，因為還沒有實際的報工功能）
+    context = {
+        'active_equipment': 0,
+        'today_reports': 0,
+        'current_shift_output': 0,
+        'pending_reports': 0,
+        'equipment_list': [],  # SMT設備列表
+        'equipment_status': [],  # 即時設備狀態列表
+        'today_reports_list': [],  # 今日報工記錄列表
+    }
+    
+    return render(request, 'workorder/report/smt/on_site/index.html', context)
+
+

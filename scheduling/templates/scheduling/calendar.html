@@ -1,0 +1,732 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 行事曆" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 行事曆" %}</h2>
+    <hr>
+    <div class="mb-3">
+        <p class="lead">{% trans "當前顯示的為排程日曆" %}</p>
+        <p class="text-muted">{% trans "您可以在此新增、編輯、刪除或匯入事件並過濾顯示的事件" %}</p>
+    </div>
+
+    <!-- 新增、匯入事件、加班和快速入口按鈕 -->
+    <div class="mb-3">
+        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addEventModal">
+            {% trans "新增事件" %}
+        </button>
+        <button type="button" class="btn btn-info ms-2" data-bs-toggle="modal" data-bs-target="#addOvertimeModal">
+            {% trans "新增加班" %}
+        </button>
+        <a href="{% url 'scheduling:work_hours' %}" class="btn btn-primary ms-2">{% trans "工作時間設定" %}</a>
+        <a href="{% url 'scheduling:import_events' %}" class="btn btn-warning ms-2">{% trans "匯入事件" %}</a>
+		<a href="{% url 'scheduling:index' %}" class="btn btn-secondary float-end">{% trans "返回首頁" %}</a>
+    </div>
+
+    <!-- 單位選擇和事件過濾區域 -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="unitFilter" class="form-label">{% trans "選擇單位" %}</label>
+                    <select id="unitFilter" class="form-select">
+                        <option value="">{% trans "所有單位" %}</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+    <label for="eventTypeFilter" class="form-label">{% trans "過濾事件類型" %}</label>
+    <select id="eventTypeFilter" class="form-select">
+        <option value="">{% trans "全部類型" %}</option>
+        <option value="holiday">{% trans "放假日" %}</option>
+        <option value="maintenance">{% trans "維護" %}</option>
+    </select>
+</div>
+                <div class="col-md-4">
+                    <label for="eventCategoryFilter" class="form-label">{% trans "過濾分類" %}</label>
+                    <select id="eventCategoryFilter" class="form-select">
+                        <option value="">{% trans "全部分類" %}</option>
+                        <option value="general">{% trans "一般" %}</option>
+                        <option value="urgent">{% trans "緊急" %}</option>
+                        <option value="routine">{% trans "例行" %}</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 行事曆主體 -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <div id="calendar"></div>
+        </div>
+    </div>
+    
+</div>
+
+<!-- 新增事件模態框 -->
+<div class="modal fade" id="addEventModal" tabindex="-1" aria-labelledby="addEventModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addEventModalLabel">{% trans "新增事件" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addEventForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="eventUnit" class="form-label">{% trans "單位" %}</label>
+                        <select class="form-select" id="eventUnit" name="unit_id">
+                            <option value="">{% trans "無單位" %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="eventTitle" class="form-label">{% trans "標題" %} <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="eventTitle" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="eventStart" class="form-label">{% trans "開始日期時間" %} <span class="text-danger">*</span></label>
+                        <input type="datetime-local" class="form-control" id="eventStart" name="start" required step="60">
+                    </div>
+                    <div class="mb-3">
+                        <label for="eventEnd" class="form-label">{% trans "結束日期時間" %} <span class="text-danger">*</span></label>
+                        <input type="datetime-local" class="form-control" id="eventEnd" name="end" required step="60">
+                    </div>
+                    <div class="mb-3">
+                        <label for="eventType" class="form-label">{% trans "類型" %} <span class="text-danger">*</span></label>
+                        <select class="form-select" id="eventType" name="type" required>
+                            <option value="holiday">{% trans "放假日" %}</option>
+                            <option value="maintenance">{% trans "維護" %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="eventCategory" class="form-label">{% trans "分類" %}</label>
+                        <select class="form-select" id="eventCategory" name="category">
+                            <option value="general">{% trans "一般" %}</option>
+                            <option value="urgent">{% trans "緊急" %}</option>
+                            <option value="routine">{% trans "例行" %}</option>
+                        </select>
+                    </div>
+                    <input type="hidden" name="all_day" value="true">
+                    <div class="mb-3">
+                        <label for="eventDescription" class="form-label">{% trans "描述" %}</label>
+                        <textarea class="form-control" id="eventDescription" name="description" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">{% trans "提交" %}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增加班模態框 -->
+<div class="modal fade" id="addOvertimeModal" tabindex="-1" aria-labelledby="addOvertimeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addOvertimeModalLabel">{% trans "新增加班" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addOvertimeForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="overtimeUnit" class="form-label">{% trans "單位" %} <span class="text-danger">*</span></label>
+                        <select class="form-select" id="overtimeUnit" name="unit_id" required>
+                            <option value="">{% trans "請選擇單位" %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="overtimeDate" class="form-label">{% trans "加班日期" %} <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="overtimeDate" name="date" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">{% trans "提交" %}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 編輯事件模態框 -->
+<div class="modal fade" id="editEventModal" tabindex="-1" aria-labelledby="editEventModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editEventModalLabel">{% trans "編輯事件" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editEventForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="editEventUnit" class="form-label">{% trans "單位" %}</label>
+                        <select class="form-select" id="editEventUnit" name="unit_id">
+                            <option value="">{% trans "無單位" %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventTitle" class="form-label">{% trans "標題" %} <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="editEventTitle" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventStart" class="form-label">{% trans "開始日期時間" %} <span class="text-danger">*</span></label>
+                        <input type="datetime-local" class="form-control" id="editEventStart" name="start" required step="60">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventEnd" class="form-label">{% trans "結束日期時間" %} <span class="text-danger">*</span></label>
+                        <input type="datetime-local" class="form-control" id="editEventEnd" name="end" required step="60">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventType" class="form-label">{% trans "類型" %} <span class="text-danger">*</span></label>
+                        <select class="form-select" id="editEventType" name="type" required>
+                            <option value="holiday">{% trans "放假日" %}</option>
+                            <option value="production">{% trans "生產任務" %}</option>
+                            <option value="meeting">{% trans "會議" %}</option>
+                            <option value="maintenance">{% trans "維護" %}</option>
+                            <option value="workday">{% trans "上班日" %}</option>
+                            <option value="overtime">{% trans "加班" %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventCategory" class="form-label">{% trans "分類" %}</label>
+                        <select class="form-select" id="editEventCategory" name="category">
+                            <option value="general">{% trans "一般" %}</option>
+                            <option value="urgent">{% trans "緊急" %}</option>
+                            <option value="routine">{% trans "例行" %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventAllDay" class="form-label">{% trans "全天事件" %}</label>
+                        <select class="form-select" id="editEventAllDay" name="all_day">
+                            <option value="true">{% trans "是" %}</option>
+                            <option value="false">{% trans "否" %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEventDescription" class="form-label">{% trans "描述" %}</label>
+                        <textarea class="form-control" id="editEventDescription" name="description" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">{% trans "保存" %}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 事件詳情模態框 -->
+<div class="modal fade" id="eventDetailModal" tabindex="-1" aria-labelledby="eventDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="eventDetailModalLabel">{% trans "事件詳情" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>{% trans "單位" %}:</strong> <span id="eventUnit"></span></p>
+                <p><strong>{% trans "標題" %}:</strong> <span id="eventTitle"></span></p>
+                <p><strong>{% trans "開始日期時間" %}:</strong> <span id="eventStart"></span></p>
+                <p><strong>{% trans "結束日期時間" %}:</strong> <span id="eventEnd"></span></p>
+                <p><strong>{% trans "類型" %}:</strong> <span id="eventType"></span></p>
+                <p><strong>{% trans "分類" %}:</strong> <span id="eventCategory"></span></p>
+                <p><strong>{% trans "全天事件" %}:</strong> <span id="eventAllDay"></span></p>
+                <p><strong>{% trans "描述" %}:</strong> <span id="eventDescription"></span></p>
+                <p><strong>{% trans "創建者" %}:</strong> <span id="eventCreatedBy"></span></p>
+                <p><strong>{% trans "創建時間" %}:</strong> <span id="eventCreatedAt"></span></p>
+                <p><strong>{% trans "更新時間" %}:</strong> <span id="eventUpdatedAt"></span></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="editEvent()">{% trans "編輯" %}</button>
+                <button type="button" class="btn btn-danger" onclick="deleteEvent()">{% trans "刪除" %}</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "關閉" %}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FullCalendar 5.11.5 CSS -->
+<link rel="stylesheet" href="{% static 'scheduling/fullcalendar/main.min.css' %}">
+
+<!-- FullCalendar 5.11.5 JS -->
+<script src="{% static 'scheduling/fullcalendar/main.min.js' %}"></script>
+<script>
+// 格式化日期時間為 24 小時制
+function formatDateTime(date) {
+    if (!date) return '';
+    return date.getFullYear() + '-' +
+           String(date.getMonth() + 1).padStart(2, '0') + '-' +
+           String(date.getDate()).padStart(2, '0') + ' ' +
+           String(date.getHours()).padStart(2, '0') + ':' +
+           String(date.getMinutes()).padStart(2, '0');
+}
+
+function populateUnitSelect(selectElement, units) {
+    units.forEach(unit => {
+        const option = document.createElement('option');
+        option.value = unit.id;
+        option.textContent = unit.name;
+        selectElement.appendChild(option);
+    });
+}
+
+function initializeCalendar() {
+    console.log('開始初始化 FullCalendar 5.11.5...');
+    var calendarEl = document.getElementById('calendar');
+    if (!calendarEl) {
+        console.error('未找到 calendar 元素');
+        return;
+    }
+    if (typeof FullCalendar === 'undefined') {
+        console.error('FullCalendar 未定義，腳本可能未正確加載');
+        return;
+    }
+    console.log('FullCalendar 成功加載，開始生成事件...');
+
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        initialDate: '2025-05-01',
+        locale: 'zh-tw',
+        timeZone: 'Asia/Taipei',
+        slotMinTime: '08:30:00',
+        slotMaxTime: '20:00:00',
+        slotDuration: '00:30:00',
+        headerToolbar: {
+            left: 'prev,next todayButton',
+            center: 'title',
+            right: 'monthView,weekView,dayView'
+        },
+        customButtons: {
+            todayButton: {
+                text: '{% trans "今天" %}',
+                click: function() {
+                    calendar.today();
+                }
+            },
+            monthView: {
+                text: '{% trans "月" %}',
+                click: function() {
+                    calendar.changeView('dayGridMonth');
+                }
+            },
+            weekView: {
+                text: '{% trans "週" %}',
+                click: function() {
+                    calendar.changeView('timeGridWeek');
+                }
+            },
+            dayView: {
+                text: '{% trans "天" %}',
+                click: function() {
+                    calendar.changeView('timeGridDay');
+                }
+            }
+        },
+        editable: true,
+        businessHours: {
+            daysOfWeek: [1, 2, 3, 4, 5], // 週一到週五
+            startTime: '08:30',
+            endTime: '17:30'
+        },
+        events: function(fetchInfo, successCallback, failureCallback) {
+            var typeFilter = document.getElementById('eventTypeFilter').value;
+            var categoryFilter = document.getElementById('eventCategoryFilter').value;
+            var unitFilter = document.getElementById('unitFilter').value;
+            var url = '{% url "scheduling:events" %}';
+            if (typeFilter || categoryFilter || unitFilter) {
+                url += '?';
+                if (typeFilter) url += 'type=' + encodeURIComponent(typeFilter);
+                if (categoryFilter) url += (typeFilter ? '&' : '') + 'category=' + encodeURIComponent(categoryFilter);
+                if (unitFilter) url += (typeFilter || categoryFilter ? '&' : '') + 'unit_id=' + encodeURIComponent(unitFilter);
+            }
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    successCallback(data);
+                })
+                .catch(error => {
+                    console.error('無法加載事件:', error);
+                    failureCallback(error);
+                    alert('{% trans "無法加載事件，請檢查網絡連接或聯繫管理員。" %}');
+                });
+        },
+        eventClick: function(info) {
+            currentEventId = info.event.id;
+            document.getElementById('eventUnit').textContent = info.event.extendedProps.unit_id ? units.find(unit => unit.id == info.event.extendedProps.unit_id)?.name : '{% trans "無單位" %}';
+            document.getElementById('eventTitle').textContent = info.event.title;
+            document.getElementById('eventStart').textContent = formatDateTime(info.event.start);
+            document.getElementById('eventEnd').textContent = info.event.end ? formatDateTime(info.event.end) : formatDateTime(info.event.start);
+            document.getElementById('eventType').textContent = info.event.extendedProps.type;
+            document.getElementById('eventCategory').textContent = info.event.extendedProps.category || '{% trans "未設置" %}';
+            document.getElementById('eventAllDay').textContent = info.event.allDay ? '{% trans "是" %}' : '{% trans "否" %}';
+            document.getElementById('eventDescription').textContent = info.event.extendedProps.description || '{% trans "無描述" %}';
+            document.getElementById('eventCreatedBy').textContent = info.event.extendedProps.created_by || '{% trans "未知" %}';
+            document.getElementById('eventCreatedAt').textContent = info.event.extendedProps.created_at ? formatDateTime(new Date(info.event.extendedProps.created_at)) : '{% trans "未知" %}';
+            document.getElementById('eventUpdatedAt').textContent = info.event.extendedProps.updated_at ? formatDateTime(new Date(info.event.extendedProps.updated_at)) : '{% trans "未知" %}';
+
+            var modal = new bootstrap.Modal(document.getElementById('eventDetailModal'));
+            modal.show();
+        },
+        eventDrop: function(info) {
+            updateEvent(info.event);
+        },
+        eventResize: function(info) {
+            updateEvent(info.event);
+        },
+        eventDidMount: function(info) {
+            if (info.event.classNames.includes('holiday')) {
+                info.el.style.backgroundColor = '#FF99FF'; // 放假日：粉紫色
+                info.el.style.borderColor = '#FF99FF';
+            } else if (info.event.classNames.includes('production')) {
+                info.el.style.backgroundColor = '#2ecc71'; // 彩色（綠色）
+                info.el.style.borderColor = '#2ecc71';
+            } else if (info.event.classNames.includes('meeting')) {
+                info.el.style.backgroundColor = '#f39c12'; // 彩色（橙色）
+                info.el.style.borderColor = '#f39c12';
+            } else if (info.event.classNames.includes('maintenance')) {
+                info.el.style.backgroundColor = '#9b59b6'; // 彩色（紫色）
+                info.el.style.borderColor = '#9b59b6';
+            } else if (info.event.classNames.includes('workday')) {
+                info.el.style.backgroundColor = '#FFFFFF'; // 上班日：白色
+                info.el.style.borderColor = '#000000'; // 黑色邊框
+                info.el.style.color = '#000000'; // 黑色文字
+            } else if (info.event.classNames.includes('overtime')) {
+                info.el.style.backgroundColor = '#ff0000'; // 加班：紅色
+                info.el.style.borderColor = '#ff0000';
+            }
+        }
+    });
+    calendar.render();
+    console.log('FullCalendar 初始化完成');
+
+    // 為過濾器添加事件監聽器
+    var unitFilter = document.getElementById('unitFilter');
+    var eventTypeFilter = document.getElementById('eventTypeFilter');
+    var eventCategoryFilter = document.getElementById('eventCategoryFilter');
+
+    unitFilter.addEventListener('change', function() {
+        var selectedUnitId = unitFilter.value;
+        var selectedUnit = units.find(unit => unit.id == selectedUnitId);
+        if (selectedUnit) {
+            var businessHours = [];
+            if (selectedUnit.has_lunch_break) {
+                // 有中午休息
+                businessHours.push({
+                    daysOfWeek: [1, 2, 3, 4, 5], // 週一到週五
+                    startTime: selectedUnit.work_start,
+                    endTime: selectedUnit.lunch_start
+                });
+                businessHours.push({
+                    daysOfWeek: [1, 2, 3, 4, 5],
+                    startTime: selectedUnit.lunch_end,
+                    endTime: selectedUnit.work_end
+                });
+            } else {
+                // 無中午休息
+                businessHours.push({
+                    daysOfWeek: [1, 2, 3, 4, 5],
+                    startTime: selectedUnit.work_start,
+                    endTime: selectedUnit.work_end
+                });
+            }
+            calendar.setOption('businessHours', businessHours);
+        } else {
+            // 無單位時，恢復默認工作時間
+            calendar.setOption('businessHours', {
+                daysOfWeek: [1, 2, 3, 4, 5],
+                startTime: '08:30',
+                endTime: '17:30'
+            });
+        }
+        calendar.refetchEvents();
+    });
+
+    eventTypeFilter.addEventListener('change', function() {
+        calendar.refetchEvents();
+    });
+    eventCategoryFilter.addEventListener('change', function() {
+        calendar.refetchEvents();
+    });
+
+    // 處理新增事件表單提交
+    document.getElementById('addEventForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        var formData = new FormData(this);
+        var addEventModal = bootstrap.Modal.getInstance(document.getElementById('addEventModal'));
+        
+        fetch('{% url "scheduling:add_event" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('{% trans "事件新增成功！" %}');
+                addEventModal.hide();
+                calendar.refetchEvents();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('新增事件失敗:', error);
+            alert('{% trans "新增事件失敗，請檢查網絡連接或聯繫管理員。" %}');
+        });
+    });
+
+    // 處理新增加班表單提交
+    document.getElementById('addOvertimeForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        var formData = new FormData(this);
+        var addOvertimeModal = bootstrap.Modal.getInstance(document.getElementById('addOvertimeModal'));
+        
+        fetch('{% url "scheduling:add_overtime" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('{% trans "加班事件新增成功！" %}');
+                addOvertimeModal.hide();
+                calendar.refetchEvents();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('新增加班事件失敗:', error);
+            alert('{% trans "新增加班事件失敗，請檢查網絡連接或聯繫管理員。" %}');
+        });
+    });
+
+    // 處理編輯事件表單提交
+    document.getElementById('editEventForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        var formData = new FormData(this);
+        var editEventModal = bootstrap.Modal.getInstance(document.getElementById('editEventModal'));
+        
+        if (!currentEventId) {
+            alert('{% trans "未選擇事件，請先點擊一個事件進行編輯。" %}');
+            return;
+        }
+        var editUrl = '/scheduling/edit_event/' + currentEventId + '/';
+        
+        fetch(editUrl, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('{% trans "事件編輯成功！" %}');
+                editEventModal.hide();
+                calendar.refetchEvents();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('編輯事件失敗:', error);
+            alert('{% trans "編輯事件失敗，請檢查網絡連接或聯繫管理員。" %}');
+        });
+    });
+}
+
+// 全局變量存儲單位列表
+let units = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM 已加載，開始加載單位列表...');
+    
+    // 加載單位列表
+    fetch('{% url "scheduling:units" %}')
+        .then(response => response.json())
+        .then(data => {
+            units = data;
+            console.log('單位列表已加載:', units);
+            
+            // 填充單位選擇下拉選單
+            var unitFilter = document.getElementById('unitFilter');
+            var eventUnitSelect = document.getElementById('eventUnit');
+            var editEventUnitSelect = document.getElementById('editEventUnit');
+            var overtimeUnitSelect = document.getElementById('overtimeUnit');
+            
+            populateUnitSelect(unitFilter, units);
+            populateUnitSelect(eventUnitSelect, units);
+            populateUnitSelect(editEventUnitSelect, units);
+            populateUnitSelect(overtimeUnitSelect, units);
+            
+            // 初始化 FullCalendar
+            setTimeout(initializeCalendar, 500);
+        })
+        .catch(error => {
+            console.error('無法加載單位列表:', error);
+            alert('{% trans "無法加載單位列表，請檢查網絡連接或聯繫管理員。" %}');
+        });
+
+    // 強制 datetime-local 輸入框使用 24 小時制格式
+    var startInput = document.getElementById('eventStart');
+    var endInput = document.getElementById('eventEnd');
+    var editStartInput = document.getElementById('editEventStart');
+    var editEndInput = document.getElementById('editEventEnd');
+
+    function formatDateTimeInput(input) {
+        if (input.value) {
+            var date = new Date(input.value);
+            input.value = date.getFullYear() + '-' +
+                          String(date.getMonth() + 1).padStart(2, '0') + '-' +
+                          String(date.getDate()).padStart(2, '0') + 'T' +
+                          String(date.getHours()).padStart(2, '0') + ':' +
+                          String(date.getMinutes()).padStart(2, '0');
+        }
+    }
+
+    [startInput, endInput, editStartInput, editEndInput].forEach(input => {
+        formatDateTimeInput(input);
+        input.addEventListener('change', function() {
+            formatDateTimeInput(input);
+        });
+    });
+});
+
+// 處理拖放或調整大小後的事件更新
+function updateEvent(event) {
+    var formData = new FormData();
+    formData.append('title', event.title);
+    formData.append('start', event.start.toISOString().slice(0, 16));
+    formData.append('end', event.end ? event.end.toISOString().slice(0, 16) : event.start.toISOString().slice(0, 16));
+    formData.append('type', event.extendedProps.type);
+    formData.append('category', event.extendedProps.category);
+    formData.append('all_day', event.allDay ? 'true' : 'false');
+    formData.append('description', event.extendedProps.description);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    var editUrl = '/scheduling/edit_event/' + event.id + '/';
+    fetch(editUrl, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status !== 'success') {
+            alert(data.message);
+            calendar.refetchEvents();
+        }
+    })
+    .catch(error => {
+        console.error('更新事件失敗:', error);
+        alert('{% trans "更新事件失敗，請檢查網絡連接或聯繫管理員。" %}');
+        calendar.refetchEvents();
+    });
+}
+
+// 編輯事件
+let currentEventId = null;
+function editEvent() {
+    var modal = bootstrap.Modal.getInstance(document.getElementById('eventDetailModal'));
+    modal.hide();
+    var editModal = new bootstrap.Modal(document.getElementById('editEventModal'));
+    fetch(`{% url 'scheduling:events' %}?id=${currentEventId}`)
+        .then(response => response.json())
+        .then(data => {
+            const event = data[0];
+            document.getElementById('editEventUnit').value = event.extendedProps.unit_id || '';
+            document.getElementById('editEventTitle').value = event.title;
+            document.getElementById('editEventStart').value = event.start.slice(0, 16);
+            document.getElementById('editEventEnd').value = event.end.slice(0, 16);
+            document.getElementById('editEventType').value = event.extendedProps.type;
+            document.getElementById('editEventCategory').value = event.extendedProps.category;
+            document.getElementById('editEventAllDay').value = event.allDay ? 'true' : 'false';
+            document.getElementById('editEventDescription').value = event.extendedProps.description;
+            editModal.show();
+        });
+}
+
+// 刪除事件
+function deleteEvent() {
+    if (confirm('{% trans "確定要刪除此事件？" %}')) {
+        if (!currentEventId) {
+            console.error('未選擇事件，currentEventId 為空');
+            alert('{% trans "未選擇事件，請先點擊一個事件進行刪除。" %}');
+            return;
+        }
+        console.log('開始刪除事件，event_id:', currentEventId);
+        var deleteUrl = '/scheduling/delete_event/' + currentEventId + '/';
+        fetch(deleteUrl, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => {
+            console.log('刪除事件響應狀態:', response.status);
+            if (!response.ok) {
+                throw new Error('刪除請求失敗，狀態碼: ' + response.status);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('刪除事件響應數據:', data);
+            if (data.status === 'success') {
+                alert('{% trans "事件刪除成功！" %}');
+                bootstrap.Modal.getInstance(document.getElementById('eventDetailModal')).hide();
+                calendar.refetchEvents();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('刪除事件失敗:', error);
+            alert('{% trans "刪除事件失敗，請檢查網絡連接或聯繫管理員。" %}');
+        });
+    }
+}
+</script>
+
+<style>
+    #calendar {
+        max-width: 900px;
+        margin: 0 auto;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 10px;
+    }
+    .fc-event {
+        font-size: 14px !important;
+        padding: 2px 4px !important;
+        border-radius: 3px;
+    }
+    .fc-button {
+        background-color: #007bff !important;
+        border-color: #007bff !important;
+        color: white !important;
+        border-radius: 5px !important;
+        padding: 5px 10px !important;
+    }
+    .fc-button:hover {
+        background-color: #0056b3 !important;
+        border-color: #0056b3 !important;
+    }
+    .fc-button.fc-button-active {
+        background-color: #0056b3 !important;
+        border-color: #0056b3 !important;
+    }
+    .fc-daygrid-day-number {
+        position: relative;
+        padding-bottom: 10px !important;
+    }
+</style>
+{% endblock %}

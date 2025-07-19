@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "生產日報表 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "生產日報表（作業員單位）" %}</h2>
+    <hr>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <a href="?download=true" class="btn btn-success mb-3">{% trans "下載 Excel 報表" %}</a>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "日期" %}</th>
+                        <th>{% trans "作業員姓名" %}</th>
+                        <th>{% trans "設備名稱" %}</th>
+                        <th>{% trans "生產線" %}</th>
+                        <th>{% trans "工序名稱" %}</th>
+                        <th>{% trans "完成數量" %}</th>
+                        <th>{% trans "工作時數" %}</th>
+                        <th>{% trans "效率 (件/小時)" %}</th>
+                        <th>{% trans "完成率 (%)" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in production_reports %}
+                    <tr>
+                        <td>{{ report.date }}</td>
+                        <td>{{ report.operator_name }}</td>
+                        <td>{{ report.equipment_name }}</td>
+                        <td>{{ report.get_line_display }}</td>
+                        <td>{{ report.process_name }}</td>
+                        <td>{{ report.completed_quantity }}</td>
+                        <td>{{ report.work_hours }}</td>
+                        <td>{{ report.efficiency_rate }}</td>
+                        <td>{{ report.completion_rate }}%</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9">{% trans "無生產日報表數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{% url 'reporting:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

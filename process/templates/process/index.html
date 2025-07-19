@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+工序管理首頁 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-primary"><i class="bi bi-diagram-3"></i> 工序管理首頁</h2>
+    <p class="text-secondary mb-4">這裡可以管理生產工序、作業員技能、產品工藝路線與標準產能。每個功能都有清楚的中文說明，操作簡單，適合不懂程式的人。</p>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %} alert-dismissible fade show" role="alert">
+                <i class="bi bi-{% if message.tags == 'success' %}check-circle{% else %}exclamation-triangle{% endif %}"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+        <!-- 工序工藝名稱 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-tags"></i> 工序工藝名稱</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">管理生產工序的基本名稱，例如：切割、焊接、組裝等。</p>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'process:process_names' %}" class="btn btn-primary">
+                            <i class="bi bi-list-ul"></i> 查看工序清單
+                        </a>
+                        <a href="{% url 'process:add_process_name' %}" class="btn btn-outline-primary">
+                            <i class="bi bi-plus-circle"></i> 新增工序
+                        </a>
+                        <a href="{% url 'process:import_process_names' %}" class="btn btn-outline-info">
+                            <i class="bi bi-upload"></i> 匯入工序
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 作業員與技能 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-people"></i> 作業員與技能</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">管理作業員資料與技能，設定每個作業員會哪些工序。</p>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'process:operators' %}" class="btn btn-success">
+                            <i class="bi bi-person-lines-fill"></i> 查看作業員清單
+                        </a>
+                        <a href="{% url 'process:add_operator' %}" class="btn btn-outline-success">
+                            <i class="bi bi-person-plus"></i> 新增作業員
+                        </a>
+                        <a href="{% url 'process:import_operators' %}" class="btn btn-outline-info">
+                            <i class="bi bi-upload"></i> 匯入作業員
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 產品工藝路線 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="bi bi-diagram-2"></i> 產品工藝路線</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">設定每個產品需要經過哪些工序，以及工序的順序。</p>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'process:product_routes' %}" class="btn btn-warning text-dark">
+                            <i class="bi bi-list-ul"></i> 查看產品路線
+                        </a>
+                        <a href="{% url 'process:add_product_route' %}" class="btn btn-outline-warning">
+                            <i class="bi bi-plus-circle"></i> 新增產品路線
+                        </a>
+                        <a href="{% url 'process:import_product_routes' %}" class="btn btn-outline-info">
+                            <i class="bi bi-upload"></i> 匯入產品路線
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 標準產能設定 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-speedometer2"></i> 標準產能設定</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">管理每個產品、每個工序的標準產能，支援查詢、編輯、批次匯入/匯出。</p>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'process:standard_capacity_list' %}" class="btn btn-info">
+                            <i class="bi bi-gear"></i> 進入產能設定
+                        </a>
+                        <a href="{% url 'process:capacity_calculator' %}" class="btn btn-outline-info">
+                            <i class="bi bi-calculator"></i> 產能計算器
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速操作提示 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="alert alert-info" role="alert">
+                <h6 class="alert-heading"><i class="bi bi-lightbulb"></i> 操作提示</h6>
+                <ul class="mb-0">
+                    <li><strong>新增工序</strong>：先新增工序名稱，再設定作業員技能</li>
+                    <li><strong>設定路線</strong>：為每個產品設定需要的工序順序</li>
+                    <li><strong>產能設定</strong>：根據實際情況設定標準產能</li>
+                    <li><strong>批次匯入</strong>：可從Excel檔案匯入大量資料</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計資訊卡片 -->
+    <div class="row mt-4">
+        <div class="col-md-3">
+            <div class="card text-center bg-light">
+                <div class="card-body">
+                    <i class="bi bi-tags text-primary" style="font-size: 2rem;"></i>
+                    <h5 class="card-title mt-2">{{ process_count }}</h5>
+                    <p class="card-text text-muted">工序總數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center bg-light">
+                <div class="card-body">
+                    <i class="bi bi-people text-success" style="font-size: 2rem;"></i>
+                    <h5 class="card-title mt-2">{{ operator_count }}</h5>
+                    <p class="card-text text-muted">作業員總數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center bg-light">
+                <div class="card-body">
+                    <i class="bi bi-diagram-2 text-warning" style="font-size: 2rem;"></i>
+                    <h5 class="card-title mt-2">{{ product_route_count }}</h5>
+                    <p class="card-text text-muted">產品路線總數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center bg-light">
+                <div class="card-body">
+                    <i class="bi bi-speedometer2 text-info" style="font-size: 2rem;"></i>
+                    <h5 class="card-title mt-2">{{ capacity_count }}</h5>
+                    <p class="card-text text-muted">產能設定總數</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

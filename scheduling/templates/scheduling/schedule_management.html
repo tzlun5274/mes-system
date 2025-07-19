@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 排程管理" %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .card { box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
+    .card-header { background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; }
+    .card-header h5 { margin: 0; font-size: 1.25rem; }
+    .btn-primary { background-color: #007bff; border-color: #007bff; }
+    .btn-primary:hover { background-color: #0056b3; border-color: #004085; }
+    .btn-hybrid { 
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+    }
+    .btn-hybrid:hover {
+        background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+        color: white;
+    }
+    .card-title {
+        color: #007bff !important; /* 藍色標題 */
+        font-weight: bold;
+    }
+    .btn-success {
+        background-color: #28a745 !important;
+        border-color: #28a745 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 排程管理" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="mb-3">
+        <a href="{% url 'scheduling:index' %}" class="btn btn-secondary">{% trans "返回首頁" %}</a>
+    </div>
+
+    <div class="row">
+        <!-- 產品產能檢視（原手動排程） -->
+        <div class="col-md-3">
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5>產品產能檢視</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">手動檢視訂單，根據工序加班與並行工序數量，馬上看到天數變化</p>
+                    <a href="{% url 'scheduling:product_capacity_setting' %}" class="btn btn-success">進入</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 半自動排程 -->
+        <div class="col-md-3">
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5>半自動排程</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{% trans "基於訂單和工序自動生成任務，允許手動調整" %}</p>
+                    <a href="{% url 'scheduling:schedule_semi_auto' %}" class="btn btn-success">進入</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 全自動排程 -->
+        <div class="col-md-3">
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5>全自動排程</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{% trans "自動為所有訂單生成最優排程" %}</p>
+                    <a href="{% url 'scheduling:schedule_auto' %}" class="btn btn-success">進入</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 混合式排程 -->
+        <div class="col-md-3">
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5>混合式排程</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{% trans "結合全局優化與順序排程，平衡效率與效果" %}</p>
+                    <a href="{% url 'scheduling:schedule_hybrid' %}" class="btn btn-success">進入</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 檢視排程 -->
+        <div class="col-md-3">
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5>檢視排程</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{% trans "瀏覽所有排程事件" %}</p>
+                    <a href="{% url 'scheduling:view_schedule' %}" class="btn btn-success">進入</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 甘特圖排程 -->
+        <div class="col-md-3">
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5>{% trans "甘特圖排程" %}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{% trans "以圖形化方式檢視與調整排程，支援拖曳互動與即時反饋。" %}</p>
+                    <a href="{% url 'scheduling:gantt' %}" class="btn btn-success">進入</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

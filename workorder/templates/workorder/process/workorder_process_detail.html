@@ -1,0 +1,1228 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}工單工序明細 - {{ workorder.order_number }}{% endblock %}
+{% block content %}
+{% csrf_token %}
+<div class="container mt-4">
+    <!-- 工單基本資訊卡片 -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                工單基本資訊
+                {% if workorder.status == 'pending' %}（待生產）
+                {% elif workorder.status == 'in_progress' %}（生產中）
+                {% elif workorder.status == 'completed' %}（已完成）
+                {% endif %}
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row mb-2">
+                <div class="col-md-6">
+                    <strong>工單編號：</strong> {{ workorder.order_number }}
+                </div>
+                <div class="col-md-6">
+                    <strong>產品編號：</strong> {{ workorder.product_code }}
+                </div>
+            </div>
+            <p>公司代號：{{ workorder.company_code }}</p>
+            <p>建立時間：{{ workorder.created_at }}</p>
+            {% if workorder.status != 'pending' %}
+                <p>開始時間：{{ workorder.start_time|default:"-" }}</p>
+            {% endif %}
+            {% if workorder.status == 'completed' %}
+                <p>完成時間：{{ workorder.end_time|default:"-" }}</p>
+            {% endif %}
+            <p>工單狀態：
+                {% if workorder.status == 'pending' %}<span class="badge bg-warning text-dark">待生產</span>
+                {% elif workorder.status == 'in_progress' %}<span class="badge bg-info text-dark">生產中</span>
+                {% elif workorder.status == 'completed' %}<span class="badge bg-success">已完成</span>
+                {% endif %}
+            </p>
+            <p>完成數量：{{ workorder.completed_quantity }}/{{ workorder.planned_quantity }}</p>
+            <p>整體進度：{{ workorder.progress_rate|default:"-" }}</p>
+        </div>
+    </div>
+
+    <!-- 返回派工單列表按鈕 -->
+    <div class="row mb-3">
+        <div class="col-auto">
+            <a href="{% url 'workorder:dispatch_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回派工單列表
+            </a>
+        </div>
+    </div>
+
+
+
+    <!-- 工序明細表格 -->
+    {% if processes %}
+    <div class="card">
+        <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">工序明細</h4>
+            <div>
+                <button class="btn btn-light btn-sm" onclick="showAddProcessModal()">
+                    <i class="fas fa-plus"></i> 新增工序
+                </button>
+                <button class="btn btn-light btn-sm" onclick="refreshProcessList()">
+                    <i class="fas fa-sync-alt"></i> 重新整理
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>工序順序</th>
+                            <th>工序名稱</th>
+                            <th>計劃數量</th>
+                            <th>完成數量</th>
+                            <th>完成率</th>
+                            <th>狀態</th>
+                            <th>分配設備</th>
+                            <th>分配作業員</th>
+                            <th>產能倍數</th>
+                            <th>目標每小時產出</th> <!-- 新增這一欄 -->
+                            <th>預計工時</th>
+                            <th>開始時間</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for process in processes %}
+                        <tr>
+                            <td>{{ process.step_order }}</td>
+                            <td>{{ process.process_name }}</td>
+                            <td>{{ process.planned_quantity }}</td>
+                            <td>{{ process.completed_quantity }}</td>
+                            <td>{{ process.completion_rate }}</td>
+                            <td>{{ process.get_status_display }}</td>
+                            <td>{{ process.assigned_equipment|default:'-' }}</td>
+                            <td>{{ process.assigned_operator|default:'-' }}</td>
+                            <td>{{ process.capacity_multiplier }}</td>
+                            <td>{{ process.target_hourly_output|default:'-' }}</td> <!-- 新增這一格 -->
+                            <td>{{ process.estimated_hours }}</td>
+                            <td>{{ process.actual_start_time|date:'Y-m-d H:i'|default:'-' }}</td>
+                            <td>
+                                <div class="btn-group-vertical btn-group-sm" role="group">
+                                    <!-- 上下移動按鈕 -->
+                                    <button class="btn btn-sm btn-outline-info" onclick="moveProcess({{ process.id }}, 'up', {{ process.step_order }})" title="向上移動" {% if forloop.first %}disabled{% endif %}>
+                                        <i class="fas fa-chevron-up"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-info" onclick="moveProcess({{ process.id }}, 'down', {{ process.step_order }})" title="向下移動" {% if forloop.last %}disabled{% endif %}>
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                                <div class="btn-group-vertical btn-group-sm ms-1" role="group">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="startProcess({{ process.id }}, '{{ process.process_name }}')">
+                                        <i class="fas fa-user-cog"></i> 分配
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="showEditProcessModal({{ process.id }}, '{{ process.process_name }}', {{ process.step_order }}, {{ process.planned_quantity }}, {{ process.target_hourly_output }})">
+                                        <i class="fas fa-edit"></i> 編輯
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteProcess({{ process.id }}, '{{ process.process_name }}')">
+                                        <i class="fas fa-trash"></i> 刪除
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+        <div class="alert alert-info mt-4">
+            此工單尚未建立工序明細。
+            {% if request.user.is_staff or request.user.is_superuser %}
+                <form method="post" action="{% url 'workorder:create_workorder_processes' workorder.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-sm ms-2">自動建立工序明細</button>
+                </form>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+<!-- 分配作業員和設備的模態框 -->
+<div class="modal fade" id="assignmentModal" tabindex="-1" aria-labelledby="assignmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="assignmentModalLabel">分配作業員和設備</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="assignmentForm">
+                    <input type="hidden" id="processId" name="process_id">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="operatorSelect" class="form-label">選擇作業員</label>
+                                <select class="form-select" id="operatorSelect" name="operator">
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="equipmentSection">
+                            <div class="mb-3">
+                                <label for="equipmentSelect" class="form-label">選擇設備</label>
+                                <select class="form-select" id="equipmentSelect" name="equipment">
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">備註</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="可選的備註說明"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitAssignment()">確認分配</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 產能設定模態框 -->
+<div class="modal fade" id="capacityModal" tabindex="-1" aria-labelledby="capacityModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="capacityModalLabel">產能設定</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="capacityForm">
+                    <input type="hidden" id="capacityProcessId" name="process_id">
+                    <div class="mb-3">
+                        <label for="standardCapacity" class="form-label">標準產能 (pcs/hr)</label>
+                        <input type="number" class="form-control" id="standardCapacity" name="standard_capacity" min="0" value="0" readonly>
+                        <div class="form-text">此工序的標準每小時產能（唯讀）</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="capacityMultiplier" class="form-label">產能倍數</label>
+                        <select class="form-select" id="capacityMultiplier" name="capacity_multiplier" onchange="onCapacityMultiplierChange()">
+                            <option value="1">1x (單人作業)</option>
+                            <option value="2">2x (雙人作業)</option>
+                            <option value="3">3x (三人作業)</option>
+                            <option value="4">4x (四人作業)</option>
+                            <option value="5">5x (五人作業)</option>
+                        </select>
+                        <div class="form-text">選擇同時作業的人數，提升產能</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="targetHourlyOutput" class="form-label">實際產能 (pcs/hr)</label>
+                        <input type="number" class="form-control" id="targetHourlyOutput" name="target_hourly_output" min="0" value="0" readonly>
+                        <div class="form-text">實際每小時產出 = 標準產能 × 產能倍數（自動計算）</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="additionalOperators" class="form-label">額外作業員</label>
+                        <select class="form-select" id="additionalOperators" name="additional_operators" multiple>
+                            <!-- 動態載入作業員選項 -->
+                        </select>
+                        <div class="form-text">按住 Ctrl 鍵可選擇多個作業員</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="additionalEquipments" class="form-label">額外設備</label>
+                        <select class="form-select" id="additionalEquipments" name="additional_equipments" multiple>
+                            <!-- 動態載入設備選項 -->
+                        </select>
+                        <div class="form-text">按住 Ctrl 鍵可選擇多個設備</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveCapacitySettings()">儲存設定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 更新數量的模態框 -->
+<div class="modal fade" id="quantityModal" tabindex="-1" aria-labelledby="quantityModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quantityModalLabel">更新完成數量</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="quantityForm">
+                    <input type="hidden" id="quantityProcessId" name="process_id">
+                    <div class="mb-3">
+                        <label for="completedQuantity" class="form-label">完成數量</label>
+                        <input type="number" class="form-control" id="completedQuantity" name="quantity" min="0" required>
+                        <div class="form-text">輸入本次完成的數量</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quantityNotes" class="form-label">備註</label>
+                        <textarea class="form-control" id="quantityNotes" name="notes" rows="3" placeholder="可選的備註說明"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitQuantityUpdate()">確認更新</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增工序模態框 -->
+<div class="modal fade" id="addProcessModal" tabindex="-1" aria-labelledby="addProcessModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addProcessModalLabel">新增工序</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addProcessForm">
+                    <div class="mb-3">
+                        <label for="processName" class="form-label">工序名稱 <span class="text-danger">*</span></label>
+                        <select class="form-control" id="processName" name="process_name" required>
+                            <option value="">請選擇工序名稱</option>
+                            {% for process in process_names %}
+                                <option value="{{ process.name }}">{{ process.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">從下拉選單中選擇工序名稱，避免輸入錯誤</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="stepOrder" class="form-label">工序順序 <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="stepOrder" name="step_order" min="1" value="1" required>
+                        <div class="form-text">插入到此順序位置，後續工序會自動往後移</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="plannedQuantity" class="form-label">計劃數量</label>
+                        <input type="number" class="form-control" id="plannedQuantity" name="planned_quantity" min="1" value="{{ workorder.quantity }}">
+                        <div class="form-text">預設為工單總數量</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="targetHourlyOutput" class="form-label">目標每小時產出</label>
+                        <input type="number" class="form-control" id="targetHourlyOutput" name="target_hourly_output" min="1" value="100">
+                        <div class="form-text">每小時預計產出數量</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddProcess()">新增工序</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 編輯工序模態框 -->
+<div class="modal fade" id="editProcessModal" tabindex="-1" aria-labelledby="editProcessModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editProcessModalLabel">編輯工序</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editProcessForm">
+                    <input type="hidden" id="editProcessId" name="process_id">
+                    <div class="mb-3">
+                        <label for="editProcessName" class="form-label">工序名稱 <span class="text-danger">*</span></label>
+                        <select class="form-control" id="editProcessName" name="process_name" required>
+                            <option value="">請選擇工序名稱</option>
+                            {% for process in process_names %}
+                                <option value="{{ process.name }}">{{ process.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editStepOrder" class="form-label">工序順序 <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="editStepOrder" name="step_order" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editPlannedQuantity" class="form-label">計劃數量</label>
+                        <input type="number" class="form-control" id="editPlannedQuantity" name="planned_quantity" min="1">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editTargetHourlyOutput" class="form-label">目標每小時產出</label>
+                        <input type="number" class="form-control" id="editTargetHourlyOutput" name="target_hourly_output" min="1">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditProcess()">更新工序</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- 載入 Flatpickr24制日期時間選擇器 -->
+<link rel="stylesheet" href="{% static 'flatpickr/flatpickr.min.css' %}">
+<script src="{% static 'flatpickr/flatpickr.min.js' %}"></script>
+<script src="{% static 'flatpickr/zh.js' %}"></script>
+<script>
+// 全局變數
+let operators = [];
+let equipments = [];
+let assignmentModal = null;
+let quantityModal = null;
+let capacityModal = null;
+
+// 頁面載入時初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('頁面載入完成，開始初始化...');
+    
+    // 初始化 Bootstrap 模態框
+    try {
+        assignmentModal = new bootstrap.Modal(document.getElementById('assignmentModal'));
+        quantityModal = new bootstrap.Modal(document.getElementById('quantityModal'));
+        capacityModal = new bootstrap.Modal(document.getElementById('capacityModal'));
+        console.log('Bootstrap 模態框初始化成功');
+    } catch (error) {
+        console.error('Bootstrap 模態框初始化失敗:', error);
+        console.log('使用原生 JavaScript 模態框');
+    }
+    
+    // 載入作業員和設備資料
+    loadOperatorsAndEquipments();
+    
+    console.log('初始化完成');
+});
+
+// 載入作業員和設備資料
+function loadOperatorsAndEquipments() {
+    console.log('開始載入作業員和設備資料...');
+    fetch('{% url "workorder:get_operators_and_equipments" %}')
+        .then(response => {
+            console.log('API 回應狀態:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('API 回應資料:', data);
+            if (data.success) {
+                operators = data.operators;
+                equipments = data.equipments;
+                console.log('作業員和設備資料載入成功');
+                console.log('作業員數量:', operators.length);
+                console.log('設備數量:', equipments.length);
+                
+                // 處理作業員下拉選單
+                const operatorSelect = document.getElementById('operatorSelect');
+                operatorSelect.innerHTML = ''; // 清空所有選項
+                
+                operators.forEach(op => {
+                    const option = document.createElement('option');
+                    option.value = op.name;
+                    option.textContent = op.name;
+                    operatorSelect.appendChild(option);
+                });
+                
+                if (operatorSelect.options.length === 0) {
+                    operatorSelect.innerHTML = '<option value="">（查無作業員）</option>';
+                }
+                
+                // 處理設備下拉選單
+                const equipmentSelect = document.getElementById('equipmentSelect');
+                equipmentSelect.innerHTML = ''; // 清空所有選項
+                
+                equipments.forEach(eq => {
+                    const option = document.createElement('option');
+                    option.value = eq.name;
+                    option.textContent = eq.name;
+                    equipmentSelect.appendChild(option);
+                });
+                
+                if (equipmentSelect.options.length === 0) {
+                    equipmentSelect.innerHTML = '<option value="">（查無設備）</option>';
+                }
+                
+                // 產能設定彈窗的多選下拉選單也要同步載入
+                loadCapacityOptions();
+            } else {
+                console.error('載入作業員和設備資料失敗：', data.message);
+                operators = []; // 移除前端所有假作業員
+                equipments = []; // 移除前端所有假設備
+            }
+        })
+        .catch(error => {
+            console.error('載入作業員和設備資料失敗：', error);
+            operators = []; // 移除前端所有假作業員
+            equipments = []; // 移除前端所有假設備
+        });
+}
+
+// 移除分配規範指南 - 不再提供自動化提示
+function showAssignmentGuidelines(processName) {
+    // 完全移除此函數，不再顯示任何自動化提示
+}
+
+// 開始工序
+function startProcess(processId, processName) {
+    console.log('開始工序:', processId, processName);
+    
+    document.getElementById('processId').value = processId;
+    document.getElementById('assignmentModalLabel').textContent = `分配作業員和設備 - ${processName}`;
+    
+    // 先載入作業員
+    loadAssignmentOperators(processName);
+    
+    // 檢查該工序是否有指定設備
+    checkProcessEquipment(processName, processId);
+    
+    // 顯示模態框
+    const modal = new bootstrap.Modal(document.getElementById('assignmentModal'));
+    modal.show();
+}
+
+// 檢查工序是否有指定設備
+function checkProcessEquipment(processName, processId) {
+    const equipmentSection = document.getElementById('equipmentSection');
+    
+    // 先隱藏設備選擇區域
+    equipmentSection.style.display = 'none';
+    document.getElementById('equipmentSelect').value = '';
+    
+    // 檢查該工序是否有指定設備
+    fetch(`{% url "workorder:get_equipments_only" %}?process_name=${encodeURIComponent(processName)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.equipments.length > 0) {
+                // 有符合規範的設備，顯示設備選擇
+                equipmentSection.style.display = 'block';
+                loadAssignmentEquipments(processName);
+                console.log(`工序「${processName}」有 ${data.equipments.length} 個符合規範的設備`);
+            } else {
+                // 沒有符合規範的設備，保持隱藏
+                console.log(`工序「${processName}」沒有符合規範的設備`);
+            }
+        })
+        .catch(error => {
+            console.error('檢查工序設備失敗:', error);
+            // 發生錯誤時，根據工序名稱進行備用判斷
+            const isEquipmentNeeded = processName.toUpperCase().includes('SMT') || 
+                                      processName.includes('貼片') || 
+                                      processName.toUpperCase().includes('AOI') || 
+                                      processName.includes('電測') || 
+                                      processName.includes('測試') ||
+                                      processName.includes('燒碼') ||
+                                      processName.includes('點膠') ||
+                                      processName.includes('裁版') ||
+                                      processName.includes('烤箱');
+            
+            if (isEquipmentNeeded) {
+                equipmentSection.style.display = 'block';
+                loadAssignmentEquipments(processName);
+            }
+        });
+}
+
+// 提交分配
+function submitAssignment() {
+    console.log('提交分配...');
+    
+    const processId = document.getElementById('processId').value;
+    const operator = document.getElementById('operatorSelect').value;
+    const equipment = document.getElementById('equipmentSelect').value;
+    const notes = document.getElementById('notes').value;
+    
+    console.log('分配資料:', { processId, operator, equipment, notes });
+    
+    // 基本驗證
+    if (!operator && !equipment) {
+        alert('請至少選擇作業員或設備其中一項');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'start');
+    formData.append('operator', operator);
+    formData.append('equipment', equipment);
+    formData.append('notes', notes);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    console.log('發送請求到:', `/workorder/update_process_status/${processId}/`);
+    
+    // 顯示載入中訊息
+    const submitBtn = document.querySelector('#assignmentModal .btn-primary');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = '分配中...';
+    submitBtn.disabled = true;
+    
+    fetch(`/workorder/update_process_status/${processId}/`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('回應狀態:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('回應資料:', data);
+        if (data.status === 'success') {
+            // 成功訊息
+            const successMessage = `✅ 分配成功！\n\n` +
+                `作業員: ${data.assigned_operator || '未分配'}\n` +
+                `設備: ${data.assigned_equipment || '未分配'}\n` +
+                `狀態: ${data.process_status}`;
+            alert(successMessage);
+            
+            // 關閉模態框並重新載入頁面
+            const modal = bootstrap.Modal.getInstance(document.getElementById('assignmentModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            // 錯誤訊息處理
+            alert('❌ 分配失敗\n\n' + (data.message || '未知錯誤'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ 分配失敗\n\n網路連線錯誤，請檢查網路連線後重試。');
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    });
+}
+
+// 顯示產能設定
+function showCapacityModal(processId, processName, currentCapacity, currentMultiplier) {
+    console.log('顯示產能設定模態框:', processId, processName, currentCapacity, currentMultiplier);
+    
+    document.getElementById('capacityProcessId').value = processId;
+    document.getElementById('capacityModalLabel').textContent = `產能設定 - ${processName}`;
+    
+    // 直接重建產能倍數下拉選單，保證每次都能正常互動
+    const oldSelect = document.getElementById('capacityMultiplier');
+    if (oldSelect) {
+        const newSelect = document.createElement('select');
+        newSelect.className = oldSelect.className;
+        newSelect.id = oldSelect.id;
+        newSelect.name = oldSelect.name;
+        newSelect.onchange = oldSelect.onchange;
+        for (let i = 1; i <= 5; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `${i}x (${['單人','雙人','三人','四人','五人'][i-1]}作業)`;
+            newSelect.appendChild(option);
+        }
+        oldSelect.replaceWith(newSelect);
+    }
+    
+    // 從 API 取得產能資訊
+    fetch(`/workorder/get_process_capacity_info/${processId}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const capacityInfo = data.capacity_info;
+                
+                // 設定標準產能
+                document.getElementById('standardCapacity').value = capacityInfo.standard_capacity;
+                
+                // 設定當前倍數
+                document.getElementById('capacityMultiplier').value = capacityInfo.current_multiplier;
+                
+                // 設定額外作業員和設備（多選）
+                setSelectedOptions('additionalOperators', capacityInfo.additional_operators);
+                setSelectedOptions('additionalEquipments', capacityInfo.additional_equipments);
+                
+                // 計算並設定實際產能
+                calculateActualCapacity();
+                
+                console.log('產能資訊載入成功:', capacityInfo);
+            } else {
+                console.error('載入產能資訊失敗:', data.message);
+                // 使用預設值
+                document.getElementById('standardCapacity').value = currentCapacity > 0 && currentMultiplier > 0 ? 
+                    Math.round(currentCapacity / currentMultiplier) : 0;
+                document.getElementById('capacityMultiplier').value = currentMultiplier || 1;
+                calculateActualCapacity();
+            }
+        })
+        .catch(error => {
+            console.error('載入產能資訊失敗:', error);
+            // 使用預設值
+            document.getElementById('standardCapacity').value = currentCapacity > 0 && currentMultiplier > 0 ? 
+                Math.round(currentCapacity / currentMultiplier) : 0;
+            document.getElementById('capacityMultiplier').value = currentMultiplier || 1;
+            calculateActualCapacity();
+        });
+    
+    // 顯示模態框
+    try {
+        if (capacityModal && typeof capacityModal.show === 'function') {
+            capacityModal.show();
+        } else {
+            // 使用原生 JavaScript 顯示模態框
+            const modal = document.getElementById('capacityModal');
+            modal.style.display = 'block';
+            modal.classList.add('show');
+            document.body.classList.add('modal-open');
+            
+            // 添加背景遮罩
+            const backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop fade show';
+            backdrop.id = 'capacityModalBackdrop';
+            document.body.appendChild(backdrop);
+        }
+    } catch (error) {
+        console.error('顯示產能設定模態框失敗:', error);
+        alert('無法開啟產能設定視窗，請重新整理頁面後再試');
+    }
+}
+
+// 載入產能設定選項
+function loadCapacityOptions() {
+    console.log('載入產能設定選項...');
+    // 載入作業員
+    const operatorSelect = document.getElementById('additionalOperators');
+    operatorSelect.innerHTML = '';
+    fetch('{% url "workorder:get_operators_only" %}')
+        .then(response => response.json())
+        .then(data => {
+            // 加入中文註解：這裡一定要有資料才塞進下拉選單
+            if (data.success && data.operators.length > 0) {
+                data.operators.forEach(op => {
+                    const option = document.createElement('option');
+                    option.value = op.name;
+                    option.textContent = op.name;
+                    operatorSelect.appendChild(option);
+                });
+            } else {
+                // 沒有資料時顯示提示
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = '（查無作業員）';
+                operatorSelect.appendChild(option);
+            }
+        })
+        .catch(() => {
+            // 載入失敗時顯示提示
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '（載入失敗）';
+            operatorSelect.appendChild(option);
+        });
+    // 載入設備
+    const equipmentSelect = document.getElementById('additionalEquipments');
+    equipmentSelect.innerHTML = '';
+    fetch('{% url "workorder:get_equipments_only" %}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.equipments.length > 0) {
+                data.equipments.forEach(eq => {
+                    const option = document.createElement('option');
+                    option.value = eq.name;
+                    option.textContent = eq.name;
+                    equipmentSelect.appendChild(option);
+                });
+            } else {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = '（查無設備）';
+                equipmentSelect.appendChild(option);
+            }
+        })
+        .catch(() => {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '（載入失敗）';
+            equipmentSelect.appendChild(option);
+        });
+}
+
+// 設定多選下拉選單的選中值
+function setSelectedOptions(selectId, selectedValues) {
+    const select = document.getElementById(selectId);
+    if (!select || !selectedValues) return;
+    
+    // 清空所有選中狀態
+    Array.from(select.options).forEach(option => {
+        option.selected = false;
+    });
+    
+    // 如果 selectedValues 是字串，轉換為陣列
+    let values = selectedValues;
+    if (typeof selectedValues === 'string') {
+        values = selectedValues.split(',').map(v => v.trim()).filter(v => v);
+    }
+    
+    // 設定選中的選項
+    values.forEach(value => {
+        const option = Array.from(select.options).find(opt => opt.value === value);
+        if (option) {
+            option.selected = true;
+        }
+    });
+}
+
+// 自動計算實際產能
+function calculateActualCapacity() {
+    const standardCapacity = parseFloat(document.getElementById('standardCapacity').value) || 0;
+    const capacityMultiplier = parseFloat(document.getElementById('capacityMultiplier').value) || 1;
+    
+    // 計算實際產能 = 標準產能 × 產能倍數
+    const actualCapacity = Math.round(standardCapacity * capacityMultiplier);
+    
+    // 更新實際產能欄位
+    document.getElementById('targetHourlyOutput').value = actualCapacity;
+    
+    console.log(`自動計算產能: 標準產能=${standardCapacity}, 倍數=${capacityMultiplier}, 實際產能=${actualCapacity}`);
+}
+
+// 儲存產能設定
+function saveCapacitySettings() {
+    const processId = document.getElementById('capacityProcessId').value;
+    const capacityMultiplier = document.getElementById('capacityMultiplier').value;
+    const targetHourlyOutput = document.getElementById('targetHourlyOutput').value;
+    
+    // 處理多選下拉選單的值
+    const additionalOperatorsSelect = document.getElementById('additionalOperators');
+    const additionalOperators = Array.from(additionalOperatorsSelect.selectedOptions)
+        .map(option => option.value)
+        .join(',');
+    
+    const additionalEquipmentsSelect = document.getElementById('additionalEquipments');
+    const additionalEquipments = Array.from(additionalEquipmentsSelect.selectedOptions)
+        .map(option => option.value)
+        .join(',');
+    
+    const formData = new FormData();
+    formData.append('capacity_multiplier', capacityMultiplier);
+    formData.append('target_hourly_output', targetHourlyOutput);
+    formData.append('additional_operators', additionalOperators);
+    formData.append('additional_equipments', additionalEquipments);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch(`/workorder/update_process_capacity/${processId}/`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('產能設定儲存成功！');
+            location.reload();
+        } else {
+            alert('產能設定儲存失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('產能設定儲存失敗，請檢查網路連線');
+    });
+}
+
+// 暫停工序
+function pauseProcess(processId) {
+    if (confirm('確定要暫停此工序嗎？')) {
+        updateProcessStatus(processId, 'pause');
+    }
+}
+
+// 恢復工序
+function resumeProcess(processId) {
+    updateProcessStatus(processId, 'resume');
+}
+
+// 完成工序
+function completeProcess(processId) {
+    if (confirm('確定要完成此工序嗎？')) {
+        updateProcessStatus(processId, 'complete');
+    }
+}
+
+// 更新數量
+function updateQuantity(processId) {
+    document.getElementById('quantityProcessId').value = processId;
+    try {
+        if (quantityModal && typeof quantityModal.show === 'function') {
+            quantityModal.show();
+        } else {
+            // 使用原生 JavaScript 顯示模態框
+            const modal = document.getElementById('quantityModal');
+            modal.style.display = 'block';
+            modal.classList.add('show');
+            document.body.classList.add('modal-open');
+            
+            // 添加背景遮罩
+            const backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop fade show';
+            backdrop.id = 'quantityModalBackdrop';
+            document.body.appendChild(backdrop);
+        }
+    } catch (error) {
+        console.error('顯示數量更新模態框失敗:', error);
+        alert('無法開啟數量更新視窗，請重新整理頁面後再試');
+    }
+}
+
+// 提交數量更新
+function submitQuantityUpdate() {
+    const processId = document.getElementById('quantityProcessId').value;
+    const quantity = document.getElementById('completedQuantity').value;
+    const notes = document.getElementById('quantityNotes').value;
+    
+    const formData = new FormData();
+    formData.append('action', 'update_quantity');
+    formData.append('quantity', quantity);
+    formData.append('notes', notes);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch(`/workorder/update_process_status/${processId}/`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            alert('數量更新成功！');
+            location.reload();
+        } else {
+            alert('數量更新失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('數量更新失敗，請檢查網路連線');
+    });
+}
+
+// 通用狀態更新函數
+function updateProcessStatus(processId, action) {
+    const formData = new FormData();
+    formData.append('action', action);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch(`/workorder/update_process_status/${processId}/`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            alert('操作成功！');
+            location.reload();
+        } else {
+            alert('操作失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('操作失敗，請檢查網路連線');
+    });
+}
+
+// 關閉模態框的函數
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('show');
+        document.body.classList.remove('modal-open');
+        // 強制移除所有 modal-backdrop，避免卡住
+        document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+    }
+}
+
+// 工序管理相關函數
+
+// 顯示新增工序模態框
+function showAddProcessModal() {
+    // 設定預設順序為最後一個工序的順序+1
+    const processes = document.querySelectorAll('tbody tr');
+    const maxStepOrder = processes.length > 0 ? processes.length + 1 : 1;
+    document.getElementById('stepOrder').value = maxStepOrder;
+    
+    const modal = new bootstrap.Modal(document.getElementById('addProcessModal'));
+    modal.show();
+}
+
+// 提交新增工序
+function submitAddProcess() {
+    const processName = document.getElementById('processName').value;
+    const stepOrder = document.getElementById('stepOrder').value;
+    const plannedQuantity = document.getElementById('plannedQuantity').value;
+    const targetHourlyOutput = document.getElementById('targetHourlyOutput').value;
+    
+    if (!processName) {
+        alert('請選擇工序名稱');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('process_name', processName);
+    formData.append('step_order', stepOrder);
+    formData.append('planned_quantity', plannedQuantity);
+    formData.append('target_hourly_output', targetHourlyOutput);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch('{% url "workorder:add_process" workorder.id %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('新增工序失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('新增工序失敗，請檢查網路連線');
+    });
+}
+
+// 顯示編輯工序模態框
+function showEditProcessModal(processId, processName, stepOrder, plannedQuantity, targetHourlyOutput) {
+    document.getElementById('editProcessId').value = processId;
+    
+    // 設定下拉選單的選中值
+    const editProcessNameSelect = document.getElementById('editProcessName');
+    editProcessNameSelect.value = processName;
+    
+    document.getElementById('editStepOrder').value = stepOrder;
+    document.getElementById('editPlannedQuantity').value = plannedQuantity;
+    document.getElementById('editTargetHourlyOutput').value = targetHourlyOutput;
+    
+    const modal = new bootstrap.Modal(document.getElementById('editProcessModal'));
+    modal.show();
+}
+
+// 提交編輯工序
+function submitEditProcess() {
+    const processId = document.getElementById('editProcessId').value;
+    const processName = document.getElementById('editProcessName').value;
+    const stepOrder = document.getElementById('editStepOrder').value;
+    const plannedQuantity = document.getElementById('editPlannedQuantity').value;
+    const targetHourlyOutput = document.getElementById('editTargetHourlyOutput').value;
+    
+    if (!processName) {
+        alert('請選擇工序名稱');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('process_name', processName);
+    formData.append('step_order', stepOrder);
+    formData.append('planned_quantity', plannedQuantity);
+    formData.append('target_hourly_output', targetHourlyOutput);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch(`{% url "workorder:edit_process" 0 %}`.replace('0', processId), {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('編輯工序失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('編輯工序失敗，請檢查網路連線');
+    });
+}
+
+// 刪除工序
+function deleteProcess(processId, processName) {
+    if (!confirm(`確定要刪除工序「${processName}」嗎？\n\n注意：只有待生產狀態的工序才能刪除。`)) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch(`{% url "workorder:delete_process" 0 %}`.replace('0', processId), {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('刪除工序失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('刪除工序失敗，請檢查網路連線');
+    });
+}
+
+// 移動工序（上下移動）
+function moveProcess(processId, direction, currentOrder) {
+    if (direction === 'up' && currentOrder <= 1) {
+        alert('第一個工序無法向上移動');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('process_id', processId);
+    formData.append('direction', direction);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch('{% url "workorder:move_process" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('移動工序失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('移動工序失敗，請檢查網路連線');
+    });
+}
+
+// 重新整理工序列表
+function refreshProcessList() {
+    location.reload();
+}
+
+// 為模態框的關閉按鈕添加事件監聽器
+document.addEventListener('DOMContentLoaded', function() {
+    // 分配模態框關閉按鈕
+    const assignmentCloseButtons = document.querySelectorAll('#assignmentModal .btn-close, #assignmentModal .btn-secondary');
+    assignmentCloseButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            closeModal('assignmentModal');
+        });
+    });
+    
+    // 數量更新模態框關閉按鈕
+    const quantityCloseButtons = document.querySelectorAll('#quantityModal .btn-close, #quantityModal .btn-secondary');
+    quantityCloseButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            closeModal('quantityModal');
+        });
+    });
+    
+    // 產能設定模態框關閉按鈕
+    const capacityCloseButtons = document.querySelectorAll('#capacityModal .btn-close, #capacityModal .btn-secondary');
+    capacityCloseButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            closeModal('capacityModal');
+        });
+    });
+    
+    // 新增工序模態框關閉按鈕
+    const addProcessCloseButtons = document.querySelectorAll('#addProcessModal .btn-close, #addProcessModal .btn-secondary');
+    addProcessCloseButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            closeModal('addProcessModal');
+        });
+    });
+    
+    // 編輯工序模態框關閉按鈕
+    const editProcessCloseButtons = document.querySelectorAll('#editProcessModal .btn-close, #editProcessModal .btn-secondary');
+    editProcessCloseButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            closeModal('editProcessModal');
+        });
+    });
+});
+
+// 分配作業員和設備下拉選單載入
+function loadAssignmentOperators(processName = '') {
+    const operatorSelect = document.getElementById('operatorSelect');
+    operatorSelect.innerHTML = ''; // 清空所有選項
+    
+    // 構建 URL，包含工序名稱參數
+    let url = '{% url "workorder:get_operators_only" %}';
+    if (processName) {
+        url += `?process_name=${encodeURIComponent(processName)}`;
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.operators.length > 0) {
+                data.operators.forEach(op => {
+                    const option = document.createElement('option');
+                    option.value = op.name;
+                    option.textContent = op.name;
+                    operatorSelect.appendChild(option);
+                });
+            } else {
+                operatorSelect.innerHTML = '<option value="">（查無符合規範的作業員）</option>';
+            }
+        })
+        .catch(() => {
+            operatorSelect.innerHTML = '<option value="">（載入失敗）</option>';
+        });
+}
+
+function loadAssignmentEquipments(processName = '') {
+    const equipmentSelect = document.getElementById('equipmentSelect');
+    equipmentSelect.innerHTML = ''; // 清空所有選項
+    
+    // 構建 URL，包含工序名稱參數
+    let url = '{% url "workorder:get_equipments_only" %}';
+    if (processName) {
+        url += `?process_name=${encodeURIComponent(processName)}`;
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.equipments.length > 0) {
+                data.equipments.forEach(eq => {
+                    const option = document.createElement('option');
+                    option.value = eq.name;
+                    option.textContent = eq.name;
+                    equipmentSelect.appendChild(option);
+                });
+            } else {
+                equipmentSelect.innerHTML = '<option value="">（查無符合規範的設備）</option>';
+            }
+        })
+        .catch(() => {
+            equipmentSelect.innerHTML = '<option value="">（載入失敗）</option>';
+        });
+}
+
+// 產能倍數改變時，重新計算實際產能
+function onCapacityMultiplierChange() {
+    calculateActualCapacity();
+}
+</script>
+{% endblock %} 

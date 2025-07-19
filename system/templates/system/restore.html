@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+{{ title }} - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+    <hr>
+    <div class="card">
+        <div class="card-body">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="sql_file">上傳備份文件 (.sql)</label>
+                    <input type="file" name="sql_file" id="sql_file" class="form-control-file" accept=".sql" required>
+                </div>
+                <button type="submit" class="btn btn-danger" onclick="return confirm('警告：此操作將覆蓋當前資料庫，是否繼續？');">恢復資料庫</button>
+                <a href="{% url 'system:backup' %}" class="btn btn-secondary">返回</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

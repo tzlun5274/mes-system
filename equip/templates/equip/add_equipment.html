@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "添加設備 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "添加設備" %}</h2>
+    <hr>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="name">設備名稱</label>
+            <input type="text" name="name" id="name" class="form-control" value="{{ name|default:'' }}" required>
+            <div class="form-text">請輸入設備的名稱，例如：SMT-001</div>
+        </div>
+        <div class="form-group">
+            <label for="model">型號</label>
+            <input type="text" name="model" id="model" class="form-control" value="{{ model|default:'' }}">
+            <div class="form-text">請輸入設備型號，例如：SMT-2023</div>
+        </div>
+        <div class="form-group">
+            <label for="status">狀態</label>
+            <select name="status" id="status" class="form-control">
+                <option value="idle" {% if status == 'idle' %}selected{% endif %}>閒置</option>
+                <option value="running" {% if status == 'running' %}selected{% endif %}>運轉中</option>
+                <option value="maintenance" {% if status == 'maintenance' %}selected{% endif %}>維修</option>
+            </select>
+            <div class="form-text">請選擇設備目前的狀態</div>
+        </div>
+        <div class="form-group">
+            <label for="production_line">所屬產線</label>
+            <select name="production_line" id="production_line" class="form-control">
+                <option value="">請選擇產線</option>
+                {% for production_line in production_lines %}
+                <option value="{{ production_line.id }}" {% if production_line_id == production_line.id %}selected{% endif %}>
+                    {{ production_line.line_name }} ({{ production_line.line_code }})
+                </option>
+                {% endfor %}
+            </select>
+            <div class="form-text">選擇此設備所屬的生產線</div>
+        </div>
+        <button type="submit" class="btn btn-primary">提交</button>
+        <a href="{% url 'equip:index' %}" class="btn btn-secondary">返回</a>
+    </form>
+</div>
+{% endblock %}

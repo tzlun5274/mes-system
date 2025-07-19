@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}新增庫存交易 - MES 系統{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    .form-card {
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .transaction-type-btn {
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+    }
+    
+    .transaction-type-btn:hover {
+        transform: translateY(-2px);
+    }
+    
+    .transaction-type-btn.active {
+        border-color: #007bff;
+        background-color: #f8f9fa;
+    }
+    
+    .transaction-type-in {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .transaction-type-out {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .transaction-type-transfer {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .transaction-type-adjustment {
+        background-color: #e2e3e5;
+        color: #383d41;
+    }
+    
+    .transaction-type-return {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="display-6 fw-bold text-primary">
+                        <i class="bi bi-plus-circle"></i> 新增庫存交易
+                    </h1>
+                    <p class="lead text-muted">記錄材料庫存的進出、調撥、調整等交易</p>
+                </div>
+                <div>
+                    <a href="{% url 'material:inventory_management' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card form-card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-archive"></i> 交易資訊</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <!-- 交易類型選擇 -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">交易類型 *</label>
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <div class="transaction-type-btn transaction-type-in text-center" data-type="in">
+                                        <i class="bi bi-arrow-down-circle fs-3"></i>
+                                        <div class="mt-2">入庫</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="transaction-type-btn transaction-type-out text-center" data-type="out">
+                                        <i class="bi bi-arrow-up-circle fs-3"></i>
+                                        <div class="mt-2">出庫</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="transaction-type-btn transaction-type-transfer text-center" data-type="transfer">
+                                        <i class="bi bi-arrow-left-right fs-3"></i>
+                                        <div class="mt-2">調撥</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="transaction-type-btn transaction-type-adjustment text-center" data-type="adjustment">
+                                        <i class="bi bi-slash-circle fs-3"></i>
+                                        <div class="mt-2">調整</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="transaction-type-btn transaction-type-return text-center" data-type="return">
+                                        <i class="bi bi-arrow-return-left fs-3"></i>
+                                        <div class="mt-2">退貨</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="transaction_type" id="transaction_type" required>
+                        </div>
+
+                        <div class="row">
+                            <!-- 材料選擇 -->
+                            <div class="col-md-6 mb-3">
+                                <label for="material_id" class="form-label">材料 *</label>
+                                <select class="form-select" id="material_id" name="material_id" required>
+                                    <option value="">請選擇材料</option>
+                                    {% for material in materials %}
+                                    <option value="{{ material.id }}">{{ material.name }} ({{ material.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- 數量 -->
+                            <div class="col-md-6 mb-3">
+                                <label for="quantity" class="form-label">數量 *</label>
+                                <input type="number" class="form-control" id="quantity" name="quantity" 
+                                       step="0.01" min="0" required placeholder="請輸入數量">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <!-- 單位成本 -->
+                            <div class="col-md-6 mb-3">
+                                <label for="unit_cost" class="form-label">單位成本</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="unit_cost" name="unit_cost" 
+                                           step="0.01" min="0" placeholder="請輸入單位成本">
+                                </div>
+                            </div>
+
+                            <!-- 倉庫位置 -->
+                            <div class="col-md-6 mb-3">
+                                <label for="warehouse" class="form-label">倉庫位置 *</label>
+                                <select class="form-select" id="warehouse" name="warehouse" required>
+                                    <option value="">請選擇倉庫</option>
+                                    {% for warehouse in warehouses %}
+                                    <option value="{{ warehouse }}">{{ warehouse }}</option>
+                                    {% endfor %}
+                                    <option value="new">新增倉庫</option>
+                                </select>
+                                <input type="text" class="form-control mt-2" id="new_warehouse" name="new_warehouse" 
+                                       placeholder="請輸入新倉庫名稱" style="display: none;">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <!-- 參考單號 -->
+                            <div class="col-md-6 mb-3">
+                                <label for="reference_no" class="form-label">參考單號</label>
+                                <input type="text" class="form-control" id="reference_no" name="reference_no" 
+                                       placeholder="採購單號、工單號等">
+                            </div>
+
+                            <!-- 批次號 -->
+                            <div class="col-md-6 mb-3">
+                                <label for="batch_no" class="form-label">批次號</label>
+                                <input type="text" class="form-control" id="batch_no" name="batch_no" 
+                                       placeholder="批次編號">
+                            </div>
+                        </div>
+
+                        <!-- 來源和目標位置（調撥時顯示） -->
+                        <div class="row" id="location_fields" style="display: none;">
+                            <div class="col-md-6 mb-3">
+                                <label for="from_location" class="form-label">來源位置</label>
+                                <input type="text" class="form-control" id="from_location" name="from_location" 
+                                       placeholder="來源倉庫或位置">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="to_location" class="form-label">目標位置</label>
+                                <input type="text" class="form-control" id="to_location" name="to_location" 
+                                       placeholder="目標倉庫或位置">
+                            </div>
+                        </div>
+
+                        <!-- 效期 -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="expiry_date" class="form-label">效期</label>
+                                <input type="date" class="form-control" id="expiry_date" name="expiry_date">
+                            </div>
+                        </div>
+
+                        <!-- 備註 -->
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">備註</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                      placeholder="交易備註或說明"></textarea>
+                        </div>
+
+                        <!-- 提交按鈕 -->
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
+                                <i class="bi bi-arrow-left"></i> 取消
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> 確認新增
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// 交易類型選擇
+document.querySelectorAll('.transaction-type-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        // 移除所有活動狀態
+        document.querySelectorAll('.transaction-type-btn').forEach(b => b.classList.remove('active'));
+        // 添加活動狀態
+        this.classList.add('active');
+        // 設置隱藏欄位值
+        document.getElementById('transaction_type').value = this.dataset.type;
+        
+        // 根據交易類型顯示/隱藏相關欄位
+        const locationFields = document.getElementById('location_fields');
+        if (this.dataset.type === 'transfer') {
+            locationFields.style.display = 'block';
+        } else {
+            locationFields.style.display = 'none';
+        }
+    });
+});
+
+// 倉庫選擇處理
+document.getElementById('warehouse').addEventListener('change', function() {
+    const newWarehouse = document.getElementById('new_warehouse');
+    if (this.value === 'new') {
+        newWarehouse.style.display = 'block';
+        newWarehouse.required = true;
+    } else {
+        newWarehouse.style.display = 'none';
+        newWarehouse.required = false;
+    }
+});
+
+// 表單驗證
+document.querySelector('form').addEventListener('submit', function(e) {
+    const transactionType = document.getElementById('transaction_type').value;
+    if (!transactionType) {
+        e.preventDefault();
+        alert('請選擇交易類型');
+        return;
+    }
+    
+    const warehouse = document.getElementById('warehouse').value;
+    if (warehouse === 'new') {
+        const newWarehouse = document.getElementById('new_warehouse').value;
+        if (!newWarehouse.trim()) {
+            e.preventDefault();
+            alert('請輸入新倉庫名稱');
+            return;
+        }
+    }
+});
+</script>
+{% endblock %} 

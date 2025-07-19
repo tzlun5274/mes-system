@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "物料存量看板 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "物料存量看板" %}</h2>
+    <hr>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "物料編號" %}</th>
+                        <th>{% trans "物料名稱" %}</th>
+                        <th>{% trans "庫存數量" %}</th>
+                        <th>{% trans "單位" %}</th>
+                        <th>{% trans "最後更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for material in material_stock %}
+                    <tr>
+                        <td>{{ material.material_code }}</td>
+                        <td>{{ material.material_name }}</td>
+                        <td>{{ material.stock_quantity }}</td>
+                        <td>{{ material.unit }}</td>
+                        <td>{{ material.last_updated|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">{% trans "無物料存量數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{% url 'kanban:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

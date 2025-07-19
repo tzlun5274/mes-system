@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load tz %}
+{% block title %}工序執行日誌 - {{ process.process_name }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <!-- 工序基本資訊 -->
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h3 class="mb-0">工序基本資訊</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-2">
+                    <strong>工單編號：</strong><br>
+                    <span class="text-primary">{{ process.workorder.order_number }}</span>
+                </div>
+                <div class="col-md-2">
+                    <strong>產品編號：</strong><br>
+                    <span class="text-primary">{{ process.workorder.product_id }}</span>
+                </div>
+                <div class="col-md-2">
+                    <strong>工單總數量：</strong><br>
+                    <span class="text-success fw-bold">{{ process.workorder.quantity }} 件</span>
+                </div>
+                <div class="col-md-2">
+                    <strong>工序名稱：</strong><br>
+                    {{ process.process_name }}
+                </div>
+                <div class="col-md-2">
+                    <strong>工序順序：</strong><br>
+                    {{ process.step_order }}
+                </div>
+                <div class="col-md-2">
+                    <strong>當前狀態：</strong><br>
+                    <span class="badge 
+                        {% if process.status == 'pending' %}bg-secondary
+                        {% elif process.status == 'in_progress' %}bg-primary
+                        {% elif process.status == 'completed' %}bg-success
+                        {% elif process.status == 'paused' %}bg-warning
+                        {% else %}bg-danger{% endif %}">
+                        {{ process.get_status_display }}
+                    </span>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-md-3">
+                    <strong>計劃數量：</strong>{{ process.planned_quantity }}
+                </div>
+                <div class="col-md-3">
+                    <strong>完成數量：</strong>{{ process.completed_quantity }}
+                </div>
+                <div class="col-md-3">
+                    <strong>完成率：</strong>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar {% if process.completion_rate >= 100 %}bg-success{% elif process.completion_rate >= 50 %}bg-warning{% else %}bg-info{% endif %}" 
+                             role="progressbar" style="width: {{ process.completion_rate }}%">
+                            {{ process.completion_rate }}%
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <strong>分配設備：</strong>
+                    {% if process.assigned_equipment %}
+                        {% for equipment in equipments %}
+                            {% if equipment.id|stringformat:"s" == process.assigned_equipment %}
+                                {{ equipment.name }}
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="row mb-3">
+        <div class="col-auto">
+            <a href="{% url 'workorder:workorder_process_detail' process.workorder.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回工序明細
+            </a>
+        </div>
+    </div>
+
+    <!-- 執行日誌列表 -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">
+                <i class="fas fa-history"></i> 執行日誌
+                <span class="badge bg-light text-dark ms-2">{{ logs.count }}</span>
+            </h4>
+        </div>
+        <div class="card-body">
+            {% if logs %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>時間</th>
+                            <th>操作類型</th>
+                            <th>操作前數量</th>
+                            <th>操作後數量</th>
+                            <th>操作員</th>
+                            <th>設備</th>
+                            <th>備註</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>{{ log.created_at|date:'Y-m-d H:i:s' }}</td>
+                            <td>
+                                <span class="badge 
+                                    {% if log.action == 'start' %}bg-success
+                                    {% elif log.action == 'pause' %}bg-warning
+                                    {% elif log.action == 'resume' %}bg-info
+                                    {% elif log.action == 'complete' %}bg-primary
+                                    {% elif log.action == 'quantity_update' %}bg-secondary
+                                    {% else %}bg-dark{% endif %}">
+                                    {% if log.action == 'start' %}開始生產
+                                    {% elif log.action == 'pause' %}暫停生產
+                                    {% elif log.action == 'resume' %}恢復生產
+                                    {% elif log.action == 'complete' %}完成生產
+                                    {% elif log.action == 'quantity_update' %}數量更新
+                                    {% elif log.action == 'quality_check' %}品質檢查
+                                    {% elif log.action == 'equipment_change' %}設備更換
+                                    {% elif log.action == 'operator_change' %}作業員更換
+                                    {% else %}{{ log.action }}{% endif %}
+                                </span>
+                            </td>
+                            <td>{{ log.quantity_before }}</td>
+                            <td>{{ log.quantity_after }}</td>
+                            <td>{{ log.operator|default:"-" }}</td>
+                            <td>{{ log.equipment|default:"-" }}</td>
+                            <td>{{ log.notes|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> 
+                此工序尚無執行日誌記錄。
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

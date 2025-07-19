@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "設備管理 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "設備管理" %}</h2>
+    <hr>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    <div class="card">
+        <div class="card-header d-flex align-items-center">
+                <a href="{% url 'equip:add_equipment' %}" class="btn btn-primary btn-sm">{% trans "添加設備" %}</a>
+                {% if user.is_superuser %}
+                <a href="{% url 'equip:export_equipment' %}" class="btn btn-success btn-sm ms-2">{% trans "匯出設備" %}</a>
+                <a href="{% url 'equip:import_equipment' %}" class="btn btn-info btn-sm ms-2">{% trans "匯入設備" %}</a>
+                {% endif %}
+            </div>           
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "設備名稱" %}</th>
+                        <th>{% trans "所屬產線" %}</th>
+                        <th>{% trans "型號" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                        <th>{% trans "操作" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for equipment in equipments %}
+                    <tr>
+                        <td>{{ equipment.name }}</td>
+                        <td>{% if equipment.production_line %}{{ equipment.production_line.line_name }}{% else %}{% trans "未指定" %}{% endif %}</td>
+                        <td>{{ equipment.model }}</td>
+                        <td>{{ equipment.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>
+                            <a href="{% url 'equip:equipment_detail' equipment.id %}" class="btn btn-info btn-sm">{% trans "詳情" %}</a>
+                            {% if user.is_superuser %}
+                            <a href="{% url 'equip:edit_equipment' equipment.id %}" class="btn btn-warning btn-sm ms-2">{% trans "編輯" %}</a>
+                            <a href="{% url 'equip:delete_equipment' equipment.id %}" class="btn btn-danger btn-sm ms-2" onclick="return confirm('確定要刪除設備 {{ equipment.name }} 嗎？');">{% trans "刪除" %}</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">{% trans "無設備資料" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

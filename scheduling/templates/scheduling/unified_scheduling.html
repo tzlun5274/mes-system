@@ -1,0 +1,825 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}統一排程操作 - MES 系統{% endblock %}
+
+{% block extra_css %}
+<!-- Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- Font Awesome -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<!-- DHTMLX Gantt -->
+<link href="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.css" rel="stylesheet">
+<!-- SweetAlert2 -->
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+<style>
+    .scheduling-card {
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+    .scheduling-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    .scheduling-card.selected {
+        border-color: #007bff;
+        background-color: #f8f9fa;
+    }
+    .progress-container {
+        display: none;
+        margin: 20px 0;
+    }
+    .conflict-warning {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 5px;
+        padding: 15px;
+        margin: 10px 0;
+    }
+    .gantt-container {
+        height: 600px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        margin-top: 20px;
+    }
+    .parameter-modal .modal-body {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    .parameter-group {
+        border: 1px solid #e9ecef;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    .parameter-group h6 {
+        color: #495057;
+        margin-bottom: 10px;
+    }
+    .btn-scheduling {
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1em;
+        font-weight: 500;
+    }
+    .btn-scheduling i {
+        font-size: 2em;
+        margin-bottom: 10px;
+    }
+    .conflict-item {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 3px;
+        padding: 8px;
+        margin: 5px 0;
+        font-size: 0.9em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="text-primary">
+                <i class="fas fa-calendar-alt me-2"></i>
+                統一排程操作
+            </h2>
+            <p class="text-muted">選擇排程模式並設定參數，系統將自動檢查資源衝突並執行排程</p>
+        </div>
+    </div>
+
+    <!-- 排程模式選擇 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cogs me-2"></i>
+                        選擇排程模式
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- 全自動排程 -->
+                        <div class="col-md-3 mb-3">
+                            <div class="card scheduling-card h-100" data-mode="auto">
+                                <div class="card-body text-center btn-scheduling">
+                                    <i class="fas fa-robot text-primary"></i>
+                                    <h6>全自動排程</h6>
+                                    <small class="text-muted">AI 演算法自動優化</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 半自動排程 -->
+                        <div class="col-md-3 mb-3">
+                            <div class="card scheduling-card h-100" data-mode="semi_auto">
+                                <div class="card-body text-center btn-scheduling">
+                                    <i class="fas fa-handshake text-success"></i>
+                                    <h6>半自動排程</h6>
+                                    <small class="text-muted">人機協作排程</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 混合排程 -->
+                        <div class="col-md-3 mb-3">
+                            <div class="card scheduling-card h-100" data-mode="hybrid">
+                                <div class="card-body text-center btn-scheduling">
+                                    <i class="fas fa-balance-scale text-warning"></i>
+                                    <h6>混合排程</h6>
+                                    <small class="text-muted">自動與手動結合</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 手動排程 -->
+                        <div class="col-md-3 mb-3">
+                            <div class="card scheduling-card h-100" data-mode="manual">
+                                <div class="card-body text-center btn-scheduling">
+                                    <i class="fas fa-mouse-pointer text-info"></i>
+                                    <h6>手動排程</h6>
+                                    <small class="text-muted">拖曳式甘特圖操作</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 排程參數設定 -->
+    <div class="row mb-4" id="parameterSection" style="display: none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-sliders-h me-2"></i>
+                        排程參數設定
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="schedulingForm">
+                        <!-- 日期範圍設定 -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="dateRange" class="form-label">排程日期範圍</label>
+                                <div class="input-group">
+                                    <input type="date" class="form-control" id="startDate" required>
+                                    <span class="input-group-text">至</span>
+                                    <input type="date" class="form-control" id="endDate" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 設備選擇 -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label class="form-label">選擇設備</label>
+                                <div class="row" id="unitSelection">
+                                    {% for unit in units %}
+                                    <div class="col-md-3 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" value="{{ unit.id }}" id="unit{{ unit.id }}">
+                                            <label class="form-check-label" for="unit{{ unit.id }}">
+                                                {{ unit.name }} (產能: {{ unit.capacity }})
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 模式特定參數 -->
+                        <div id="modeSpecificParams">
+                            <!-- 參數將由 JavaScript 動態載入 -->
+                        </div>
+
+                        <!-- 操作按鈕 -->
+                        <div class="row mt-4">
+                            <div class="col-12 text-center">
+                                <button type="button" class="btn btn-secondary me-2" id="checkConflictsBtn">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    檢查資源衝突
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-play me-1"></i>
+                                    開始排程
+                                </button>
+                                <button type="button" class="btn btn-outline-primary ms-2" id="resetBtn">
+                                    <i class="fas fa-redo me-1"></i>
+                                    重置
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 衝突警告 -->
+    <div class="row mb-4" id="conflictWarning" style="display: none;">
+        <div class="col-12">
+            <div class="conflict-warning">
+                <h6 class="text-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    發現資源衝突
+                </h6>
+                <div id="conflictDetails"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 進度條 -->
+    <div class="row mb-4" id="progressContainer" style="display: none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">排程進度</h6>
+                    <div class="progress mb-2">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <small class="text-muted" id="progressText">準備中...</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 甘特圖容器 -->
+    <div class="row" id="ganttContainer" style="display: none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        排程甘特圖
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="gantt-container" id="gantt_here"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 參數設定模態框 -->
+<div class="modal fade" id="parameterModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">進階參數設定</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="advancedParameters">
+                    <!-- 進階參數將由 JavaScript 動態載入 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="saveParameters">儲存參數</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+<!-- DHTMLX Gantt -->
+<script src="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.js"></script>
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- 原生 JavaScript 互動功能，含中文註解 -->
+<script>
+// 全域變數
+let selectedMode = null;
+let currentParameters = {};
+let ganttInstance = null;
+
+// 頁面載入完成後初始化
+window.addEventListener('DOMContentLoaded', function() {
+    initializePage();
+    bindEvents();
+});
+
+// 初始化頁面
+function initializePage() {
+    // 設定預設日期範圍（今天到一週後）
+    const today = new Date();
+    const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    document.getElementById('startDate').value = today.toISOString().split('T')[0];
+    document.getElementById('endDate').value = nextWeek.toISOString().split('T')[0];
+    // 載入預設參數
+    loadDefaultParameters();
+}
+
+// 綁定所有互動事件
+function bindEvents() {
+    // 綁定排程模式卡片點擊事件
+    document.querySelectorAll('.scheduling-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            const mode = card.getAttribute('data-mode');
+            selectSchedulingMode(mode);
+        });
+    });
+    // 檢查衝突按鈕
+    document.getElementById('checkConflictsBtn').addEventListener('click', checkResourceConflicts);
+    // 表單送出
+    document.getElementById('schedulingForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        executeScheduling();
+    });
+    // 重置按鈕
+    document.getElementById('resetBtn').addEventListener('click', resetForm);
+    // 儲存參數按鈕
+    document.getElementById('saveParameters').addEventListener('click', saveAdvancedParameters);
+    // 滑桿即時顯示數值
+    document.addEventListener('input', function(e) {
+        if (e.target.type === 'range') {
+            const value = e.target.value;
+            const name = e.target.name;
+            if (name === 'constraint_weight') {
+                document.getElementById('constraintWeightValue').textContent = value;
+            } else if (name === 'auto_ratio') {
+                document.getElementById('autoRatioValue').textContent = (value * 100) + '%';
+            } else if (name === 'manual_ratio') {
+                document.getElementById('manualRatioValue').textContent = (value * 100) + '%';
+            }
+        }
+    });
+}
+
+// 選擇排程模式
+function selectSchedulingMode(mode) {
+    selectedMode = mode;
+    // 更新卡片樣式
+    document.querySelectorAll('.scheduling-card').forEach(function(card) {
+        card.classList.remove('selected');
+    });
+    document.querySelector('.scheduling-card[data-mode="' + mode + '"]').classList.add('selected');
+    // 顯示參數設定區域
+    document.getElementById('parameterSection').style.display = '';
+    // 載入模式特定參數
+    loadModeSpecificParameters(mode);
+    // 滾動到參數區域
+    document.getElementById('parameterSection').scrollIntoView({ behavior: 'smooth' });
+}
+
+// 載入預設參數（用 fetch 取代 $.get）
+function loadDefaultParameters() {
+    fetch('{% url "scheduling:get_scheduling_parameters" %}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                currentParameters = data.default_parameters;
+            }
+        })
+        .catch(error => {
+            console.error('載入參數失敗:', error);
+            Swal.fire('錯誤', '載入參數失敗', 'error');
+        });
+}
+
+// 載入模式特定參數
+function loadModeSpecificParameters(mode) {
+    const params = currentParameters[mode] || {};
+    let html = '';
+    switch(mode) {
+        case 'auto':
+            html = generateAutoParameters(params);
+            break;
+        case 'semi_auto':
+            html = generateSemiAutoParameters(params);
+            break;
+        case 'hybrid':
+            html = generateHybridParameters(params);
+            break;
+        case 'manual':
+            html = generateManualParameters(params);
+            break;
+    }
+    document.getElementById('modeSpecificParams').innerHTML = html;
+}
+
+// 生成全自動排程參數
+function generateAutoParameters(params) {
+    return `
+        <div class="parameter-group">
+            <h6><i class="fas fa-robot me-2"></i>全自動排程參數</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">優化目標</label>
+                    <select class="form-select" name="optimization_target">
+                        <option value="minimize_makespan" ${params.optimization_target === 'minimize_makespan' ? 'selected' : ''}>
+                            最小化完工時間
+                        </option>
+                        <option value="minimize_setup_time" ${params.optimization_target === 'minimize_setup_time' ? 'selected' : ''}>
+                            最小化換線時間
+                        </option>
+                        <option value="maximize_utilization" ${params.optimization_target === 'maximize_utilization' ? 'selected' : ''}>
+                            最大化設備利用率
+                        </option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">約束權重</label>
+                    <input type="range" class="form-range" name="constraint_weight" 
+                           min="0" max="1" step="0.1" value="${params.constraint_weight || 0.8}">
+                    <small class="text-muted">當前值: <span id="constraintWeightValue">${params.constraint_weight || 0.8}</span></small>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <label class="form-label">時間限制（秒）</label>
+                    <input type="number" class="form-control" name="time_limit" 
+                           value="${params.time_limit || 300}" min="60" max="3600">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">批次處理大小</label>
+                    <input type="number" class="form-control" name="batch_size" 
+                           value="${params.batch_size || 50}" min="10" max="200">
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// 生成半自動排程參數
+function generateSemiAutoParameters(params) {
+    return `
+        <div class="parameter-group">
+            <h6><i class="fas fa-handshake me-2"></i>半自動排程參數</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="auto_fill" 
+                               ${params.auto_fill ? 'checked' : ''}>
+                        <label class="form-check-label">自動填充空白時段</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="respect_constraints" 
+                               ${params.respect_constraints ? 'checked' : ''}>
+                        <label class="form-check-label">遵守所有約束條件</label>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <label class="form-label">手動分配規則</label>
+                    <textarea class="form-control" name="manual_rules" rows="3" 
+                              placeholder="輸入手動分配規則說明..."></textarea>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// 生成混合排程參數
+function generateHybridParameters(params) {
+    return `
+        <div class="parameter-group">
+            <h6><i class="fas fa-balance-scale me-2"></i>混合排程參數</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">自動排程比例</label>
+                    <input type="range" class="form-range" name="auto_ratio" 
+                           min="0" max="1" step="0.1" value="${params.auto_ratio || 0.7}">
+                    <small class="text-muted">當前值: <span id="autoRatioValue">${(params.auto_ratio || 0.7) * 100}%</span></small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">手動排程比例</label>
+                    <input type="range" class="form-range" name="manual_ratio" 
+                           min="0" max="1" step="0.1" value="${params.manual_ratio || 0.3}">
+                    <small class="text-muted">當前值: <span id="manualRatioValue">${(params.manual_ratio || 0.3) * 100}%</span></small>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <label class="form-label">優化等級</label>
+                    <select class="form-select" name="optimization_level">
+                        <option value="low" ${params.optimization_level === 'low' ? 'selected' : ''}>低</option>
+                        <option value="medium" ${params.optimization_level === 'medium' ? 'selected' : ''}>中</option>
+                        <option value="high" ${params.optimization_level === 'high' ? 'selected' : ''}>高</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">切換頻率</label>
+                    <select class="form-select" name="switch_frequency">
+                        <option value="low">低頻切換</option>
+                        <option value="medium" selected>中頻切換</option>
+                        <option value="high">高頻切換</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// 生成手動排程參數
+function generateManualParameters(params) {
+    return `
+        <div class="parameter-group">
+            <h6><i class="fas fa-mouse-pointer me-2"></i>手動排程參數</h6>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="drag_enabled" 
+                               ${params.drag_enabled ? 'checked' : ''}>
+                        <label class="form-check-label">啟用拖曳</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="resize_enabled" 
+                               ${params.resize_enabled ? 'checked' : ''}>
+                        <label class="form-check-label">啟用調整大小</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="snap_to_grid" 
+                               ${params.snap_to_grid ? 'checked' : ''}>
+                        <label class="form-check-label">對齊網格</label>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <label class="form-label">時間網格間隔（分鐘）</label>
+                    <input type="number" class="form-control" name="grid_interval" 
+                           value="30" min="5" max="120">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">衝突檢查模式</label>
+                    <select class="form-select" name="conflict_check_mode">
+                        <option value="realtime">即時檢查</option>
+                        <option value="manual">手動檢查</option>
+                        <option value="off">關閉檢查</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// 取得 CSRF token 的函數
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
+// 檢查資源衝突（用 fetch 取代 $.ajax）
+function checkResourceConflicts() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const unitIds = Array.from(document.querySelectorAll('#unitSelection input[type="checkbox"]:checked')).map(cb => cb.value);
+    if (!startDate || !endDate) {
+        Swal.fire('警告', '請選擇日期範圍', 'warning');
+        return;
+    }
+    if (unitIds.length === 0) {
+        Swal.fire('警告', '請選擇至少一個設備', 'warning');
+        return;
+    }
+    Swal.fire({
+        title: '檢查中...',
+        text: '正在檢查資源衝突',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+    fetch('{% url "scheduling:check_resource_conflicts" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+        body: JSON.stringify({ start_date: startDate, end_date: endDate, unit_ids: unitIds })
+    })
+    .then(response => response.json())
+    .then(response => {
+        Swal.close();
+        if (response.has_conflicts) {
+            displayConflicts(response);
+        } else {
+            Swal.fire('成功', '未發現資源衝突', 'success');
+        }
+    })
+    .catch(error => {
+        Swal.close();
+        Swal.fire('錯誤', '檢查衝突失敗: ' + error, 'error');
+    });
+}
+
+// 顯示衝突資訊
+function displayConflicts(response) {
+    let conflictHtml = '';
+    if (response.unit_conflicts.length > 0) {
+        conflictHtml += '<h6 class="text-danger">設備衝突:</h6>';
+        response.unit_conflicts.forEach(function(unitConflict) {
+            conflictHtml += `<div class="conflict-item">
+                <strong>${unitConflict.unit_name}</strong><br>
+                ${unitConflict.conflicts.map(c => `${c.title} (${c.start} - ${c.end})`).join('<br>')}
+            </div>`;
+        });
+    }
+    document.getElementById('conflictDetails').innerHTML = conflictHtml;
+    document.getElementById('conflictWarning').style.display = '';
+    Swal.fire({
+        title: '發現衝突',
+        html: conflictHtml,
+        icon: 'warning',
+        confirmButtonText: '了解'
+    });
+}
+
+// 執行排程（用 fetch 取代 $.ajax）
+function executeScheduling() {
+    if (!selectedMode) {
+        Swal.fire('警告', '請先選擇排程模式', 'warning');
+        return;
+    }
+    const formData = collectFormData();
+    if (!validateFormData(formData)) {
+        return;
+    }
+    document.getElementById('progressContainer').style.display = '';
+    updateProgress(0, '準備執行排程...');
+    fetch('{% url "scheduling:execute_scheduling" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+        body: JSON.stringify({ mode: selectedMode, parameters: formData })
+    })
+    .then(response => response.json())
+    .then(response => {
+        if (response.status === 'success') {
+            updateProgress(100, '排程完成');
+            Swal.fire('成功', response.message, 'success');
+            if (selectedMode === 'manual') {
+                showGanttChart();
+            }
+        } else {
+            updateProgress(0, '排程失敗');
+            Swal.fire('錯誤', response.message, 'error');
+        }
+    })
+    .catch(error => {
+        updateProgress(0, '排程失敗');
+        Swal.fire('錯誤', '排程執行失敗: ' + error, 'error');
+    });
+}
+
+// 收集表單資料
+function collectFormData() {
+    const formData = {
+        start_date: document.getElementById('startDate').value,
+        end_date: document.getElementById('endDate').value,
+        unit_ids: Array.from(document.querySelectorAll('#unitSelection input[type="checkbox"]:checked')).map(cb => cb.value),
+        mode_specific: {}
+    };
+    document.querySelectorAll('#modeSpecificParams input, #modeSpecificParams select, #modeSpecificParams textarea').forEach(function(el) {
+        const name = el.name;
+        const value = el.type === 'checkbox' ? el.checked : el.value;
+        if (name) {
+            formData.mode_specific[name] = value;
+        }
+    });
+    return formData;
+}
+
+// 驗證表單資料
+function validateFormData(data) {
+    if (!data.start_date || !data.end_date) {
+        Swal.fire('警告', '請選擇日期範圍', 'warning');
+        return false;
+    }
+    if (data.unit_ids.length === 0) {
+        Swal.fire('警告', '請選擇至少一個設備', 'warning');
+        return false;
+    }
+    return true;
+}
+
+// 更新進度條
+function updateProgress(percentage, message) {
+    document.querySelector('.progress-bar').style.width = percentage + '%';
+    document.getElementById('progressText').textContent = message;
+}
+
+// 重置表單
+function resetForm() {
+    document.getElementById('schedulingForm').reset();
+    document.querySelectorAll('.scheduling-card').forEach(function(card) {
+        card.classList.remove('selected');
+    });
+    document.getElementById('parameterSection').style.display = 'none';
+    document.getElementById('conflictWarning').style.display = 'none';
+    document.getElementById('progressContainer').style.display = 'none';
+    document.getElementById('ganttContainer').style.display = 'none';
+    selectedMode = null;
+}
+
+// 顯示甘特圖
+function showGanttChart() {
+    document.getElementById('ganttContainer').style.display = '';
+    
+    // 初始化甘特圖
+    if (!ganttInstance) {
+        gantt.config.date_format = "%Y-%m-%d %H:%i:%s";
+        gantt.config.drag_resize = true;
+        gantt.config.drag_move = true;
+        gantt.config.drag_progress = false;
+        
+        // 綁定拖曳事件
+        gantt.attachEvent("onTaskDrag", function(id, mode, task, original) {
+            return true; // 允許拖曳
+        });
+        
+        gantt.attachEvent("onAfterTaskUpdate", function(id, task) {
+            updateTaskInDatabase(id, task);
+        });
+        
+        gantt.init("gantt_here");
+        ganttInstance = gantt;
+    }
+    
+    // 載入甘特圖資料
+    loadGanttData();
+}
+
+// 載入甘特圖資料
+function loadGanttData() {
+    // 這裡應該從後端載入甘特圖資料
+    const sampleData = {
+        data: [
+            {id: 1, text: "任務 1", start_date: "2024-01-01 08:00", duration: 2, progress: 0.6},
+            {id: 2, text: "任務 2", start_date: "2024-01-01 10:00", duration: 3, progress: 0.4}
+        ],
+        links: [
+            {id: 1, source: 1, target: 2, type: "0"}
+        ]
+    };
+    
+    gantt.parse(sampleData);
+}
+
+// 更新資料庫中的任務
+function updateTaskInDatabase(id, task) {
+    fetch('{% url "scheduling:update_gantt_task" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            task_id: id,
+            new_start: task.start_date,
+            new_end: gantt.calculateEndDate(task.start_date, task.duration),
+            unit_id: task.unit_id || 1
+        })
+    })
+    .then(response => response.json())
+    .then(response => {
+        if (response.status === 'conflict') {
+            Swal.fire('衝突警告', response.message, 'warning');
+            // 重新載入甘特圖資料
+            loadGanttData();
+        }
+    })
+    .catch(error => {
+        Swal.fire('錯誤', '更新任務失敗: ' + error, 'error');
+        // 重新載入甘特圖資料
+        loadGanttData();
+    });
+}
+
+// 儲存進階參數
+function saveAdvancedParameters() {
+    // 這裡可以實現儲存進階參數的邏輯
+    var modal = document.getElementById('parameterModal');
+    if (modal) {
+        var modalInstance = bootstrap.Modal.getInstance(modal);
+        if (modalInstance) modalInstance.hide();
+    }
+    Swal.fire('成功', '參數已儲存', 'success');
+}
+</script>
+{% endblock %} 

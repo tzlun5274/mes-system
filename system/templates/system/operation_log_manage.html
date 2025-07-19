@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+{{ title }} - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+    <hr>
+    <div class="card mb-4">
+        <div class="card-body">
+            <h4>設置紀錄保留天數</h4>
+            <form method="post" class="form-inline">
+                {% csrf_token %}
+                <div class="form-group mb-2">
+                    {{ form.retain_days.label_tag }}
+                    {{ form.retain_days }}
+                </div>
+                <button type="submit" class="btn btn-primary mb-2 ms-2">保存</button>
+                <a href="{% url 'system:index' %}" class="btn btn-secondary mb-2 ms-2">返回</a>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h4>操作紀錄</h4>
+            <form method="get" class="form-inline mb-3">
+                <div class="form-group mr-2">
+                    <label for="module" class="mr-2">模組:</label>
+                    <select name="module" id="module" class="form-control">
+                        <option value="">所有模組</option>
+                        {% for module_value, module_name in module_choices %}
+                        <option value="{{ module_value }}" {% if selected_module == module_value %}selected{% endif %}>{{ module_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group mr-2">
+                    <label for="user" class="mr-2">使用者:</label>
+                    <select name="user" id="user" class="form-control">
+                        <option value="">所有使用者</option>
+                        {% for user in users %}
+                        <option value="{{ user }}" {% if selected_user == user %}selected{% endif %}>{{ user }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group mr-2">
+                    <label for="start_date" class="mr-2">開始日期:</label>
+                    <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date|default:default_start_date }}" max="{{ default_end_date }}">
+                </div>
+                <div class="form-group mr-2">
+                    <label for="end_date" class="mr-2">結束日期:</label>
+                    <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date|default:default_end_date }}" max="{{ default_end_date }}">
+                </div>
+                <button type="submit" class="btn btn-primary">篩選</button>
+                <a href="{% url 'system:clean_operation_logs' %}" class="btn btn-danger btn-sm ms-2">清理過期紀錄</a>
+            </form>
+
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>時間</th>
+                        <th>使用者</th>
+                        <th>模組</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ log.user }}</td>
+                        <td>{{ log.module }}</td>
+                        <td>{{ log.action }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">無操作紀錄</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

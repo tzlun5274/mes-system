@@ -1,0 +1,320 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}物料需求估算 - MES 系統{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    .status-badge {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .status-draft {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .status-confirmed {
+        background-color: #17a2b8;
+        color: white;
+    }
+    
+    .status-in_progress {
+        background-color: #ffc107;
+        color: black;
+    }
+    
+    .status-completed {
+        background-color: #28a745;
+        color: white;
+    }
+    
+    .status-cancelled {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .method-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
+        background-color: #e9ecef;
+        color: #495057;
+        border-radius: 4px;
+    }
+    
+    .search-form {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .estimation-card {
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease;
+    }
+    
+    .estimation-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .accuracy-bar {
+        height: 8px;
+        border-radius: 4px;
+        background-color: #e9ecef;
+        overflow: hidden;
+    }
+    
+    .accuracy-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%);
+        transition: width 0.3s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="display-6 fw-bold text-primary">
+                        <i class="bi bi-graph-up"></i> 物料需求估算
+                    </h1>
+                    <p class="lead text-muted">根據生產計劃和歷史數據估算物料需求，支援智能預測</p>
+                </div>
+                <div>
+                    <a href="{% url 'material:create_requirement_estimation' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> 新增估算
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0">{{ total_estimations }}</h3>
+                        <small>總估算數</small>
+                    </div>
+                    <i class="bi bi-graph-up fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="background: linear-gradient(135deg, #6c757d 0%, #495057 100%);">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0">{{ draft_count }}</h3>
+                        <small>草稿</small>
+                    </div>
+                    <i class="bi bi-file-earmark-text fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="background: linear-gradient(135deg, #17a2b8 0%, #0f6674 100%);">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0">{{ confirmed_count }}</h3>
+                        <small>已確認</small>
+                    </div>
+                    <i class="bi bi-check-circle fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0">{{ completed_count }}</h3>
+                        <small>已完成</small>
+                    </div>
+                    <i class="bi bi-check-circle-fill fs-1"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 搜尋和篩選 -->
+    <div class="search-form">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label for="search" class="form-label">搜尋材料</label>
+                <input type="text" class="form-control" id="search" name="search" 
+                       value="{{ search }}" placeholder="材料名稱或編號">
+            </div>
+            <div class="col-md-3">
+                <label for="status" class="form-label">狀態</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">全部狀態</option>
+                    <option value="draft" {% if status == 'draft' %}selected{% endif %}>草稿</option>
+                    <option value="confirmed" {% if status == 'confirmed' %}selected{% endif %}>已確認</option>
+                    <option value="in_progress" {% if status == 'in_progress' %}selected{% endif %}>執行中</option>
+                    <option value="completed" {% if status == 'completed' %}selected{% endif %}>已完成</option>
+                    <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>已取消</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="estimation_method" class="form-label">估算方法</label>
+                <select class="form-select" id="estimation_method" name="estimation_method">
+                    <option value="">全部方法</option>
+                    <option value="historical" {% if estimation_method == 'historical' %}selected{% endif %}>歷史平均</option>
+                    <option value="trend" {% if estimation_method == 'trend' %}selected{% endif %}>趨勢分析</option>
+                    <option value="seasonal" {% if estimation_method == 'seasonal' %}selected{% endif %}>季節性分析</option>
+                    <option value="manual" {% if estimation_method == 'manual' %}selected{% endif %}>手動估算</option>
+                    <option value="ai" {% if estimation_method == 'ai' %}selected{% endif %}>AI預測</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search"></i> 搜尋
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 估算列表 -->
+    <div class="row">
+        {% for estimation in estimations %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card estimation-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h5 class="card-title mb-1">{{ estimation.material.name }}</h5>
+                            <small class="text-muted">{{ estimation.material.code }}</small>
+                        </div>
+                        <span class="badge status-badge status-{{ estimation.status }}">
+                            {% if estimation.status == 'draft' %}草稿
+                            {% elif estimation.status == 'confirmed' %}已確認
+                            {% elif estimation.status == 'in_progress' %}執行中
+                            {% elif estimation.status == 'completed' %}已完成
+                            {% elif estimation.status == 'cancelled' %}已取消
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <span class="method-badge">{{ estimation.get_estimation_method_display }}</span>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <small class="text-muted">估算需求</small>
+                            <div class="fw-bold">{{ estimation.estimated_demand }} {{ estimation.material.unit }}</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">實際需求</small>
+                            <div class="fw-bold">{{ estimation.actual_demand|default:"-" }} {{ estimation.material.unit }}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <small class="text-muted">期間</small>
+                            <div class="fw-bold">{{ estimation.period_start|date:"m/d" }} - {{ estimation.period_end|date:"m/d" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">估算日期</small>
+                            <div class="fw-bold">{{ estimation.estimation_date|date:"m/d" }}</div>
+                        </div>
+                    </div>
+                    
+                    {% if estimation.forecast_accuracy > 0 %}
+                    <div class="mb-3">
+                        <small class="text-muted">預測準確率</small>
+                        <div class="d-flex align-items-center">
+                            <div class="accuracy-bar flex-grow-1 me-2">
+                                <div class="accuracy-fill" style="width: {{ estimation.forecast_accuracy }}%"></div>
+                            </div>
+                            <small class="fw-bold">{{ estimation.forecast_accuracy }}%</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            建立時間：{{ estimation.created_at|date:"m/d H:i" }}
+                        </small>
+                        <a href="{% url 'material:estimation_detail' estimation.id %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i> 詳情
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="bi bi-graph-up fs-1 text-muted"></i>
+                <h5 class="text-muted mt-3">暫無需求估算資料</h5>
+                <p class="text-muted">請先建立物料需求估算</p>
+                <a href="{% url 'material:create_requirement_estimation' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> 新增估算
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- 分頁 -->
+    {% if estimations.has_other_pages %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <nav aria-label="估算分頁">
+                <ul class="pagination justify-content-center">
+                    {% if estimations.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ estimations.previous_page_number }}&search={{ search }}&status={{ status }}&estimation_method={{ estimation_method }}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in estimations.paginator.page_range %}
+                    <li class="page-item {% if estimations.number == num %}active{% endif %}">
+                        <a class="page-link" href="?page={{ num }}&search={{ search }}&status={{ status }}&estimation_method={{ estimation_method }}">
+                            {{ num }}
+                        </a>
+                    </li>
+                    {% endfor %}
+                    
+                    {% if estimations.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ estimations.next_page_number }}&search={{ search }}&status={{ status }}&estimation_method={{ estimation_method }}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %} 

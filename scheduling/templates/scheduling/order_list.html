@@ -1,0 +1,269 @@
+{# 這個檔案是訂單管理頁面，顯示所有公司國內/國外訂單，支援查詢與匯出 #}
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}訂單管理{% endblock %}
+
+{% block extra_head %}
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<style>
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .stats-number {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    .stats-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    .alert-urgent {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+    }
+    .alert-overdue {
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+        color: #856404;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>訂單管理</h2>
+    <p class="text-muted">本頁顯示所有公司國內/國外訂單（同步自ERP），可依公司、客戶、訂單類型、交期查詢，並可匯出Excel。</p>
+    
+    <!-- 統計資訊區塊 -->
+    {% if order_summary %}
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number">{{ order_summary.total_orders }}</div>
+                <div class="stats-label">總訂單數</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number">{{ order_summary.total_quantity|floatformat:0 }}</div>
+                <div class="stats-label">總訂購數量</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number">{{ order_summary.total_remain|floatformat:0 }}</div>
+                <div class="stats-label">未交貨數量</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number">{{ order_summary.completion_rate|floatformat:1 }}%</div>
+                <div class="stats-label">完成率</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 交期警告區塊 -->
+    {% if delivery_analysis %}
+    <div class="row mb-4">
+        {% if delivery_analysis.urgent_orders > 0 %}
+        <div class="col-md-6">
+            <div class="alert alert-urgent">
+                <strong>⚠️ 緊急訂單：</strong> {{ delivery_analysis.urgent_orders }} 筆訂單將在7天內到期
+            </div>
+        </div>
+        {% endif %}
+        {% if delivery_analysis.overdue_orders > 0 %}
+        <div class="col-md-6">
+            <div class="alert alert-overdue">
+                <strong>🚨 逾期訂單：</strong> {{ delivery_analysis.overdue_orders }} 筆訂單已逾期
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- 查詢條件區塊 -->
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-2">
+            <label>公司</label>
+            <select name="company" class="form-select">
+                <option value="">全部</option>
+                {% for c in company_choices %}
+                <option value="{{ c }}" {% if filters.company == c %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label>客戶</label>
+            <select name="customer" class="form-select">
+                <option value="">全部</option>
+                {% for c in customer_choices %}
+                <option value="{{ c }}" {% if filters.customer == c %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label>訂單類型</label>
+            <select name="order_type" class="form-select">
+                <option value="">全部</option>
+                <option value="國內" {% if filters.order_type == '國內' %}selected{% endif %}>國內</option>
+                <option value="國外" {% if filters.order_type == '國外' %}selected{% endif %}>國外</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label>交期(起)</label>
+            <input type="date" name="date_start" class="form-control" value="{{ filters.date_start }}">
+        </div>
+        <div class="col-md-2">
+            <label>交期(迄)</label>
+            <input type="date" name="date_end" class="form-control" value="{{ filters.date_end }}">
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary w-100">查詢</button>
+        </div>
+    </form>
+    
+    <!-- 操作按鈕區塊 -->
+    <div class="mb-3">
+        <a href="?export=excel{{ export_querystring }}" class="btn btn-success">
+            <i class="fas fa-download"></i> 匯出Excel
+        </a>
+        <button id="updateOrdersBtn" class="btn btn-warning">
+            <i class="fas fa-sync"></i> 同步訂單
+        </button>
+        <span class="text-muted ms-2">共 {{ orders|length }} 筆訂單</span>
+    </div>
+    
+    <!-- 訂單列表區塊 -->
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead class="table-primary">
+                <tr>
+                    <th>公司</th>
+                    <th>客戶</th>
+                    <th>訂單編號</th>
+                    <th>訂單類型</th>
+                    <th>產品編號</th>
+                    <th>產品名稱</th>
+                    <th>訂購數量</th>
+                    <th>訂單日期</th>
+                    <th>
+                        <a href="?order_by={% if order_by == 'pre_in_date' %}-pre_in_date{% else %}pre_in_date{% endif %}{{ export_querystring }}" class="text-decoration-none">
+                            預交貨日
+                            {% if order_by == 'pre_in_date' %}
+                                <span style="font-size:1.2em;">▲</span>
+                            {% elif order_by == '-pre_in_date' %}
+                                <span style="font-size:1.2em;">▼</span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>未交貨數量</th>
+                    <th>狀態</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>{{ order.company_name }}</td>
+                    <td>{{ order.customer_short_name }}</td>
+                    <td>{{ order.bill_no }}</td>
+                    <td>
+                        <span class="badge {% if order.order_type == '國內' %}bg-primary{% else %}bg-success{% endif %}">
+                            {{ order.order_type }}
+                        </span>
+                    </td>
+                    <td>{{ order.product_id }}</td>
+                    <td>{{ order.product_name }}</td>
+                    <td>{{ order.quantity|floatformat:0 }}</td>
+                    <td>{{ order.bill_date }}</td>
+                    <td>
+                        {% if order.pre_in_date != 'N/A' %}
+                            <span class="{% if order.pre_in_date < today %}text-danger{% elif order.pre_in_date < week_later %}text-warning{% endif %}">
+                                {{ order.pre_in_date }}
+                            </span>
+                        {% else %}
+                            {{ order.pre_in_date }}
+                        {% endif %}
+                    </td>
+                    <td>{{ order.qty_remain|floatformat:0 }}</td>
+                    <td>
+                        {% if order.pre_in_date != 'N/A' %}
+                            {% if order.pre_in_date < today %}
+                                <span class="badge bg-danger">逾期</span>
+                            {% elif order.pre_in_date < week_later %}
+                                <span class="badge bg-warning">緊急</span>
+                            {% else %}
+                                <span class="badge bg-success">正常</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-secondary">未知</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="11" class="text-center text-muted">查無資料</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- 說明區塊 -->
+    <div class="alert alert-info mt-3">
+        <b>說明：</b>
+        <ul class="mb-0">
+            <li>本頁資料來自ERP國內/國外訂單表，僅顯示未交貨的訂單</li>
+            <li>可依公司、客戶、交期等條件查詢，並可匯出Excel</li>
+            <li>紅色標示為逾期訂單，黃色標示為7天內到期訂單</li>
+            <li>點擊「同步訂單」可手動更新最新訂單資料</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 同步訂單按鈕事件
+    document.getElementById('updateOrdersBtn').addEventListener('click', function() {
+        if (confirm('確定要同步訂單資料嗎？這將更新所有公司的訂單資訊。')) {
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 同步中...';
+            
+            fetch('{% url "scheduling:update_orders" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('{% trans "訂單數據更新成功！" %}');
+                    location.reload();
+                } else {
+                    alert('{% trans "更新失敗：" %}' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('更新訂單數據失敗:', error);
+                alert('{% trans "更新訂單數據失敗，請檢查網絡連接或聯繫管理員。" %}');
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-sync"></i> 同步訂單';
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

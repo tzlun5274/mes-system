@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}產線管理 - MES系統{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-industry"></i> 產線管理
+        </h1>
+        <div>
+            <a href="{% url 'production:line_create' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> 新增產線
+            </a>
+            <a href="{% url 'production:line_type_create' %}" class="btn btn-success btn-sm">
+                <i class="fas fa-tags"></i> 新增產線類型
+            </a>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                總產線數量
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_lines }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-industry fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                產線類型數量
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_types }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-tags fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速操作 -->
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">快速操作</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <a href="{% url 'production:line_list' %}" class="btn btn-outline-primary btn-block">
+                                <i class="fas fa-list"></i> 產線列表
+                            </a>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <a href="{% url 'production:line_type_list' %}" class="btn btn-outline-success btn-block">
+                                <i class="fas fa-tags"></i> 產線類型
+                            </a>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <a href="{% url 'production:schedule_list' %}" class="btn btn-outline-info btn-block">
+                                <i class="fas fa-calendar"></i> 排程記錄
+                            </a>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <a href="{% url 'production:line_create' %}" class="btn btn-outline-warning btn-block">
+                                <i class="fas fa-plus"></i> 新增產線
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">最近建立的產線</h6>
+                </div>
+                <div class="card-body">
+                    {% if recent_lines %}
+                        <div class="list-group list-group-flush">
+                            {% for line in recent_lines %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ line.line_name }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ line.line_code }} - {{ line.line_type.type_name }}</small>
+                                </div>
+                                <a href="{% url 'production:line_detail' line.pk %}" class="btn btn-sm btn-outline-primary">
+                                    查看
+                                </a>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">尚無產線資料</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 類型統計 -->
+    {% if type_stats %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">各類型產線統計</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for type_name, count in type_stats.items %}
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-left-info">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                                {{ type_name }}
+                                            </div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ count }} 條產線</div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-tags fa-2x text-gray-300"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 頁面載入完成後的初始化
+    console.log('產線管理首頁載入完成');
+});
+</script>
+{% endblock %} 

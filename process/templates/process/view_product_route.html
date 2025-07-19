@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 檢視產品工藝路線" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 檢視產品工藝路線" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% elif message.tags == 'info' %}info{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>{% trans "產品編號" %}: {{ product_id }}</h5>
+            <a href="{% url 'process:product_routes' %}" class="btn btn-secondary btn-sm float-end">{% trans "返回" %}</a>
+        </div>
+        <div class="card-body">
+            {% if routes %}
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>工序順序</th>
+                            <th>工序名稱</th>
+                            <th>指定可用設備</th>
+                            <th>依賴半成品</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for route in routes %}
+                            <tr>
+                                <td>{{ route.step_order }}</td>
+                                <td>{{ route.process_name.name }}</td>
+                                <td>
+                                    {% if route.usable_equipment_names %}
+                                        {{ route.usable_equipment_names|join:', ' }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>{{ route.dependent_semi_product|default:'-' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>{% trans "此產品編號無工藝路線記錄。" %}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

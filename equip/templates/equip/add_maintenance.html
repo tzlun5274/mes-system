@@ -1,0 +1,486 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}新增維護計劃{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 2rem;
+    }
+    
+    .equipment-info {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- 頁面標題 -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-tools text-primary"></i>
+                    新增維護計劃
+                </h1>
+                <a href="{% url 'equip:maintenance_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    返回列表
+                </a>
+            </div>
+
+            <div class="form-card">
+                <form method="post" id="maintenanceForm">
+                    {% csrf_token %}
+                    
+                    <!-- 設備選擇 -->
+                    <div class="mb-4">
+                        <h5 class="mb-3">
+                            <i class="fas fa-cog"></i>
+                            設備資訊
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="equipment" class="form-label required-field">選擇設備</label>
+                                <select name="equipment" id="equipment" class="form-select" required>
+                                    <option value="">請選擇設備</option>
+                                    {% for equipment in equipments %}
+                                    <option value="{{ equipment.id }}" 
+                                            data-type="{{ equipment.equipment_type }}"
+                                            data-location="{{ equipment.location }}"
+                                            data-department="{{ equipment.department }}"
+                                            data-last-maintenance="{{ equipment.last_maintenance_date|date:'Y-m-d'|default:'未記錄' }}"
+                                            data-next-maintenance="{{ equipment.next_maintenance_date|date:'Y-m-d'|default:'未設定' }}">
+                                        {{ equipment.name }} ({{ equipment.get_equipment_type_display }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">設備資訊</label>
+                                <div id="equipmentInfo" class="equipment-info" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <small class="text-muted">設備類型：</small><br>
+                                            <span id="equipmentType">-</span>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted">位置：</small><br>
+                                            <span id="equipmentLocation">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-6">
+                                            <small class="text-muted">所屬部門：</small><br>
+                                            <span id="equipmentDepartment">-</span>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted">最後維護：</small><br>
+                                            <span id="lastMaintenance">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 維護基本資訊 -->
+                    <div class="mb-4">
+                        <h5 class="mb-3">
+                            <i class="fas fa-clipboard-list"></i>
+                            維護基本資訊
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="maintenance_type" class="form-label required-field">維護類型</label>
+                                <select name="maintenance_type" id="maintenance_type" class="form-select" required>
+                                    <option value="">請選擇維護類型</option>
+                                    {% for value, label in maintenance_types %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="priority" class="form-label">優先級</label>
+                                <select name="priority" id="priority" class="form-select">
+                                    {% for value, label in priority_choices %}
+                                    <option value="{{ value }}" {% if value == 'medium' %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <label for="title" class="form-label required-field">維護標題</label>
+                                <input type="text" name="title" id="title" class="form-control" 
+                                       placeholder="例如：SMT設備定期保養" required>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <label for="description" class="form-label">維護描述</label>
+                                <textarea name="description" id="description" class="form-control" rows="3" 
+                                          placeholder="請詳細描述維護內容、檢查項目等"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 計劃時間 -->
+                    <div class="mb-4">
+                        <h5 class="mb-3">
+                            <i class="fas fa-calendar-alt"></i>
+                            計劃時間
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="planned_date" class="form-label required-field">計劃日期</label>
+                                <input type="date" name="planned_date" id="planned_date" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="estimated_duration_hours" class="form-label required-field">預計時數</label>
+                                <div class="input-group">
+                                    <input type="number" name="estimated_duration_hours" id="estimated_duration_hours" 
+                                           class="form-control" min="1" max="24" value="4" required>
+                                    <span class="input-group-text">小時</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 執行人員 -->
+                    <div class="mb-4">
+                        <h5 class="mb-3">
+                            <i class="fas fa-user-cog"></i>
+                            執行人員
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="assigned_technician" class="form-label">指派技師</label>
+                                <input type="text" name="assigned_technician" id="assigned_technician" 
+                                       class="form-control" placeholder="請輸入技師姓名">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">建議技師</label>
+                                <div class="form-control-plaintext">
+                                    <small class="text-muted">根據設備類型和維護歷史推薦</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 維護檢查清單 -->
+                    <div class="mb-4">
+                        <h5 class="mb-3">
+                            <i class="fas fa-tasks"></i>
+                            維護檢查清單
+                        </h5>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            根據選擇的維護類型，系統會自動生成相應的檢查項目建議
+                        </div>
+                        <div id="checklistContainer">
+                            <!-- 動態生成的檢查清單 -->
+                        </div>
+                    </div>
+
+                    <!-- 備註 -->
+                    <div class="mb-4">
+                        <h5 class="mb-3">
+                            <i class="fas fa-sticky-note"></i>
+                            備註
+                        </h5>
+                        <textarea name="notes" class="form-control" rows="3" 
+                                  placeholder="其他需要說明的資訊"></textarea>
+                    </div>
+
+                    <!-- 提交按鈕 -->
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-secondary" onclick="history.back()">
+                            <i class="fas fa-times"></i>
+                            取消
+                        </button>
+                        <div>
+                            <button type="button" class="btn btn-info me-2" onclick="previewMaintenance()">
+                                <i class="fas fa-eye"></i>
+                                預覽
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i>
+                                建立維護計劃
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 預覽模態框 -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">維護計劃預覽</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="previewContent">
+                <!-- 預覽內容 -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 設備選擇事件
+document.getElementById('equipment').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const equipmentInfo = document.getElementById('equipmentInfo');
+    
+    if (this.value) {
+        // 顯示設備資訊
+        document.getElementById('equipmentType').textContent = selectedOption.getAttribute('data-type') || '-';
+        document.getElementById('equipmentLocation').textContent = selectedOption.getAttribute('data-location') || '-';
+        document.getElementById('equipmentDepartment').textContent = selectedOption.getAttribute('data-department') || '-';
+        document.getElementById('lastMaintenance').textContent = selectedOption.getAttribute('data-last-maintenance') || '-';
+        equipmentInfo.style.display = 'block';
+        
+        // 生成檢查清單
+        generateChecklist(selectedOption.getAttribute('data-type'));
+    } else {
+        equipmentInfo.style.display = 'none';
+        document.getElementById('checklistContainer').innerHTML = '';
+    }
+});
+
+// 維護類型變更事件
+document.getElementById('maintenance_type').addEventListener('change', function() {
+    const equipmentSelect = document.getElementById('equipment');
+    const selectedOption = equipmentSelect.options[equipmentSelect.selectedIndex];
+    
+    if (selectedOption && selectedOption.value) {
+        generateChecklist(selectedOption.getAttribute('data-type'));
+    }
+});
+
+// 生成檢查清單
+function generateChecklist(equipmentType) {
+    const checklistContainer = document.getElementById('checklistContainer');
+    const maintenanceType = document.getElementById('maintenance_type').value;
+    
+    let checklist = '';
+    
+    // 根據設備類型和維護類型生成檢查項目
+    if (maintenanceType === 'preventive') {
+        checklist = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>基本檢查項目</h6>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check1" checked disabled>
+                        <label class="form-check-label" for="check1">設備外觀檢查</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check2" checked disabled>
+                        <label class="form-check-label" for="check2">潤滑系統檢查</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check3" checked disabled>
+                        <label class="form-check-label" for="check3">電氣系統檢查</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6>專項檢查項目</h6>
+                    ${getSpecificChecklist(equipmentType)}
+                </div>
+            </div>
+        `;
+    } else if (maintenanceType === 'inspection') {
+        checklist = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                檢查類型維護：重點關注設備運行狀態和性能指標
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>運行狀態檢查</h6>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check4" checked disabled>
+                        <label class="form-check-label" for="check4">設備運行噪音</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check5" checked disabled>
+                        <label class="form-check-label" for="check5">溫度檢查</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check6" checked disabled>
+                        <label class="form-check-label" for="check6">振動檢查</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6>性能指標檢查</h6>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check7" checked disabled>
+                        <label class="form-check-label" for="check7">產能效率</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="check8" checked disabled>
+                        <label class="form-check-label" for="check8">品質指標</label>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        checklist = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                其他類型維護：請根據實際需求制定檢查項目
+            </div>
+        `;
+    }
+    
+    checklistContainer.innerHTML = checklist;
+}
+
+// 根據設備類型獲取特定檢查項目
+function getSpecificChecklist(equipmentType) {
+    const checklists = {
+        'smt': `
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="smt1" checked disabled>
+                <label class="form-check-label" for="smt1">錫膏印刷機清潔</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="smt2" checked disabled>
+                <label class="form-check-label" for="smt2">貼片機精度校準</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="smt3" checked disabled>
+                <label class="form-check-label" for="smt3">回流焊爐溫曲線檢查</label>
+            </div>
+        `,
+        'test': `
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="test1" checked disabled>
+                <label class="form-check-label" for="test1">測試程式更新</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="test2" checked disabled>
+                <label class="form-check-label" for="test2">測試夾具檢查</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="test3" checked disabled>
+                <label class="form-check-label" for="test3">測試精度校準</label>
+            </div>
+        `,
+        'default': `
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="default1" checked disabled>
+                <label class="form-check-label" for="default1">機械部件檢查</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="default2" checked disabled>
+                <label class="form-check-label" for="default2">安全裝置檢查</label>
+            </div>
+        `
+    };
+    
+    return checklists[equipmentType] || checklists['default'];
+}
+
+// 預覽維護計劃
+function previewMaintenance() {
+    const formData = new FormData(document.getElementById('maintenanceForm'));
+    const previewContent = document.getElementById('previewContent');
+    
+    // 獲取設備名稱
+    const equipmentSelect = document.getElementById('equipment');
+    const equipmentName = equipmentSelect.options[equipmentSelect.selectedIndex]?.text || '未選擇';
+    
+    // 獲取維護類型名稱
+    const maintenanceTypeSelect = document.getElementById('maintenance_type');
+    const maintenanceTypeName = maintenanceTypeSelect.options[maintenanceTypeSelect.selectedIndex]?.text || '未選擇';
+    
+    const preview = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>設備資訊</h6>
+                <p><strong>設備：</strong>${equipmentName}</p>
+                <p><strong>維護類型：</strong>${maintenanceTypeName}</p>
+                <p><strong>優先級：</strong>${formData.get('priority')}</p>
+            </div>
+            <div class="col-md-6">
+                <h6>時間安排</h6>
+                <p><strong>計劃日期：</strong>${formData.get('planned_date')}</p>
+                <p><strong>預計時數：</strong>${formData.get('estimated_duration_hours')}小時</p>
+                <p><strong>指派技師：</strong>${formData.get('assigned_technician') || '未指派'}</p>
+            </div>
+        </div>
+        <div class="mt-3">
+            <h6>維護標題</h6>
+            <p>${formData.get('title')}</p>
+        </div>
+        <div class="mt-3">
+            <h6>維護描述</h6>
+            <p>${formData.get('description') || '無'}</p>
+        </div>
+    `;
+    
+    previewContent.innerHTML = preview;
+    
+    // 顯示模態框
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    modal.show();
+}
+
+// 表單驗證
+document.getElementById('maintenanceForm').addEventListener('submit', function(e) {
+    const equipment = document.getElementById('equipment').value;
+    const maintenanceType = document.getElementById('maintenance_type').value;
+    const title = document.getElementById('title').value;
+    const plannedDate = document.getElementById('planned_date').value;
+    
+    if (!equipment || !maintenanceType || !title || !plannedDate) {
+        e.preventDefault();
+        alert('請填寫所有必填欄位！');
+        return false;
+    }
+    
+    // 檢查日期是否為過去
+    const selectedDate = new Date(plannedDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+        e.preventDefault();
+        alert('計劃日期不能是過去的日期！');
+        return false;
+    }
+});
+
+// 設定預設日期為明天
+document.addEventListener('DOMContentLoaded', function() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById('planned_date').value = tomorrow.toISOString().split('T')[0];
+});
+</script>
+{% endblock %} 

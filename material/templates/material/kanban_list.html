@@ -1,0 +1,264 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}物料看板 - 物料管理{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2>物料看板</h2>
+        <p class="text-muted">管理物料的看板狀態和流程控制</p>
+    </div>
+</div>
+
+{% if error_message %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-warning" role="alert">
+            <i class="fas fa-exclamation-triangle"></i>
+            {{ error_message }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- 統計卡片 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h5 class="card-title">總看板數</h5>
+                <h3 class="card-text">{{ kanbans.count }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h5 class="card-title">正常</h5>
+                <h3 class="card-text">{{ normal_kanbans.count }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <h5 class="card-title">警告</h5>
+                <h3 class="card-text">{{ warning_kanbans.count }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <h5 class="card-title">緊急</h5>
+                <h3 class="card-text">{{ emergency_kanbans.count }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 篩選功能 -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <select name="status" class="form-select">
+                    <option value="">所有狀態</option>
+                    <option value="normal" {% if status == 'normal' %}selected{% endif %}>正常</option>
+                    <option value="warning" {% if status == 'warning' %}selected{% endif %}>警告</option>
+                    <option value="emergency" {% if status == 'emergency' %}selected{% endif %}>緊急</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="type" class="form-select">
+                    <option value="">所有類型</option>
+                    <option value="production" {% if type == 'production' %}selected{% endif %}>生產看板</option>
+                    <option value="supply" {% if type == 'supply' %}selected{% endif %}>供應看板</option>
+                    <option value="withdrawal" {% if type == 'withdrawal' %}selected{% endif %}>領料看板</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">篩選</button>
+                <a href="{% url 'material:kanban_list' %}" class="btn btn-secondary">清除</a>
+            </div>
+        </form>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="#" class="btn btn-success">新增看板</a>
+    </div>
+</div>
+
+<!-- 看板列表 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">看板列表</h5>
+            </div>
+            <div class="card-body">
+                {% if kanbans %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>看板編號</th>
+                                    <th>材料</th>
+                                    <th>類型</th>
+                                    <th>數量</th>
+                                    <th>位置</th>
+                                    <th>狀態</th>
+                                    <th>最後更新</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for kanban in kanbans %}
+                                <tr>
+                                    <td>{{ kanban.kanban_number }}</td>
+                                    <td>{{ kanban.material.name }}</td>
+                                    <td>
+                                        {% if kanban.kanban_type == 'production' %}
+                                            <span class="badge bg-primary">生產看板</span>
+                                        {% elif kanban.kanban_type == 'supply' %}
+                                            <span class="badge bg-info">供應看板</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">領料看板</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ kanban.quantity }} {{ kanban.material.unit }}</td>
+                                    <td>{{ kanban.location|default:"-" }}</td>
+                                    <td>
+                                        {% if kanban.status == 'normal' %}
+                                            <span class="badge bg-success">正常</span>
+                                        {% elif kanban.status == 'warning' %}
+                                            <span class="badge bg-warning">警告</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">緊急</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ kanban.updated_at|date:"Y-m-d H:i" }}</td>
+                                    <td>
+                                        <a href="{% url 'material:update_kanban_status' kanban.id %}" class="btn btn-sm btn-outline-primary">更新狀態</a>
+                                        <a href="#" class="btn btn-sm btn-outline-info">查看</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-tags fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">暫無看板資料</h5>
+                        <p class="text-muted">目前沒有找到符合條件的看板</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 看板狀態更新表單 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">快速狀態更新</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{% url 'material:update_kanban_status' 0 %}">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="kanban_id" class="form-label">看板編號</label>
+                            <select name="kanban_id" id="kanban_id" class="form-select" required>
+                                <option value="">選擇看板</option>
+                                {% for kanban in kanbans %}
+                                    <option value="{{ kanban.id }}">{{ kanban.kanban_number }} - {{ kanban.material.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="new_status" class="form-label">新狀態</label>
+                            <select name="new_status" id="new_status" class="form-select" required>
+                                <option value="normal">正常</option>
+                                <option value="warning">警告</option>
+                                <option value="emergency">緊急</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="notes" class="form-label">備註</label>
+                            <input type="text" name="notes" id="notes" class="form-control" placeholder="狀態更新備註">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary w-100">更新</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 分頁功能 -->
+{% if kanbans.has_other_pages %}
+<div class="row mt-4">
+    <div class="col-12">
+        <nav aria-label="看板分頁">
+            <ul class="pagination justify-content-center">
+                {% if kanbans.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ kanbans.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if type %}&type={{ type }}{% endif %}">上一頁</a>
+                    </li>
+                {% endif %}
+                
+                {% for num in kanbans.paginator.page_range %}
+                    {% if kanbans.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                    {% elif num > kanbans.number|add:'-3' and num < kanbans.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if status %}&status={{ status }}{% endif %}{% if type %}&type={{ type }}{% endif %}">{{ num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if kanbans.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ kanbans.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if type %}&type={{ type }}{% endif %}">下一頁</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 自動重新整理功能
+setTimeout(function() {
+    location.reload();
+}, 30000); // 每30秒重新整理一次
+
+// 看板狀態更新確認
+document.querySelector('form').addEventListener('submit', function(e) {
+    const kanbanId = document.getElementById('kanban_id').value;
+    const newStatus = document.getElementById('new_status').value;
+    
+    if (!kanbanId) {
+        e.preventDefault();
+        alert('請選擇要更新的看板');
+        return;
+    }
+    
+    if (!confirm(`確定要將看板狀態更新為「${newStatus}」嗎？`)) {
+        e.preventDefault();
+    }
+});
+</script>
+{% endblock %} 

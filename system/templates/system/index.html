@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+系統管理首頁 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-primary"><i class="bi bi-gear"></i> 系統管理首頁</h2>
+    <p class="text-secondary mb-4">這裡可以設定系統基本功能，管理用戶、群組、備份與操作紀錄。每個功能都有清楚的中文說明，操作簡單，適合不懂程式的人。</p>
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+        <!-- 環境管理 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-cogs"></i> 環境管理</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">切換系統環境（開發/測試/生產），管理日誌檔案，查看系統運行狀態。</p>
+                    <a href="{% url 'system:environment_management' %}" class="btn btn-danger"><i class="bi bi-cogs"></i> 環境管理</a>
+                </div>
+            </div>
+        </div>
+        <!-- 郵件主機設定 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-envelope"></i> 郵件主機設定</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">設定系統發信郵件主機，讓系統能自動發送通知。</p>
+                    <a href="{% url 'system:email_config' %}" class="btn btn-info"><i class="bi bi-gear"></i> 郵件主機設定</a>
+                </div>
+            </div>
+        </div>
+        <!-- 資料庫備份 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-hdd"></i> 資料庫備份</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">手動備份系統資料庫，確保資料安全。</p>
+                    <a href="{% url 'system:backup' %}" class="btn btn-success"><i class="bi bi-download"></i> 資料庫備份</a>
+                </div>
+            </div>
+        </div>
+        <!-- 自動備份設定 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> 自動備份設定</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">設定自動備份排程，讓系統每天自動備份。</p>
+                    <a href="{% url 'system:backup_schedule' %}" class="btn btn-warning text-dark"><i class="bi bi-clock"></i> 自動備份設定</a>
+                </div>
+            </div>
+        </div>
+        <!-- 用戶管理 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-people"></i> 用戶管理</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">管理系統登入用戶，新增、編輯或刪除帳號。</p>
+                    <a href="{% url 'system:user_list' %}" class="btn btn-primary"><i class="bi bi-person-lines-fill"></i> 用戶管理</a>
+                    <a href="{% url 'system:user_add' %}" class="btn btn-outline-primary ms-2"><i class="bi bi-person-plus"></i> 新增用戶</a>
+                </div>
+            </div>
+        </div>
+        <!-- 群組管理 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="bi bi-collection"></i> 群組管理</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">設定用戶群組與權限，方便管理不同角色。</p>
+                    <a href="{% url 'system:group_list' %}" class="btn btn-secondary"><i class="bi bi-collection"></i> 群組管理</a>
+                    <a href="{% url 'system:group_add' %}" class="btn btn-outline-secondary ms-2"><i class="bi bi-collection-plus"></i> 新增群組</a>
+                </div>
+            </div>
+        </div>
+        <!-- 操作紀錄管理 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-journal-text"></i> 操作紀錄管理</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">查詢、管理系統操作紀錄，並可清理過期資料。</p>
+                    <a href="{% url 'system:operation_log_manage' %}" class="btn btn-dark"><i class="bi bi-journal-text"></i> 操作紀錄管理</a>
+                    <a href="{% url 'system:clean_operation_logs' %}" class="btn btn-outline-danger ms-2"><i class="bi bi-trash"></i> 清理過期紀錄</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="alert alert-info mt-4" role="alert">
+        <i class="bi bi-info-circle"></i> 所有操作都有中文說明，遇到問題可隨時詢問管理員。
+    </div>
+</div>
+{% endblock %}

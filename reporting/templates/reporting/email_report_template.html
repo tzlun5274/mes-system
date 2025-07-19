@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MES 系統報表</title>
+    <style>
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #007bff;
+            margin: 0;
+            font-size: 28px;
+        }
+        .header p {
+            color: #666;
+            margin: 10px 0 0 0;
+            font-size: 16px;
+        }
+        .summary {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        .summary h3 {
+            color: #495057;
+            margin-top: 0;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 10px;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .summary-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .summary-value {
+            color: #007bff;
+            font-weight: bold;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: white;
+        }
+        .data-table th {
+            background-color: #007bff;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        .data-table td {
+            padding: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .data-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .data-table tr:hover {
+            background-color: #e9ecef;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #dee2e6;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        .attachment-notice {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .attachment-notice h4 {
+            margin: 0 0 10px 0;
+            color: #856404;
+        }
+        .no-data {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 40px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MES 系統報表</h1>
+            <p>製造執行系統 - 自動化報表發送</p>
+        </div>
+
+        <div class="summary">
+            <h3>📊 報表摘要</h3>
+            <div class="summary-item">
+                <span class="summary-label">報表類型：</span>
+                <span class="summary-value">{{ report_type }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">報表日期：</span>
+                <span class="summary-value">{{ report_date }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">數據筆數：</span>
+                <span class="summary-value">{{ data_count }} 筆</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">發送時間：</span>
+                <span class="summary-value">{{ schedule.send_time|time:"H:i" }}</span>
+            </div>
+        </div>
+
+        {% if data_count > 0 %}
+            <div class="attachment-notice">
+                <h4>📎 附件說明</h4>
+                <p>詳細的報表數據已附加為 Excel 檔案，檔名：<strong>{{ report_type }}_{{ report_date|date:"Ymd" }}.xlsx</strong></p>
+                <p>請查看附件以獲取完整的報表資訊。</p>
+            </div>
+
+            {% if report_type == "SMT生產報表" %}
+                <h3>📈 SMT 生產數據預覽</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>設備名稱</th>
+                            <th>型號</th>
+                            <th>生產數量</th>
+                            <th>完成數量</th>
+                            <th>完成率</th>
+                            <th>每小時點數</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in data|slice:":5" %}
+                        <tr>
+                            <td>{{ item.equipment_name }}</td>
+                            <td>{{ item.equipment_model|default:"-" }}</td>
+                            <td>{{ item.production_quantity }}</td>
+                            <td>{{ item.completed_quantity }}</td>
+                            <td>{{ item.completion_rate }}%</td>
+                            <td>{{ item.point_per_hour|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if data|length > 5 %}
+                    <p style="text-align: center; color: #666; font-style: italic;">
+                        顯示前 5 筆數據，完整數據請查看附件
+                    </p>
+                {% endif %}
+
+            {% elif report_type == "作業員生產報表" %}
+                <h3>👥 作業員生產數據預覽</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>作業員名稱</th>
+                            <th>設備名稱</th>
+                            <th>生產數量</th>
+                            <th>設備使用率</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in data|slice:":5" %}
+                        <tr>
+                            <td>{{ item.operator_name }}</td>
+                            <td>{{ item.equipment_name }}</td>
+                            <td>{{ item.production_quantity }}</td>
+                            <td>{{ item.equipment_usage_rate }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if data|length > 5 %}
+                    <p style="text-align: center; color: #666; font-style: italic;">
+                        顯示前 5 筆數據，完整數據請查看附件
+                    </p>
+                {% endif %}
+
+            {% elif report_type == "生產日報表" %}
+                <h3>🏭 生產日報數據預覽</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>作業員姓名</th>
+                            <th>設備名稱</th>
+                            <th>生產線</th>
+                            <th>完成數量</th>
+                            <th>工作時數</th>
+                            <th>效率</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in data|slice:":5" %}
+                        <tr>
+                            <td>{{ item.operator_name }}</td>
+                            <td>{{ item.equipment_name }}</td>
+                            <td>{{ item.get_line_display }}</td>
+                            <td>{{ item.completed_quantity }}</td>
+                            <td>{{ item.work_hours }}</td>
+                            <td>{{ item.efficiency_rate }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if data|length > 5 %}
+                    <p style="text-align: center; color: #666; font-style: italic;">
+                        顯示前 5 筆數據，完整數據請查看附件
+                    </p>
+                {% endif %}
+
+            {% elif report_type == "所有報表" %}
+                <h3>📋 綜合報表數據預覽</h3>
+                {% for report_name, report_data in data.items %}
+                    <h4>{{ report_name|title }} ({{ report_data|length }} 筆)</h4>
+                    {% if report_data %}
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>項目</th>
+                                    <th>數量</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in report_data|slice:":3" %}
+                                <tr>
+                                    <td>{{ item.equipment_name|default:item.operator_name|default:"未命名" }}</td>
+                                    <td>{{ item.completed_quantity|default:item.production_quantity|default:"0" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+
+        {% else %}
+            <div class="no-data">
+                <h3>📭 無數據</h3>
+                <p>在 {{ report_date }} 沒有找到相關的報表數據。</p>
+                <p>這可能是因為當天沒有生產活動，或者數據尚未同步。</p>
+            </div>
+        {% endif %}
+
+        <div class="footer">
+            <p><strong>MES 製造執行系統</strong></p>
+            <p>此郵件由系統自動發送，請勿直接回覆</p>
+            <p>如有問題，請聯繫系統管理員</p>
+            <p>發送時間：{{ schedule.send_time|time:"H:i" }} | 發送頻率：{{ schedule.get_schedule_type_display }}</p>
+        </div>
+    </div>
+</body>
+</html> 

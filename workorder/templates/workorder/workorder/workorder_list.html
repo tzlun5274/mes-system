@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block title %}工單管理{% endblock %}
+{% block content %}
+    <div class="container mt-4">
+        <h2>工單管理</h2>
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">派工單</h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            MES 內部用來分配產線、追蹤進度。
+                            <br>
+                            可新增、派工、進度追蹤。
+                        </p>
+                        <a href="{% url 'workorder:dispatch_list' %}" class="btn btn-success">進入派工單管理</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">完工工單</h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            只顯示狀態為「完工」的工單。
+                            <br>
+                            可查詢、檢視、匯出。
+                        </p>
+                        <a href="{% url 'workorder:completed_workorders' %}"
+                           class="btn btn-info">進入完工工單</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h4 class="mb-0">公司製令單</h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            ERP 同步來的原始工單，依公司分群查詢。
+                            <br>
+                            可查詢、同步、比對。
+                        </p>
+                        <a href="{% url 'workorder:company_orders' %}" class="btn btn-primary">進入公司製令單</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h4 class="mb-0">
+                            <i class="fas fa-clipboard-check"></i> 報工管理
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            作業員報工記錄管理，包含生產進度回報。
+                            <br>
+                            可查詢、統計、分析。
+                        </p>
+                        <a href="{% url 'workorder:report_index' %}" class="btn btn-warning">
+                            <i class="fas fa-tools"></i> 進入報工管理
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- 管理員專用：清除數據功能 -->
+            {% if user.is_staff or user.is_superuser %}
+                <div class="col-md-3">
+                    <div class="card shadow-sm mb-4 border-danger">
+                        <div class="card-header bg-danger text-white">
+                            <h4 class="mb-0">
+                                <i class="fas fa-trash-alt"></i> 清除數據
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text">
+                                清除派工單、完工工單、公司製令單。
+                                <br>
+                                <strong class="text-danger">僅供管理員使用！</strong>
+                            </p>
+                            <a href="{% url 'workorder:clear_data' %}" class="btn btn-danger">
+                                <i class="fas fa-exclamation-triangle"></i> 清除數據
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+            <!-- 超級管理員專用：手動派工功能 -->
+        </div>
+    </div>
+    <!-- 原本的工單列表暫時隱藏，改由卡片分流 -->
+    {# <table> ... </table> #}
+{% endblock %}

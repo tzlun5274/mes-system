@@ -1,0 +1,10 @@
+/* material 模組的 CSS 樣式 */
+.material-container {
+    padding: 20px;
+    background-color: #f8f9fa;
+}
+.material-title {
+    color: #343a40;
+    font-size: 24px;
+    margin-bottom: 15px;
+}

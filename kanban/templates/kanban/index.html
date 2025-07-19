@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "看板功能 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "看板功能" %}</h2>
+    <hr>
+
+    <h3>{% trans "功能選單" %}</h3>
+    <div class="card mb-4">
+        <div class="card-body">
+            <a href="{% url 'kanban:production_progress' %}" class="btn btn-primary btn-sm">{% trans "生產進度看板" %}</a>
+            <a href="{% url 'kanban:equipment_status' %}" class="btn btn-primary btn-sm">{% trans "設備狀態看板" %}</a>
+            <a href="{% url 'kanban:quality_monitoring' %}" class="btn btn-primary btn-sm">{% trans "品質監控看板" %}</a>
+            <a href="{% url 'kanban:material_stock' %}" class="btn btn-primary btn-sm">{% trans "物料存量看板" %}</a>
+            <a href="{% url 'kanban:delivery_schedule' %}" class="btn btn-primary btn-sm">{% trans "預交貨日看板" %}</a>
+            <a href="{% url 'kanban:schedule_warning_board' %}" class="btn btn-danger btn-sm ms-2">排程警告看板</a>
+        </div>
+    </div>
+
+    <h3>{% trans "看板概覽" %}</h3>
+    
+    <h4>{% trans "生產進度看板" %}</h4>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "工單編號" %}</th>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "總數量" %}</th>
+                        <th>{% trans "完成數量" %}</th>
+                        <th>{% trans "進度 (%)" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for progress in production_progress %}
+                    <tr>
+                        <td>{{ progress.work_order_number }}</td>
+                        <td>{{ progress.product_name }}</td>
+                        <td>{{ progress.total_quantity }}</td>
+                        <td>{{ progress.completed_quantity }}</td>
+                        <td>{{ progress.progress }}%</td>
+                        <td>{{ progress.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">{% trans "無生產進度數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h4>{% trans "設備狀態看板" %}</h4>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "設備名稱" %}</th>
+                        <th>{% trans "生產線" %}</th>
+                        <th>{% trans "狀態" %}</th>
+                        <th>{% trans "最後更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for equipment in equipment_status %}
+                    <tr>
+                        <td>{{ equipment.equipment_name }}</td>
+                        <td>{{ equipment.line }}</td>
+                        <td>{{ equipment.status }}</td>
+                        <td>{{ equipment.last_updated|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">{% trans "無設備狀態數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h4>{% trans "品質監控看板" %}</h4>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "不合格率 (%)" %}</th>
+                        <th>{% trans "總檢驗數量" %}</th>
+                        <th>{% trans "不合格數量" %}</th>
+                        <th>{% trans "最後更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for quality in quality_monitoring %}
+                    <tr>
+                        <td>{{ quality.product_name }}</td>
+                        <td>{{ quality.defect_rate }}%</td>
+                        <td>{{ quality.total_inspected }}</td>
+                        <td>{{ quality.defective_count }}</td>
+                        <td>{{ quality.last_updated|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">{% trans "無品質監控數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h4>{% trans "物料存量看板" %}</h4>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "物料編號" %}</th>
+                        <th>{% trans "物料名稱" %}</th>
+                        <th>{% trans "庫存數量" %}</th>
+                        <th>{% trans "單位" %}</th>
+                        <th>{% trans "最後更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for material in material_stock %}
+                    <tr>
+                        <td>{{ material.material_code }}</td>
+                        <td>{{ material.material_name }}</td>
+                        <td>{{ material.stock_quantity }}</td>
+                        <td>{{ material.unit }}</td>
+                        <td>{{ material.last_updated|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">{% trans "無物料存量數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h4>{% trans "預交貨日看板" %}</h4>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "訂單編號" %}</th>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "訂單數量" %}</th>
+                        <th>{% trans "預定交貨日期" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for schedule in delivery_schedule %}
+                    <tr>
+                        <td>{{ schedule.order_number }}</td>
+                        <td>{{ schedule.product_name }}</td>
+                        <td>{{ schedule.quantity }}</td>
+                        <td>{{ schedule.due_date }}</td>
+                        <td>{{ schedule.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">{% trans "無預交貨日數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

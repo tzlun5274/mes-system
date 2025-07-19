@@ -1,0 +1,79 @@
+<!--
+這個模板用來顯示所有已完工工單的列表。
+管理員可以在這裡快速查詢、檢視每一張已完工工單的詳細資料。
+-->
+{% extends 'base.html' %}
+{% block title %}完工工單列表{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>完工工單列表</h2>
+    <div class="row mb-3">
+        <div class="col-12">
+            <!-- 工單管理子選單（分頁按鈕） -->
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'workorder:dispatch_list' %}">派工單</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'workorder:company_orders' %}">公司製令</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="{% url 'workorder:completed_workorders' %}">完工工單</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="alert alert-info">本頁只顯示狀態為「完工」的工單。</div>
+    
+    <!-- 測試期間清除按鈕 -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-warning">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>測試期間功能</strong> - 清除所有完工工單記錄
+                    </div>
+                    <a href="{% url 'workorder:clear_completed_workorders' %}" class="btn btn-danger btn-sm">
+                        <i class="fas fa-trash"></i> 清除完工工單
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <table class="table table-bordered table-hover">
+        <thead class="table-primary">
+            <tr>
+                <th>工單編號</th>
+                <th>產品編號</th>
+                <th>數量</th>
+                <th>狀態</th>
+                <th>建立時間</th>
+                <th>最後更新</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in completed_orders %}
+            <tr>
+                <td>{{ order.order_number }}</td>
+                <td>{{ order.product_code }}</td>
+                <td>{{ order.quantity }}</td>
+                <td><span class="badge bg-success">已完工</span></td>
+                <td>{{ order.created_at|date:'Y-m-d H:i' }}</td>
+                <td>{{ order.updated_at|date:'Y-m-d H:i' }}</td>
+                <td>
+                    <a href="{% url 'workorder:workorder_process_detail' order.id %}" class="btn btn-info btn-sm">工序明細</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center">目前沒有已完工工單</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a href="{% url 'workorder:dispatch_list' %}" class="btn btn-secondary">返回工單管理</a>
+</div>
+{% endblock %} 

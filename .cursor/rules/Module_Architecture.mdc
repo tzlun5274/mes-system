@@ -1,0 +1,99 @@
+---
+description:
+globs:
+alwaysApply : true
+---
+下面為MES系統專案的模組結構在設計代碼,模板,路由,視圖的時候須以結構為標準
+templates/
+├── base.html                           # 基礎模板
+├── dashboard/                          # 儀表板
+│   ├── index.html                      # 主儀表板
+│   ├── production_dashboard.html       # 生產儀表板
+│   └── quality_dashboard.html          # 品質儀表板
+│
+├── system/                             # 系統管理模板
+│   ├── login.html                      # 登入頁面
+│   ├── user_list.html                  # 使用者管理
+│   ├── user_form.html                  # 使用者表單
+│   ├── operator_list.html              # 作業員管理
+│   ├── operator_form.html              # 作業員表單
+│   ├── role_list.html                  # 角色管理
+│   ├── role_form.html                  # 角色表單
+│   ├── company_list.html               # 公司管理
+│   └── company_form.html               # 公司表單
+│
+├── equipment/                          # 設備管理模板
+│   ├── equipment_list.html             # 設備清單
+│   ├── equipment_form.html             # 設備表單
+│   ├── equipment_detail.html           # 設備詳情
+│   ├── equipment_status.html           # 設備狀態
+│   ├── maintenance_list.html           # 維護記錄
+│   └── maintenance_form.html           # 維護表單
+│
+├── workorder/                          # 工單管理模板
+│   ├── workorder_list.html             # 工單清單
+│   ├── workorder_form.html             # 工單表單
+│   ├── workorder_detail.html           # 工單詳情
+│   ├── workorder_execution.html        # 工單執行
+│   └── workorder_progress.html         # 工單進度
+│
+├material/                   			# 物料管理模板
+│   ├── material_demand_estimation.html # 物料需求估算
+│   ├── material_form.html              # 物料表單
+│   ├── inventory_list.html             # 庫存清單
+│   ├── inventory_form.html             # 庫存表單
+│
+├── process/                            # 製程管理模板
+│   ├── process_route_list.html         # 工藝路線清單
+│   ├── process_route_form.html         # 工藝路線表單
+│   ├── operation_list.html             # 工序清單
+│   ├── operation_form.html             # 工序表單
+│   ├── standard_work_list.html         # 標準作業清單
+│   └── standard_work_form.html         # 標準作業表單
+│
+├── scheduling/                         # 排程管理模板
+│   ├── schedule_list.html              # 排程清單
+│   ├── schedule_form.html              # 排程表單
+│   ├── gantt_chart.html                # 甘特圖
+│   ├── capacity_planning.html          # 產能規劃
+│   └── resource_allocation.html        # 資源配置
+│
+├── production/                         # 生產管理模板
+│   ├── production_line_list.html       # 產線清單
+│   ├── production_line_form.html       # 產線表單
+│   ├── production_execution.html       # 生產執行
+│   ├── production_progress.html        # 生產進度
+│   └── production_monitoring.html      # 生產監控
+│
+├── quality/                            # 品質管理模板
+│   ├── inspection_list.html            # 檢驗清單
+│   ├── inspection_form.html            # 檢驗表單
+│   ├── defect_list.html                # 不良品清單
+│   ├── defect_form.html                # 不良品表單
+│   ├── quality_report.html             # 品質報表
+│   └── quality_analysis.html           # 品質分析
+│
+├── kanban/                             # 看板模板
+│   ├── production_kanban.html          # 生產看板
+│   ├── equipment_kanban.html           # 設備看板
+│   ├── quality_kanban.html             # 品質看板
+│   └── material_kanban.html            # 物料看板
+│
+├── reporting/                          # 報表模板
+│   ├── production_report.html          # 生產報表
+│   ├── quality_report.html             # 品質報表
+│   ├── efficiency_report.html          # 效率報表
+│   ├── cost_report.html                # 成本報表
+│   └── export_excel.html               # Excel匯出
+│
+├── erp_integration/                    # ERP整合模板
+│   ├── sync_status.html                # 同步狀態
+│   ├── sync_log.html                   # 同步日誌
+│   ├── data_mapping.html               # 資料對應
+│   └── manual_sync.html                # 手動同步
+│
+└── ai/                                 # AI功能模板
+    ├── prediction_dashboard.html       # 預測儀表板
+    ├── anomaly_detection.html          # 異常檢測
+    ├── optimization_suggestions.html   # 優化建議
+    └── ai_analysis.html                # AI分析

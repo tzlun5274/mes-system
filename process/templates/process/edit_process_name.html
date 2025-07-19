@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 編輯工序工藝名稱" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 編輯工序工藝名稱" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" id="processNameForm">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="name" class="form-label">{% trans "工序名稱" %}</label>
+                    <input type="text" class="form-control" id="name" name="name" value="{{ process_name.name }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="description" class="form-label">{% trans "描述" %}</label>
+                    <textarea class="form-control" id="description" name="description" rows="3">{{ process_name.description }}</textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="usable_equipments" class="form-label">{% trans "能使用的設備" %}</label>
+                    <select multiple class="form-control" id="usable_equipments" name="usable_equipment_ids[]">
+                        {% for equip in equipments %}
+                            <option value="{{ equip.id }}" {% if equip.id in normal_equip_ids %}selected{% endif %}>{{ equip.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">{% trans "提交" %}</button>
+                <a href="{% url 'process:process_names' %}" class="btn btn-secondary">{% trans "取消" %}</a>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 無需額外邏輯，直接使用多選框提交
+});
+</script>
+{% endblock %}
+{% endblock %}

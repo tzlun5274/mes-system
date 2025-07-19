@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+作業員與技能管理 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-primary mb-1"><i class="bi bi-people"></i> 作業員與技能管理</h2>
+            <p class="text-secondary mb-0">管理作業員資料與技能，設定每個作業員會哪些工序</p>
+        </div>
+        <a href="{% url 'process:index' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> 返回首頁
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% elif message.tags == 'info' %}info{% else %}danger{% endif %} alert-dismissible fade show" role="alert">
+                <i class="bi bi-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'info' %}info-circle{% else %}exclamation-triangle{% endif %}"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- 操作按鈕區 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'process:add_operator' %}" class="btn btn-primary">
+                            <i class="bi bi-person-plus"></i> 新增作業員
+                        </a>
+                        {% if user.is_superuser %}
+                            <a href="{% url 'process:export_operators' %}" class="btn btn-info">
+                                <i class="bi bi-download"></i> 匯出資料
+                            </a>
+                            <a href="{% url 'process:import_operators' %}" class="btn btn-warning">
+                                <i class="bi bi-upload"></i> 匯入資料
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="搜尋作業員名稱、所屬產線或技能...">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 作業員清單 -->
+    <div class="card">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-list-ul"></i> 作業員清單</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if operators %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="operatorTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th><i class="bi bi-person"></i> 作業員名稱</th>
+                                <th><i class="bi bi-building"></i> 所屬產線</th>
+                                <th><i class="bi bi-award"></i> 技能</th>
+                                <th><i class="bi bi-calendar"></i> 創建時間</th>
+                                <th><i class="bi bi-tools"></i> 操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for operator in operators %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-person-circle text-primary me-2" style="font-size: 1.5rem;"></i>
+                                            <strong>{{ operator.name }}</strong>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if operator.production_line %}
+                                            <span class="badge bg-info">
+                                                <i class="bi bi-building me-1"></i>
+                                                {{ operator.production_line.line_name }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted fst-italic">未設定</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if operator.skills.all %}
+                                            <div class="d-flex flex-wrap gap-1">
+                                                {% for skill in operator.skills.all %}
+                                                    <span class="badge bg-success" title="優先順序: {{ skill.priority }}">
+                                                        {{ skill.process_name.name }}
+                                                        <small class="ms-1">({{ skill.priority }})</small>
+                                                    </span>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted fst-italic">無技能</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            <i class="bi bi-clock"></i>
+                                            {{ operator.created_at|date:"Y-m-d H:i" }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'process:edit_operator' operator.id %}" class="btn btn-sm btn-outline-warning" title="編輯">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="{% url 'process:delete_operator' operator.id %}" 
+                                               class="btn btn-sm btn-outline-danger" 
+                                               onclick="return confirm('確定要刪除作業員「{{ operator.name }}」嗎？此操作無法復原。');"
+                                               title="刪除">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-people text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="text-muted mt-3">目前沒有作業員記錄</h5>
+                    <p class="text-muted">點擊上方「新增作業員」按鈕開始新增第一個作業員</p>
+                    <a href="{% url 'process:add_operator' %}" class="btn btn-primary">
+                        <i class="bi bi-person-plus"></i> 新增第一個作業員
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    {% if operators %}
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <i class="bi bi-people text-primary" style="font-size: 2rem;"></i>
+                        <h5 class="card-title mt-2">{{ operators|length }}</h5>
+                        <p class="card-text text-muted">總作業員數量</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <i class="bi bi-award text-success" style="font-size: 2rem;"></i>
+                        <!-- 有技能的作業員數量 -->
+                        <h5 class="card-title mt-2">{{ skilled_operators_count }}</h5>
+                        <p class="card-text text-muted">有技能的作業員</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <i class="bi bi-star text-warning" style="font-size: 2rem;"></i>
+                        <!-- 高優先級技能數量 -->
+                        <h5 class="card-title mt-2">{{ high_priority_skills_count }}</h5>
+                        <p class="card-text text-muted">高優先級技能</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <i class="bi bi-calendar text-info" style="font-size: 2rem;"></i>
+                        <!-- 今日新增作業員數量 -->
+                        <h5 class="card-title mt-2">{{ today_new_operators_count }}</h5>
+                        <p class="card-text text-muted">今日新增</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- 搜尋功能 JavaScript -->
+<script>
+document.getElementById('searchInput').addEventListener('keyup', function() {
+    const searchTerm = this.value.toLowerCase();
+    const table = document.getElementById('operatorTable');
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+        const nameCell = rows[i].getElementsByTagName('td')[0];
+        const productionLineCell = rows[i].getElementsByTagName('td')[1];
+        const skillCell = rows[i].getElementsByTagName('td')[2];
+        
+        if (nameCell && productionLineCell && skillCell) {
+            const name = nameCell.textContent.toLowerCase();
+            const productionLine = productionLineCell.textContent.toLowerCase();
+            const skills = skillCell.textContent.toLowerCase();
+            
+            if (name.includes(searchTerm) || productionLine.includes(searchTerm) || skills.includes(searchTerm)) {
+                rows[i].style.display = '';
+            } else {
+                rows[i].style.display = 'none';
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

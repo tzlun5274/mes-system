@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+公司設定 - ERP 整合
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>公司設定</h2>
+    <hr>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% elif message.tags == 'info' %}info{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <a href="{% url 'erp_integration:company_detail' %}" class="btn btn-primary mb-3">新增公司</a>
+    <a href="{% url 'erp_integration:index' %}" class="btn btn-secondary mb-3">返回</a>
+
+    <hr>
+
+    <!-- 公司列表 -->
+    <h3>已設定的公司</h3>
+    {% if companies %}
+        <table class="table table-striped table-bordered">
+            <thead class="thead-dark">
+                <tr>
+                    <th>公司名稱</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for company in companies %}
+                    <tr>
+                        <td>{{ company.company_name }}</td>
+                        <td>
+                            <a href="{% url 'erp_integration:company_detail' company.id %}" class="btn btn-sm btn-primary">編輯</a>
+                            <form method="post" action="{% url 'erp_integration:delete_company' company.id %}" style="display:inline;" onsubmit="return confirm('確定要刪除公司 {{ company.company_name }} 嗎？此操作將不可恢復！');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger">刪除</button>
+                            </form>
+                            <form method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="company_id" value="{{ company.id }}">
+                                <button type="submit" name="sync_data" class="btn btn-sm btn-success">同步資料</button>
+                                <button type="submit" name="full_sync_data" class="btn btn-sm btn-warning">全量同步</button>
+                            </form>
+                            <form method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="company_id" value="{{ company.id }}">
+                                <input type="number" name="sync_interval_minutes" value="{{ company.sync_interval_minutes }}" min="0" style="width: 80px; display:inline-block;" placeholder="分鐘">
+                                <button type="submit" name="update_sync_interval" class="btn btn-sm btn-info">設定自動同步</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>尚未設定任何公司。</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+{% if company.id %}
+編輯公司 - ERP 整合
+{% else %}
+新增公司 - ERP 整合
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>
+        {% if company.id %}
+        編輯公司：{{ company.company_name }}
+        {% else %}
+        新增公司
+        {% endif %}
+    </h2>
+    <hr>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% elif message.tags == 'info' %}info{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="company_name">公司名稱 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="company_name" name="company_name" value="{{ company.company_name }}" required>
+        </div>
+        <div class="form-group">
+            <label for="company_code">公司編號 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="company_code" name="company_code" value="{{ company.company_code }}" required>
+        </div>
+        <div class="form-group">
+            <label for="mssql_database">MSSQL 資料庫名稱 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="mssql_database" name="mssql_database" value="{{ company.mssql_database }}" required>
+        </div>
+        <div class="form-group">
+            <label for="mes_database">MES 資料庫名稱 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="mes_database" name="mes_database" value="{{ company.mes_database }}" required>
+        </div>
+        <div class="form-group">
+            <label for="notes">備註</label>
+            <textarea class="form-control" id="notes" name="notes" rows="5">{{ company.notes }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>需要同步的資料表（可多選，選填）</label>
+            <select class="form-control" id="sync_tables" name="sync_tables" multiple>
+                {% for table in all_table_names %}
+                    <option value="{{ table }}" {% if table in sync_tables_list %}selected{% endif %}>
+                        {{ table }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">保存</button>
+        <a href="{% url 'erp_integration:company_config' %}" class="btn btn-secondary">取消</a>
+    </form>
+</div>
+{% endblock %}

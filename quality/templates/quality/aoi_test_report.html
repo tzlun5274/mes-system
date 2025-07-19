@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "AOI 測試報告 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "AOI 測試報告" %}</h2>
+    <hr>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "測試日期" %}</th>
+                        <th>{% trans "是否檢測到缺陷" %}</th>
+                        <th>{% trans "缺陷詳情" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in aoi_test_reports %}
+                    <tr>
+                        <td>{{ report.product_name }}</td>
+                        <td>{{ report.test_date }}</td>
+                        <td>{{ report.defect_detected|yesno:"是,否" }}</td>
+                        <td>{{ report.defect_details }}</td>
+                        <td>{{ report.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ report.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">{% trans "無 AOI 測試報告數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{% url 'quality:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

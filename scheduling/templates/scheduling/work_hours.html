@@ -1,0 +1,764 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 工作時間設定" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 工作時間設定" %}</h2>
+    <hr>
+    <div class="mb-3">
+        <p class="lead">{% trans "在此頁面管理單位的工作時間、訂單更新排程、安全天數與工序間隔時間設定" %}</p>
+    </div>
+
+    <!-- 安全天數設定 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>{% trans "安全天數設定" %}</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "預定出貨日到完工日安全天數（天）" %}</th>
+                        <th>{% trans "操作" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ safety_settings.delivery_to_completion_safety_days|default:"3" }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editSafetySettings()">{% trans "編輯" %}</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 工序間隔時間設定 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>{% trans "工序間隔時間設定" %}</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "工序間隔時間（分鐘）" %}</th>
+                        <th>{% trans "操作" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ process_interval_settings.process_interval_minutes|default:"5" }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="editProcessInterval()">{% trans "編輯" %}</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 單位工作時間設定 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>{% trans "單位工作時間設定" %}</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "單位名稱" %}</th>
+                        <th>{% trans "上班開始時間" %}</th>
+                        <th>{% trans "下班時間" %}</th>
+                        <th>{% trans "是否有中午休息" %}</th>
+                        <th>{% trans "午休開始時間" %}</th>
+                        <th>{% trans "午休結束時間" %}</th>
+                        <th>{% trans "加班開始時間" %}</th>
+                        <th>{% trans "加班結束時間" %}</th>
+                        <th>{% trans "操作" %}</th>
+                    </tr>
+                </thead>
+                <tbody id="unitWorkHoursTableBody">
+                    <!-- 動態填充 -->
+                </tbody>
+            </table>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUnitWorkHoursModal">
+                {% trans "新增單位" %}
+            </button>
+        </div>
+    </div>
+
+    <!-- 訂單更新時間設定 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>{% trans "訂單更新時間設定" %}</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "同步間隔（分鐘）" %}</th>
+                        <th>{% trans "上次更新時間" %}</th>
+                        <th>{% trans "操作" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            {% if order_schedule and order_schedule.sync_interval_minutes and order_schedule.sync_interval_minutes > 0 %}
+                                {{ order_schedule.sync_interval_minutes }}
+                            {% else %}
+                                <span class="text-muted">尚未設定</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order_schedule and order_schedule.last_updated %}
+                                {{ order_schedule.last_updated|date:"Y-m-d H:i" }}
+                            {% else %}
+                                <span class="text-muted">尚未更新</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editOrderScheduleModal">編輯</button>
+                            <button class="btn btn-sm btn-warning ms-2" id="manualSyncOrderBtn">手動同步</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 編輯訂單同步間隔 Modal -->
+    <div class="modal fade" id="editOrderScheduleModal" tabindex="-1" aria-labelledby="editOrderScheduleModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editOrderScheduleModalLabel">設定訂單同步間隔</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="orderScheduleForm">
+              {% csrf_token %}
+              <div class="mb-3">
+                <label for="sync_interval_minutes" class="form-label">同步間隔（分鐘）</label>
+                <input type="number" class="form-control" id="sync_interval_minutes" name="sync_interval_minutes" min="0" step="1" value="{{ order_schedule.sync_interval_minutes|default:0 }}" required>
+                <div class="form-text">0 代表停用自動同步</div>
+              </div>
+              <button type="submit" class="btn btn-primary">儲存</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <a href="{% url 'scheduling:calendar' %}" class="btn btn-secondary">{% trans "返回行事曆" %}</a>
+</div>
+
+<!-- 新增單位模態框 -->
+<div class="modal fade" id="addUnitWorkHoursModal" tabindex="-1" aria-labelledby="addUnitWorkHoursModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addUnitWorkHoursModalLabel">{% trans "新增單位工作時間" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addUnitWorkHoursForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="unit_name" class="form-label">{% trans "單位名稱" %}</label>
+                        <input type="text" class="form-control" id="unit_name" name="unit_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="work_start" class="form-label">{% trans "上班開始時間" %}</label>
+                        <input type="text" class="form-control" id="work_start" name="work_start" required placeholder="HH:MM">
+                    </div>
+                    <div class="mb-3">
+                        <label for="work_end" class="form-label">{% trans "下班時間" %}</label>
+                        <input type="text" class="form-control" id="work_end" name="work_end" required placeholder="HH:MM">
+                    </div>
+                    <div class="mb-3">
+                        <label for="has_lunch_break" class="form-label">{% trans "是否有中午休息" %}</label>
+                        <select class="form-select" id="has_lunch_break" name="has_lunch_break">
+                            <option value="true">{% trans "是" %}</option>
+                            <option value="false">{% trans "否" %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="addLunchBreakFields">
+                        <label for="lunch_start" class="form-label">{% trans "午休開始時間" %}</label>
+                        <input type="text" class="form-control" id="lunch_start" name="lunch_start" placeholder="HH:MM">
+                        <label for="lunch_end" class="form-label mt-2">{% trans "午休結束時間" %}</label>
+                        <input type="text" class="form-control" id="lunch_end" name="lunch_end" placeholder="HH:MM">
+                    </div>
+                    <div class="mb-3">
+                        <label for="overtime_start" class="form-label">{% trans "加班開始時間" %}</label>
+                        <input type="text" class="form-control" id="overtime_start" name="overtime_start" placeholder="HH:MM">
+                    </div>
+                    <div class="mb-3">
+                        <label for="overtime_end" class="form-label">{% trans "加班結束時間" %}</label>
+                        <input type="text" class="form-control" id="overtime_end" name="overtime_end" placeholder="HH:MM">
+                    </div>
+                    <button type="submit" class="btn btn-primary">{% trans "保存" %}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 設置單位工作時間模態框 -->
+<div class="modal fade" id="setUnitWorkHoursModal" tabindex="-1" aria-labelledby="setUnitWorkHoursModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="setUnitWorkHoursModalLabel">{% trans "設置單位工作時間" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="setUnitWorkHoursForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="setUnitId" name="unit_id">
+                    <div class="mb-3">
+                        <label for="workStart" class="form-label">{% trans "上班開始時間" %} <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="workStart" name="work_start" required placeholder="HH:MM">
+                    </div>
+                    <div class="mb-3">
+                        <label for="workEnd" class="form-label">{% trans "下班時間" %} <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="workEnd" name="work_end" required placeholder="HH:MM">
+                    </div>
+                    <div class="mb-3">
+                        <label for="hasLunchBreak" class="form-label">{% trans "是否有中午休息" %}</label>
+                        <select class="form-select" id="hasLunchBreak" name="has_lunch_break">
+                            <option value="true">{% trans "是" %}</option>
+                            <option value="false">{% trans "否" %}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="lunchBreakFields">
+                        <label for="lunchStart" class="form-label">{% trans "午休開始時間" %}</label>
+                        <input type="text" class="form-control" id="lunchStart" name="lunch_start" placeholder="HH:MM">
+                        <label for="lunchEnd" class="form-label mt-2">{% trans "午休結束時間" %}</label>
+                        <input type="text" class="form-control" id="lunchEnd" name="lunch_end" placeholder="HH:MM">
+                    </div>
+                    <div class="mb-3">
+                        <label for="overtimeStart" class="form-label">{% trans "加班開始時間" %}</label>
+                        <input type="text" class="form-control" id="overtimeStart" name="overtime_start" placeholder="HH:MM">
+                    </div>
+                    <div class="mb-3">
+                        <label for="overtimeEnd" class="form-label">{% trans "加班結束時間" %}</label>
+                        <input type="text" class="form-control" id="overtimeEnd" name="overtime_end" placeholder="HH:MM">
+                    </div>
+                    <button type="submit" class="btn btn-primary">{% trans "保存" %}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 設置安全天數模態框 -->
+<div class="modal fade" id="setSafetySettingsModal" tabindex="-1" aria-labelledby="setSafetySettingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="setSafetySettingsModalLabel">{% trans "設置安全天數" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="setSafetySettingsForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="safetyDays" class="form-label">{% trans "預定出貨日到完工日安全天數（天）" %} <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="safetyDays" name="delivery_to_completion_safety_days" min="0" step="1" value="{{ safety_settings.delivery_to_completion_safety_days|default:'3' }}" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">{% trans "保存" %}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 設置工序間隔時間模態框 -->
+<div class="modal fade" id="setProcessIntervalModal" tabindex="-1" aria-labelledby="setProcessIntervalModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="setProcessIntervalModalLabel">{% trans "設置工序間隔時間" %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="setProcessIntervalForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="processIntervalMinutes" class="form-label">{% trans "工序間隔時間（分鐘）" %} <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="processIntervalMinutes" name="process_interval_minutes" min="0" step="1" value="{{ process_interval_settings.process_interval_minutes|default:'5' }}" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">{% trans "保存" %}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+<script>
+let units = [];
+
+// 初始化 flatpickr 24小時制時間選擇器
+document.addEventListener('DOMContentLoaded', function() {
+    // 新增單位表單的時間欄位
+    flatpickr('#work_start, #work_end, #lunch_start, #lunch_end, #overtime_start, #overtime_end', {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: 'H:i',
+        time_24hr: true,
+        allowInput: true,
+        locale: flatpickr.l10ns.zh,
+        onReady: function(selectedDates, dateStr, instance) {
+            instance._input.removeAttribute('readonly');
+        }
+    });
+    
+    // 編輯單位模態框的時間欄位
+    flatpickr('#workStart, #workEnd, #lunchStart, #lunchEnd, #overtimeStart, #overtimeEnd', {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: 'H:i',
+        time_24hr: true,
+        allowInput: true,
+        locale: flatpickr.l10ns.zh,
+        onReady: function(selectedDates, dateStr, instance) {
+            instance._input.removeAttribute('readonly');
+        }
+    });
+});
+
+function populateUnitSelect(selectElement, units) {
+    units.forEach(unit => {
+        const option = document.createElement('option');
+        option.value = unit.id;
+        option.textContent = unit.name;
+        selectElement.appendChild(option);
+    });
+}
+
+function populateUnitWorkHoursTable(units) {
+    const tableBody = document.getElementById('unitWorkHoursTableBody');
+    tableBody.innerHTML = '';
+    units.forEach(unit => {
+        const isDefault = unit.name === '預設單位';
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${isDefault ? `<input type='text' class='form-control' value='${unit.name}' readonly>` : unit.name}</td>
+            <td>${unit.work_start}</td>
+            <td>${unit.work_end}</td>
+            <td>${unit.has_lunch_break ? '{% trans "是" %}' : '{% trans "否" %}'}</td>
+            <td>${unit.lunch_start || 'N/A'}</td>
+            <td>${unit.lunch_end || 'N/A'}</td>
+            <td>${unit.overtime_start || 'N/A'}</td>
+            <td>${unit.overtime_end || 'N/A'}</td>
+            <td>
+                <button class="btn btn-sm btn-primary me-1" onclick="editUnitWorkHours(${unit.id})">{% trans "編輯" %}</button>
+                ${isDefault ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteUnit(${unit.id}, '${unit.name}')">{% trans "刪除" %}</button>`}
+            </td>
+        `;
+        tableBody.appendChild(row);
+    });
+}
+
+function editUnitWorkHours(unitId) {
+    const unit = units.find(u => u.id == unitId);
+    if (!unit) {
+        console.error('未找到單位，ID:', unitId);
+        alert('{% trans "未找到單位，請刷新頁面後重試。" %}');
+        return;
+    }
+    
+    try {
+        const modal = new bootstrap.Modal(document.getElementById('setUnitWorkHoursModal'));
+        document.getElementById('setUnitId').value = unit.id;
+        document.getElementById('workStart').value = unit.work_start.slice(0, 5);
+        document.getElementById('workEnd').value = unit.work_end.slice(0, 5);
+        document.getElementById('hasLunchBreak').value = unit.has_lunch_break ? 'true' : 'false';
+        document.getElementById('lunchStart').value = unit.lunch_start ? unit.lunch_start.slice(0, 5) : '';
+        document.getElementById('lunchEnd').value = unit.lunch_end ? unit.lunch_end.slice(0, 5) : '';
+        document.getElementById('overtimeStart').value = unit.overtime_start ? unit.overtime_start.slice(0, 5) : '';
+        document.getElementById('overtimeEnd').value = unit.overtime_end ? unit.overtime_end.slice(0, 5) : '';
+        
+        const lunchBreakFields = document.getElementById('lunchBreakFields');
+        lunchBreakFields.style.display = unit.has_lunch_break ? 'block' : 'none';
+        
+        modal.show();
+        console.log('單位工作時間模態框已顯示，單位ID:', unitId);
+    } catch (error) {
+        console.error('打開單位工作時間模態框失敗:', error);
+        alert('{% trans "無法顯示單位工作時間模態框，請檢查網絡或聯繫管理員。" %}');
+    }
+}
+
+function deleteUnit(unitId, unitName) {
+    if (confirm(`{% trans "確定要刪除單位" %} '${unitName}'？`)) {
+        console.log('開始刪除單位，unit_id:', unitId);
+        fetch(`/scheduling/delete_unit/${unitId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => {
+            console.log('刪除單位響應狀態:', response.status);
+            if (!response.ok) {
+                throw new Error('刪除請求失敗，狀態碼: ' + response.status);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('刪除單位響應數據:', data);
+            if (data.status === 'success') {
+                alert('{% trans "單位刪除成功！" %}');
+                fetch('{% url "scheduling:units" %}')
+                    .then(response => response.json())
+                    .then(data => {
+                        units = data;
+                        populateUnitWorkHoursTable(units);
+                    });
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('刪除單位失敗:', error);
+            alert('{% trans "刪除單位失敗，請檢查網絡連接或聯繫管理員。" %}');
+        });
+    }
+}
+
+function editSafetySettings() {
+    console.log('editSafetySettings 函數已觸發');
+    try {
+        const modalElement = document.getElementById('setSafetySettingsModal');
+        if (!modalElement) {
+            throw new Error('未找到 setSafetySettingsModal 元素');
+        }
+        
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        console.log('安全天數設定模態框已顯示');
+    } catch (error) {
+        console.error('打開安全天數設定模態框失敗:', error);
+        alert('{% trans "無法顯示安全天數設定模態框，請檢查網絡或聯繫管理員。" %}');
+    }
+}
+
+function editProcessInterval() {
+    console.log('editProcessInterval 函數已觸發');
+    try {
+        const modalElement = document.getElementById('setProcessIntervalModal');
+        if (!modalElement) {
+            throw new Error('未找到 setProcessIntervalModal 元素');
+        }
+        
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        console.log('工序間隔時間設定模態框已顯示');
+    } catch (error) {
+        console.error('打開工序間隔時間設定模態框失敗:', error);
+        alert('{% trans "無法顯示工序間隔時間設定模態框，請檢查網絡或聯繫管理員。" %}');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM 已載入，開始初始化...');
+    
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap JavaScript 未載入');
+        alert('{% trans "頁面資源載入失敗，請檢查網絡或聯繫管理員。" %}');
+        return;
+    }
+
+    fetch('{% url "scheduling:units" %}')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('網絡請求失敗，狀態碼: ' + response.status);
+            }
+            return response.json();
+        })
+        .then(data => {
+            units = data;
+            console.log('單位列表已加載:', units);
+            populateUnitWorkHoursTable(units);
+        })
+        .catch(error => {
+            console.error('無法加載單位列表:', error);
+            alert('{% trans "無法加載單位列表，請檢查網絡連接或聯繫管理員。" %}');
+        });
+
+    const addUnitWorkHoursForm = document.getElementById('addUnitWorkHoursForm');
+    if (addUnitWorkHoursForm) {
+        addUnitWorkHoursForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const addUnitWorkHoursModal = bootstrap.Modal.getInstance(document.getElementById('addUnitWorkHoursModal'));
+            
+            console.log('提交新增單位表單，數據:', Object.fromEntries(formData));
+            
+            fetch('{% url "scheduling:add_unit" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('網絡請求失敗，狀態碼: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('新增單位響應:', data);
+                if (data.status === 'success') {
+                    alert('{% trans "單位新增成功！" %}');
+                    addUnitWorkHoursModal.hide();
+                    fetch('{% url "scheduling:units" %}')
+                        .then(response => response.json())
+                        .then(data => {
+                            units = data;
+                            populateUnitWorkHoursTable(units);
+                        });
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('新增單位失敗:', error);
+                alert('{% trans "新增單位失敗，請檢查網絡連接或聯繫管理員。" %}');
+            });
+        });
+    } else {
+        console.error('未找到 addUnitWorkHoursForm 元素');
+    }
+
+    const unitWorkHoursForm = document.getElementById('setUnitWorkHoursForm');
+    if (unitWorkHoursForm) {
+        unitWorkHoursForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const setUnitWorkHoursModal = bootstrap.Modal.getInstance(document.getElementById('setUnitWorkHoursModal'));
+            
+            console.log('提交單位工作時間表單，數據:', Object.fromEntries(formData));
+            
+            fetch('{% url "scheduling:update_unit_work_hours" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('網絡請求失敗，狀態碼: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('單位工作時間更新響應:', data);
+                if (data.status === 'success') {
+                    alert('{% trans "單位工作時間更新成功！" %}');
+                    setUnitWorkHoursModal.hide();
+                    fetch('{% url "scheduling:units" %}')
+                        .then(response => response.json())
+                        .then(data => {
+                            units = data;
+                            populateUnitWorkHoursTable(units);
+                        });
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('更新單位工作時間失敗:', error);
+                alert('{% trans "更新單位工作時間失敗，請檢查網絡連接或聯繫管理員。" %}');
+            });
+        });
+    } else {
+        console.error('未找到 setUnitWorkHoursForm 元素');
+    }
+
+    const orderScheduleForm = document.getElementById('orderScheduleForm');
+    if (orderScheduleForm) {
+        orderScheduleForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const interval = document.getElementById('sync_interval_minutes').value;
+            fetch('{% url "scheduling:update_order_schedule" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'sync_interval_minutes=' + encodeURIComponent(interval)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('設定成功！');
+                    location.reload();
+                } else {
+                    alert('設定失敗：' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('發生錯誤，請稍後再試');
+            });
+        });
+    } else {
+        console.error('未找到 orderScheduleForm 元素');
+    }
+
+    const safetySettingsForm = document.getElementById('setSafetySettingsForm');
+    if (safetySettingsForm) {
+        safetySettingsForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const setSafetySettingsModal = bootstrap.Modal.getInstance(document.getElementById('setSafetySettingsModal'));
+            
+            console.log('提交安全天數設定表單，數據:', Object.fromEntries(formData));
+            
+            fetch('/scheduling/update_safety_settings/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('網絡請求失敗，狀態碼: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('安全天數設定響應:', data);
+                if (data.status === 'success') {
+                    alert('{% trans "安全天數設定成功！" %}');
+                    setSafetySettingsModal.hide();
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('更新安全天數失敗:', error);
+                alert('{% trans "更新安全天數失敗，請檢查網絡連接或聯繫管理員。" %}');
+            });
+        });
+    } else {
+        console.error('未找到 setSafetySettingsForm 元素');
+    }
+
+    const processIntervalForm = document.getElementById('setProcessIntervalForm');
+    if (processIntervalForm) {
+        processIntervalForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const setProcessIntervalModal = bootstrap.Modal.getInstance(document.getElementById('setProcessIntervalModal'));
+            
+            console.log('提交工序間隔時間設定表單，數據:', Object.fromEntries(formData));
+            
+            fetch('/scheduling/update_process_interval/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('網絡請求失敗，狀態碼: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('工序間隔時間設定響應:', data);
+                if (data.status === 'success') {
+                    alert('{% trans "工序間隔時間設定成功！" %}');
+                    setProcessIntervalModal.hide();
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('更新工序間隔時間失敗:', error);
+                alert('{% trans "更新工序間隔時間失敗，請檢查網絡連接或聯繫管理員。" %}');
+            });
+        });
+    } else {
+        console.error('未找到 setProcessIntervalForm 元素');
+    }
+
+    const addHasLunchBreakSelect = document.getElementById('has_lunch_break');
+    const addLunchBreakFields = document.getElementById('addLunchBreakFields');
+    if (addHasLunchBreakSelect && addLunchBreakFields) {
+        addHasLunchBreakSelect.addEventListener('change', function() {
+            addLunchBreakFields.style.display = this.value === 'true' ? 'block' : 'none';
+        });
+        addLunchBreakFields.style.display = addHasLunchBreakSelect.value === 'true' ? 'block' : 'none';
+    } else {
+        console.error('未找到 has_lunch_break 或 addLunchBreakFields 元素');
+    }
+
+    const hasLunchBreakSelect = document.getElementById('hasLunchBreak');
+    const lunchBreakFields = document.getElementById('lunchBreakFields');
+    if (hasLunchBreakSelect && lunchBreakFields) {
+        hasLunchBreakSelect.addEventListener('change', function() {
+            lunchBreakFields.style.display = this.value === 'true' ? 'block' : 'none';
+        });
+        lunchBreakFields.style.display = hasLunchBreakSelect.value === 'true' ? 'block' : 'none';
+    } else {
+        console.error('未找到 hasLunchBreak 或 lunchBreakFields 元素');
+    }
+
+    // 手動同步按鈕事件
+    document.getElementById('manualSyncOrderBtn').addEventListener('click', function() {
+        if (confirm('確定要立即手動同步訂單資料嗎？')) {
+            this.disabled = true;
+            this.innerHTML = '同步中...';
+            fetch('{% url "scheduling:update_orders" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('手動同步成功！');
+                    location.reload();
+                } else {
+                    alert('同步失敗：' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('同步失敗，請稍後再試');
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.innerHTML = '手動同步';
+            });
+        }
+    });
+});
+</script>
+
+<style>
+#lunchBreakFields, #addLunchBreakFields {
+    display: none;
+}
+</style>
+{% endblock %}

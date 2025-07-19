@@ -1,0 +1,298 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}環境管理 - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .environment-card {
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .environment-card:hover {
+        border-color: #007bff;
+        box-shadow: 0 4px 8px rgba(0,123,255,0.1);
+    }
+    
+    .environment-card.current {
+        border-color: #28a745;
+        background-color: #f8fff9;
+    }
+    
+    .environment-card h5 {
+        color: #495057;
+        margin-bottom: 10px;
+    }
+    
+    .environment-card .badge {
+        font-size: 0.8em;
+    }
+    
+    .feature-list {
+        list-style: none;
+        padding-left: 0;
+    }
+    
+    .feature-list li {
+        padding: 2px 0;
+        color: #6c757d;
+    }
+    
+    .feature-list li:before {
+        content: "✓ ";
+        color: #28a745;
+        font-weight: bold;
+    }
+    
+    .log-file-item {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .log-file-item:hover {
+        background: #e9ecef;
+    }
+    
+    .log-file-name {
+        font-weight: bold;
+        color: #495057;
+    }
+    
+    .log-file-size {
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    
+    .log-file-actions {
+        margin-top: 5px;
+    }
+    
+    .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .status-development { background-color: #17a2b8; }
+    .status-testing { background-color: #ffc107; }
+    .status-production { background-color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-cogs"></i> 環境管理
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- 當前環境狀態 -->
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle"></i> 當前環境狀態</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>環境：</strong>
+                                <span class="status-indicator status-{{ current_env }}"></span>
+                                {% if current_env == 'development' %}
+                                    <span class="badge badge-info">開發環境</span>
+                                {% elif current_env == 'testing' %}
+                                    <span class="badge badge-warning">測試環境</span>
+                                {% elif current_env == 'production' %}
+                                    <span class="badge badge-danger">生產環境</span>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>DEBUG 模式：</strong>
+                                {% if current_debug %}
+                                    <span class="badge badge-success">啟用</span>
+                                {% else %}
+                                    <span class="badge badge-secondary">停用</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 環境切換 -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h5><i class="fas fa-exchange-alt"></i> 環境切換</h5>
+                            <p class="text-muted">選擇要切換的環境，系統會自動備份當前設定並套用新環境配置。</p>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        {% for env_key, env_info in environments.items %}
+                        <div class="col-md-4">
+                            <div class="environment-card {% if env_key == current_env %}current{% endif %}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <h5>{{ env_info.name }}</h5>
+                                    {% if env_key == current_env %}
+                                        <span class="badge badge-success">當前</span>
+                                    {% endif %}
+                                </div>
+                                
+                                <p class="text-muted">{{ env_info.description }}</p>
+                                
+                                <div class="mb-3">
+                                    <span class="badge badge-info">日誌級別: {{ env_info.log_level }}</span>
+                                    {% if env_info.debug %}
+                                        <span class="badge badge-warning">DEBUG 模式</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">生產模式</span>
+                                    {% endif %}
+                                </div>
+                                
+                                <ul class="feature-list">
+                                    {% for feature in env_info.features %}
+                                        <li>{{ feature }}</li>
+                                    {% endfor %}
+                                </ul>
+                                
+                                {% if env_key != current_env %}
+                                    <form method="post" style="display: inline;">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="switch_environment">
+                                        <input type="hidden" name="environment" value="{{ env_key }}">
+                                        <button type="submit" class="btn btn-primary btn-sm" 
+                                                onclick="return confirm('確定要切換到 {{ env_info.name }} 嗎？\\n\\n注意：切換後需要重啟 Django 服務才能生效。')">
+                                            <i class="fas fa-arrow-right"></i> 切換到此環境
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <button class="btn btn-secondary btn-sm" disabled>
+                                        <i class="fas fa-check"></i> 當前環境
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- 日誌檔案管理 -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5><i class="fas fa-file-alt"></i> 日誌檔案管理</h5>
+                            <p class="text-muted">日誌目錄：{{ log_dir }}</p>
+                            
+                            {% if log_files %}
+                                <div class="row">
+                                    {% for log_file in log_files %}
+                                    <div class="col-md-6">
+                                        <div class="log-file-item">
+                                            <div class="log-file-name">{{ log_file.name }}</div>
+                                            <div class="log-file-size">
+                                                大小：{{ log_file.size_mb }} MB | 
+                                                修改時間：{{ log_file.modified|date:"Y-m-d H:i:s" }}
+                                            </div>
+                                            <div class="log-file-actions">
+                                                <a href="{% url 'system:view_log_file' log_file.name %}" 
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-eye"></i> 查看
+                                                </a>
+                                                <a href="{% url 'system:download_log_file' log_file.name %}" 
+                                                   class="btn btn-sm btn-outline-success">
+                                                    <i class="fas fa-download"></i> 下載
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                
+                                <!-- 清理日誌 -->
+                                <div class="mt-3">
+                                    <h6><i class="fas fa-broom"></i> 清理舊日誌</h6>
+                                    <form method="post" class="form-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="clean_logs">
+                                        <div class="form-group mr-2">
+                                            <label for="days" class="mr-2">清理幾天前的日誌：</label>
+                                            <select name="days" id="days" class="form-control form-control-sm">
+                                                <option value="7">7 天前</option>
+                                                <option value="30" selected>30 天前</option>
+                                                <option value="60">60 天前</option>
+                                                <option value="90">90 天前</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-check mr-2">
+                                            <input type="checkbox" name="dry_run" id="dry_run" class="form-check-input">
+                                            <label for="dry_run" class="form-check-label">模擬執行</label>
+                                        </div>
+                                        <button type="submit" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-trash"></i> 清理日誌
+                                        </button>
+                                    </form>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> 沒有找到日誌檔案
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 注意事項 -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-exclamation-triangle"></i> 重要注意事項</h6>
+                                <ul class="mb-0">
+                                    <li>環境切換後需要重啟 Django 服務才能生效</li>
+                                    <li>生產環境請謹慎操作，建議在維護時間進行</li>
+                                    <li>系統會自動備份當前環境設定</li>
+                                    <li>日誌檔案會自動輪轉，避免佔用過多磁碟空間</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 環境切換確認
+    $('form[action="switch_environment"]').on('submit', function(e) {
+        var targetEnv = $(this).find('input[name="environment"]').val();
+        var envNames = {
+            'development': '開發環境',
+            'testing': '測試環境',
+            'production': '生產環境'
+        };
+        
+        if (!confirm('確定要切換到 ' + envNames[targetEnv] + ' 嗎？\n\n注意：切換後需要重啟 Django 服務才能生效。')) {
+            e.preventDefault();
+        }
+    });
+    
+    // 清理日誌確認
+    $('form[action="clean_logs"]').on('submit', function(e) {
+        var days = $(this).find('select[name="days"]').val();
+        var dryRun = $(this).find('input[name="dry_run"]').is(':checked');
+        
+        if (!dryRun) {
+            if (!confirm('確定要清理 ' + days + ' 天前的日誌檔案嗎？\n\n此操作無法復原！')) {
+                e.preventDefault();
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

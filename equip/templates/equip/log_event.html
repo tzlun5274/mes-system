@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "記錄設備事件 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "記錄設備事件" %} - {{ equipment.name }}</h2>
+    <hr>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="event">{% trans "事件" %}</label>
+            <select name="event" id="event" class="form-control" required>
+                <option value="start">{% trans "啟動" %}</option>
+                <option value="stop">{% trans "停止" %}</option>
+                <option value="fault">{% trans "故障" %}</option>
+                <option value="maintenance">{% trans "維護" %}</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="runtime">{% trans "運行時間 (格式: HH:MM:SS)" %}</label>
+            <input type="text" name="runtime" id="runtime" class="form-control" placeholder="例如: 01:30:00">
+        </div>
+        <div class="form-group">
+            <label for="description">{% trans "描述" %}</label>
+            <textarea name="description" id="description" class="form-control" rows="3"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">{% trans "提交" %}</button>
+        <a href="{% url 'equip:equipment_detail' equipment.id %}" class="btn btn-secondary">{% trans "返回" %}</a>
+    </form>
+</div>
+{% endblock %}

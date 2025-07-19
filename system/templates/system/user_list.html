@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+用戶管理 - MES 系統
+{% endblock %}
+
+{% block extra_head %}
+<script src="{% static 'bootstrap/bootstrap.bundle.min.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>用戶管理</h2>
+    <hr>
+    <div class="card">
+        <div class="card-header">
+            <a href="{% url 'system:user_add' %}" class="btn btn-primary btn-sm">新增用戶</a>
+            <a href="{% url 'system:user_export' %}" class="btn btn-success btn-sm ms-2">匯出用戶</a>
+            <button type="button" class="btn btn-info btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#importModal">匯入用戶</button>
+            <a href="{% url 'system:index' %}" class="btn btn-secondary btn-sm float-right">返回系統管理</a>
+        </div>
+        <div class="card-body">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>用戶名</th>
+                        <th>Email</th>
+                        <th>最後登入</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.last_login|date:"Y-m-d H:i:s" }}</td>
+                        <td>
+                            <a href="{% url 'system:user_edit' user.id %}" class="btn btn-info btn-sm">編輯</a>
+                            <a href="{% url 'system:user_change_password' user.id %}" class="btn btn-warning btn-sm">更改密碼</a>
+                            <form action="{% url 'system:user_delete' user.id %}" method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('確定刪除用戶 {{ user.username }}？');">刪除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">無用戶資料</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 匯入用戶 Modal -->
+    <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="importModalLabel">匯入用戶</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="post" enctype="multipart/form-data" action="{% url 'system:user_import' %}">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="csv_file">上傳 CSV 或 Excel 文件</label>
+                            <input type="file" name="csv_file" id="csv_file" class="form-control-file" accept=".csv,.xlsx" required>
+                            <small class="form-text text-muted">支援 .csv 或 .xlsx 文件，應包含以下欄位：username, email, password（可選）。未提供密碼的用戶將使用預設密碼 123456。</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">匯入</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

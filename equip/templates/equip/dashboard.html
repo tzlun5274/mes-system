@@ -1,0 +1,354 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}設備監控看板{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet">
+<style>
+    .status-card {
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
+    }
+    .status-card:hover {
+        transform: translateY(-2px);
+    }
+    .status-running { background: linear-gradient(135deg, #28a745, #20c997); }
+    .status-idle { background: linear-gradient(135deg, #ffc107, #fd7e14); }
+    .status-stopped { background: linear-gradient(135deg, #6c757d, #495057); }
+    .status-alarm { background: linear-gradient(135deg, #dc3545, #e83e8c); }
+    .status-fault { background: linear-gradient(135deg, #dc3545, #fd7e14); }
+    .status-maintenance { background: linear-gradient(135deg, #17a2b8, #20c997); }
+    
+    .metric-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+    .metric-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .alert-card {
+        border-left: 4px solid #dc3545;
+        background: #fff5f5;
+    }
+    .maintenance-card {
+        border-left: 4px solid #ffc107;
+        background: #fffbf0;
+    }
+    
+    .uptime-progress {
+        height: 8px;
+        border-radius: 4px;
+    }
+    
+    .real-time-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #28a745;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-tachometer-alt text-primary"></i>
+            設備監控看板
+        </h1>
+        <div class="d-flex align-items-center">
+            <div class="real-time-indicator me-2"></div>
+            <small class="text-muted">即時更新</small>
+        </div>
+    </div>
+
+    <!-- 即時狀態統計 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i>
+                        即時設備狀態
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for status in current_statuses %}
+                        <div class="col-md-2 col-sm-4 col-6 mb-3">
+                            <div class="status-card text-white p-3 text-center">
+                                <div class="h4 mb-1">{{ status.count }}</div>
+                                <div class="small">{{ status.get_status_display }}</div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="col-12 text-center text-muted">
+                            <i class="fas fa-info-circle fa-2x mb-2"></i>
+                            <p>目前沒有即時狀態數據</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 效能指標 -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="metric-value text-primary">
+                            {{ performance_stats.avg_efficiency|default:0|floatformat:1 }}%
+                        </div>
+                        <div class="metric-label">平均效率率</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-chart-line fa-2x text-primary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="metric-value text-success">
+                            {{ performance_stats.total_runtime|default:0|floatformat:1 }}
+                        </div>
+                        <div class="metric-label">總運行時數</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x text-success"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="metric-value text-info">
+                            {{ performance_stats.total_production|default:0 }}
+                        </div>
+                        <div class="metric-label">總生產數量</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-boxes fa-2x text-info"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="metric-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="metric-value text-warning">
+                            {{ performance_stats.total_downtime|default:0|floatformat:1 }}
+                        </div>
+                        <div class="metric-label">總停機時數</div>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-exclamation-triangle fa-2x text-warning"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 最近警報 -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-exclamation-triangle text-danger"></i>
+                        最近警報 (24小時內)
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_alarms %}
+                    <div class="list-group list-group-flush">
+                        {% for alarm in recent_alarms %}
+                        <div class="list-group-item alert-card">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">{{ alarm.equipment.name }}</h6>
+                                    <p class="mb-1 text-danger">{{ alarm.get_status_display }}</p>
+                                    {% if alarm.alarm_message %}
+                                    <small class="text-muted">{{ alarm.alarm_message }}</small>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">{{ alarm.timestamp|date:"H:i" }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-check-circle fa-2x mb-2 text-success"></i>
+                        <p>目前沒有警報</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 維護提醒 -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-tools text-warning"></i>
+                        維護提醒 (7天內)
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if upcoming_maintenance %}
+                    <div class="list-group list-group-flush">
+                        {% for maintenance in upcoming_maintenance %}
+                        <div class="list-group-item maintenance-card">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">{{ maintenance.equipment.name }}</h6>
+                                    <p class="mb-1">{{ maintenance.title }}</p>
+                                    <small class="text-muted">{{ maintenance.get_maintenance_type_display }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <small class="text-warning">{{ maintenance.planned_date|date:"m/d" }}</small>
+                                    <br>
+                                    <small class="text-muted">{{ maintenance.estimated_duration_hours }}小時</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-calendar-check fa-2x mb-2 text-success"></i>
+                        <p>目前沒有維護計劃</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 設備稼動率排行 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-trophy text-warning"></i>
+                        設備稼動率排行 (最近7天)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if equipment_uptime %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>排名</th>
+                                    <th>設備名稱</th>
+                                    <th>設備類型</th>
+                                    <th>稼動率</th>
+                                    <th>進度條</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in equipment_uptime %}
+                                <tr>
+                                    <td>
+                                        {% if forloop.counter == 1 %}
+                                        <span class="badge bg-warning">🥇</span>
+                                        {% elif forloop.counter == 2 %}
+                                        <span class="badge bg-secondary">🥈</span>
+                                        {% elif forloop.counter == 3 %}
+                                        <span class="badge bg-bronze">🥉</span>
+                                        {% else %}
+                                        <span class="text-muted">{{ forloop.counter }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'equip:equipment_detail' item.equipment.id %}" class="text-decoration-none">
+                                            {{ item.equipment.name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ item.equipment.get_equipment_type_display }}</td>
+                                    <td>
+                                        <span class="fw-bold {% if item.uptime >= 90 %}text-success{% elif item.uptime >= 70 %}text-warning{% else %}text-danger{% endif %}">
+                                            {{ item.uptime }}%
+                                        </span>
+                                    </td>
+                                    <td style="width: 200px;">
+                                        <div class="progress uptime-progress">
+                                            <div class="progress-bar {% if item.uptime >= 90 %}bg-success{% elif item.uptime >= 70 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                                 style="width: {{ item.uptime }}%"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-chart-bar fa-2x mb-2"></i>
+                        <p>目前沒有稼動率數據</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+// 自動刷新頁面數據
+setInterval(function() {
+    // 這裡可以添加 AJAX 請求來更新數據
+    // 目前使用頁面刷新作為簡單方案
+    // location.reload();
+}, 30000); // 每30秒刷新一次
+
+// 添加一些互動效果
+document.addEventListener('DOMContentLoaded', function() {
+    // 為狀態卡片添加點擊效果
+    const statusCards = document.querySelectorAll('.status-card');
+    statusCards.forEach(card => {
+        card.addEventListener('click', function() {
+            // 可以添加點擊後跳轉到對應狀態的設備列表
+            console.log('點擊狀態卡片');
+        });
+    });
+});
+</script>
+{% endblock %} 

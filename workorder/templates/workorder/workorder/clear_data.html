@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% block title %}清除工單管理數據{% endblock %}
+{% block content %}
+{% if not is_debug %}
+<div class="alert alert-danger mt-4">
+    <strong>此功能僅供測試環境使用，正式環境已隱藏！</strong>
+</div>
+{% else %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-trash-alt"></i>
+                        清除工單管理數據
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5><i class="fas fa-exclamation-triangle"></i> 重要警告</h5>
+                        <p>此功能將永久刪除選定的數據，請謹慎操作！</p>
+                        <ul>
+                            <li>所有刪除的數據都無法復原</li>
+                            <li>建議在執行前先備份重要數據</li>
+                            <li>此功能僅供管理員使用</li>
+                        </ul>
+                    </div>
+                    
+                    <form method="post" id="clearDataForm">
+                        {% csrf_token %}
+                        
+                        <!-- 派工單清除選項 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-primary text-white">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="clear_dispatch" name="clear_dispatch">
+                                    <label class="form-check-label" for="clear_dispatch">
+                                        <i class="fas fa-clipboard-list"></i> 清除派工單
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2">將清除所有狀態為「待生產」和「生產中」的工單：</p>
+                                <ul class="mb-2">
+                                    <li>待生產工單：{{ dispatch_count }} 筆</li>
+                                    <li>包含相關的工序明細、日誌記錄</li>
+                                    <li>包含相關的補登記錄</li>
+                                </ul>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i> 
+                                    此操作將清除所有未完成的工單，請確認所有生產活動已停止
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <!-- 完工工單清除選項 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-success text-white">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="clear_completed" name="clear_completed">
+                                    <label class="form-check-label" for="clear_completed">
+                                        <i class="fas fa-check-circle"></i> 清除完工工單
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2">將清除所有狀態為「已完成」的工單：</p>
+                                <ul class="mb-2">
+                                    <li>完工工單：{{ completed_count }} 筆</li>
+                                    <li>包含相關的工序明細、日誌記錄</li>
+                                    <li>包含相關的補登記錄</li>
+                                </ul>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i> 
+                                    此操作將清除所有已完成的工單歷史記錄
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <!-- 公司製令單清除選項 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-info text-white">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="clear_company_orders" name="clear_company_orders">
+                                    <label class="form-check-label" for="clear_company_orders">
+                                        <i class="fas fa-building"></i> 清除公司製令單
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2">將清除所有公司製令單數據：</p>
+                                <ul class="mb-2">
+                                    <li>公司製令單：{{ company_orders_count }} 筆</li>
+                                    <li>包含所有公司的製令單記錄</li>
+                                    <li>包含已轉換和未轉換的製令單</li>
+                                </ul>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i> 
+                                    此操作將清除所有從ERP同步的製令單數據
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <!-- 操作按鈕 -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'workorder:index' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> 返回工單管理
+                            </a>
+                            <button type="submit" class="btn btn-danger" id="submitBtn" disabled>
+                                <i class="fas fa-trash"></i> 確認清除選定數據
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- 使用說明 -->
+            <div class="card mt-3">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">
+                        <i class="fas fa-question-circle"></i> 使用說明
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ol>
+                        <li>選擇要清除的數據類型（可多選）</li>
+                        <li>確認選定的數據類型和數量</li>
+                        <li>點擊「確認清除選定數據」按鈕</li>
+                        <li>系統將顯示清除結果</li>
+                    </ol>
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="fas fa-lightbulb"></i> 
+                            <strong>提示：</strong>建議在系統維護時間執行此操作，避免影響正常生產活動。
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 檢查是否有選中任何選項，控制提交按鈕狀態
+function updateSubmitButton() {
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    const submitBtn = document.getElementById('submitBtn');
+    let anyChecked = false;
+    
+    checkboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+            anyChecked = true;
+        }
+    });
+    
+    submitBtn.disabled = !anyChecked;
+}
+
+// 為所有checkbox添加事件監聽器
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateSubmitButton);
+    });
+    
+    // 初始化按鈕狀態
+    updateSubmitButton();
+    
+    // 表單提交確認
+    document.getElementById('clearDataForm').addEventListener('submit', function(e) {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+        if (checkboxes.length === 0) {
+            e.preventDefault();
+            alert('請至少選擇一個要清除的數據類型！');
+            return false;
+        }
+        
+        const selectedTypes = [];
+        checkboxes.forEach(checkbox => {
+            if (checkbox.id === 'clear_dispatch') selectedTypes.push('派工單');
+            if (checkbox.id === 'clear_completed') selectedTypes.push('完工工單');
+            if (checkbox.id === 'clear_company_orders') selectedTypes.push('公司製令單');
+        });
+        
+        const confirmMessage = `確定要清除以下數據嗎？\n\n${selectedTypes.join('\n')}\n\n此操作無法復原！`;
+        if (!confirm(confirmMessage)) {
+            e.preventDefault();
+            return false;
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %} 

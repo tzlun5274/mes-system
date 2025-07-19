@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}確認刪除所有未派工工單{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        確認刪除所有未派工工單
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5 class="alert-heading">⚠️ 警告！此操作無法復原</h5>
+                        <p class="mb-0">您即將刪除所有未派工工單（狀態為 pending）。此操作無法復原，請確認您真的要執行此操作。</p>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="text-warning">{{ pending_count }}</h3>
+                                    <p class="mb-0">未派工工單數量</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <h6>刪除內容包括：</h6>
+                        <ul class="mb-0">
+                            <li>所有未派工工單記錄</li>
+                            <li>相關的工序明細</li>
+                            <li>工序日誌記錄</li>
+                            <li>所有相關的生產數據</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-success">
+                        <h6>注意：</h6>
+                        <p class="mb-0">已派工工單（生產中）不會受到影響，會繼續保留。</p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-warning me-2">
+                            <i class="fas fa-trash me-1"></i>
+                            確認刪除所有未派工工單
+                        </button>
+                    </form>
+                    <a href="{% url 'workorder:dispatch_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times me-1"></i>
+                        取消
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

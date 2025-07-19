@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}清除報表資料 - MES 系統{% endblock %}
+
+{% block extra_css %}
+<style>
+    .clear-data-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 2rem;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .warning-box {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .warning-box h4 {
+        color: #856404;
+        margin-bottom: 1rem;
+    }
+    
+    .clear-options {
+        margin-bottom: 2rem;
+    }
+    
+    .clear-option {
+        background: #f8f9fa;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .clear-option:hover {
+        border-color: #007bff;
+        background: #f0f8ff;
+    }
+    
+    .clear-option.selected {
+        border-color: #007bff;
+        background: #e3f2fd;
+    }
+    
+    .clear-option input[type="radio"] {
+        margin-right: 1rem;
+    }
+    
+    .date-range-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 1rem;
+    }
+    
+    .btn-clear {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 1rem 2rem;
+        border-radius: 6px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+    
+    .btn-clear:hover {
+        background: #c82333;
+    }
+    
+    .btn-cancel {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 1rem 2rem;
+        border-radius: 6px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-left: 1rem;
+        transition: background 0.3s ease;
+    }
+    
+    .btn-cancel:hover {
+        background: #5a6268;
+    }
+    
+    .info-box {
+        background: #d1ecf1;
+        border: 1px solid #bee5eb;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .info-box h5 {
+        color: #0c5460;
+        margin-bottom: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="clear-data-container">
+    <h2 class="text-center mb-4">
+        <i class="fas fa-trash-alt text-danger"></i>
+        清除報表資料
+    </h2>
+    
+    <!-- 警告訊息 -->
+    <div class="warning-box">
+        <h4><i class="fas fa-exclamation-triangle"></i> 重要警告</h4>
+        <p class="mb-0">
+            此操作將永久刪除報表資料，刪除後無法恢復！請確認您要清除的資料類型，
+            並建議在執行前先備份重要資料。
+        </p>
+    </div>
+    
+    <form method="post" action="{% url 'reporting:clear_report_data' %}" id="clearDataForm">
+        {% csrf_token %}
+        
+        <!-- 清除選項 -->
+        <div class="clear-options">
+            <h4 class="mb-3">選擇清除類型：</h4>
+            
+            <div class="clear-option" onclick="selectOption('reports_only')">
+                <input type="radio" name="clear_type" value="reports_only" id="reports_only" checked>
+                <label for="reports_only">
+                    <strong>只清除報表資料</strong>
+                    <br>
+                    <small class="text-muted">
+                        清除生產日報表、作業員績效報表、SMT生產報表等報表資料，
+                        保留設定和日誌記錄。
+                    </small>
+                </label>
+            </div>
+            
+            <div class="clear-option" onclick="selectOption('logs_only')">
+                <input type="radio" name="clear_type" value="logs_only" id="logs_only">
+                <label for="logs_only">
+                    <strong>只清除日誌資料</strong>
+                    <br>
+                    <small class="text-muted">
+                        清除報表操作日誌和郵件發送記錄，保留報表資料和設定。
+                    </small>
+                </label>
+            </div>
+            
+            <div class="clear-option" onclick="selectOption('settings_only')">
+                <input type="radio" name="clear_type" value="settings_only" id="settings_only">
+                <label for="settings_only">
+                    <strong>只清除設定資料</strong>
+                    <br>
+                    <small class="text-muted">
+                        清除同步設定和郵件發送設定，保留報表資料和日誌。
+                    </small>
+                </label>
+            </div>
+            
+            <div class="clear-option" onclick="selectOption('all')">
+                <input type="radio" name="clear_type" value="all" id="all">
+                <label for="all">
+                    <strong>清除所有報表相關資料</strong>
+                    <br>
+                    <small class="text-muted">
+                        清除所有報表資料、日誌和設定，此操作將完全重置報表模組。
+                    </small>
+                </label>
+            </div>
+        </div>
+        
+        <!-- 日期範圍選擇 -->
+        <div class="date-range-section">
+            <h4 class="mb-3">日期範圍（可選）：</h4>
+            <div class="info-box">
+                <h5><i class="fas fa-info-circle"></i> 說明</h5>
+                <p class="mb-0">
+                    如果指定日期範圍，只會清除該日期範圍內的資料。
+                    如果不填寫，將清除所有資料。
+                </p>
+            </div>
+            
+            <div class="form-group">
+                <label for="date_range">日期範圍：</label>
+                <input type="text" 
+                       class="form-control" 
+                       id="date_range" 
+                       name="date_range" 
+                       placeholder="格式：2024-01-01,2024-12-31"
+                       pattern="\d{4}-\d{2}-\d{2},\d{4}-\d{2}-\d{2}">
+                <small class="form-text text-muted">
+                    請使用 YYYY-MM-DD,YYYY-MM-DD 格式，例如：2024-01-01,2024-12-31
+                </small>
+            </div>
+        </div>
+        
+        <!-- 確認按鈕 -->
+        <div class="text-center">
+            <button type="submit" class="btn-clear" onclick="return confirmClear();">
+                <i class="fas fa-trash-alt"></i>
+                確認清除資料
+            </button>
+            <a href="{% url 'reporting:index' %}" class="btn-cancel">
+                <i class="fas fa-times"></i>
+                取消
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+function selectOption(value) {
+    // 移除所有選中的樣式
+    document.querySelectorAll('.clear-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // 選中對應的選項
+    document.getElementById(value).checked = true;
+    document.getElementById(value).closest('.clear-option').classList.add('selected');
+}
+
+function confirmClear() {
+    const clearType = document.querySelector('input[name="clear_type"]:checked').value;
+    const dateRange = document.getElementById('date_range').value;
+    let message = '您確定要清除';
+    switch(clearType) {
+        case 'reports_only':
+            message += '報表資料';
+            break;
+        case 'logs_only':
+            message += '日誌資料';
+            break;
+        case 'settings_only':
+            message += '設定資料';
+            break;
+        case 'all':
+            message += '所有報表相關資料';
+            break;
+    }
+    if (dateRange) {
+        message += `（日期範圍：${dateRange}）`;
+    } else {
+        message += '（所有日期）';
+    }
+    message += '嗎？此操作無法撤銷！';
+    if (confirm(message)) {
+        return true; // 送出表單
+    }
+    return false; // 取消送出
+}
+
+// 頁面載入時選中預設選項
+document.addEventListener('DOMContentLoaded', function() {
+    selectOption('reports_only');
+});
+</script>
+{% endblock %} 

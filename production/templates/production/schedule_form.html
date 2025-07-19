@@ -1,0 +1,311 @@
+{# 這個檔案是排程記錄新增/編輯的表單頁面，讓管理者可以輸入排程資料 #}
+{# 使用 Bootstrap 美化，所有欄位都有中文提示，適合完全不懂程式的人 #}
+
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - MES系統{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-calendar-alt"></i> {{ title }}
+        </h1>
+        <div>
+            <a href="{% url 'production:schedule_list' %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> 返回列表
+            </a>
+        </div>
+    </div>
+
+    <!-- 表單卡片 -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">{{ title }}</h6>
+        </div>
+        <div class="card-body">
+            <form method="post" id="scheduleForm">
+                {% csrf_token %}
+                
+                <!-- 基本資訊 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="text-primary mb-3">
+                            <i class="fas fa-info-circle"></i> 基本資訊
+                        </h5>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.production_line.id_for_label }}" class="form-label">
+                            {{ form.production_line.label }}
+                        </label>
+                        {{ form.production_line }}
+                        {% if form.production_line.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.production_line.errors.0 }}
+                            </div>
+                        {% endif %}
+                        {% if form.production_line.help_text %}
+                            <div class="form-text">{{ form.production_line.help_text }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.schedule_date.id_for_label }}" class="form-label">
+                            {{ form.schedule_date.label }}
+                        </label>
+                        {{ form.schedule_date }}
+                        {% if form.schedule_date.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.schedule_date.errors.0 }}
+                            </div>
+                        {% endif %}
+                        {% if form.schedule_date.help_text %}
+                            <div class="form-text">{{ form.schedule_date.help_text }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 工作時間設定 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="text-primary mb-3">
+                            <i class="fas fa-clock"></i> 工作時間設定
+                        </h5>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="{{ form.work_start_time.id_for_label }}" class="form-label">
+                            {{ form.work_start_time.label }}
+                        </label>
+                        {{ form.work_start_time }}
+                        {% if form.work_start_time.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.work_start_time.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="{{ form.work_end_time.id_for_label }}" class="form-label">
+                            {{ form.work_end_time.label }}
+                        </label>
+                        {{ form.work_end_time }}
+                        {% if form.work_end_time.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.work_end_time.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="{{ form.overtime_start_time.id_for_label }}" class="form-label">
+                            {{ form.overtime_start_time.label }}
+                        </label>
+                        {{ form.overtime_start_time }}
+                        {% if form.overtime_start_time.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.overtime_start_time.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label for="{{ form.overtime_end_time.id_for_label }}" class="form-label">
+                            {{ form.overtime_end_time.label }}
+                        </label>
+                        {{ form.overtime_end_time }}
+                        {% if form.overtime_end_time.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.overtime_end_time.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 午休時間設定 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="text-primary mb-3">
+                            <i class="fas fa-utensils"></i> 午休時間設定
+                        </h5>
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <div class="form-check">
+                            {{ form.has_lunch_break }}
+                            <label class="form-check-label" for="{{ form.has_lunch_break.id_for_label }}">
+                                {{ form.has_lunch_break.label }}
+                            </label>
+                            {% if form.has_lunch_break.help_text %}
+                                <div class="form-text">{{ form.has_lunch_break.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3 lunch-time-field">
+                        <label for="{{ form.lunch_start_time.id_for_label }}" class="form-label">
+                            {{ form.lunch_start_time.label }}
+                        </label>
+                        {{ form.lunch_start_time }}
+                        {% if form.lunch_start_time.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.lunch_start_time.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-3 mb-3 lunch-time-field">
+                        <label for="{{ form.lunch_end_time.id_for_label }}" class="form-label">
+                            {{ form.lunch_end_time.label }}
+                        </label>
+                        {{ form.lunch_end_time }}
+                        {% if form.lunch_end_time.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.lunch_end_time.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 假日設定 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="text-primary mb-3">
+                            <i class="fas fa-calendar-times"></i> 假日設定
+                        </h5>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="form-check">
+                            {{ form.is_holiday }}
+                            <label class="form-check-label" for="{{ form.is_holiday.id_for_label }}">
+                                {{ form.is_holiday.label }}
+                            </label>
+                            {% if form.is_holiday.help_text %}
+                                <div class="form-text">{{ form.is_holiday.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.holiday_reason.id_for_label }}" class="form-label">
+                            {{ form.holiday_reason.label }}
+                        </label>
+                        {{ form.holiday_reason }}
+                        {% if form.holiday_reason.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.holiday_reason.errors.0 }}
+                            </div>
+                        {% endif %}
+                        {% if form.holiday_reason.help_text %}
+                            <div class="form-text">{{ form.holiday_reason.help_text }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 工作日設定 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="text-primary mb-3">
+                            <i class="fas fa-calendar"></i> 工作日設定
+                        </h5>
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <div class="row">
+                            {% for choice in form.work_days %}
+                            <div class="col-md-2 mb-2">
+                                <div class="form-check">
+                                    {{ choice.tag }}
+                                    <label class="form-check-label" for="{{ choice.id_for_label }}">
+                                        {{ choice.choice_label }}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if form.work_days.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.work_days.errors.0 }}
+                            </div>
+                        {% endif %}
+                        {% if form.work_days.help_text %}
+                            <div class="form-text">{{ form.work_days.help_text }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 表單錯誤訊息 -->
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- 提交按鈕 -->
+                <div class="row">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 
+                            {% if action == 'create' %}建立排程{% else %}更新排程{% endif %}
+                        </button>
+                        <a href="{% url 'production:schedule_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> 取消
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 午休時間欄位顯示/隱藏控制
+    function toggleLunchTimeFields() {
+        var hasLunchBreak = $('#{{ form.has_lunch_break.id_for_label }}').is(':checked');
+        if (hasLunchBreak) {
+            $('.lunch-time-field').show();
+        } else {
+            $('.lunch-time-field').hide();
+            // 清空午休時間欄位
+            $('#{{ form.lunch_start_time.id_for_label }}').val('');
+            $('#{{ form.lunch_end_time.id_for_label }}').val('');
+        }
+    }
+    
+    // 初始化時執行一次
+    toggleLunchTimeFields();
+    
+    // 當午休時間選項改變時執行
+    $('#{{ form.has_lunch_break.id_for_label }}').change(function() {
+        toggleLunchTimeFields();
+    });
+    
+    // 表單驗證
+    $('#scheduleForm').submit(function(e) {
+        var hasLunchBreak = $('#{{ form.has_lunch_break.id_for_label }}').is(':checked');
+        
+        if (hasLunchBreak) {
+            var lunchStart = $('#{{ form.lunch_start_time.id_for_label }}').val();
+            var lunchEnd = $('#{{ form.lunch_end_time.id_for_label }}').val();
+            
+            if (!lunchStart || !lunchEnd) {
+                alert('請填寫完整的午休時間（開始和結束時間）');
+                e.preventDefault();
+                return false;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{# 小提醒：所有欄位都有中文說明，表單送出後會自動檢查必填欄位 #} 

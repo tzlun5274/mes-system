@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "製成檢驗/入庫檢驗表 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "製成檢驗/入庫檢驗表" %}</h2>
+    <hr>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "檢驗日期" %}</th>
+                        <th>{% trans "是否符合入庫標準" %}</th>
+                        <th>{% trans "備註" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inspection in final_inspections %}
+                    <tr>
+                        <td>{{ inspection.product_name }}</td>
+                        <td>{{ inspection.inspection_date }}</td>
+                        <td>{{ inspection.meets_standards|yesno:"是,否" }}</td>
+                        <td>{{ inspection.remarks }}</td>
+                        <td>{{ inspection.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ inspection.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">{% trans "無製成檢驗/入庫檢驗表數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{% url 'quality:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

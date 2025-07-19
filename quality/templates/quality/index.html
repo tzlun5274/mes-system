@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "品質管理 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "品質管理" %}</h2>
+    <hr>
+
+    <h3>{% trans "功能選單" %}</h3>
+    <div class="card mb-4">
+        <div class="card-body">
+            <a href="{% url 'quality:inspection_items' %}" class="btn btn-primary btn-sm">{% trans "檢驗項目定義" %}</a>
+            <a href="{% url 'quality:inspection_records' %}" class="btn btn-primary btn-sm">{% trans "檢驗記錄" %}</a>
+            <a href="{% url 'quality:defective_products' %}" class="btn btn-primary btn-sm">{% trans "不良品記錄" %}</a>
+            <a href="{% url 'quality:final_inspection' %}" class="btn btn-primary btn-sm">{% trans "製成檢驗/入庫檢驗表" %}</a>
+            <a href="{% url 'quality:aoi_test_report' %}" class="btn btn-primary btn-sm">{% trans "AOI 測試報告" %}</a>
+        </div>
+    </div>
+
+    <h3>{% trans "品質管理概覽" %}</h3>
+    
+    <h4>{% trans "檢驗項目定義" %}</h4>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "檢驗項目名稱" %}</th>
+                        <th>{% trans "檢驗標準" %}</th>
+                        <th>{% trans "檢驗要求" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in inspection_items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.standard }}</td>
+                        <td>{{ item.requirement }}</td>
+                        <td>{{ item.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ item.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">{% trans "無檢驗項目數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h4>{% trans "檢驗記錄" %}</h4>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "檢驗項目" %}</th>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "檢驗日期" %}</th>
+                        <th>{% trans "檢驗結果" %}</th>
+                        <th>{% trans "備註" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in inspection_records %}
+                    <tr>
+                        <td>{{ record.inspection_item.name }}</td>
+                        <td>{{ record.product_name }}</td>
+                        <td>{{ record.inspection_date }}</td>
+                        <td>{{ record.result }}</td>
+                        <td>{{ record.remarks }}</td>
+                        <td>{{ record.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ record.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7">{% trans "無檢驗記錄數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h4>{% trans "不良品記錄" %}</h4>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "不合格原因" %}</th>
+                        <th>{% trans "不合格數量" %}</th>
+                        <th>{% trans "不合格日期" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in defective_products %}
+                    <tr>
+                        <td>{{ product.product_name }}</td>
+                        <td>{{ product.defect_reason }}</td>
+                        <td>{{ product.quantity }}</td>
+                        <td>{{ product.defect_date }}</td>
+                        <td>{{ product.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ product.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">{% trans "無不良品記錄數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h4>{% trans "製成檢驗/入庫檢驗表" %}</h4>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "檢驗日期" %}</th>
+                        <th>{% trans "是否符合入庫標準" %}</th>
+                        <th>{% trans "備註" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inspection in final_inspections %}
+                    <tr>
+                        <td>{{ inspection.product_name }}</td>
+                        <td>{{ inspection.inspection_date }}</td>
+                        <td>{{ inspection.meets_standards|yesno:"是,否" }}</td>
+                        <td>{{ inspection.remarks }}</td>
+                        <td>{{ inspection.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ inspection.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">{% trans "無製成檢驗/入庫檢驗表數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h4>{% trans "AOI 測試報告" %}</h4>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "測試日期" %}</th>
+                        <th>{% trans "是否檢測到缺陷" %}</th>
+                        <th>{% trans "缺陷詳情" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in aoi_test_reports %}
+                    <tr>
+                        <td>{{ report.product_name }}</td>
+                        <td>{{ report.test_date }}</td>
+                        <td>{{ report.defect_detected|yesno:"是,否" }}</td>
+                        <td>{{ report.defect_details }}</td>
+                        <td>{{ report.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ report.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">{% trans "無 AOI 測試報告數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

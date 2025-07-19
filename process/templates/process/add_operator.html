@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 添加作業員" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 添加作業員" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" id="operatorForm">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="name" class="form-label">{% trans "作業員名稱" %}</label>
+                    <input type="text" class="form-control" id="name" name="name" value="{{ name|default_if_none:'' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="production_line" class="form-label">所屬產線</label>
+                    <select class="form-select" id="production_line" name="production_line">
+                        <option value="">-- 請選擇產線 --</option>
+                        {% for line in production_lines %}
+                            <option value="{{ line.id }}">{{ line.line_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div id="skillFields">
+                    <div class="skill-entry mb-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="process_name_0" class="form-label">{% trans "工序名稱" %}</label>
+                                <select class="form-control process-name" id="process_name_0" name="process_name[]">
+                                    <option value="">{% trans "選擇工序" %}</option>
+                                    {% for process in process_names %}
+                                        <option value="{{ process.id }}">{{ process.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="priority_0" class="form-label">{% trans "技能優先順序" %}</label>
+                                <input type="number" class="form-control priority" id="priority_0" name="priority[]" min="1" value="1">
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="button" class="btn btn-danger remove-skill-btn">{% trans "移除" %}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary mb-3" id="addSkillBtn">{% trans "添加更多技能" %}</button>
+                <button type="submit" class="btn btn-primary">{% trans "提交" %}</button>
+                <a href="{% url 'process:operators' %}" class="btn btn-secondary">{% trans "取消" %}</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        let skillIndex = 1;
+
+        const addSkillBtn = document.getElementById('addSkillBtn');
+        if (!addSkillBtn) {
+            console.error("未找到 'addSkillBtn' 元素");
+            return;
+        }
+
+        addSkillBtn.addEventListener('click', function () {
+            const skillFields = document.getElementById('skillFields');
+            if (!skillFields) {
+                console.error("未找到 'skillFields' 元素");
+                return;
+            }
+
+            const newSkillDiv = document.createElement('div');
+            newSkillDiv.className = 'skill-entry mb-3';
+            newSkillDiv.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <label for="process_name_${skillIndex}" class="form-label">{% trans "工序名稱" %}</label>
+                        <select class="form-control process-name" id="process_name_${skillIndex}" name="process_name[]">
+                            <option value="">{% trans "選擇工序" %}</option>
+                            {% for process in process_names %}
+                                <option value="{{ process.id }}">{{ process.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="priority_${skillIndex}" class="form-label">{% trans "技能優先順序" %}</label>
+                        <input type="number" class="form-control priority" id="priority_${skillIndex}" name="priority[]" min="1" value="1">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="button" class="btn btn-danger remove-skill-btn">{% trans "移除" %}</button>
+                    </div>
+                </div>
+            `;
+            skillFields.appendChild(newSkillDiv);
+            skillIndex++;
+        });
+
+        document.addEventListener('click', function (e) {
+            if (e.target && e.target.classList.contains('remove-skill-btn')) {
+                e.target.closest('.skill-entry').remove();
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 匯入作業員與技能" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 匯入作業員與技能" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if duplicate_skills %}
+        <div class="alert alert-warning">
+            <p>{% trans "以下作業員與工序組合已存在於資料庫中：" %}</p>
+            <ul>
+                {% for skill in duplicate_skills %}
+                    <li>{{ skill }}</li>
+                {% endfor %}
+            </ul>
+            <p>{% trans "是否要覆蓋這些記錄？" %}</p>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="dataset" value="{{ dataset|escape }}">
+                <button type="submit" name="action" value="overwrite" class="btn btn-danger">{% trans "覆蓋" %}</button>
+                <button type="submit" name="action" value="cancel" class="btn btn-secondary">{% trans "取消" %}</button>
+            </form>
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{% trans "匯入作業員與技能" %}</h5>
+                <p class="card-text">{% trans "請上傳 Excel 檔案（.xlsx 格式），檔案必須包含以下欄位：" %}</p>
+                <ul>
+                    <li>{% trans "作業員名稱" %}（必填）</li>
+                    <li>{% trans "所屬單位" %}（選填，產線名稱）</li>
+                    <li>{% trans "工序名稱" %}（必填）</li>
+                    <li>{% trans "技能優先順序" %}（必填）</li>
+                </ul>
+                <p class="card-text"><strong>{% trans "建議欄位順序：" %}</strong></p>
+                <ol>
+                    <li>{% trans "作業員名稱" %}</li>
+                    <li>{% trans "所屬單位" %}</li>
+                    <li>{% trans "工序名稱" %}</li>
+                    <li>{% trans "技能優先順序" %}</li>
+                </ol>
+                <div class="alert alert-info">
+                    <small>{% trans "注意：所屬單位欄位會根據產線名稱自動對應到對應的產線。如果找不到對應的產線，系統會顯示警告訊息但繼續處理其他資料。" %}</small>
+                </div>
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="file" class="form-label">{% trans "上傳 Excel 文件" %}</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".xlsx" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">{% trans "匯入" %}</button>
+                    <a href="{% url 'process:operators' %}" class="btn btn-secondary">{% trans "取消" %}</a>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

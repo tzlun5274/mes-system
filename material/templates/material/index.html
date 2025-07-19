@@ -1,0 +1,343 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}物料管理 - MES 系統{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    .pause-badge {
+        background: linear-gradient(90deg, #ff4d4f 0%, #ff7875 100%);
+        color: white;
+        font-size: 1.2rem;
+        font-weight: bold;
+        border-radius: 8px;
+        padding: 8px 18px;
+        margin-bottom: 18px;
+        display: inline-block;
+        box-shadow: 0 2px 8px rgba(255,77,79,0.15);
+        letter-spacing: 2px;
+    }
+    .dashboard-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        transition: transform 0.3s ease;
+    }
+    
+    .dashboard-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .alert-card {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    
+    .success-card {
+        background: linear-gradient(135deg, #2ed573 0%, #1e90ff 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    
+    .info-card {
+        background: linear-gradient(135deg, #3742fa 0%, #2f3542 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    
+    .feature-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border-left: 4px solid #667eea;
+        transition: all 0.3s ease;
+    }
+    
+    .feature-card:hover {
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    .requirement-item {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-left: 4px solid #28a745;
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 開發暫停中標籤 -->
+    <div class="row mb-2">
+        <div class="col-12 text-center">
+            <span class="pause-badge"><i class="bi bi-pause-circle"></i> 開發暫停中</span>
+        </div>
+    </div>
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5 fw-bold text-primary">
+                <i class="bi bi-boxes"></i> 物料管理系統
+            </h1>
+            <p class="lead text-muted">MES 生產用料管理與缺料預警</p>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">{{ material_count }}</div>
+                        <div class="stat-label">材料總數</div>
+                    </div>
+                    <i class="bi bi-box fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">{{ product_count }}</div>
+                        <div class="stat-label">產品總數</div>
+                    </div>
+                    <i class="bi bi-cpu fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">{{ active_alerts }}</div>
+                        <div class="stat-label">缺料警告</div>
+                    </div>
+                    <i class="bi bi-exclamation-triangle fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-number">{{ critical_alerts }}</div>
+                        <div class="stat-label">緊急警告</div>
+                    </div>
+                    <i class="bi bi-exclamation-triangle-fill fs-1"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 公司卡片（自動依ERP整合公司設定產生） -->
+    <div class="row mb-4">
+        {% for company in company_cards %}
+        <div class="col-md-4">
+            <div class="dashboard-card" style="background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%); color: #333;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <h5 class="mb-1"><i class="bi bi-building"></i> {{ company.company_name }}</h5>
+                        <small class="text-muted">公司編號：{{ company.company_code }}</small>
+                    </div>
+                    <i class="bi bi-people fs-1"></i>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div>
+                        <div class="stat-number">{{ company.material_count }}</div>
+                        <div class="stat-label">物料數量</div>
+                    </div>
+                    <div>
+                        <div class="stat-number text-danger">{{ company.low_stock_count }}</div>
+                        <div class="stat-label">低庫存</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- 緊急警告 -->
+    {% if critical_alerts > 0 %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5><i class="bi bi-exclamation-triangle-fill"></i> 緊急缺料警告</h5>
+                        <p class="mb-0">目前有 {{ critical_alerts }} 個緊急缺料狀況需要立即處理</p>
+                    </div>
+                    <a href="{% url 'material:shortage_alerts' %}" class="btn btn-light">
+                        <i class="bi bi-arrow-right"></i> 查看詳情
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 功能模組 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="feature-card">
+                <h5><i class="bi bi-calculator text-primary"></i> 物料需求計算</h5>
+                <p class="text-muted">根據產品和數量計算所需材料，支援生產排程規劃</p>
+                <a href="{% url 'material:requirement_calculation' %}" class="btn btn-primary">
+                    <i class="bi bi-arrow-right"></i> 開始計算
+                </a>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="feature-card">
+                <h5><i class="bi bi-exclamation-triangle text-warning"></i> 缺料警告管理</h5>
+                <p class="text-muted">查看和管理缺料警告，確保生產順暢進行</p>
+                <a href="{% url 'material:shortage_alerts' %}" class="btn btn-warning">
+                    <i class="bi bi-arrow-right"></i> 查看警告
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="feature-card">
+                <h5><i class="bi bi-box text-info"></i> 材料管理</h5>
+                <p class="text-muted">管理材料基本資料，包括編號、名稱、規格等</p>
+                <a href="{% url 'material:material_list' %}" class="btn btn-info">
+                    <i class="bi bi-arrow-right"></i> 管理材料
+                </a>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="feature-card">
+                <h5><i class="bi bi-cpu text-success"></i> 產品管理</h5>
+                <p class="text-muted">管理產品基本資料，設定材料需求關係</p>
+                <a href="{% url 'material:product_list' %}" class="btn btn-success">
+                    <i class="bi bi-arrow-right"></i> 管理產品
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="feature-card">
+                <h5><i class="bi bi-calendar-check text-primary"></i> 供應計劃</h5>
+                <p class="text-muted">管理材料供應計劃，確保生產用料及時到位</p>
+                <a href="{% url 'material:supply_plan_list' %}" class="btn btn-primary">
+                    <i class="bi bi-arrow-right"></i> 查看計劃
+                </a>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="feature-card">
+                <h5><i class="bi bi-kanban text-secondary"></i> 看板管理</h5>
+                <p class="text-muted">管理 JIT 供料的看板狀態，支援精益生產</p>
+                <a href="{% url 'material:kanban_list' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-right"></i> 查看看板
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增功能模組 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="feature-card">
+                <h5><i class="bi bi-archive text-danger"></i> 庫存管理</h5>
+                <p class="text-muted">管理材料庫存進出、盤點、安全庫存設定，即時掌握庫存狀況</p>
+                <a href="{% url 'material:inventory_management' %}" class="btn btn-danger">
+                    <i class="bi bi-arrow-right"></i> 管理庫存
+                </a>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="feature-card">
+                <h5><i class="bi bi-graph-up text-success"></i> 物料需求估算</h5>
+                <p class="text-muted">根據生產計劃和歷史數據估算物料需求，支援智能預測</p>
+                <a href="{% url 'material:requirement_estimation' %}" class="btn btn-success">
+                    <i class="bi bi-arrow-right"></i> 需求估算
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近的材料需求 -->
+    {% if recent_requirements %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="info-card">
+                <h5><i class="bi bi-clock-history"></i> 最近的材料需求</h5>
+                <div class="row">
+                    {% for requirement in recent_requirements %}
+                    <div class="col-md-6">
+                        <div class="requirement-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ requirement.product.name }}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        需要 {{ requirement.material.name }} 
+                                        {{ requirement.quantity_per_unit }} {{ requirement.unit }}
+                                    </small>
+                                </div>
+                                <span class="badge bg-primary">{{ requirement.unit }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 系統狀態 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="success-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5><i class="bi bi-check-circle-fill"></i> 系統狀態</h5>
+                        <p class="mb-0">物料管理系統運行正常，ERP 資料同步狀態良好</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

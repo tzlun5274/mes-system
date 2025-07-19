@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+工序工藝名稱管理 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-primary mb-1"><i class="bi bi-tags"></i> 工序工藝名稱管理</h2>
+            <p class="text-secondary mb-0">管理生產工序的基本名稱，例如：切割、焊接、組裝等</p>
+        </div>
+        <a href="{% url 'process:index' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> 返回首頁
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% elif message.tags == 'info' %}info{% else %}danger{% endif %} alert-dismissible fade show" role="alert">
+                <i class="bi bi-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'info' %}info-circle{% else %}exclamation-triangle{% endif %}"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- 操作按鈕區 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'process:add_process_name' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> 新增工序
+                        </a>
+                        {% if user.is_superuser %}
+                            <a href="{% url 'process:export_process_names' %}" class="btn btn-info">
+                                <i class="bi bi-download"></i> 匯出資料
+                            </a>
+                            <a href="{% url 'process:import_process_names' %}" class="btn btn-warning">
+                                <i class="bi bi-upload"></i> 匯入資料
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="搜尋工序名稱...">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工序清單 -->
+    <div class="card">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-list-ul"></i> 工序清單</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if process_names %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="processTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th><i class="bi bi-tag"></i> 工序名稱</th>
+                                <th><i class="bi bi-card-text"></i> 描述</th>
+                                <th><i class="bi bi-gear"></i> 能使用的設備</th>
+                                <th><i class="bi bi-tools"></i> 操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for process in process_names %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ process.name }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if process.description %}
+                                            <span class="text-muted">{{ process.description }}</span>
+                                        {% else %}
+                                            <span class="text-muted fst-italic">無描述</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if process.usable_equipment_names %}
+                                            <span class="badge bg-secondary">{{ process.usable_equipment_names }}</span>
+                                        {% else %}
+                                            <span class="text-muted fst-italic">無指定設備</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'process:edit_process_name' process.id %}" class="btn btn-sm btn-outline-warning" title="編輯">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="{% url 'process:delete_process_name' process.id %}" 
+                                               class="btn btn-sm btn-outline-danger" 
+                                               onclick="return confirm('確定要刪除工序「{{ process.name }}」嗎？此操作無法復原。');"
+                                               title="刪除">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-tags text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="text-muted mt-3">目前沒有工序記錄</h5>
+                    <p class="text-muted">點擊上方「新增工序」按鈕開始新增第一個工序</p>
+                    <a href="{% url 'process:add_process_name' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> 新增第一個工序
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    {% if process_names %}
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <i class="bi bi-tags text-primary" style="font-size: 2rem;"></i>
+                        <!-- 總工序數量 -->
+                        <h5 class="card-title mt-2">{{ total_count }}</h5>
+                        <p class="card-text text-muted">總工序數量</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <i class="bi bi-gear text-success" style="font-size: 2rem;"></i>
+                        <!-- 有設備的工序數量 -->
+                        <h5 class="card-title mt-2">{{ with_equipment_count }}</h5>
+                        <p class="card-text text-muted">有指定設備的工序</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <i class="bi bi-card-text text-info" style="font-size: 2rem;"></i>
+                        <!-- 有描述的工序數量 -->
+                        <h5 class="card-title mt-2">{{ with_description_count }}</h5>
+                        <p class="card-text text-muted">有描述的工序</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- 搜尋功能 JavaScript -->
+<script>
+document.getElementById('searchInput').addEventListener('keyup', function() {
+    const searchTerm = this.value.toLowerCase();
+    const table = document.getElementById('processTable');
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+        const nameCell = rows[i].getElementsByTagName('td')[0];
+        const descCell = rows[i].getElementsByTagName('td')[1];
+        
+        if (nameCell && descCell) {
+            const name = nameCell.textContent.toLowerCase();
+            const desc = descCell.textContent.toLowerCase();
+            
+            if (name.includes(searchTerm) || desc.includes(searchTerm)) {
+                rows[i].style.display = '';
+            } else {
+                rows[i].style.display = 'none';
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

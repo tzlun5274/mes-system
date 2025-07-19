@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h2>排程警告看板</h2>
+  <p class="text-danger">此頁會顯示所有最新的排程驗證警告，請生管或管理員定期檢查！</p>
+  <table class="table table-bordered table-striped">
+    <thead class="table-danger">
+      <tr>
+        <th>訂單編號</th>
+        <th>工序名稱</th>
+        <th>警告內容</th>
+        <th>產生時間</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for warn in warnings %}
+      <tr>
+        <td>{{ warn.order_id }}</td>
+        <td>{{ warn.process_name }}</td>
+        <td>{{ warn.warning_message }}</td>
+        <td>{{ warn.created_at|date:'Y-m-d H:i' }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="text-center">目前沒有排程警告！</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<!--
+說明：
+- 這個頁面會自動顯示所有排程驗證警告。
+- 欄位包含訂單編號、工序名稱、警告內容、產生時間。
+- 請生管或管理員定期檢查，及時處理異常。
+-->
+{% endblock %} 

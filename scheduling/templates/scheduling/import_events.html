@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 匯入事件" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 匯入事件" %}</h2>
+    <hr>
+    <div class="mb-3">
+        <p class="lead">{% trans "上傳行政院辦公日曆表（CSV 格式）以匯入放假日" %}</p>
+        <p class="text-muted">{% trans "CSV 文件應包含以下欄位：Subject, Start Date, End Date, All Day Event" %}</p>
+        <p class="text-muted">{% trans "示例：" %}</p>
+        <pre>
+Subject,Start Date,Start Time,End Date,End Time,All Day Event,Description,Location
+中華民國開國紀念日,2025/1/1,,2025/1/1,,TRUE,,
+例假日,2025/1/4,,2025/1/4,,TRUE,,
+農曆除夕,2025/1/28,,2025/1/28,,TRUE,,
+春節,2025/1/29,,2025/1/29,,TRUE,,
+        </pre>
+    </div>
+
+    {% if messages %}
+    <div class="mb-3">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %}" role="alert">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if show_duplicate_events %}
+    <div class="alert alert-warning">
+        <p>{% trans "以下事件（標題和開始時間）已存在於資料庫中：" %}</p>
+        <ul>
+            {% for event in duplicate_events %}
+                <li>{{ event }}</li>
+            {% endfor %}
+        </ul>
+        <p>{% trans "是否要覆蓋這些記錄？" %}</p>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="dataset" value="{{ dataset|escape }}">
+            <button type="submit" name="action" value="overwrite" class="btn btn-danger w-100">{% trans "覆蓋" %}</button>
+            <button type="submit" name="action" value="cancel" class="btn btn-secondary w-100">{% trans "取消" %}</button>
+        </form>
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body">
+            <form id="importEventsForm" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="file" class="form-label">{% trans "選擇 CSV 文件" %}</label>
+                    <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">{% trans "匯入" %}</button>
+                <a href="{% url 'scheduling:calendar' %}" class="btn btn-secondary w-100 mt-2">{% trans "取消" %}</a>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('importEventsForm');
+    if (form) {
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+
+            fetch('{% url "scheduling:import_events" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(data.message);
+                    window.location.href = '{% url "scheduling:calendar" %}'; // 跳轉到行事曆頁面
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('匯入事件失敗:', error);
+                alert('{% trans "匯入事件失敗，請檢查網絡連接或聯繫管理員。" %}');
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

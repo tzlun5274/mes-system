@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}選擇性轉回已轉換製令{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-list-check me-2"></i>
+                        選擇性轉回已轉換製令
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6>使用說明：</h6>
+                        <ul class="mb-0">
+                            <li>勾選要轉回的製令（可選擇一筆或多筆）</li>
+                            <li>使用「全選」按鈕可快速選擇所有製令</li>
+                            <li>使用「取消全選」按鈕可快速取消所有選擇</li>
+                            <li>點擊「轉回選中製令」按鈕執行轉回操作</li>
+                        </ul>
+                    </div>
+                    
+                    {% if converted_orders %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="row mb-3">
+                            <div class="col-auto">
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectAll()">
+                                    <i class="fas fa-check-square me-1"></i>全選
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="deselectAll()">
+                                    <i class="fas fa-square me-1"></i>取消全選
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button type="submit" class="btn btn-warning" onclick="return confirm('確定要轉回選中的製令嗎？')">
+                                    <i class="fas fa-undo me-1"></i>轉回選中製令
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <a href="{% url 'material:company_orders' %}" class="btn btn-secondary">
+                                    <i class="fas fa-times me-1"></i>取消
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th width="50">
+                                            <input type="checkbox" id="selectAllCheckbox" onchange="toggleAll(this)">
+                                        </th>
+                                        <th>公司代號</th>
+                                        <th>製令單號</th>
+                                        <th>產品編號</th>
+                                        <th>生產數量</th>
+                                        <th>預定開工日</th>
+                                        <th>預定出貨日</th>
+                                        <th>同步時間</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for order in converted_orders %}
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" name="selected_orders" value="{{ order.id }}" class="order-checkbox">
+                                        </td>
+                                        <td>{{ order.company_code }}</td>
+                                        <td>{{ order.mkordno }}</td>
+                                        <td>{{ order.product_id }}</td>
+                                        <td>{{ order.prodt_qty }}</td>
+                                        <td>{{ order.est_take_mat_date }}</td>
+                                        <td>{{ order.est_stock_out_date }}</td>
+                                        <td>{{ order.sync_time|date:'Y-m-d H:i' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="alert alert-warning mt-3">
+                            <h6>轉回效果：</h6>
+                            <ul class="mb-0">
+                                <li>選中的製令 <code>is_converted</code> 欄位將設為 <code>False</code></li>
+                                <li>這些製令可以重新執行「手動轉換工單」功能</li>
+                                <li>不會影響已建立的 MES 工單資料</li>
+                                <li>不會影響工序明細和生產記錄</li>
+                            </ul>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="alert alert-success">
+                        <h5 class="alert-heading">目前沒有已轉換的製令</h5>
+                        <p class="mb-0">所有製令都是未轉換狀態，無需進行轉回操作。</p>
+                    </div>
+                    <div class="text-center">
+                        <a href="{% url 'material:company_orders' %}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left me-1"></i>返回
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function selectAll() {
+    document.querySelectorAll('.order-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    document.getElementById('selectAllCheckbox').checked = true;
+}
+
+function deselectAll() {
+    document.querySelectorAll('.order-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.getElementById('selectAllCheckbox').checked = false;
+}
+
+function toggleAll(selectAllCheckbox) {
+    document.querySelectorAll('.order-checkbox').forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+}
+
+// 監聽個別checkbox變化，更新全選checkbox狀態
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.order-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const allCheckboxes = document.querySelectorAll('.order-checkbox');
+            const checkedCheckboxes = document.querySelectorAll('.order-checkbox:checked');
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            
+            if (checkedCheckboxes.length === allCheckboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedCheckboxes.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 

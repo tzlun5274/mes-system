@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "MES 系統 - 排程管理" %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .card { box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
+    .card-header { background-color: #007bff; color: #fff; border-bottom: 1px solid #dee2e6; }
+    .card-header h5 { margin: 0; font-size: 1.25rem; }
+    .btn-success { background-color: #28a745; border-color: #28a745; }
+    .btn-success:hover { background-color: #218838; border-color: #1e7e34; }
+    .pause-badge {
+        background: linear-gradient(90deg, #ff4d4f 0%, #ff7875 100%);
+        color: white;
+        font-size: 1.2rem;
+        font-weight: bold;
+        border-radius: 8px;
+        padding: 8px 18px;
+        margin-bottom: 18px;
+        display: inline-block;
+        box-shadow: 0 2px 8px rgba(255,77,79,0.15);
+        letter-spacing: 2px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 開發暫停中標籤 -->
+    <div class="row mb-2">
+        <div class="col-12 text-center">
+            <span class="pause-badge"><i class="bi bi-pause-circle"></i> 開發暫停中</span>
+        </div>
+    </div>
+    <div class="container mt-4">
+        <h2>{% trans "MES 系統 - 排程管理" %}</h2>
+        <hr>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="row">
+            <!-- 統一排程操作 -->
+            <div class="col-md-3">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>{% trans "統一排程操作" %}</h5>
+                        <a href="{% url 'scheduling:unified_scheduling' %}" class="btn btn-success btn-sm ms-2" style="display: inline-block !important;">{% trans "開始排程" %}</a>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">整合全自動、半自動、混合、手動排程，支援資源衝突檢查和甘特圖拖曳</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 排程管理 -->
+            <div class="col-md-3">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>{% trans "排程管理" %}</h5>
+                        <a href="{% url 'scheduling:schedule_management' %}" class="btn btn-success btn-sm ms-2" style="display: inline-block !important;">{% trans "查看更多" %}</a>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">{% trans "管理全自動、半自動、手動及混合式排程" %}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 訂單管理 -->
+            <div class="col-md-3">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>{% trans "訂單管理" %}</h5>
+                        <a href="{% url 'scheduling:order_list' %}" class="btn btn-success btn-sm ms-2" style="display: inline-block !important;">{% trans "查看更多" %}</a>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">管理與查詢公司訂單，支援查詢、篩選與匯出。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 行事曆 -->
+            <div class="col-md-3">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>{% trans "行事曆" %}</h5>
+                        <a href="{% url 'scheduling:calendar' %}" class="btn btn-success btn-sm ms-2" style="display: inline-block !important;">{% trans "查看更多" %}</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 公司檢視 -->
+            <div class="col-md-3">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>{% trans "公司檢視" %}</h5>
+                        <a href="{% url 'scheduling:company_view' %}" class="btn btn-success btn-sm ms-2" style="display: inline-block !important;">{% trans "查看更多" %}</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

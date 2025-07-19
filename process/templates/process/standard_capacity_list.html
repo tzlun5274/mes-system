@@ -1,0 +1,986 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}標準產能設定管理{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    .capacity-card {
+        border-left: 4px solid #007bff;
+        transition: all 0.3s ease;
+    }
+    .capacity-card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    .filter-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .action-buttons {
+        margin-bottom: 20px;
+    }
+    .table-responsive {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .badge-equipment {
+        background: #17a2b8;
+    }
+    .badge-operator {
+        background: #28a745;
+    }
+    .badge-version {
+        background: #6c757d;
+    }
+    
+    /* 排序按鈕樣式 */
+    .sort-buttons {
+        display: flex;
+        gap: 2px;
+    }
+    
+    .sort-buttons .btn {
+        padding: 2px 4px;
+        font-size: 0.75rem;
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    .sort-buttons .btn:hover {
+        background-color: rgba(255,255,255,0.1);
+        border-color: rgba(255,255,255,0.5);
+    }
+    
+    .sort-buttons .btn .bi {
+        font-size: 0.8rem;
+    }
+    
+    .sort-buttons .btn .text-warning {
+        color: #ffc107 !important;
+    }
+    
+    /* 表格標題樣式 */
+    .table th {
+        position: relative;
+        white-space: nowrap;
+    }
+    
+    .table th .d-flex {
+        min-width: 120px;
+    }
+    
+    /* 產品編號排序特殊樣式 */
+    .product-code-sort {
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題（已修正為「標準產能設定」） -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="text-primary">
+                <i class="bi bi-speedometer2"></i> 標準產能設定
+            </h2>
+            <p class="text-muted">
+                管理產品工序的標準產能設定，支援多維度產能規劃與分析。
+            </p>
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ total_capacities }}</h4>
+                        <small>總產能設定</small>
+                    </div>
+                    <i class="bi bi-clipboard-data fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ active_capacities }}</h4>
+                        <small>啟用中設定</small>
+                    </div>
+                    <i class="bi bi-check-circle fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ process_count }}</h4>
+                        <small>工序種類</small>
+                    </div>
+                    <i class="bi bi-gear fs-1"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ product_count }}</h4>
+                        <small>產品種類</small>
+                    </div>
+                    <i class="bi bi-box fs-1"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 篩選區域 -->
+    <div class="filter-section">
+        <h5 class="mb-3">
+            <i class="bi bi-funnel"></i> 篩選條件
+        </h5>
+        <form method="GET" class="row g-3">
+            <div class="col-md-2">
+                <label class="form-label">產品編號</label>
+                <input type="text" class="form-control" name="product_code" value="{{ filters.product_code }}" placeholder="輸入產品編號">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">工序名稱</label>
+                <select class="form-select" name="process_name">
+                    <option value="">全部工序</option>
+                    {% for process in process_names %}
+                    <option value="{{ process }}" {% if filters.process_name == process %}selected{% endif %}>{{ process }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">設備類型</label>
+                <select class="form-select" name="equipment_type">
+                    <option value="">全部設備</option>
+                    {% for value, label in equipment_types %}
+                    <option value="{{ value }}" {% if filters.equipment_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">作業員等級</label>
+                <select class="form-select" name="operator_level">
+                    <option value="">全部等級</option>
+                    {% for value, label in operator_levels %}
+                    <option value="{{ value }}" {% if filters.operator_level == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">啟用狀態</label>
+                <select class="form-select" name="is_active">
+                    <option value="">全部狀態</option>
+                    <option value="true" {% if filters.is_active == 'true' %}selected{% endif %}>啟用</option>
+                    <option value="false" {% if filters.is_active == 'false' %}selected{% endif %}>停用</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search"></i> 篩選
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 操作按鈕區，含操作說明按鈕 -->
+    <div class="action-buttons">
+        <div class="row">
+            <div class="col-md-8">
+                <button class="btn btn-success me-2" onclick="openCreateModal()">
+                    <i class="bi bi-plus-circle"></i> 新增產能設定
+                </button>
+                <button class="btn btn-info me-2" onclick="openCalculatorModal()">
+                    <i class="bi bi-calculator"></i> 產能計算器
+                </button>
+                <button class="btn btn-warning me-2" onclick="exportData()">
+                    <i class="bi bi-download"></i> 匯出 Excel
+                </button>
+                <button class="btn btn-secondary me-2" onclick="openImportModal()">
+                    <i class="bi bi-upload"></i> 匯入 Excel
+                </button>
+                <button class="btn btn-danger me-2" onclick="deleteAllCapacities()">
+                    <i class="bi bi-trash3"></i> 全部刪除
+                </button>
+                <!-- 操作說明按鈕，點擊會開啟說明 HTML 檔案 -->
+                <a href="{% static 'docs/standard_capacity_help.html' %}" target="_blank" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-question-circle"></i> 操作說明
+                </a>
+            </div>
+            <div class="col-md-4 text-end">
+                <span class="text-muted">共 {{ total_capacities }} 筆資料</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 資料表格 -->
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="product-code-sort">產品編號</span>
+                            <div class="sort-buttons">
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('product_code', 'asc')" title="產品編號升序排列">
+                                    <i class="bi bi-arrow-up {% if sort.sort_by == 'product_code' and sort.sort_order == 'asc' %}text-warning{% endif %}"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('product_code', 'desc')" title="產品編號降序排列">
+                                    <i class="bi bi-arrow-down {% if sort.sort_by == 'product_code' and sort.sort_order == 'desc' %}text-warning{% endif %}"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>工序名稱</span>
+                            <div class="sort-buttons">
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('process_name', 'asc')" title="工序名稱升序排列">
+                                    <i class="bi bi-arrow-up {% if sort.sort_by == 'process_name' and sort.sort_order == 'asc' %}text-warning{% endif %}"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('process_name', 'desc')" title="工序名稱降序排列">
+                                    <i class="bi bi-arrow-down {% if sort.sort_by == 'process_name' and sort.sort_order == 'desc' %}text-warning{% endif %}"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>設備類型</span>
+                            <div class="sort-buttons">
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('equipment_type', 'asc')" title="設備類型升序排列">
+                                    <i class="bi bi-arrow-up {% if sort.sort_by == 'equipment_type' and sort.sort_order == 'asc' %}text-warning{% endif %}"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('equipment_type', 'desc')" title="設備類型降序排列">
+                                    <i class="bi bi-arrow-down {% if sort.sort_by == 'equipment_type' and sort.sort_order == 'desc' %}text-warning{% endif %}"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>作業員等級</span>
+                            <div class="sort-buttons">
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('operator_level', 'asc')" title="作業員等級升序排列">
+                                    <i class="bi bi-arrow-up {% if sort.sort_by == 'operator_level' and sort.sort_order == 'asc' %}text-warning{% endif %}"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('operator_level', 'desc')" title="作業員等級降序排列">
+                                    <i class="bi bi-arrow-down {% if sort.sort_by == 'operator_level' and sort.sort_order == 'desc' %}text-warning{% endif %}"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>標準產能</span>
+                            <div class="sort-buttons">
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('standard_capacity_per_hour', 'asc')" title="標準產能升序排列">
+                                    <i class="bi bi-arrow-up {% if sort.sort_by == 'standard_capacity_per_hour' and sort.sort_order == 'asc' %}text-warning{% endif %}"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('standard_capacity_per_hour', 'desc')" title="標準產能降序排列">
+                                    <i class="bi bi-arrow-down {% if sort.sort_by == 'standard_capacity_per_hour' and sort.sort_order == 'desc' %}text-warning{% endif %}"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>效率因子</span>
+                            <div class="sort-buttons">
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('efficiency_factor', 'asc')" title="效率因子升序排列">
+                                    <i class="bi bi-arrow-up {% if sort.sort_by == 'efficiency_factor' and sort.sort_order == 'asc' %}text-warning{% endif %}"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('efficiency_factor', 'desc')" title="效率因子降序排列">
+                                    <i class="bi bi-arrow-down {% if sort.sort_by == 'efficiency_factor' and sort.sort_order == 'desc' %}text-warning{% endif %}"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>版本</span>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('version', 'asc')" title="升序排列">
+                                    <i class="bi bi-arrow-up {% if sort.sort_by == 'version' and sort.sort_order == 'asc' %}text-warning{% endif %}"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('version', 'desc')" title="降序排列">
+                                    <i class="bi bi-arrow-down {% if sort.sort_by == 'version' and sort.sort_order == 'desc' %}text-warning{% endif %}"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>狀態</span>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('is_active', 'asc')" title="升序排列">
+                                    <i class="bi bi-arrow-up {% if sort.sort_by == 'is_active' and sort.sort_order == 'asc' %}text-warning{% endif %}"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('is_active', 'desc')" title="降序排列">
+                                    <i class="bi bi-arrow-down {% if sort.sort_by == 'is_active' and sort.sort_order == 'desc' %}text-warning{% endif %}"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </th>
+                    <th>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>建立日期</span>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('effective_date', 'asc')" title="升序排列">
+                                    <i class="bi bi-arrow-up {% if sort.sort_by == 'effective_date' and sort.sort_order == 'asc' %}text-warning{% endif %}"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-light btn-sm" onclick="sortTable('effective_date', 'desc')" title="降序排列">
+                                    <i class="bi bi-arrow-down {% if sort.sort_by == 'effective_date' and sort.sort_order == 'desc' %}text-warning{% endif %}"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for capacity in capacities %}
+                <tr class="capacity-card">
+                    <td><strong>{{ capacity.product_code }}</strong></td>
+                    <td>{{ capacity.process_name }}</td>
+                    <td>
+                        <span class="badge badge-equipment">{{ capacity.get_equipment_type_display }}</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-operator">{{ capacity.get_operator_level_display }}</span>
+                    </td>
+                    <td>
+                        <strong>{{ capacity.standard_capacity_per_hour }}</strong> pcs/hr
+                        {% if capacity.min_capacity_per_hour > 0 or capacity.max_capacity_per_hour > 0 %}
+                        <br><small class="text-muted">
+                            ({{ capacity.min_capacity_per_hour }}-{{ capacity.max_capacity_per_hour }})
+                        </small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ capacity.efficiency_factor|floatformat:2 }}
+                        {% if capacity.learning_curve_factor != 1.00 %}
+                        <br><small class="text-muted">學習: {{ capacity.learning_curve_factor|floatformat:2 }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-version">v{{ capacity.version }}</span>
+                    </td>
+                    <td>
+                        {% if capacity.is_active %}
+                        <span class="badge bg-success">啟用</span>
+                        {% else %}
+                        <span class="badge bg-secondary">停用</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ capacity.effective_date|date:"Y-m-d" }}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="viewCapacity({{ capacity.id }})" title="查看詳情">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-warning" onclick="editCapacity({{ capacity.id }})" title="編輯">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="deleteCapacity({{ capacity.id }})" title="刪除">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p class="mt-2">目前沒有產能設定資料</p>
+                        <button class="btn btn-primary" onclick="openCreateModal()">
+                            <i class="bi bi-plus-circle"></i> 新增第一筆資料
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 說明區塊 -->
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle"></i> 標準產能設定說明
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>📊 產能維度說明</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>設備類型：</strong>標準設備、SMT設備、DIP設備、測試設備、包裝設備</li>
+                                <li><strong>作業員等級：</strong>新手(80%)、標準(100%)、熟手(120%)、大師(150%)</li>
+                                <li><strong>效率因子：</strong>考慮設備狀態、環境因素對產能的影響</li>
+                                <li><strong>學習曲線：</strong>作業員熟練度對產能的影響因子</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>⚙️ 時間因素說明</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>換線時間：</strong>產品切換時的準備時間</li>
+                                <li><strong>週期時間：</strong>單件產品的標準加工時間</li>
+                                <li><strong>批量大小：</strong>最佳生產批量，影響整體效率</li>
+                                <li><strong>不良率：</strong>預期不良品比例，影響實際產能</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增/編輯 Modal -->
+<div class="modal fade" id="capacityModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">新增標準產能設定</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="capacityForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">產品編號 *</label>
+                                <input type="text" class="form-control" name="product_code" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">工序名稱 *</label>
+                                <select class="form-select" name="process_name" required>
+                                    <option value="">請選擇工序</option>
+                                    {% for process in process_names %}
+                                    <option value="{{ process }}">{{ process }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">設備類型</label>
+                                <select class="form-select" name="equipment_type">
+                                    {% for value, label in equipment_types %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">作業員等級</label>
+                                <select class="form-select" name="operator_level">
+                                    {% for value, label in operator_levels %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">標準產能 (pcs/hr) *</label>
+                                <input type="number" class="form-control" name="standard_capacity_per_hour" min="1" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">效率因子</label>
+                                <input type="number" class="form-control" name="efficiency_factor" min="0.1" max="2.0" step="0.01" value="1.00">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">學習曲線因子</label>
+                                <input type="number" class="form-control" name="learning_curve_factor" min="0.1" max="2.0" step="0.01" value="1.00">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">換線時間 (分鐘)</label>
+                                <input type="number" class="form-control" name="setup_time_minutes" min="0" value="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">週期時間 (秒)</label>
+                                <input type="number" class="form-control" name="cycle_time_seconds" min="0" step="0.01" value="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">最佳批量</label>
+                                <input type="number" class="form-control" name="optimal_batch_size" min="1" value="1">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">備註</label>
+                        <textarea class="form-control" name="notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveCapacity()">儲存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 產能計算器 Modal -->
+<div class="modal fade" id="calculatorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-calculator"></i> 產能計算器
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>輸入參數</h6>
+                        <div class="mb-3">
+                            <label class="form-label">標準產能 (pcs/hr)</label>
+                            <input type="number" class="form-control" id="calcStandardCapacity" value="100">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">效率因子</label>
+                            <input type="number" class="form-control" id="calcEfficiency" min="0.1" max="2.0" step="0.01" value="1.00">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">批量大小</label>
+                            <input type="number" class="form-control" id="calcBatchSize" min="1" value="100">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">換線時間 (分鐘)</label>
+                            <input type="number" class="form-control" id="calcSetupTime" min="0" value="30">
+                        </div>
+                        <button class="btn btn-primary" onclick="calculateCapacity()">
+                            <i class="bi bi-calculator"></i> 計算產能
+                        </button>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>計算結果</h6>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">有效產能</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="calcEffectiveCapacity" readonly>
+                                        <span class="input-group-text">pcs/hr</span>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">生產時間</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="calcProductionTime" readonly>
+                                        <span class="input-group-text">分鐘</span>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">總時間</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="calcTotalTime" readonly>
+                                        <span class="input-group-text">分鐘</span>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">每件成本時間</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="calcTimePerPiece" readonly>
+                                        <span class="input-group-text">分鐘</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 匯入 Modal -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-upload"></i> 匯入 Excel 資料
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">選擇 Excel 檔案</label>
+                    <input type="file" class="form-control" id="importFile" accept=".xlsx,.xls,.csv">
+                </div>
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="overwriteMode">
+                        <label class="form-check-label" for="overwriteMode">
+                            <strong>覆蓋模式</strong> - 如果記錄已存在，會更新現有資料（預設為跳過已存在的記錄）
+                        </label>
+                    </div>
+                </div>
+                <div class="alert alert-info">
+                    <h6>匯入格式說明：</h6>
+                    <p class="mb-1">檔案需包含以下欄位：</p>
+                    <ul class="mb-0">
+                        <li><strong>產品編號</strong>（必填）</li>
+                        <li><strong>工序名稱</strong>（必填）</li>
+                        <li><strong>標準產能(pcs/hr)</strong>（必填）</li>
+                        <li>設備類型（可選，預設：標準設備）</li>
+                        <li>作業員等級（可選，預設：標準）</li>
+                        <li>效率因子（可選，預設：1.00）</li>
+                        <li>版本號（可選，預設：1）</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="importData()">匯入</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 操作說明 Modal（繁體中文，簡單易懂） -->
+<div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="helpModalLabel">操作說明</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <h6>【功能簡介】</h6>
+        <ul>
+          <li>本頁面用來設定每個產品、工序、設備型號、作業員等級的標準產能。</li>
+          <li>可匯入、匯出 Excel，快速批次管理資料。</li>
+          <li>可用產能計算器協助推算合理產能。</li>
+        </ul>
+        <h6>【主要操作】</h6>
+        <ol>
+          <li>點「新增產能設定」可新增一筆標準產能。</li>
+          <li>點「匯出 Excel」可下載目前篩選結果。</li>
+          <li>點「匯入 Excel」可批次上傳產能資料。</li>
+          <li>點「產能計算器」可協助計算建議產能。</li>
+          <li>點「操作說明」可隨時查看本說明。</li>
+        </ol>
+        <h6>【參數說明】</h6>
+        <ul>
+          <li><b>標準產能：</b>每小時標準產出數量。</li>
+          <li><b>換線時間：</b>設備切換產品時所需時間（分鐘）。</li>
+          <li><b>最佳批量：</b>建議每批生產數量。</li>
+          <li><b>效率因子：</b>考慮實際作業效率的調整值。</li>
+        </ul>
+        <h6>【常見問題】</h6>
+        <ul>
+          <li>如遇資料無法儲存，請檢查必填欄位是否填寫完整。</li>
+          <li>如遇匯入失敗，請確認 Excel 格式正確。</li>
+          <li>如有任何問題，請聯絡系統管理員。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// 全域變數
+let currentCapacityId = null;
+
+// 開啟新增 Modal
+function openCreateModal() {
+    currentCapacityId = null;
+    document.getElementById('modalTitle').textContent = '新增標準產能設定';
+    document.getElementById('capacityForm').reset();
+    new bootstrap.Modal(document.getElementById('capacityModal')).show();
+}
+
+// 開啟編輯 Modal
+function editCapacity(id) {
+    currentCapacityId = id;
+    document.getElementById('modalTitle').textContent = '編輯標準產能設定';
+    
+    // 載入資料
+    fetch(`/process/standard_capacity/update/${id}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const form = document.getElementById('capacityForm');
+                form.product_code.value = data.data.product_code;
+                form.process_name.value = data.data.process_name;
+                form.equipment_type.value = data.data.equipment_type;
+                form.operator_level.value = data.data.operator_level;
+                form.standard_capacity_per_hour.value = data.data.standard_capacity_per_hour;
+                form.efficiency_factor.value = data.data.efficiency_factor;
+                form.learning_curve_factor.value = data.data.learning_curve_factor;
+                form.setup_time_minutes.value = data.data.setup_time_minutes;
+                form.cycle_time_seconds.value = data.data.cycle_time_seconds;
+                form.optimal_batch_size.value = data.data.optimal_batch_size;
+                form.notes.value = data.data.notes || '';
+            }
+        });
+    
+    new bootstrap.Modal(document.getElementById('capacityModal')).show();
+}
+
+// 儲存產能設定
+function saveCapacity() {
+    const form = document.getElementById('capacityForm');
+    const formData = new FormData(form);
+    
+    const url = currentCapacityId 
+        ? `/process/standard_capacity/update/${currentCapacityId}/`
+        : '/process/standard_capacity/create/';
+    
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('儲存成功！');
+            location.reload();
+        } else {
+            alert('錯誤：' + data.message);
+        }
+    });
+}
+
+// 刪除產能設定
+function deleteCapacity(id) {
+    if (confirm('確定要刪除這筆產能設定嗎？')) {
+        fetch(`/process/standard_capacity/delete/${id}/`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('刪除成功！');
+                location.reload();
+            } else {
+                alert('錯誤：' + data.message);
+            }
+        });
+    }
+}
+
+// 查看產能詳情
+function viewCapacity(id) {
+    // 可以開啟詳細資訊的 Modal 或跳轉到詳情頁面
+    alert('查看詳情功能開發中...');
+}
+
+// 開啟產能計算器
+function openCalculatorModal() {
+    new bootstrap.Modal(document.getElementById('calculatorModal')).show();
+}
+
+// 計算產能
+function calculateCapacity() {
+    const standardCapacity = parseFloat(document.getElementById('calcStandardCapacity').value);
+    const efficiency = parseFloat(document.getElementById('calcEfficiency').value);
+    const batchSize = parseInt(document.getElementById('calcBatchSize').value);
+    const setupTime = parseInt(document.getElementById('calcSetupTime').value);
+    
+    // 計算有效產能
+    const effectiveCapacity = standardCapacity * efficiency;
+    
+    // 計算生產時間（分鐘）
+    const productionTime = (batchSize / effectiveCapacity) * 60;
+    
+    // 計算總時間
+    const totalTime = setupTime + productionTime;
+    
+    // 計算每件成本時間
+    const timePerPiece = totalTime / batchSize;
+    
+    // 顯示結果
+    document.getElementById('calcEffectiveCapacity').value = effectiveCapacity.toFixed(2);
+    document.getElementById('calcProductionTime').value = productionTime.toFixed(2);
+    document.getElementById('calcTotalTime').value = totalTime.toFixed(2);
+    document.getElementById('calcTimePerPiece').value = timePerPiece.toFixed(2);
+}
+
+// 匯出資料
+function exportData() {
+    window.location.href = '/process/standard_capacity/export/';
+}
+
+// 開啟匯入 Modal
+function openImportModal() {
+    new bootstrap.Modal(document.getElementById('importModal')).show();
+}
+
+// 匯入資料
+function importData() {
+    const fileInput = document.getElementById('importFile');
+    const file = fileInput.files[0];
+    const overwriteMode = document.getElementById('overwriteMode').checked;
+    
+    if (!file) {
+        alert('請選擇檔案');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('overwrite_mode', overwriteMode);
+    
+    fetch('/process/standard_capacity/import/', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('匯入失敗：' + data.message);
+        }
+    });
+}
+
+// 全部刪除功能
+function deleteAllCapacities() {
+    // 取得目前的篩選條件
+    const urlParams = new URLSearchParams(window.location.search);
+    const productCode = urlParams.get('product_code') || '';
+    const processName = urlParams.get('process_name') || '';
+    const equipmentType = urlParams.get('equipment_type') || '';
+    const operatorLevel = urlParams.get('operator_level') || '';
+    const isActive = urlParams.get('is_active') || '';
+    
+    // 建立確認訊息
+    let confirmMessage = '確定要刪除所有產能設定嗎？\n\n';
+    
+    if (productCode || processName || equipmentType || operatorLevel || isActive) {
+        confirmMessage += '⚠️ 注意：將根據目前的篩選條件刪除資料\n';
+        confirmMessage += `篩選條件：\n`;
+        if (productCode) confirmMessage += `- 產品編號：${productCode}\n`;
+        if (processName) confirmMessage += `- 工序名稱：${processName}\n`;
+        if (equipmentType) confirmMessage += `- 設備類型：${equipmentType}\n`;
+        if (operatorLevel) confirmMessage += `- 作業員等級：${operatorLevel}\n`;
+        if (isActive) confirmMessage += `- 啟用狀態：${isActive === 'true' ? '啟用' : '停用'}\n`;
+    } else {
+        confirmMessage += '⚠️ 注意：將刪除所有產能設定資料\n';
+    }
+    
+    confirmMessage += '\n此操作無法復原，請確認！';
+    
+    if (confirm(confirmMessage)) {
+        // 建立表單資料
+        const formData = new FormData();
+        formData.append('product_code', productCode);
+        formData.append('process_name', processName);
+        formData.append('equipment_type', equipmentType);
+        formData.append('operator_level', operatorLevel);
+        formData.append('is_active', isActive);
+        
+        // 發送刪除請求
+        fetch('/process/standard_capacity/delete_all/', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('刪除失敗：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('刪除失敗：', error);
+            alert('刪除失敗：網路錯誤');
+        });
+    }
+}
+
+// 表格排序功能
+function sortTable(sortBy, sortOrder) {
+    // 取得目前的 URL 參數
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // 更新排序參數
+    urlParams.set('sort_by', sortBy);
+    urlParams.set('sort_order', sortOrder);
+    
+    // 重新導向到排序後的頁面
+    window.location.href = window.location.pathname + '?' + urlParams.toString();
+}
+
+// 產品編號數字排序功能（支援混合文字和數字）
+function sortProductCode(a, b) {
+    // 提取數字部分
+    const aNum = a.match(/\d+/);
+    const bNum = b.match(/\d+/);
+    
+    if (aNum && bNum) {
+        // 如果都有數字，按數字排序
+        return parseInt(aNum[0]) - parseInt(bNum[0]);
+    } else if (aNum) {
+        // 只有 a 有數字，a 排在前面
+        return -1;
+    } else if (bNum) {
+        // 只有 b 有數字，b 排在前面
+        return 1;
+    } else {
+        // 都沒有數字，按文字排序
+        return a.localeCompare(b);
+    }
+}
+</script>
+{% endblock %} 

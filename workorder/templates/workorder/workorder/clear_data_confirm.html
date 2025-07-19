@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}清除數據確認 - MES 系統{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> 清除數據確認
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning" role="alert">
+                        <h5><i class="fas fa-warning"></i> 警告！</h5>
+                        <p class="mb-0">
+                            此操作將<strong class="text-danger">永久刪除</strong>以下所有數據，且無法恢復！
+                            請確認您真的要執行此操作。
+                        </p>
+                    </div>
+
+                    <h5>將要清除的數據：</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    工單數量
+                                    <span class="badge bg-primary rounded-pill">{{ workorder_count }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    公司製令單數量
+                                    <span class="badge bg-primary rounded-pill">{{ company_order_count }}</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    派工記錄數量
+                                    <span class="badge bg-primary rounded-pill">{{ dispatch_log_count }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    補登記錄數量
+                    
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <form method="POST">
+                            {% csrf_token %}
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <a href="{% url 'workorder:index' %}" class="btn btn-secondary me-md-2">
+                                    <i class="fas fa-arrow-left"></i> 取消
+                                </a>
+                                <button type="submit" class="btn btn-danger" onclick="return confirm('確定要清除所有數據嗎？此操作無法恢復！')">
+                                    <i class="fas fa-trash-alt"></i> 確認清除
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

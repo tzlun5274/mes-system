@@ -1,0 +1,8 @@
+/* Scheduling 模組樣式文件 */
+.scheduling-container {
+    margin: 20px;
+}
+#calendar {
+    max-width: 900px;
+    margin: 0 auto;
+}

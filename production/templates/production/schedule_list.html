@@ -1,0 +1,196 @@
+{# 這個檔案是排程記錄列表頁面，顯示所有產線的排程記錄 #}
+{# 使用 Bootstrap 美化，包含搜尋篩選和分頁功能 #}
+
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}排程記錄列表 - MES系統{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- 頁面標題 -->
+  <div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">
+      <i class="fas fa-calendar-alt"></i> 排程記錄列表
+    </h1>
+    <div>
+      <a href="{% url 'production:schedule_create' %}" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus"></i> 新增排程
+      </a>
+      <a href="{% url 'production:index' %}" class="btn btn-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i> 返回首頁
+      </a>
+    </div>
+  </div>
+
+  <!-- 搜尋和篩選 -->
+  <div class="card shadow mb-4">
+    <div class="card-header py-3">
+      <h6 class="m-0 font-weight-bold text-primary">搜尋和篩選</h6>
+    </div>
+    <div class="card-body">
+      <form method="get" class="row">
+        <div class="col-md-3 mb-3">
+          <label for="production_line" class="form-label">產線</label>
+          <select class="form-select" id="production_line" name="production_line">
+            <option value="">全部</option>
+            {% for line in production_lines %}
+            <option value="{{ line.id }}" {% if line.id|stringformat:"s" == production_line_filter %}selected{% endif %}>
+              {{ line.line_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3 mb-3">
+          <label for="date_from" class="form-label">開始日期</label>
+          <input type="date" class="form-control" id="date_from" name="date_from" 
+                 value="{{ date_from }}" placeholder="開始日期">
+        </div>
+        <div class="col-md-3 mb-3">
+          <label for="date_to" class="form-label">結束日期</label>
+          <input type="date" class="form-control" id="date_to" name="date_to" 
+                 value="{{ date_to }}" placeholder="結束日期">
+        </div>
+        <div class="col-md-3 mb-3">
+          <label for="is_holiday" class="form-label">假日狀態</label>
+          <select class="form-select" id="is_holiday" name="is_holiday">
+            <option value="">全部</option>
+            <option value="true" {% if is_holiday_filter == 'true' %}selected{% endif %}>假日</option>
+            <option value="false" {% if is_holiday_filter == 'false' %}selected{% endif %}>工作日</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-primary me-2">
+            <i class="fas fa-search"></i> 搜尋
+          </button>
+          <a href="{% url 'production:schedule_list' %}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> 清除
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 排程記錄列表 -->
+  <div class="card shadow mb-4">
+    <div class="card-header py-3">
+      <h6 class="m-0 font-weight-bold text-primary">排程記錄列表</h6>
+    </div>
+    <div class="card-body">
+      {% if page_obj %}
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>產線</th>
+                <th>排程日期</th>
+                <th>工作時間</th>
+                <th>午休時間</th>
+                <th>加班時間</th>
+                <th>假日狀態</th>
+                <th>假日原因</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for schedule in page_obj %}
+              <tr>
+                <td>{{ schedule.production_line.line_name }}</td>
+                <td>{{ schedule.schedule_date|date:"Y-m-d" }}</td>
+                <td>{{ schedule.work_start_time|time:"H:i" }} - {{ schedule.work_end_time|time:"H:i" }}</td>
+                <td>
+                  {% if schedule.lunch_start_time and schedule.lunch_end_time %}
+                    {{ schedule.lunch_start_time|time:"H:i" }} - {{ schedule.lunch_end_time|time:"H:i" }}
+                  {% else %}
+                    <span class="text-muted">無午休時間</span>
+                  {% endif %}
+                </td>
+                <td>{{ schedule.overtime_start_time|time:"H:i" }} - {{ schedule.overtime_end_time|time:"H:i" }}</td>
+                <td>
+                  {% if schedule.is_holiday %}
+                    <span class="badge bg-warning">假日</span>
+                  {% else %}
+                    <span class="badge bg-success">工作日</span>
+                  {% endif %}
+                </td>
+                <td>{{ schedule.holiday_reason|default:"-" }}</td>
+                <td>
+                  <div class="btn-group" role="group">
+                    <a href="{% url 'production:schedule_edit' schedule.pk %}" 
+                       class="btn btn-sm btn-outline-warning">
+                      <i class="fas fa-edit"></i>
+                    </a>
+                    <a href="{% url 'production:schedule_delete' schedule.pk %}" 
+                       class="btn btn-sm btn-outline-danger"
+                       onclick="return confirm('確定要刪除此排程記錄嗎？')">
+                      <i class="fas fa-trash"></i>
+                    </a>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分頁 -->
+        {% if page_obj.has_other_pages %}
+        <nav aria-label="分頁導航">
+          <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page=1{% if production_line_filter %}&production_line={{ production_line_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if is_holiday_filter %}&is_holiday={{ is_holiday_filter }}{% endif %}">
+                  第一頁
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if production_line_filter %}&production_line={{ production_line_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if is_holiday_filter %}&is_holiday={{ is_holiday_filter }}{% endif %}">
+                  上一頁
+                </a>
+              </li>
+            {% endif %}
+
+            <li class="page-item active">
+              <span class="page-link">
+                第 {{ page_obj.number }} 頁，共 {{ page_obj.paginator.num_pages }} 頁
+              </span>
+            </li>
+
+            {% if page_obj.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if production_line_filter %}&production_line={{ production_line_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if is_holiday_filter %}&is_holiday={{ is_holiday_filter }}{% endif %}">
+                  下一頁
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if production_line_filter %}&production_line={{ production_line_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if is_holiday_filter %}&is_holiday={{ is_holiday_filter }}{% endif %}">
+                  最後一頁
+                </a>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+        {% endif %}
+
+      {% else %}
+        <div class="text-center py-4">
+          <i class="fas fa-calendar-alt fa-3x text-gray-300 mb-3"></i>
+          <h5 class="text-gray-500">尚無排程記錄</h5>
+          <p class="text-gray-400">點擊上方「新增排程」按鈕開始建立第一個排程記錄</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+  // 自動提交篩選表單
+  $('#production_line, #is_holiday').change(function() {
+    $(this).closest('form').submit();
+  });
+});
+</script>
+{% endblock %} 

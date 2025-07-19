@@ -1,0 +1,7 @@
+{
+    "allowed_tables": [
+    "comCustomer", "comProduct", "impPurchaseMain", "impPurchaseMergeSub", "impPurchaseSub",
+	"ordBillMain", "ordBillSub", "prdMKOrdMain", "prdMkOrdMats", "TraBillMain", "TraBillSub",
+	"stkBorrowSub", "stkYearMonthQty"
+    ]
+}

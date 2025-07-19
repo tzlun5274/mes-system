@@ -1,0 +1,444 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}維護管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    .maintenance-card {
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
+    }
+    .maintenance-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .status-planned { border-left: 4px solid #17a2b8; }
+    .status-in_progress { border-left: 4px solid #ffc107; }
+    .status-completed { border-left: 4px solid #28a745; }
+    .status-cancelled { border-left: 4px solid #6c757d; }
+    .status-overdue { border-left: 4px solid #dc3545; }
+    
+    .priority-low { background-color: #f8f9fa; }
+    .priority-medium { background-color: #fff3cd; }
+    .priority-high { background-color: #f8d7da; }
+    .priority-urgent { background-color: #f5c6cb; }
+    
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-tools text-primary"></i>
+            維護管理
+        </h1>
+        <div>
+            <a href="{% url 'equip:add_maintenance' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                新增維護計劃
+            </a>
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ total_maintenance }}</h4>
+                            <small>總維護計劃</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clipboard-list fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ planned_maintenance }}</h4>
+                            <small>已計劃</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-calendar fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ in_progress_maintenance }}</h4>
+                            <small>進行中</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-cogs fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ overdue_maintenance }}</h4>
+                            <small>逾期</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 篩選器 -->
+    <div class="filter-card">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="status" class="form-label">狀態</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="">全部狀態</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="maintenance_type" class="form-label">維護類型</label>
+                <select name="maintenance_type" id="maintenance_type" class="form-select">
+                    <option value="">全部類型</option>
+                    {% for value, label in type_choices %}
+                    <option value="{{ value }}" {% if maintenance_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="equipment_id" class="form-label">設備</label>
+                <select name="equipment_id" id="equipment_id" class="form-select">
+                    <option value="">全部設備</option>
+                    {% for equipment in equipments %}
+                    <option value="{{ equipment.id }}" {% if equipment_id == equipment.id|stringformat:"s" %}selected{% endif %}>{{ equipment.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fas fa-search"></i>
+                    篩選
+                </button>
+                <a href="{% url 'equip:maintenance_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i>
+                    清除
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- 維護列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-list"></i>
+                維護計劃列表
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            {% if page_obj %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>設備名稱</th>
+                            <th>維護標題</th>
+                            <th>類型</th>
+                            <th>計劃日期</th>
+                            <th>預計時數</th>
+                            <th>優先級</th>
+                            <th>狀態</th>
+                            <th>指派技師</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for maintenance in page_obj %}
+                        <tr class="maintenance-card status-{{ maintenance.status }} priority-{{ maintenance.priority }}">
+                            <td>
+                                <a href="{% url 'equip:equipment_detail' maintenance.equipment.id %}" class="text-decoration-none">
+                                    {{ maintenance.equipment.name }}
+                                </a>
+                                <br>
+                                <small class="text-muted">{{ maintenance.equipment.get_equipment_type_display }}</small>
+                            </td>
+                            <td>
+                                <strong>{{ maintenance.title }}</strong>
+                                {% if maintenance.description %}
+                                <br>
+                                <small class="text-muted">{{ maintenance.description|truncatechars:50 }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ maintenance.get_maintenance_type_display }}</span>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="fw-bold">{{ maintenance.planned_date|date:"m/d" }}</span>
+                                    <small class="text-muted">{{ maintenance.planned_date|date:"Y" }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ maintenance.estimated_duration_hours }}小時</span>
+                            </td>
+                            <td>
+                                {% if maintenance.priority == 'urgent' %}
+                                <span class="badge bg-danger">緊急</span>
+                                {% elif maintenance.priority == 'high' %}
+                                <span class="badge bg-warning">高</span>
+                                {% elif maintenance.priority == 'medium' %}
+                                <span class="badge bg-info">中</span>
+                                {% else %}
+                                <span class="badge bg-secondary">低</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if maintenance.status == 'planned' %}
+                                <span class="badge bg-info">已計劃</span>
+                                {% elif maintenance.status == 'in_progress' %}
+                                <span class="badge bg-warning">進行中</span>
+                                {% elif maintenance.status == 'completed' %}
+                                <span class="badge bg-success">已完成</span>
+                                {% elif maintenance.status == 'cancelled' %}
+                                <span class="badge bg-secondary">已取消</span>
+                                {% elif maintenance.status == 'overdue' %}
+                                <span class="badge bg-danger">逾期</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if maintenance.assigned_technician %}
+                                <span class="badge bg-primary">{{ maintenance.assigned_technician }}</span>
+                                {% else %}
+                                <span class="text-muted">未指派</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                            data-bs-toggle="modal" data-bs-target="#maintenanceModal{{ maintenance.id }}">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    {% if maintenance.status == 'planned' %}
+                                    <button type="button" class="btn btn-sm btn-outline-success" 
+                                            onclick="startMaintenance({{ maintenance.id }})">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                    {% endif %}
+                                    {% if maintenance.status == 'in_progress' %}
+                                    <button type="button" class="btn btn-sm btn-outline-warning" 
+                                            onclick="completeMaintenance({{ maintenance.id }})">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 分頁 -->
+            {% if page_obj.has_other_pages %}
+            <div class="card-footer">
+                <nav aria-label="維護計劃分頁">
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if maintenance_type %}&maintenance_type={{ maintenance_type }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if status %}&status={{ status }}{% endif %}{% if maintenance_type %}&maintenance_type={{ maintenance_type }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if maintenance_type %}&maintenance_type={{ maintenance_type }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">目前沒有維護計劃</h5>
+                <p class="text-muted">點擊上方「新增維護計劃」按鈕來創建第一個維護計劃</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 維護詳情模態框 -->
+{% for maintenance in page_obj %}
+<div class="modal fade" id="maintenanceModal{{ maintenance.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">維護計劃詳情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>基本資訊</h6>
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>設備名稱：</strong></td>
+                                <td>{{ maintenance.equipment.name }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>維護標題：</strong></td>
+                                <td>{{ maintenance.title }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>維護類型：</strong></td>
+                                <td>{{ maintenance.get_maintenance_type_display }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>計劃日期：</strong></td>
+                                <td>{{ maintenance.planned_date|date:"Y-m-d" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>預計時數：</strong></td>
+                                <td>{{ maintenance.estimated_duration_hours }}小時</td>
+                            </tr>
+                            <tr>
+                                <td><strong>優先級：</strong></td>
+                                <td>{{ maintenance.get_priority_display }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>執行資訊</h6>
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>狀態：</strong></td>
+                                <td>{{ maintenance.get_status_display }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>指派技師：</strong></td>
+                                <td>{{ maintenance.assigned_technician|default:"未指派" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>執行人員：</strong></td>
+                                <td>{{ maintenance.performed_by|default:"未執行" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>實際開始：</strong></td>
+                                <td>{{ maintenance.actual_start_date|date:"Y-m-d H:i"|default:"未開始" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>實際結束：</strong></td>
+                                <td>{{ maintenance.actual_end_date|date:"Y-m-d H:i"|default:"未結束" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>實際時數：</strong></td>
+                                <td>{{ maintenance.actual_duration_hours|default:"未記錄" }}小時</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                {% if maintenance.description %}
+                <div class="mt-3">
+                    <h6>維護描述</h6>
+                    <p>{{ maintenance.description }}</p>
+                </div>
+                {% endif %}
+                
+                {% if maintenance.findings or maintenance.actions_taken or maintenance.recommendations %}
+                <div class="mt-3">
+                    <h6>執行結果</h6>
+                    {% if maintenance.findings %}
+                    <p><strong>檢查發現：</strong>{{ maintenance.findings }}</p>
+                    {% endif %}
+                    {% if maintenance.actions_taken %}
+                    <p><strong>採取行動：</strong>{{ maintenance.actions_taken }}</p>
+                    {% endif %}
+                    {% if maintenance.recommendations %}
+                    <p><strong>建議：</strong>{{ maintenance.recommendations }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function startMaintenance(maintenanceId) {
+    if (confirm('確定要開始執行這個維護計劃嗎？')) {
+        // 這裡可以添加 AJAX 請求來更新維護狀態
+        alert('維護計劃已開始執行');
+        location.reload();
+    }
+}
+
+function completeMaintenance(maintenanceId) {
+    if (confirm('確定要完成這個維護計劃嗎？')) {
+        // 這裡可以添加 AJAX 請求來更新維護狀態
+        alert('維護計劃已完成');
+        location.reload();
+    }
+}
+
+// 自動刷新頁面（每5分鐘）
+setInterval(function() {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %} 

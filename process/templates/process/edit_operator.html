@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block extra_headers %}
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+{% endblock %}
+
+{% block title %}
+{% trans "MES 系統 - 編輯作業員" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "MES 系統 - 編輯作業員" %}</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" id="operatorForm">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="name" class="form-label">{% trans "作業員名稱" %}</label>
+                    <input type="text" class="form-control" id="name" name="name" value="{{ operator.name }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="production_line" class="form-label">所屬產線</label>
+                    <select class="form-select" id="production_line" name="production_line">
+                        <option value="">-- 請選擇產線 --</option>
+                        {% for line in production_lines %}
+                            <option value="{{ line.id }}" {% if operator.production_line and operator.production_line.id == line.id %}selected{% endif %}>{{ line.line_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div id="skillFields">
+                    {% for skill in operator.skills.all %}
+                        <div class="skill-entry mb-3">
+                            <div class="row">
+                                <input type="hidden" name="skill_id[]" value="{{ skill.id }}">
+                                <div class="col-md-6">
+                                    <label for="process_name_{{ forloop.counter0 }}" class="form-label">{% trans "工序名稱" %}</label>
+                                    <select class="form-control process-name" id="process_name_{{ forloop.counter0 }}" name="process_name[]" required>
+                                        <option value="">{% trans "選擇工序" %}</option>
+                                        {% for process in process_names %}
+                                            <option value="{{ process.id }}" {% if process.id == skill.process_name.id %}selected{% endif %}>{{ process.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="priority_{{ forloop.counter0 }}" class="form-label">{% trans "技能優先順序" %}</label>
+                                    <input type="number" class="form-control priority" id="priority_{{ forloop.counter0 }}" name="priority[]" min="1" value="{{ skill.priority }}" required>
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button type="button" class="btn btn-danger remove-skill-btn">{% trans "移除" %}</button>
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="skill-entry mb-3">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="process_name_0" class="form-label">{% trans "工序名稱" %}</label>
+                                    <select class="form-control process-name" id="process_name_0" name="process_name[]">
+                                        <option value="">{% trans "選擇工序" %}</option>
+                                        {% for process in process_names %}
+                                            <option value="{{ process.id }}">{{ process.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="priority_0" class="form-label">{% trans "技能優先順序" %}</label>
+                                    <input type="number" class="form-control priority" id="priority_0" name="priority[]" min="1" value="1">
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button type="button" class="btn btn-danger remove-skill-btn">{% trans "移除" %}</button>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div id="feedbackMessage" class="alert alert-info" style="display: none;"></div>
+                <button type="button" class="btn btn-secondary mb-3" id="addSkillBtn" onclick="addSkillFallback()">{% trans "添加更多技能" %}</button>
+                <button type="submit" class="btn btn-primary">{% trans "提交" %}</button>
+                <a href="{% url 'process:operators' %}" class="btn btn-secondary">{% trans "取消" %}</a>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 簡單腳本，僅保留核心功能 -->
+<script>
+    // 將 process_names 數據傳遞給 JavaScript
+    const processNames = [
+        {% for process in process_names %}
+            { id: "{{ process.id }}", name: "{{ process.name|escapejs }}" }{% if not forloop.last %},{% endif %}
+        {% empty %}
+            []
+        {% endfor %}
+    ];
+
+    // 初始化 skillIndex
+    let skillIndex = 0;
+
+    // 定義 addSkill 函數（使用 process_names 數據）
+    window.addSkill = function () {
+        const skillFields = document.getElementById('skillFields');
+        if (!skillFields) {
+            return;
+        }
+
+        const feedbackMessage = document.getElementById('feedbackMessage');
+        if (!feedbackMessage) {
+            return;
+        }
+
+        const newSkillDiv = document.createElement('div');
+        newSkillDiv.className = 'skill-entry mb-3';
+
+        // 使用 process_names 數據動態生成工序選項
+        let processOptions = '<option value="">選擇工序</option>';
+        if (processNames && Array.isArray(processNames) && processNames.length > 0) {
+            processNames.forEach(process => {
+                processOptions += `<option value="${process.id}">${process.name}</option>`;
+            });
+        } else {
+            processOptions += '<option value="">無可用工序</option>';
+        }
+
+        try {
+            newSkillDiv.innerHTML = [
+                '<div class="row">',
+                    '<input type="hidden" name="skill_id[]" value="">',
+                    '<div class="col-md-6">',
+                        '<label for="process_name_' + skillIndex + '" class="form-label">工序名稱</label>',
+                        '<select class="form-control process-name" id="process_name_' + skillIndex + '" name="process_name[]">',
+                            processOptions,
+                        '</select>',
+                    '</div>',
+                    '<div class="col-md-4">',
+                        '<label for="priority_' + skillIndex + '" class="form-label">技能優先順序</label>',
+                        '<input type="number" class="form-control priority" id="priority_' + skillIndex + '" name="priority[]" min="1" value="1">',
+                    '</div>',
+                    '<div class="col-md-2 d-flex align-items-end">',
+                        '<button type="button" class="btn btn-danger remove-skill-btn">移除</button>',
+                    '</div>',
+                '</div>'
+            ].join('');
+            skillFields.appendChild(newSkillDiv);
+            skillIndex++;
+
+            // 顯示反饋訊息
+            if (feedbackMessage) {
+                feedbackMessage.textContent = '已成功添加新技能條目！';
+                feedbackMessage.style.display = 'block';
+                setTimeout(() => {
+                    feedbackMessage.style.display = 'none';
+                }, 3000); // 3秒後隱藏
+            }
+        } catch (error) {
+            alert("添加新技能條目時發生錯誤：" + error.message);
+        }
+    };
+
+    // 定義 addSkillFallback 函數
+    window.addSkillFallback = function () {
+        window.addSkill();
+    };
+
+    // 綁定移除按鈕的事件監聽器
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.classList.contains('remove-skill-btn')) {
+            const skillEntry = e.target.closest('.skill-entry');
+            if (skillEntry) {
+                skillEntry.remove();
+            }
+        }
+    });
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 全局錯誤處理
+    window.onerror = function (message, source, lineno, colno, error) {
+        return true;
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const addSkillBtn = document.getElementById('addSkillBtn');
+        if (!addSkillBtn) {
+            return;
+        }
+
+        // 主事件監聽器
+        addSkillBtn.addEventListener('click', function () {
+            window.addSkill();
+        });
+    });
+</script>
+{% endblock %}

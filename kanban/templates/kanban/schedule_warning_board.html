@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h2>排程警告看板</h2>
+  <p class="text-danger">此頁會分頁顯示所有最新的排程驗證警告（每頁 20 筆），請生管或管理員定期檢查！</p>
+  <table class="table table-bordered table-striped">
+    <thead class="table-danger">
+      <tr>
+        <th>訂單編號</th>
+        <th>工序名稱</th>
+        <th>警告內容</th>
+        <th>產生時間</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for warn in page_obj %}
+      <tr>
+        <td>{{ warn.order_id }}</td>
+        <td>{{ warn.process_name }}</td>
+        <td>{{ warn.warning_message }}</td>
+        <td>{{ warn.created_at|date:'Y-m-d H:i' }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="text-center">目前沒有排程警告！</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <!-- 分頁按鈕 -->
+  <nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center">
+      {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一頁</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">上一頁</span></li>
+      {% endif %}
+      {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+          <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+          <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.next_page_number }}">下一頁</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">下一頁</span></li>
+      {% endif %}
+    </ul>
+  </nav>
+</div>
+<!--
+說明：
+- 這個頁面會分頁顯示所有排程驗證警告。
+- 欄位包含訂單編號、工序名稱、警告內容、產生時間。
+- 請生管或管理員定期檢查，及時處理異常。
+-->
+{% endblock %} 

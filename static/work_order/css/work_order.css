@@ -1,0 +1,10 @@
+/* work_order 模組的 CSS 樣式 */
+.work_order-container {
+    padding: 20px;
+    background-color: #f8f9fa;
+}
+.work_order-title {
+    color: #343a40;
+    font-size: 24px;
+    margin-bottom: 15px;
+}

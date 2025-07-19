@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+報表郵件發送設定 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-envelope-paper"></i> 報表郵件發送設定</h2>
+        <a href="{% url 'reporting:email_schedule_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> 新增設定
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-list-ul"></i> 發送設定列表</h5>
+                </div>
+                <div class="card-body">
+                    {% if schedules %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>報表類型</th>
+                                        <th>發送頻率</th>
+                                        <th>發送時間</th>
+                                        <th>收件人</th>
+                                        <th>狀態</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for schedule in schedules %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-primary">{{ schedule.get_report_type_display }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ schedule.get_schedule_type_display }}</span>
+                                        </td>
+                                        <td>
+                                            <i class="bi bi-clock"></i> {{ schedule.send_time|time:"H:i" }}
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                {% for email in schedule.get_recipient_list|slice:":2" %}
+                                                    {{ email }}{% if not forloop.last %}, {% endif %}
+                                                {% endfor %}
+                                                {% if schedule.get_recipient_list|length > 2 %}
+                                                    <span class="text-muted">...等 {{ schedule.get_recipient_list|length }} 人</span>
+                                                {% endif %}
+                                            </small>
+                                        </td>
+                                        <td>
+                                            {% if schedule.is_active %}
+                                                <span class="badge bg-success">啟用</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">停用</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                        onclick="testSendEmail({{ schedule.id }})">
+                                                    <i class="bi bi-send"></i> 測試
+                                                </button>
+                                                <a href="{% url 'reporting:email_schedule_edit' schedule.id %}" 
+                                                   class="btn btn-sm btn-outline-warning">
+                                                    <i class="bi bi-pencil"></i> 編輯
+                                                </a>
+                                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                        onclick="deleteSchedule({{ schedule.id }}, '{{ schedule.get_report_type_display }}')">
+                                                    <i class="bi bi-trash"></i> 刪除
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-envelope-x display-1 text-muted"></i>
+                            <h4 class="text-muted mt-3">尚未設定報表郵件發送</h4>
+                            <p class="text-muted">點擊上方「新增設定」按鈕來設定自動發送報表郵件</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> 功能說明</h5>
+                </div>
+                <div class="card-body">
+                    <h6>📧 自動發送報表</h6>
+                    <p class="small text-muted">
+                        設定系統自動發送報表郵件給相關人員，支援以下功能：
+                    </p>
+                    <ul class="small text-muted">
+                        <li>支援多種報表類型（SMT、作業員、生產日報）</li>
+                        <li>可設定發送頻率（每天、每週、每月）</li>
+                        <li>支援多個收件人和副本收件人</li>
+                        <li>自動附加 Excel 格式的報表檔案</li>
+                        <li>美觀的 HTML 郵件內容</li>
+                    </ul>
+
+                    <h6>⏰ 發送時間</h6>
+                    <p class="small text-muted">
+                        系統會在設定的時間自動發送前一天的報表數據。
+                    </p>
+
+                    <h6>📊 報表內容</h6>
+                    <p class="small text-muted">
+                        郵件包含報表摘要和 Excel 附件，方便查看和分析。
+                    </p>
+
+                    <div class="mt-3">
+                                        <a href="{% url 'reporting:email_log_list' %}" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-clock-history"></i> 查看發送記錄
+                </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <a href="{% url 'reporting:index' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> 返回報表首頁
+        </a>
+    </div>
+</div>
+
+<script>
+function testSendEmail(scheduleId) {
+    if (!confirm('確定要發送測試郵件嗎？')) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('schedule_id', scheduleId);
+    
+    fetch('/reporting/api/test_send_report_email/', {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('測試郵件發送成功！');
+        } else {
+            alert('測試郵件發送失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('發送失敗：' + error.message);
+    });
+}
+
+function deleteSchedule(scheduleId, scheduleName) {
+    if (!confirm(`確定要刪除「${scheduleName}」的郵件發送設定嗎？\n\n此操作無法復原。`)) {
+        return;
+    }
+    
+    window.location.href = `/reporting/email_schedule/${scheduleId}/delete/`;
+}
+</script>
+{% endblock %} 

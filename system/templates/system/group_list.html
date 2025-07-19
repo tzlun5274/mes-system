@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+群組管理 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>群組管理</h2>
+    <hr>
+    <div class="card">
+        <div class="card-header">
+            <a href="{% url 'system:group_add' %}" class="btn btn-primary btn-sm">新增群組</a>
+            <a href="{% url 'system:index' %}" class="btn btn-secondary btn-sm float-right">返回系統管理</a>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>群組名稱</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in groups %}
+                    <tr>
+                        <td>{{ group.name }}</td>
+                        <td>
+                            <a href="{% url 'system:group_edit' group.id %}" class="btn btn-info btn-sm">編輯</a>
+                            <form action="{% url 'system:group_delete' group.id %}" method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('確定刪除群組 {{ group.name }}？');">刪除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="2">無群組資料</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

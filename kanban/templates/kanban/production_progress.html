@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "生產進度看板 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "生產進度看板" %}</h2>
+    <hr>
+
+    <!-- 排序選項 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="d-flex align-items-center mb-2">
+                <div class="me-2">
+                    <label for="sort_by" class="me-2">{% trans "排序：" %}</label>
+                    <select name="sort_by" id="sort_by" class="form-control me-2">
+                        <option value="-updated_at" {% if sort_by == '-updated_at' %}selected{% endif %}>{% trans "更新時間（降序）" %}</option>
+                        <option value="updated_at" {% if sort_by == 'updated_at' %}selected{% endif %}>{% trans "更新時間（升序）" %}</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">{% trans "排序" %}</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 生產進度表格 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "工單編號" %}</th>
+                        <th>{% trans "產品名稱" %}</th>
+                        <th>{% trans "總數量" %}</th>
+                        <th>{% trans "完成數量" %}</th>
+                        <th>{% trans "進度 (%)" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for progress in page_obj %}
+                    <tr>
+                        <td>{{ progress.work_order_number }}</td>
+                        <td>{{ progress.product_name }}</td>
+                        <td>{{ progress.total_quantity }}</td>
+                        <td>{{ progress.completed_quantity }}</td>
+                        <td>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: {{ progress.progress }}%;" aria-valuenow="{{ progress.progress }}" aria-valuemin="0" aria-valuemax="100">
+                                    {{ progress.progress }}%
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ progress.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">{% trans "無生產進度數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- 分頁導航 -->
+            <nav aria-label="Page navigation">
+                <ul class="pagination">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}">{% trans "上一頁" %}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">{% trans "上一頁" %}</span>
+                    </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                    <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                        <a class="page-link" href="?page={{ num }}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}">{{ num }}</a>
+                    </li>
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}">{% trans "下一頁" %}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">{% trans "下一頁" %}</span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+
+            <a href="{% url 'kanban:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

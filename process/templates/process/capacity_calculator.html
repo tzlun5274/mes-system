@@ -1,0 +1,466 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}產能計算器{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    .calculator-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .input-section {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 20px;
+    }
+    .result-section {
+        background: #e8f5e8;
+        border-radius: 10px;
+        padding: 25px;
+        border-left: 5px solid #28a745;
+    }
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    .btn-calculate {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        padding: 12px 30px;
+        border-radius: 25px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    .btn-calculate:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        color: white;
+    }
+    .result-value {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #28a745;
+    }
+    .info-card {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="text-primary">
+                <i class="bi bi-calculator"></i> 產能計算器
+            </h2>
+            <p class="text-muted">根據設備、作業員、批量等參數，計算實際有效產能與生產時間</p>
+        </div>
+    </div>
+
+    <!-- 說明卡片 -->
+    <div class="info-card">
+        <h5><i class="bi bi-info-circle"></i> 使用說明</h5>
+        <ul class="mb-0">
+            <li><strong>標準產能：</strong>設備在理想狀態下每小時的理論產能</li>
+            <li><strong>效率因子：</strong>考慮設備狀態、環境因素等影響（1.00=100%效率）</li>
+            <li><strong>學習曲線：</strong>作業員熟練度對產能的影響（1.00=標準熟練度）</li>
+            <li><strong>批量大小：</strong>一次生產的數量，影響整體效率</li>
+            <li><strong>換線時間：</strong>產品切換時的準備時間（分鐘）</li>
+        </ul>
+    </div>
+
+    <div class="row">
+        <!-- 輸入參數區域 -->
+        <div class="col-md-6">
+            <div class="input-section">
+                <h4 class="mb-3">
+                    <i class="bi bi-input-cursor"></i> 輸入參數
+                </h4>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">標準產能 (pcs/hr)</label>
+                            <input type="number" class="form-control" id="standardCapacity" value="100" min="1">
+                            <small class="text-muted">設備理論每小時產能</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">效率因子</label>
+                            <input type="number" class="form-control" id="efficiencyFactor" value="1.00" min="0.1" max="2.0" step="0.01">
+                            <small class="text-muted">1.00=100%效率，0.80=80%效率</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">學習曲線因子</label>
+                            <input type="number" class="form-control" id="learningCurve" value="1.00" min="0.1" max="2.0" step="0.01">
+                            <small class="text-muted">作業員熟練度影響</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">批量大小</label>
+                            <input type="number" class="form-control" id="batchSize" value="100" min="1">
+                            <small class="text-muted">一次生產的數量</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">換線時間 (分鐘)</label>
+                            <input type="number" class="form-control" id="setupTime" value="30" min="0">
+                            <small class="text-muted">產品切換準備時間</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">收線時間 (分鐘)</label>
+                            <input type="number" class="form-control" id="teardownTime" value="10" min="0">
+                            <small class="text-muted">生產結束收線時間</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">預期不良率 (%)</label>
+                            <input type="number" class="form-control" id="defectRate" value="1.0" min="0" max="100" step="0.1">
+                            <small class="text-muted">預期不良品比例</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">重工時間因子</label>
+                            <input type="number" class="form-control" id="reworkFactor" value="1.5" min="0.1" max="5.0" step="0.1">
+                            <small class="text-muted">重工所需時間倍數</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button class="btn btn-calculate" onclick="calculateCapacity()">
+                        <i class="bi bi-calculator"></i> 計算產能
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 計算結果區域 -->
+        <div class="col-md-6">
+            <div class="result-section">
+                <h4 class="mb-3">
+                    <i class="bi bi-graph-up"></i> 計算結果
+                </h4>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">有效產能</label>
+                            <div class="result-value" id="effectiveCapacity">--</div>
+                            <small class="text-muted">pcs/hr</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">生產時間</label>
+                            <div class="result-value" id="productionTime">--</div>
+                            <small class="text-muted">分鐘</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">總時間</label>
+                            <div class="result-value" id="totalTime">--</div>
+                            <small class="text-muted">分鐘</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">每件成本時間</label>
+                            <div class="result-value" id="timePerPiece">--</div>
+                            <small class="text-muted">分鐘</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">預期不良數量</label>
+                            <div class="result-value" id="defectQuantity">--</div>
+                            <small class="text-muted">pcs</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">重工時間</label>
+                            <div class="result-value" id="reworkTime">--</div>
+                            <small class="text-muted">分鐘</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-12">
+                        <div class="mb-3">
+                            <label class="form-label">設備利用率</label>
+                            <div class="result-value" id="utilizationRate">--</div>
+                            <small class="text-muted">%</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細分析區域 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-bar-chart"></i> 詳細分析
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6>時間分解</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>換線時間：</strong><span id="setupTimeDetail">--</span> 分鐘</li>
+                                <li><strong>生產時間：</strong><span id="productionTimeDetail">--</span> 分鐘</li>
+                                <li><strong>重工時間：</strong><span id="reworkTimeDetail">--</span> 分鐘</li>
+                                <li><strong>收線時間：</strong><span id="teardownTimeDetail">--</span> 分鐘</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>效率分析</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>基礎效率：</strong><span id="baseEfficiency">--</span>%</li>
+                                <li><strong>學習曲線：</strong><span id="learningEfficiency">--</span>%</li>
+                                <li><strong>批量效應：</strong><span id="batchEfficiency">--</span>%</li>
+                                <li><strong>綜合效率：</strong><span id="totalEfficiency">--</span>%</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>品質影響</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>預期不良：</strong><span id="defectDetail">--</span> pcs</li>
+                                <li><strong>不良率：</strong><span id="defectRateDetail">--</span>%</li>
+                                <li><strong>重工成本：</strong><span id="reworkCost">--</span> 分鐘</li>
+                                <li><strong>良品率：</strong><span id="yieldRate">--</span>%</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速設定模板 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-gear"></i> 快速設定模板
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-primary w-100 mb-2" onclick="loadTemplate('smt')">
+                                <i class="bi bi-cpu"></i> SMT 設備
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-success w-100 mb-2" onclick="loadTemplate('dip')">
+                                <i class="bi bi-tools"></i> DIP 設備
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-warning w-100 mb-2" onclick="loadTemplate('test')">
+                                <i class="bi bi-check-circle"></i> 測試設備
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-info w-100 mb-2" onclick="loadTemplate('packaging')">
+                                <i class="bi bi-box"></i> 包裝設備
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// 計算產能函數
+function calculateCapacity() {
+    // 取得輸入值
+    const standardCapacity = parseFloat(document.getElementById('standardCapacity').value);
+    const efficiencyFactor = parseFloat(document.getElementById('efficiencyFactor').value);
+    const learningCurve = parseFloat(document.getElementById('learningCurve').value);
+    const batchSize = parseInt(document.getElementById('batchSize').value);
+    const setupTime = parseInt(document.getElementById('setupTime').value);
+    const teardownTime = parseInt(document.getElementById('teardownTime').value);
+    const defectRate = parseFloat(document.getElementById('defectRate').value) / 100;
+    const reworkFactor = parseFloat(document.getElementById('reworkFactor').value);
+
+    // 計算有效產能
+    const effectiveCapacity = standardCapacity * efficiencyFactor * learningCurve;
+    
+    // 計算生產時間（分鐘）
+    const productionTime = (batchSize / effectiveCapacity) * 60;
+    
+    // 計算預期不良數量
+    const defectQuantity = batchSize * defectRate;
+    
+    // 計算重工時間
+    const reworkTime = (defectQuantity / effectiveCapacity) * 60 * reworkFactor;
+    
+    // 計算總時間
+    const totalTime = setupTime + productionTime + reworkTime + teardownTime;
+    
+    // 計算每件成本時間
+    const timePerPiece = totalTime / batchSize;
+    
+    // 計算設備利用率（假設8小時工作制）
+    const workHours = 8;
+    const utilizationRate = ((totalTime / 60) / workHours) * 100;
+    
+    // 計算效率分析
+    const baseEfficiency = efficiencyFactor * 100;
+    const learningEfficiency = learningCurve * 100;
+    const batchEfficiency = Math.min(120, 100 + (batchSize - 100) / 100 * 10); // 批量效應
+    const totalEfficiency = (effectiveCapacity / standardCapacity) * 100;
+    
+    // 計算良品率
+    const yieldRate = (1 - defectRate) * 100;
+
+    // 顯示結果
+    document.getElementById('effectiveCapacity').textContent = effectiveCapacity.toFixed(2);
+    document.getElementById('productionTime').textContent = productionTime.toFixed(2);
+    document.getElementById('totalTime').textContent = totalTime.toFixed(2);
+    document.getElementById('timePerPiece').textContent = timePerPiece.toFixed(2);
+    document.getElementById('defectQuantity').textContent = defectQuantity.toFixed(1);
+    document.getElementById('reworkTime').textContent = reworkTime.toFixed(2);
+    document.getElementById('utilizationRate').textContent = utilizationRate.toFixed(1);
+
+    // 顯示詳細分析
+    document.getElementById('setupTimeDetail').textContent = setupTime;
+    document.getElementById('productionTimeDetail').textContent = productionTime.toFixed(2);
+    document.getElementById('reworkTimeDetail').textContent = reworkTime.toFixed(2);
+    document.getElementById('teardownTimeDetail').textContent = teardownTime;
+    
+    document.getElementById('baseEfficiency').textContent = baseEfficiency.toFixed(1);
+    document.getElementById('learningEfficiency').textContent = learningEfficiency.toFixed(1);
+    document.getElementById('batchEfficiency').textContent = batchEfficiency.toFixed(1);
+    document.getElementById('totalEfficiency').textContent = totalEfficiency.toFixed(1);
+    
+    document.getElementById('defectDetail').textContent = defectQuantity.toFixed(1);
+    document.getElementById('defectRateDetail').textContent = (defectRate * 100).toFixed(1);
+    document.getElementById('reworkCost').textContent = reworkTime.toFixed(2);
+    document.getElementById('yieldRate').textContent = yieldRate.toFixed(1);
+}
+
+// 載入模板設定
+function loadTemplate(type) {
+    const templates = {
+        'smt': {
+            standardCapacity: 2000,
+            efficiencyFactor: 0.95,
+            learningCurve: 1.10,
+            batchSize: 500,
+            setupTime: 45,
+            teardownTime: 15,
+            defectRate: 0.5,
+            reworkFactor: 2.0
+        },
+        'dip': {
+            standardCapacity: 500,
+            efficiencyFactor: 0.90,
+            learningCurve: 1.05,
+            batchSize: 200,
+            setupTime: 60,
+            teardownTime: 20,
+            defectRate: 1.0,
+            reworkFactor: 1.5
+        },
+        'test': {
+            standardCapacity: 300,
+            efficiencyFactor: 0.98,
+            learningCurve: 1.02,
+            batchSize: 100,
+            setupTime: 30,
+            teardownTime: 10,
+            defectRate: 2.0,
+            reworkFactor: 1.2
+        },
+        'packaging': {
+            standardCapacity: 800,
+            efficiencyFactor: 0.92,
+            learningCurve: 1.08,
+            batchSize: 300,
+            setupTime: 20,
+            teardownTime: 5,
+            defectRate: 0.2,
+            reworkFactor: 1.8
+        }
+    };
+
+    const template = templates[type];
+    if (template) {
+        document.getElementById('standardCapacity').value = template.standardCapacity;
+        document.getElementById('efficiencyFactor').value = template.efficiencyFactor;
+        document.getElementById('learningCurve').value = template.learningCurve;
+        document.getElementById('batchSize').value = template.batchSize;
+        document.getElementById('setupTime').value = template.setupTime;
+        document.getElementById('teardownTime').value = template.teardownTime;
+        document.getElementById('defectRate').value = template.defectRate;
+        document.getElementById('reworkFactor').value = template.reworkFactor;
+        
+        // 自動計算
+        calculateCapacity();
+        
+        // 顯示提示
+        alert(`${type.toUpperCase()} 設備模板已載入！`);
+    }
+}
+
+// 頁面載入時自動計算一次
+document.addEventListener('DOMContentLoaded', function() {
+    calculateCapacity();
+});
+</script>
+{% endblock %} 

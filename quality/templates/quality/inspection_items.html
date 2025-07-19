@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "檢驗項目定義 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "檢驗項目定義" %}</h2>
+    <hr>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "檢驗項目名稱" %}</th>
+                        <th>{% trans "檢驗標準" %}</th>
+                        <th>{% trans "檢驗要求" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                        <th>{% trans "更新時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in inspection_items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.standard }}</td>
+                        <td>{{ item.requirement }}</td>
+                        <td>{{ item.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ item.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">{% trans "無檢驗項目數據" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{% url 'quality:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

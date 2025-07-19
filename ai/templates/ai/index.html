@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+{% trans "AI 功能 - MES 系統" %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{% trans "AI 功能" %}</h2>
+    <hr>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <h3>{% trans "AI 預測" %}</h3>
+    <div class="card mb-4">
+        <div class="card-header">
+            <a href="{% url 'ai:run_production_prediction' %}" class="btn btn-primary btn-sm">{% trans "執行生產預測" %}</a>
+            <a href="{% url 'ai:run_demand_prediction' %}" class="btn btn-primary btn-sm ms-2">{% trans "執行需求預測" %}</a>
+            <a href="{% url 'ai:run_quality_prediction' %}" class="btn btn-primary btn-sm ms-2">{% trans "執行品質預測" %}</a>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "預測類型" %}</th>
+                        <th>{% trans "輸入數據" %}</th>
+                        <th>{% trans "預測結果" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prediction in predictions %}
+                    <tr>
+                        <td>{{ prediction.get_prediction_type_display }}</td>
+                        <td>
+                            {% if prediction.prediction_type == 'production' %}
+                                生產線：{{ prediction.production_line|default:"-" }}，當前產量：{{ prediction.current_output|default:"-" }}
+                            {% elif prediction.prediction_type == 'demand' %}
+                                產品名稱：{{ prediction.product_name|default:"-" }}，歷史需求量：{{ prediction.historical_demand|default:"-" }}
+                            {% elif prediction.prediction_type == 'quality' %}
+                                產品名稱：{{ prediction.product_name|default:"-" }}，生產溫度：{{ prediction.production_temperature|default:"-" }}，生產壓力：{{ prediction.production_pressure|default:"-" }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if prediction.predicted_output and prediction.confidence %}
+                                {% if prediction.prediction_type == 'production' %}
+                                    預測產量：{{ prediction.predicted_output }}，信心度：{{ prediction.confidence|floatformat:2 }}%
+                                {% elif prediction.prediction_type == 'demand' %}
+                                    預測需求量：{{ prediction.predicted_output }}，信心度：{{ prediction.confidence|floatformat:2 }}%
+                                {% elif prediction.prediction_type == 'quality' %}
+                                    預測品質分數：{{ prediction.predicted_output }}，信心度：{{ prediction.confidence|floatformat:2 }}%
+                                {% endif %}
+                            {% else %}
+                                等待處理
+                            {% endif %}
+                        </td>
+                        <td>{{ prediction.created_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">{% trans "無預測記錄" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h3>{% trans "AI 優化" %}</h3>
+    <div class="card mb-4">
+        <div class="card-header">
+            <a href="{% url 'ai:run_production_optimization' %}" class="btn btn-primary btn-sm">{% trans "執行生產優化" %}</a>
+            <a href="{% url 'ai:run_auto_scheduling' %}" class="btn btn-primary btn-sm ms-2">{% trans "執行自動化調度" %}</a>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "優化類型" %}</th>
+                        <th>{% trans "輸入數據" %}</th>
+                        <th>{% trans "優化結果" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for optimization in optimizations %}
+                    <tr>
+                        <td>{{ optimization.get_optimization_type_display }}</td>
+                        <td>
+                            {% if optimization.optimization_type == 'production' %}
+                                生產線：{{ optimization.production_line|default:"-" }}，當前產能：{{ optimization.current_capacity|default:"-" }}
+                            {% elif optimization.optimization_type == 'scheduling' %}
+                                任務名稱：{{ optimization.task_name|default:"-" }}，可用資源：{{ optimization.resource_available|default:"-" }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if optimization.optimized_result %}
+                                {{ optimization.optimized_result }}，效率提升：{{ optimization.efficiency_gain|floatformat:2 }}%
+                            {% else %}
+                                等待處理
+                            {% endif %}
+                        </td>
+                        <td>{{ optimization.created_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">{% trans "無優化記錄" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h3>{% trans "AI 異常檢測" %}</h3>
+    <div class="card mb-4">
+        <div class="card-header">
+            <a href="{% url 'ai:run_production_anomaly_detection' %}" class="btn btn-primary btn-sm">{% trans "執行生產異常檢測" %}</a>
+            <a href="{% url 'ai:run_defect_detection' %}" class="btn btn-primary btn-sm ms-2">{% trans "執行缺陷檢測" %}</a>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "異常類型" %}</th>
+                        <th>{% trans "輸入數據" %}</th>
+                        <th>{% trans "檢測結果" %}</th>
+                        <th>{% trans "創建時間" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for anomaly in anomalies %}
+                    <tr>
+                        <td>{{ anomaly.get_anomaly_type_display }}</td>
+                        <td>
+                            {% if anomaly.anomaly_type == 'production' %}
+                                生產線：{{ anomaly.production_line|default:"-" }}，生產速率：{{ anomaly.production_rate|default:"-" }}
+                            {% elif anomaly.anomaly_type == 'defect' %}
+                                產品名稱：{{ anomaly.product_name|default:"-" }}，缺陷類型：{{ anomaly.defect_type|default:"-" }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if anomaly.anomaly_detected %}
+                                已檢測到異常：{{ anomaly.anomaly_details }}
+                            {% else %}
+                                無異常
+                            {% endif %}
+                        </td>
+                        <td>{{ anomaly.created_at|date:"Y-m-d H:i:s" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">{% trans "無異常檢測記錄" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

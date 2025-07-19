@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+{{ title }} - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+    <hr>
+    <div class="card">
+        <div class="card-body">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">立即備份資料庫</button>
+                <a href="{% url 'system:restore_database' %}" class="btn btn-warning">恢復資料庫</a>
+                <a href="{% url 'system:index' %}" class="btn btn-secondary">返回</a>
+            </form>
+            <hr>
+            <h4>現有備份文件</h4>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>文件名</th>
+                        <th>大小 (KB)</th>
+                        <th>創建日期</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for file in backup_files %}
+                    <tr>
+                        <td>{{ file.name }}</td>
+                        <td>{{ file.size }}</td>
+                        <td>{{ file.date }}</td>
+                        <td>
+                            <a href="{% url 'system:download_backup' file.name %}" class="btn btn-sm btn-success">下載</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">無備份文件</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

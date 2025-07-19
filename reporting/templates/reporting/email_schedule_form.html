@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+{{ title }} - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0"><i class="bi bi-envelope-paper"></i> {{ title }}</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="report_type" class="form-label">報表類型 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="report_type" name="report_type" required>
+                                        <option value="">請選擇報表類型</option>
+                                        <option value="smt" {% if schedule.report_type == 'smt' %}selected{% endif %}>SMT生產報表</option>
+                                        <option value="operator" {% if schedule.report_type == 'operator' %}selected{% endif %}>作業員生產報表</option>
+                                        <option value="production_daily" {% if schedule.report_type == 'production_daily' %}selected{% endif %}>生產日報表</option>
+                                        <option value="all" {% if schedule.report_type == 'all' %}selected{% endif %}>所有報表</option>
+                                    </select>
+                                    <div class="form-text">選擇要自動發送的報表類型</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="schedule_type" class="form-label">發送頻率 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="schedule_type" name="schedule_type" required>
+                                        <option value="daily" {% if schedule.schedule_type == 'daily' or not schedule %}selected{% endif %}>每天</option>
+                                        <option value="weekly" {% if schedule.schedule_type == 'weekly' %}selected{% endif %}>每週</option>
+                                        <option value="monthly" {% if schedule.schedule_type == 'monthly' %}selected{% endif %}>每月</option>
+                                    </select>
+                                    <div class="form-text">選擇報表的發送頻率</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="send_time" class="form-label">發送時間 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="send_time" name="send_time" 
+                                           value="{% if schedule.send_time %}{{ schedule.send_time|time:'H:i' }}{% else %}08:00{% endif %}" required placeholder="HH:MM">
+                                    <div class="form-text">設定每天發送報表的時間（24小時制）</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="is_active" class="form-label">啟用狀態</label>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 
+                                               {% if schedule.is_active or not schedule %}checked{% endif %}>
+                                        <label class="form-check-label" for="is_active">
+                                            啟用此發送設定
+                                        </label>
+                                    </div>
+                                    <div class="form-text">停用後將不會發送郵件</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="recipients" class="form-label">收件人郵箱 <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="recipients" name="recipients" rows="3" 
+                                      placeholder="請輸入收件人郵箱，多個郵箱請用逗號分隔&#10;例如：manager@company.com, supervisor@company.com" required>{% if schedule.recipients %}{{ schedule.recipients }}{% endif %}</textarea>
+                            <div class="form-text">多個郵箱請用逗號分隔</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="cc_recipients" class="form-label">副本收件人</label>
+                            <textarea class="form-control" id="cc_recipients" name="cc_recipients" rows="2" 
+                                      placeholder="請輸入副本收件人郵箱，多個郵箱請用逗號分隔&#10;例如：admin@company.com">{% if schedule.cc_recipients %}{{ schedule.cc_recipients }}{% endif %}</textarea>
+                            <div class="form-text">副本收件人會收到相同的郵件（可選）</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="subject_template" class="form-label">郵件主旨模板</label>
+                            <input type="text" class="form-control" id="subject_template" name="subject_template" 
+                                   value="{% if schedule.subject_template %}{{ schedule.subject_template }}{% else %}MES 系統 - {report_type} - {date}{% endif %}" 
+                                   placeholder="MES 系統 - {report_type} - {date}">
+                            <div class="form-text">
+                                可使用變數：{report_type}（報表類型）、{date}（報表日期）
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <h6><i class="bi bi-info-circle"></i> 設定說明</h6>
+                            <ul class="mb-0 small">
+                                <li><strong>發送時間：</strong>系統會在設定的時間自動發送前一天的報表數據</li>
+                                <li><strong>發送頻率：</strong>每天發送、每週一發送、每月第一天發送</li>
+                                <li><strong>報表內容：</strong>包含 HTML 格式的報表摘要和 Excel 附件</li>
+                                <li><strong>郵件記錄：</strong>所有發送記錄都會保存在系統中供查詢</li>
+                            </ul>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'reporting:email_schedule_list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> 返回列表
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> 
+                                {% if action == 'create' %}創建設定{% else %}更新設定{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+<script>
+// 初始化 flatpickr 24小時制時間選擇器
+document.addEventListener('DOMContentLoaded', function() {
+    flatpickr('#send_time', {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: 'H:i',
+        time_24hr: true,
+        allowInput: true,
+        locale: flatpickr.l10ns.zh,
+        onReady: function(selectedDates, dateStr, instance) {
+            instance._input.removeAttribute('readonly');
+        }
+    });
+});
+
+// 表單驗證
+document.querySelector('form').addEventListener('submit', function(e) {
+    const recipients = document.getElementById('recipients').value.trim();
+    const sendTime = document.getElementById('send_time').value;
+    
+    if (!recipients) {
+        alert('請輸入收件人郵箱');
+        e.preventDefault();
+        return;
+    }
+    
+    if (!sendTime) {
+        alert('請設定發送時間');
+        e.preventDefault();
+        return;
+    }
+    
+    // 驗證郵箱格式
+    const emails = recipients.split(',').map(email => email.trim()).filter(email => email);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    for (let email of emails) {
+        if (!emailRegex.test(email)) {
+            alert(`郵箱格式錯誤：${email}`);
+            e.preventDefault();
+            return;
+        }
+    }
+});
+</script>
+{% endblock %} 
