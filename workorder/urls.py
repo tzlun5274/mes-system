@@ -83,4 +83,6 @@ urlpatterns = [
     path('report/operator/', views.operator_report_index, name='operator_report_index'),
     path('report/smt/', views.smt_report_index, name='smt_report_index'),
     path('report/smt/on_site/', views.smt_on_site_report, name='smt_on_site_report'),
+    path('report/smt/submit/', views.submit_smt_report, name='submit_smt_report'),
+    path('api/get_workorders_by_equipment/', views.get_workorders_by_equipment, name='get_workorders_by_equipment'),
 ]

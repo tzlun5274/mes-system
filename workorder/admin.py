@@ -4,6 +4,7 @@ from .models import (
     WorkOrderProcess,
     WorkOrderProcessLog,
     WorkOrderAssignment,
+    SMTProductionReport,
 )
 
 
@@ -57,3 +58,32 @@ class WorkOrderAssignmentAdmin(admin.ModelAdmin):
     list_filter = ["assigned_at", "company_code"]
     search_fields = ["workorder__order_number", "equipment_id", "operator_id"]
     ordering = ["-assigned_at"]
+
+
+@admin.register(SMTProductionReport)
+class SMTProductionReportAdmin(admin.ModelAdmin):
+    list_display = [
+        "equipment",
+        "workorder",
+        "report_time",
+        "quantity",
+        "hours",
+        "production_status",
+    ]
+    list_filter = ["production_status", "report_time", "equipment"]
+    search_fields = ["equipment__name", "workorder__order_number"]
+    ordering = ["-report_time"]
+    readonly_fields = ["created_at", "updated_at"]
+    
+    fieldsets = (
+        ('基本資訊', {
+            'fields': ('equipment', 'workorder', 'report_time')
+        }),
+        ('報工資料', {
+            'fields': ('quantity', 'hours', 'quality', 'notes')
+        }),
+        ('系統資訊', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )

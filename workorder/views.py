@@ -2904,18 +2904,241 @@ def smt_on_site_report(request):
     """
     SMT現場報工首頁視圖
     顯示SMT現場報工的主要功能，包含即時報工表單和設備狀態
+    SMT設備為自動化運作，不需要作業員
     """
-    # 準備統計資料（目前都是 0，因為還沒有實際的報工功能）
+    from equip.models import Equipment
+    from datetime import date
+    from .models import SMTProductionReport
+    
+    # 取得 SMT 設備列表（假設設備名稱包含 'SMT' 或 '貼片'）
+    equipment_list = Equipment.objects.filter(
+        models.Q(name__icontains='SMT') | 
+        models.Q(name__icontains='貼片') |
+        models.Q(name__icontains='Pick') |
+        models.Q(name__icontains='Place')
+    ).order_by('name')
+    
+    # 準備設備狀態資料（使用真實設備資料）
+    equipment_status = []
+    active_count = 0
+    
+    for equipment in equipment_list:
+        # 使用真實的設備狀態
+        status = equipment.status
+        
+        if status == 'running':
+            active_count += 1
+        
+        # 查詢該設備的當前工單
+        current_workorder = None
+        try:
+            # 查找分配給該設備且正在進行的工序
+            current_process = WorkOrderProcess.objects.filter(
+                assigned_equipment=equipment.name,
+                status='in_progress'
+            ).select_related('workorder').first()
+            
+            if current_process:
+                current_workorder = current_process.workorder.order_number
+        except:
+            pass
+        
+        # 計算今日該設備的產出數量
+        today_output = 0
+        try:
+            today_reports = SMTProductionReport.objects.filter(
+                equipment=equipment,
+                report_time__date=today
+            )
+            today_output = sum(report.quantity for report in today_reports)
+        except:
+            pass
+        
+        equipment_status.append({
+            'id': equipment.id,
+            'name': equipment.name,
+            'status': status,
+            'status_display': equipment.get_status_display(),
+            'current_workorder': current_workorder,
+            'running_hours': 0,  # 暫時設為0，實際應該從設備監控系統取得
+            'output_quantity': today_output,
+            'efficiency': 95 if status == 'running' else (85 if status == 'idle' else 0),  # 運轉中95%，閒置85%，維修0%
+            'last_update': equipment.updated_at
+        })
+    
+    # 取得今日的 SMT 報工記錄
+    today = date.today()
+    today_reports_list = SMTProductionReport.objects.filter(
+        report_time__date=today
+    ).select_related('equipment', 'workorder').order_by('-report_time')
+    
+    # 計算統計資料
+    today_reports_count = today_reports_list.count()
+    current_shift_output = sum(report.quantity for report in today_reports_list)
+    
+    # 準備統計資料
     context = {
-        'active_equipment': 0,
-        'today_reports': 0,
-        'current_shift_output': 0,
-        'pending_reports': 0,
-        'equipment_list': [],  # SMT設備列表
-        'equipment_status': [],  # 即時設備狀態列表
-        'today_reports_list': [],  # 今日報工記錄列表
+        'active_equipment': active_count,
+        'today_reports': today_reports_count,
+        'current_shift_output': current_shift_output,
+        'pending_reports': 0,  # 待處理報工（目前為0）
+        'equipment_list': equipment_list,
+        'equipment_status': equipment_status,
+        'today_reports_list': today_reports_list,
     }
     
     return render(request, 'workorder/report/smt/on_site/index.html', context)
+
+
+@require_POST
+@csrf_exempt
+def submit_smt_report(request):
+    """
+    API：提交 SMT 報工記錄
+    SMT 設備為自動化運作，不需要作業員
+    """
+    try:
+        equipment_id = request.POST.get('equipment_id')
+        workorder_id = request.POST.get('workorder_id')
+        quantity = request.POST.get('quantity')
+        production_status = request.POST.get('production_status')
+        notes = request.POST.get('notes', '')
+        
+        # 基本驗證
+        if not all([equipment_id, workorder_id, quantity, production_status]):
+            return JsonResponse({
+                'status': 'error',
+                'message': '請填寫所有必要欄位'
+            })
+        
+        # 取得設備和工單
+        from equip.models import Equipment
+        equipment = Equipment.objects.get(id=equipment_id)
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        
+        # 建立報工記錄
+        from .models import SMTProductionReport
+        report = SMTProductionReport.objects.create(
+            equipment=equipment,
+            workorder=workorder,
+            report_time=timezone.now(),  # 自動使用當前時間
+            quantity=int(quantity),
+            hours=0.0,  # 預設為0，因為不需要手動輸入
+            production_status=production_status,
+            notes=notes
+        )
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'SMT 報工記錄提交成功',
+            'report_id': report.id
+        })
+        
+    except Equipment.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': '找不到指定的設備'
+        })
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': '找不到指定的工單'
+        })
+    except ValueError as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'資料格式錯誤：{str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'提交失敗：{str(e)}'
+        })
+
+@require_GET
+@csrf_exempt
+def get_workorders_by_equipment(request):
+    """
+    API：根據設備 ID 獲取該設備的工單列表
+    用於 SMT 現場報工系統中的工單選擇
+    """
+    try:
+        equipment_id = request.GET.get('equipment_id')
+        
+        if not equipment_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': '請提供設備 ID'
+            })
+        
+        # 取得設備
+        from equip.models import Equipment
+        try:
+            equipment = Equipment.objects.get(id=equipment_id)
+        except Equipment.DoesNotExist:
+            return JsonResponse({
+                'status': 'error',
+                'message': '找不到指定的設備'
+            })
+        
+        # 查詢該設備相關的工單
+        # 1. 從 WorkOrderProcess 中查找分配給該設備的工序
+        # 2. 取得這些工序對應的工單
+        workorder_processes = WorkOrderProcess.objects.filter(
+            assigned_equipment=equipment.name,
+            status__in=['pending', 'in_progress']
+        ).select_related('workorder')
+        
+        # 去重並整理工單資料
+        workorders = []
+        seen_workorder_ids = set()
+        
+        for process in workorder_processes:
+            workorder = process.workorder
+            if workorder.id not in seen_workorder_ids:
+                seen_workorder_ids.add(workorder.id)
+                workorders.append({
+                    'id': workorder.id,
+                    'order_number': workorder.order_number,
+                    'product_code': workorder.product_code,
+                    'quantity': workorder.quantity,
+                    'status': workorder.status,
+                    'status_display': workorder.get_status_display(),
+                    'process_name': process.process_name,
+                    'process_status': process.status,
+                    'process_status_display': process.get_status_display(),
+                })
+        
+        # 如果沒有找到分配給該設備的工單，則顯示所有狀態為 pending 或 in_progress 的工單
+        if not workorders:
+            all_workorders = WorkOrder.objects.filter(
+                status__in=['pending', 'in_progress']
+            ).order_by('-created_at')[:20]  # 限制顯示前20筆
+            
+            for workorder in all_workorders:
+                workorders.append({
+                    'id': workorder.id,
+                    'order_number': workorder.order_number,
+                    'product_code': workorder.product_code,
+                    'quantity': workorder.quantity,
+                    'status': workorder.status,
+                    'status_display': workorder.get_status_display(),
+                    'process_name': '未分配',
+                    'process_status': 'pending',
+                    'process_status_display': '待生產',
+                })
+        
+        return JsonResponse({
+            'status': 'success',
+            'equipment_name': equipment.name,
+            'workorders': workorders,
+            'count': len(workorders)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'獲取工單列表失敗：{str(e)}'
+        })
 
 

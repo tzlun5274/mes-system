@@ -4,3 +4,5 @@ globs:
 alwaysApply: false
 ---
 專案使用 Django 建立，所有設計方案必須嚴格按照 Django 的規範實行跟設計。
+使用原生 JavaScript - 所有功能改用原生 JavaScript 實現
+遵循 Django 最佳實踐 - 使用 Django 的靜態檔案管理和 CSRF 保護

@@ -71,26 +71,25 @@
         font-size: 0.8em;
         padding: 4px 8px;
         border-radius: 12px;
+        font-weight: 500;
     }
     
     .status-running {
         background-color: #d4edda;
         color: #155724;
+        border: 1px solid #c3e6cb;
     }
     
     .status-idle {
         background-color: #fff3cd;
         color: #856404;
+        border: 1px solid #ffeaa7;
     }
     
     .status-maintenance {
         background-color: #f8d7da;
         color: #721c24;
-    }
-    
-    .status-error {
-        background-color: #f8d7da;
-        color: #721c24;
+        border: 1px solid #f5c6cb;
     }
     
     .equipment-selector {
@@ -206,9 +205,9 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">&nbsp;</label>
-                        <button type="button" class="btn btn-success btn-block" id="start_reporting">
-                            <i class="fas fa-play"></i> 開始報工
-                        </button>
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle"></i> 選擇設備和工單後，下方表單將自動啟用
+                        </div>
                     </div>
                 </div>
             </div>
@@ -221,7 +220,7 @@
             <div class="card smt-on-site-card">
                 <div class="card-header bg-success text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-edit"></i> 即時報工表單
+                        <i class="fas fa-edit"></i> 報工資訊填寫
                     </h5>
                 </div>
                 <div class="card-body">
@@ -233,38 +232,26 @@
                                     <input type="number" class="form-control" id="report_quantity" name="quantity" min="1" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="report_hours" class="form-label">工作時數</label>
-                                    <input type="number" class="form-control" id="report_hours" name="hours" step="0.5" min="0" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="report_quality" class="form-label">品質狀態</label>
-                                    <select class="form-select" id="report_quality" name="quality" required>
-                                        <option value="">請選擇品質狀態...</option>
-                                        <option value="good">良品</option>
-                                        <option value="defect">不良品</option>
-                                        <option value="rework">重工</option>
+                                    <label for="report_production_status" class="form-label">報工狀態</label>
+                                    <select class="form-select" id="report_production_status" name="production_status" required>
+                                        <option value="">請選擇報工狀態...</option>
+                                        <option value="start">開始生產</option>
+                                        <option value="pause">暫停</option>
+                                        <option value="complete">完工</option>
                                     </select>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="report_notes" class="form-label">備註說明</label>
-                                    <textarea class="form-control" id="report_notes" name="notes" rows="3" placeholder="請輸入備註說明..."></textarea>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="report_operator" class="form-label">作業員</label>
-                                    <input type="text" class="form-control" id="report_operator" name="operator" value="{{ user.username }}" readonly>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="report_time" class="form-label">報工時間</label>
-                                    <input type="datetime-local" class="form-control" id="report_time" name="report_time" required>
+                                    <textarea class="form-control" id="report_notes" name="notes" rows="5" placeholder="請輸入備註說明..."></textarea>
                                 </div>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-12">
                                 <button type="submit" class="btn btn-success">
-                                    <i class="fas fa-save"></i> 提交報工
+                                    <i class="fas fa-save"></i> 確認報工
                                 </button>
                                 <button type="reset" class="btn btn-secondary">
                                     <i class="fas fa-undo"></i> 重置表單
@@ -308,7 +295,7 @@
                                         <td>{{ equipment.name }}</td>
                                         <td>
                                             <span class="status-badge status-{{ equipment.status }}">
-                                                {{ equipment.get_status_display }}
+                                                {{ equipment.status_display }}
                                             </span>
                                         </td>
                                         <td>{{ equipment.current_workorder|default:"-" }}</td>
@@ -358,9 +345,7 @@
                                     <th>設備名稱</th>
                                     <th>工單號</th>
                                     <th>報工數量</th>
-                                    <th>工作時數</th>
-                                    <th>品質狀態</th>
-                                    <th>作業員</th>
+                                    <th>報工狀態</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -372,13 +357,11 @@
                                         <td>{{ report.equipment_name }}</td>
                                         <td>{{ report.workorder_number }}</td>
                                         <td>{{ report.quantity }}</td>
-                                        <td>{{ report.hours }}小時</td>
                                         <td>
-                                            <span class="badge {% if report.quality == 'good' %}bg-success{% elif report.quality == 'defect' %}bg-danger{% else %}bg-warning{% endif %}">
-                                                {{ report.get_quality_display }}
+                                            <span class="badge {% if report.production_status == 'start' %}bg-primary{% elif report.production_status == 'pause' %}bg-warning{% else %}bg-success{% endif %}">
+                                                {{ report.get_production_status_display }}
                                             </span>
                                         </td>
-                                        <td>{{ report.operator }}</td>
                                         <td>
                                             <button class="btn btn-sm btn-outline-info" onclick="viewReport({{ report.id }})">
                                                 <i class="fas fa-eye"></i> 查看
@@ -388,7 +371,7 @@
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="8" class="text-center text-muted">
+                                        <td colspan="6" class="text-center text-muted">
                                             <i class="fas fa-inbox fa-2x mb-2"></i>
                                             <br>
                                             今日尚無報工記錄
@@ -408,65 +391,124 @@
 {% block extra_js %}
 <script>
     // SMT現場報工專用 JavaScript
-    $(document).ready(function() {
-        // 設定當前時間
-        const now = new Date();
-        const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-        $('#report_time').val(localDateTime);
+    document.addEventListener('DOMContentLoaded', function() {
         
         // 卡片懸停效果
-        $('.smt-on-site-card').hover(
-            function() {
-                $(this).addClass('shadow-lg');
-            },
-            function() {
-                $(this).removeClass('shadow-lg');
-            }
-        );
+        const cards = document.querySelectorAll('.smt-on-site-card');
+        cards.forEach(function(card) {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow-lg');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow-lg');
+            });
+        });
         
         // 設備選擇事件
-        $('#equipment_select').change(function() {
-            const equipmentId = $(this).val();
+        const equipmentSelect = document.getElementById('equipment_select');
+        equipmentSelect.addEventListener('change', function() {
+            const equipmentId = this.value;
             if (equipmentId) {
                 loadWorkorders(equipmentId);
             } else {
-                $('#workorder_select').html('<option value="">請先選擇設備...</option>');
+                document.getElementById('workorder_select').innerHTML = '<option value="">請先選擇設備...</option>';
+                // 清空報工數量
+                document.getElementById('report_quantity').value = '';
             }
+            // 檢查並啟用/禁用表單
+            enableReportingForm();
         });
         
-        // 開始報工按鈕
-        $('#start_reporting').click(function() {
-            const equipmentId = $('#equipment_select').val();
-            const workorderId = $('#workorder_select').val();
-            
-            if (!equipmentId) {
-                alert('請先選擇設備！');
-                return;
+        // 工單選擇事件
+        const workorderSelect = document.getElementById('workorder_select');
+        workorderSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+                // 從選項的 data 屬性中獲取工單數量
+                const quantity = selectedOption.getAttribute('data-quantity');
+                if (quantity) {
+                    document.getElementById('report_quantity').value = quantity;
+                }
+            } else {
+                // 清空報工數量
+                document.getElementById('report_quantity').value = '';
             }
-            if (!workorderId) {
-                alert('請先選擇工單！');
-                return;
-            }
-            
-            // 啟用報工表單
-            $('#smt_reporting_form input, #smt_reporting_form select, #smt_reporting_form textarea').prop('disabled', false);
-            $('#report_quantity').focus();
+            // 檢查並啟用/禁用表單
+            enableReportingForm();
         });
+        
+        // 自動啟用報工表單的函數
+        function enableReportingForm() {
+            const equipmentId = document.getElementById('equipment_select').value;
+            const workorderId = document.getElementById('workorder_select').value;
+            
+            const formElements = document.querySelectorAll('#smt_reporting_form input, #smt_reporting_form select, #smt_reporting_form textarea');
+            
+            if (equipmentId && workorderId) {
+                // 有選擇設備和工單時，啟用表單
+                formElements.forEach(function(element) {
+                    element.disabled = false;
+                });
+                document.getElementById('report_quantity').focus();
+            } else {
+                // 沒有完整選擇時，禁用表單
+                formElements.forEach(function(element) {
+                    element.disabled = true;
+                });
+            }
+        }
         
         // 表單提交
-        $('#smt_reporting_form').submit(function(e) {
+        const smtReportingForm = document.getElementById('smt_reporting_form');
+        smtReportingForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            if (confirm('確定要提交此報工記錄嗎？')) {
+            const equipmentId = document.getElementById('equipment_select').value;
+            const workorderId = document.getElementById('workorder_select').value;
+            const quantity = document.getElementById('report_quantity').value;
+            const productionStatus = document.getElementById('report_production_status').value;
+            const notes = document.getElementById('report_notes').value;
+            
+            if (!equipmentId || !workorderId || !quantity || !productionStatus) {
+                alert('請填寫所有必要欄位！');
+                return;
+            }
+            
+            if (confirm('確定要提交此 SMT 報工記錄嗎？')) {
                 showLoading();
                 
-                // 這裡應該發送 AJAX 請求到後端
-                setTimeout(function() {
+                // 發送 AJAX 請求到後端
+                fetch('{% url "workorder:submit_smt_report" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: new URLSearchParams({
+                        equipment_id: equipmentId,
+                        workorder_id: workorderId,
+                        quantity: quantity,
+                        production_status: productionStatus,
+                        notes: notes
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
                     hideLoading();
-                    alert('報工記錄提交成功！');
-                    $('#smt_reporting_form')[0].reset();
-                    $('#report_time').val(localDateTime);
-                }, 1000);
+                    if (data.status === 'success') {
+                        alert('SMT 報工記錄提交成功！');
+                        smtReportingForm.reset();
+                        // 重新載入頁面以更新報工記錄列表
+                        location.reload();
+                    } else {
+                        alert('提交失敗：' + data.message);
+                    }
+                })
+                .catch(error => {
+                    hideLoading();
+                    alert('提交失敗，請檢查網路連線！');
+                    console.error('Error:', error);
+                });
             }
         });
         
@@ -478,25 +520,59 @@
     
     // 載入工單列表
     function loadWorkorders(equipmentId) {
-        // 這裡應該發送 AJAX 請求獲取該設備的工單列表
-        $('#workorder_select').html('<option value="">載入中...</option>');
+        // 發送 AJAX 請求獲取該設備的工單列表
+        console.log('開始載入工單，設備ID:', equipmentId);
+        document.getElementById('workorder_select').innerHTML = '<option value="">載入中...</option>';
         
-        setTimeout(function() {
-            $('#workorder_select').html(`
-                <option value="">請選擇工單...</option>
-                <option value="1">WO-2025-001 - 產品A</option>
-                <option value="2">WO-2025-002 - 產品B</option>
-                <option value="3">WO-2025-003 - 產品C</option>
-            `);
-        }, 500);
+        fetch('{% url "workorder:get_workorders_by_equipment" %}?equipment_id=' + equipmentId, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                let options = '<option value="">請選擇工單...</option>';
+                
+                if (data.workorders && data.workorders.length > 0) {
+                    data.workorders.forEach(function(workorder) {
+                        const statusText = workorder.process_status === 'in_progress' ? 
+                            '[生產中]' : 
+                            '[待生產]';
+                        
+                        options += `<option value="${workorder.id}" data-status="${workorder.process_status}" data-quantity="${workorder.quantity}">
+                            ${workorder.order_number} - ${workorder.product_code} 
+                            (${workorder.quantity}件) ${statusText}
+                        </option>`;
+                    });
+                } else {
+                    options += '<option value="" disabled>該設備目前沒有可用的工單</option>';
+                }
+                
+                document.getElementById('workorder_select').innerHTML = options;
+            } else {
+                document.getElementById('workorder_select').innerHTML = '<option value="">載入失敗：' + data.message + '</option>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('workorder_select').innerHTML = '<option value="">載入失敗，請檢查網路連線</option>';
+        });
     }
     
     // 選擇設備
     function selectEquipment(equipmentId) {
-        $('#equipment_select').val(equipmentId).trigger('change');
-        $('html, body').animate({
-            scrollTop: $('#equipment_select').offset().top - 100
-        }, 500);
+        const equipmentSelect = document.getElementById('equipment_select');
+        equipmentSelect.value = equipmentId;
+        equipmentSelect.dispatchEvent(new Event('change'));
+        
+        // 平滑滾動到設備選擇器
+        const equipmentSelectElement = document.getElementById('equipment_select');
+        equipmentSelectElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+        });
     }
     
     // 查看報工記錄
@@ -507,8 +583,12 @@
     
     // 刷新設備狀態
     function refreshEquipmentStatus() {
-        // 這裡應該發送 AJAX 請求刷新設備狀態
+        // 發送 AJAX 請求刷新設備狀態
         console.log('刷新設備狀態...');
+        
+        // 重新載入頁面以更新設備狀態
+        // 注意：這裡使用頁面重新載入，實際應用中可以改為 AJAX 更新
+        location.reload();
     }
     
     // 顯示載入中
