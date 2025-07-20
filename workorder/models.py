@@ -506,49 +506,133 @@ class SMTProductionReport(models.Model):
     SMT 生產報工記錄模型
     SMT 設備為自動化運作，不需要作業員
     """
-    PRODUCTION_STATUS_CHOICES = [
-        ('start', '開始生產'),
-        ('pause', '暫停'),
-        ('complete', '完工'),
-    ]
     
-    equipment = models.ForeignKey(
-        'equip.Equipment',
-        on_delete=models.CASCADE,
-        verbose_name="設備"
+    # 基本資訊
+    product_id = models.CharField(
+        max_length=100,
+        verbose_name="產品編號",
+        help_text="請選擇產品編號，將自動帶出相關工單",
+        default=""
     )
     
     workorder = models.ForeignKey(
         WorkOrder,
         on_delete=models.CASCADE,
-        verbose_name="工單"
+        verbose_name="工單號碼",
+        help_text="請選擇工單號碼，或透過產品編號自動帶出",
+        null=True,
+        blank=True
     )
     
-    report_time = models.DateTimeField(
-        default=timezone.now,
-        verbose_name="報工時間"
+    planned_quantity = models.IntegerField(
+        verbose_name="工單預設生產數量",
+        help_text="此為工單規劃的總生產數量，不可修改",
+        default=0
     )
     
-    quantity = models.IntegerField(
-        verbose_name="報工數量"
+    operation = models.CharField(
+        max_length=100,
+        verbose_name="工序",
+        help_text="請選擇此次補登的SMT工序",
+        default=""
     )
     
-    hours = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=0.0,
-        verbose_name="工作時數"
+    equipment = models.ForeignKey(
+        'equip.Equipment',
+        on_delete=models.CASCADE,
+        verbose_name="設備",
+        help_text="請選擇本次報工使用的SMT設備",
+        null=True,
+        blank=True
     )
     
-    production_status = models.CharField(
-        max_length=10,
-        choices=PRODUCTION_STATUS_CHOICES,
-        verbose_name="報工狀態"
+    # 時間資訊
+    work_date = models.DateField(
+        verbose_name="日期",
+        help_text="請選擇實際報工日期",
+        default=timezone.now
     )
     
-    notes = models.TextField(
+    start_time = models.TimeField(
+        verbose_name="開始時間",
+        help_text="請輸入實際開始時間 (24小時制)，例如 16:00",
+        default=timezone.now
+    )
+    
+    end_time = models.TimeField(
+        verbose_name="結束時間",
+        help_text="請輸入實際結束時間 (24小時制)，例如 18:30",
+        default=timezone.now
+    )
+    
+    # 數量資訊
+    work_quantity = models.IntegerField(
+        verbose_name="工作數量",
+        help_text="請輸入該時段內實際完成的合格產品數量",
+        default=0
+    )
+    
+    defect_quantity = models.IntegerField(
+        default=0,
+        verbose_name="不良品數量",
+        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0"
+    )
+    
+    # 狀態資訊
+    is_completed = models.BooleanField(
+        default=False,
+        verbose_name="是否已完工",
+        help_text="若此工單在此工序上已全部完成，請勾選"
+    )
+    
+    # 核准狀態
+    APPROVAL_STATUS_CHOICES = [
+        ('pending', '待核准'),
+        ('approved', '已核准'),
+        ('rejected', '已駁回'),
+    ]
+    
+    approval_status = models.CharField(
+        max_length=20,
+        choices=APPROVAL_STATUS_CHOICES,
+        default='pending',
+        verbose_name="核准狀態",
+        help_text="補登記錄的核准狀態，已核准的記錄不可修改"
+    )
+    
+    approved_by = models.CharField(
+        max_length=100,
         blank=True,
-        verbose_name="備註說明"
+        null=True,
+        verbose_name="核准人員",
+        help_text="核准此補登記錄的人員"
+    )
+    
+    approved_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="核准時間",
+        help_text="此補登記錄的核准時間"
+    )
+    
+    approval_remarks = models.TextField(
+        blank=True,
+        verbose_name="核准備註",
+        help_text="核准時的備註說明"
+    )
+    
+    # 備註
+    remarks = models.TextField(
+        blank=True,
+        verbose_name="備註",
+        help_text="請輸入任何需要補充的資訊，如異常、停機等"
+    )
+    
+    # 系統欄位
+    created_by = models.CharField(
+        max_length=100,
+        verbose_name="建立人員",
+        default="system"
     )
     
     created_at = models.DateTimeField(
@@ -560,29 +644,83 @@ class SMTProductionReport(models.Model):
         auto_now=True,
         verbose_name="更新時間"
     )
-    
+
     class Meta:
-        verbose_name = "SMT 報工記錄"
-        verbose_name_plural = "SMT 報工記錄"
+        verbose_name = "SMT 補登報工記錄"
+        verbose_name_plural = "SMT 補登報工記錄"
         db_table = 'workorder_smt_production_report'
-        ordering = ['-report_time']
-    
+        ordering = ['-work_date', '-start_time']
+
     def __str__(self):
-        return f"{self.equipment.name} - {self.workorder.order_number} - {self.report_time.strftime('%Y-%m-%d %H:%M')}"
-    
-    def get_production_status_display(self):
-        """取得報工狀態顯示名稱"""
-        return dict(self.PRODUCTION_STATUS_CHOICES).get(self.production_status, self.production_status)
-    
+        return f"{self.product_id} - {self.workorder.order_number} - {self.work_date}"
+
+
+
     @property
     def equipment_name(self):
-        """設備名稱"""
-        return self.equipment.name
-    
+        """取得設備名稱"""
+        return self.equipment.name if self.equipment else ""
+
     @property
     def workorder_number(self):
-        """工單號"""
-        return self.workorder.order_number
+        """取得工單號碼"""
+        return self.workorder.order_number if self.workorder else ""
+
+    @property
+    def total_quantity(self):
+        """取得總數量（工作數量 + 不良品數量）"""
+        return self.work_quantity + self.defect_quantity
+
+    @property
+    def work_hours(self):
+        """計算工作時數"""
+        if self.start_time and self.end_time:
+            from datetime import datetime, timedelta
+            start_dt = datetime.combine(self.work_date, self.start_time)
+            end_dt = datetime.combine(self.work_date, self.end_time)
+            if end_dt < start_dt:
+                end_dt += timedelta(days=1)
+            duration = end_dt - start_dt
+            return round(duration.total_seconds() / 3600, 2)
+        return 0.0
+
+    def can_edit(self, user):
+        """
+        檢查記錄是否可以編輯
+        已核准的記錄只有超級管理員可以編輯
+        """
+        if self.approval_status == 'approved':
+            return user.is_superuser
+        return True
+
+    def can_delete(self, user):
+        """
+        檢查記錄是否可以刪除
+        只有超級管理員可以刪除已核准的記錄
+        """
+        if self.approval_status == 'approved':
+            return user.is_superuser
+        return True
+
+    def approve(self, user, remarks=''):
+        """
+        核准補登記錄
+        """
+        self.approval_status = 'approved'
+        self.approved_by = user.username
+        self.approved_at = timezone.now()
+        self.approval_remarks = remarks
+        self.save()
+
+    def reject(self, user, remarks=''):
+        """
+        駁回補登記錄
+        """
+        self.approval_status = 'rejected'
+        self.approved_by = user.username
+        self.approved_at = timezone.now()
+        self.approval_remarks = remarks
+        self.save()
 
 
 

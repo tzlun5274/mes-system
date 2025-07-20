@@ -62,28 +62,50 @@ class WorkOrderAssignmentAdmin(admin.ModelAdmin):
 
 @admin.register(SMTProductionReport)
 class SMTProductionReportAdmin(admin.ModelAdmin):
+    """SMT 補登報工記錄管理介面"""
     list_display = [
-        "equipment",
-        "workorder",
-        "report_time",
-        "quantity",
-        "hours",
-        "production_status",
+        'id', 'product_id', 'workorder', 'operation', 'equipment', 
+        'work_date', 'work_quantity', 'approval_status', 'created_at'
     ]
-    list_filter = ["production_status", "report_time", "equipment"]
-    search_fields = ["equipment__name", "workorder__order_number"]
-    ordering = ["-report_time"]
-    readonly_fields = ["created_at", "updated_at"]
+    list_filter = [
+        'equipment', 'operation', 'work_date', 'approval_status', 'created_at'
+    ]
+    search_fields = [
+        'product_id', 'equipment__name', 'workorder__order_number', 'workorder__product_code'
+    ]
+    readonly_fields = ['created_at', 'updated_at', 'created_by', 'approved_by', 'approved_at']
+    date_hierarchy = 'work_date'
+    ordering = ['-work_date', '-start_time']
     
     fieldsets = (
         ('基本資訊', {
-            'fields': ('equipment', 'workorder', 'report_time')
+            'fields': ('product_id', 'workorder', 'planned_quantity', 'operation', 'equipment')
         }),
-        ('報工資料', {
-            'fields': ('quantity', 'hours', 'quality', 'notes')
+        ('時間資訊', {
+            'fields': ('work_date', 'start_time', 'end_time')
+        }),
+        ('數量資訊', {
+            'fields': ('work_quantity', 'defect_quantity')
+        }),
+        ('狀態資訊', {
+            'fields': ('is_completed', 'remarks')
+        }),
+        ('核准資訊', {
+            'fields': ('approval_status', 'approved_by', 'approved_at', 'approval_remarks'),
+            'classes': ('collapse',)
         }),
         ('系統資訊', {
-            'fields': ('created_at', 'updated_at'),
+            'fields': ('created_by', 'created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
+    
+    def get_queryset(self, request):
+        """優化查詢效能"""
+        return super().get_queryset(request).select_related('equipment', 'workorder')
+    
+    def get_readonly_fields(self, request, obj=None):
+        """編輯時某些欄位為唯讀"""
+        if obj:  # 編輯現有記錄
+            return list(self.readonly_fields) + ['product_id', 'workorder', 'planned_quantity']
+        return self.readonly_fields

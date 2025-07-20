@@ -1,6 +1,7 @@
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.core.paginator import Paginator
 from .models import (
     WorkOrder,
     PrdMKOrdMain,
@@ -3001,11 +3002,10 @@ def submit_smt_report(request):
         equipment_id = request.POST.get('equipment_id')
         workorder_id = request.POST.get('workorder_id')
         quantity = request.POST.get('quantity')
-        production_status = request.POST.get('production_status')
         notes = request.POST.get('notes', '')
         
         # 基本驗證
-        if not all([equipment_id, workorder_id, quantity, production_status]):
+        if not all([equipment_id, workorder_id, quantity]):
             return JsonResponse({
                 'status': 'error',
                 'message': '請填寫所有必要欄位'
@@ -3021,11 +3021,8 @@ def submit_smt_report(request):
         report = SMTProductionReport.objects.create(
             equipment=equipment,
             workorder=workorder,
-            report_time=timezone.now(),  # 自動使用當前時間
-            quantity=int(quantity),
-            hours=0.0,  # 預設為0，因為不需要手動輸入
-            production_status=production_status,
-            notes=notes
+            work_quantity=int(quantity),
+            remarks=notes
         )
         
         return JsonResponse({
@@ -3139,6 +3136,481 @@ def get_workorders_by_equipment(request):
         return JsonResponse({
             'status': 'error',
             'message': f'獲取工單列表失敗：{str(e)}'
+        })
+
+# ==================== SMT 補登報工功能 ====================
+
+def smt_supplement_report_index(request):
+    """
+    SMT補登報工首頁視圖
+    顯示SMT補登報工的主要功能，包含補登記錄列表和統計資訊
+    """
+    from equip.models import Equipment
+    from datetime import date, timedelta
+    from .models import SMTProductionReport
+    from django.db import models
+    from django.core.paginator import Paginator
+    
+    # 取得查詢參數
+    equipment_id = request.GET.get('equipment')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    
+    # 取得 SMT 設備列表
+    equipment_list = Equipment.objects.filter(
+        models.Q(name__icontains='SMT') | 
+        models.Q(name__icontains='貼片') |
+        models.Q(name__icontains='Pick') |
+        models.Q(name__icontains='Place')
+    ).order_by('name')
+    
+    # 查詢補登記錄
+    supplement_reports = SMTProductionReport.objects.all()
+    
+    # 篩選條件
+    if equipment_id:
+        supplement_reports = supplement_reports.filter(equipment_id=equipment_id)
+    if start_date:
+        supplement_reports = supplement_reports.filter(work_date__gte=start_date)
+    if end_date:
+        supplement_reports = supplement_reports.filter(work_date__lte=end_date)
+    
+    # 排序
+    supplement_reports = supplement_reports.order_by('-work_date', '-start_time')
+    
+    # 分頁
+    paginator = Paginator(supplement_reports, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # 統計資訊
+    today = date.today()
+    today_reports = SMTProductionReport.objects.filter(work_date=today)
+    total_quantity = today_reports.aggregate(total=models.Sum('work_quantity'))['total'] or 0
+    total_reports = today_reports.count()
+    
+    # 最近7天統計
+    week_ago = today - timedelta(days=7)
+    week_reports = SMTProductionReport.objects.filter(work_date__gte=week_ago)
+    week_quantity = week_reports.aggregate(total=models.Sum('work_quantity'))['total'] or 0
+    
+    # 為每個記錄添加權限檢查
+    for report in page_obj:
+        report.can_edit = report.can_edit(request.user)
+        report.can_delete = report.can_delete(request.user)
+    
+    context = {
+        'page_obj': page_obj,
+        'equipment_list': equipment_list,
+        'selected_equipment': equipment_id,
+        'start_date': start_date,
+        'end_date': end_date,
+        'today_quantity': total_quantity,
+        'today_reports': total_reports,
+        'week_quantity': week_quantity,
+    }
+    
+    return render(request, 'workorder/report/smt/supplement/index.html', context)
+
+
+def smt_supplement_report_create(request):
+    """
+    SMT補登報工創建視圖
+    用於創建新的SMT補登報工記錄
+    """
+    from equip.models import Equipment
+    from .forms import SMTSupplementReportForm
+    
+    if request.method == 'POST':
+        form = SMTSupplementReportForm(request.POST)
+        if form.is_valid():
+            supplement_report = form.save(commit=False)
+            supplement_report.created_by = request.user.username
+            supplement_report.save()
+            
+            messages.success(request, 'SMT補登報工記錄已成功創建！')
+            return redirect('workorder:smt_supplement_report_index')
+    else:
+        form = SMTSupplementReportForm()
+    
+    # 取得 SMT 設備列表
+    equipment_list = Equipment.objects.filter(
+        models.Q(name__icontains='SMT') | 
+        models.Q(name__icontains='貼片') |
+        models.Q(name__icontains='Pick') |
+        models.Q(name__icontains='Place')
+    ).order_by('name')
+    
+    context = {
+        'form': form,
+        'equipment_list': equipment_list,
+    }
+    
+    return render(request, 'workorder/report/smt/supplement/form.html', context)
+
+
+def smt_supplement_report_edit(request, report_id):
+    """
+    SMT補登報工編輯視圖
+    用於編輯現有的SMT補登報工記錄
+    """
+    from .models import SMTProductionReport
+    from .forms import SMTSupplementReportForm
+    from equip.models import Equipment
+    
+    supplement_report = get_object_or_404(SMTProductionReport, id=report_id)
+    
+    # 檢查編輯權限
+    if not supplement_report.can_edit(request.user):
+        messages.error(request, '此記錄已核准，只有超級管理員可以編輯！')
+        return redirect('workorder:smt_supplement_report_index')
+    
+    if request.method == 'POST':
+        form = SMTSupplementReportForm(request.POST, instance=supplement_report, user=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'SMT補登報工記錄已成功更新！')
+            return redirect('workorder:smt_supplement_report_index')
+    else:
+        form = SMTSupplementReportForm(instance=supplement_report, user=request.user)
+    
+    # 取得 SMT 設備列表
+    equipment_list = Equipment.objects.filter(
+        models.Q(name__icontains='SMT') | 
+        models.Q(name__icontains='貼片') |
+        models.Q(name__icontains='Pick') |
+        models.Q(name__icontains='Place')
+    ).order_by('name')
+    
+    context = {
+        'form': form,
+        'supplement_report': supplement_report,
+        'equipment_list': equipment_list,
+        'can_edit': supplement_report.can_edit(request.user),
+        'can_delete': supplement_report.can_delete(request.user),
+    }
+    
+    return render(request, 'workorder/report/smt/supplement/form.html', context)
+
+
+def smt_supplement_report_delete(request, report_id):
+    """
+    SMT補登報工刪除視圖
+    用於刪除SMT補登報工記錄
+    """
+    from .models import SMTProductionReport
+    
+    supplement_report = get_object_or_404(SMTProductionReport, id=report_id)
+    
+    # 檢查刪除權限
+    if not supplement_report.can_delete(request.user):
+        messages.error(request, '此記錄已核准，只有超級管理員可以刪除！')
+        return redirect('workorder:smt_supplement_report_index')
+    
+    if request.method == 'POST':
+        supplement_report.delete()
+        messages.success(request, 'SMT補登報工記錄已成功刪除！')
+        return redirect('workorder:smt_supplement_report_index')
+    
+    context = {
+        'supplement_report': supplement_report,
+        'can_delete': supplement_report.can_delete(request.user),
+    }
+    
+    return render(request, 'workorder/report/smt/supplement/delete_confirm.html', context)
+
+
+def smt_supplement_report_detail(request, report_id):
+    """
+    SMT補登報工詳情視圖
+    用於查看SMT補登報工記錄的詳細資訊
+    """
+    from .models import SMTProductionReport
+    
+    supplement_report = get_object_or_404(SMTProductionReport, id=report_id)
+    
+    context = {
+        'supplement_report': supplement_report,
+    }
+    
+    context = {
+        'supplement_report': supplement_report,
+        'can_edit': supplement_report.can_edit(request.user),
+        'can_delete': supplement_report.can_delete(request.user),
+    }
+    
+    return render(request, 'workorder/report/smt/supplement/detail.html', context)
+
+
+def smt_supplement_report_approve(request, report_id):
+    """
+    SMT補登報工核准視圖
+    用於核准SMT補登報工記錄
+    """
+    from .models import SMTProductionReport
+    
+    supplement_report = get_object_or_404(SMTProductionReport, id=report_id)
+    
+    if request.method == 'POST':
+        remarks = request.POST.get('approval_remarks', '')
+        supplement_report.approve(request.user, remarks)
+        messages.success(request, 'SMT補登報工記錄已成功核准！')
+        return redirect('workorder:smt_supplement_report_detail', report_id=report_id)
+    
+    context = {
+        'supplement_report': supplement_report,
+    }
+    
+    return render(request, 'workorder/report/smt/supplement/approve_confirm.html', context)
+
+
+def smt_supplement_report_reject(request, report_id):
+    """
+    SMT補登報工駁回視圖
+    用於駁回SMT補登報工記錄
+    """
+    from .models import SMTProductionReport
+    
+    supplement_report = get_object_or_404(SMTProductionReport, id=report_id)
+    
+    if request.method == 'POST':
+        remarks = request.POST.get('rejection_remarks', '')
+        supplement_report.reject(request.user, remarks)
+        messages.success(request, 'SMT補登報工記錄已成功駁回！')
+        return redirect('workorder:smt_supplement_report_detail', report_id=report_id)
+    
+    context = {
+        'supplement_report': supplement_report,
+    }
+    
+    return render(request, 'workorder/report/smt/supplement/reject_confirm.html', context)
+
+
+@require_POST
+@csrf_exempt
+def smt_supplement_batch_create(request):
+    """
+    SMT補登報工批量創建API
+    用於批量創建SMT補登報工記錄
+    """
+    try:
+        from .models import SMTProductionReport
+        from equip.models import Equipment
+        
+        data = json.loads(request.body)
+        reports_data = data.get('reports', [])
+        
+        created_reports = []
+        errors = []
+        
+        for report_data in reports_data:
+            try:
+                # 驗證必要欄位
+                required_fields = ['equipment_id', 'workorder_id', 'quantity']
+                for field in required_fields:
+                    if not report_data.get(field):
+                        errors.append(f'記錄缺少必要欄位: {field}')
+                        continue
+                
+                # 取得設備和工單
+                equipment = Equipment.objects.get(id=report_data['equipment_id'])
+                workorder = WorkOrder.objects.get(id=report_data['workorder_id'])
+                
+                # 處理報工時間
+                report_time = timezone.now()
+                if report_data.get('report_time'):
+                    try:
+                        report_time = timezone.make_aware(
+                            datetime.strptime(report_data['report_time'], '%Y-%m-%d %H:%M:%S')
+                        )
+                    except ValueError:
+                        errors.append(f'報工時間格式錯誤: {report_data["report_time"]}')
+                        continue
+                
+                # 創建補登記錄
+                report = SMTProductionReport.objects.create(
+                    equipment=equipment,
+                    workorder=workorder,
+                    work_quantity=report_data['quantity'],
+                    remarks=report_data.get('notes', ''),
+                )
+                
+                created_reports.append({
+                    'id': report.id,
+                    'equipment': equipment.name,
+                    'workorder': workorder.order_number,
+                    'quantity': report.work_quantity,
+                })
+                
+            except Equipment.DoesNotExist:
+                errors.append(f'找不到設備 ID: {report_data.get("equipment_id")}')
+            except WorkOrder.DoesNotExist:
+                errors.append(f'找不到工單 ID: {report_data.get("workorder_id")}')
+            except Exception as e:
+                errors.append(f'創建記錄失敗: {str(e)}')
+        
+        return JsonResponse({
+            'success': True,
+            'created_reports': created_reports,
+            'errors': errors,
+            'message': f'成功創建 {len(created_reports)} 筆記錄，{len(errors)} 筆錯誤'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'message': 'JSON 格式錯誤'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'批量創建失敗: {str(e)}'
+        })
+
+
+@require_GET
+@csrf_exempt
+def get_workorders_by_product(request):
+    """
+    AJAX 視圖：根據產品編號取得相關工單
+    用於 SMT 補登報工表單的產品編號和工單聯動
+    """
+    product_id = request.GET.get('product_id')
+    
+    if not product_id:
+        return JsonResponse({
+            'status': 'error',
+            'message': '請提供產品編號'
+        })
+    
+    try:
+        from .models import WorkOrder
+        
+        # 查詢該產品編號的所有工單
+        workorders = WorkOrder.objects.filter(
+            product_code=product_id,
+            status__in=['pending', 'in_progress']
+        ).order_by('-created_at')
+        
+        workorder_list = []
+        for workorder in workorders:
+            workorder_list.append({
+                'id': workorder.id,
+                'order_number': workorder.order_number,
+                'company_code': workorder.company_code,
+                'quantity': workorder.quantity,
+                'status': workorder.get_status_display(),
+                'created_at': workorder.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        return JsonResponse({
+            'status': 'success',
+            'workorders': workorder_list,
+            'count': len(workorder_list)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'查詢失敗：{str(e)}'
+        })
+
+
+@require_GET
+@csrf_exempt
+def get_workorder_details(request):
+    """
+    AJAX 視圖：根據工單ID取得工單詳細資訊
+    用於 SMT 補登報工表單的工單資訊顯示
+    """
+    workorder_id = request.GET.get('workorder_id')
+    
+    if not workorder_id:
+        return JsonResponse({
+            'status': 'error',
+            'message': '請提供工單ID'
+        })
+    
+    try:
+        from .models import WorkOrder
+        
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        
+        return JsonResponse({
+            'status': 'success',
+            'workorder': {
+                'id': workorder.id,
+                'order_number': workorder.order_number,
+                'company_code': workorder.company_code,
+                'product_code': workorder.product_code,
+                'quantity': workorder.quantity,
+                'status': workorder.get_status_display(),
+                'created_at': workorder.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            }
+        })
+        
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': '找不到指定的工單'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'查詢失敗：{str(e)}'
+        })
+
+
+@require_GET
+@csrf_exempt
+def get_smt_workorders_by_equipment(request):
+    """
+    API：根據設備取得可用的工單列表
+    用於SMT補登報工中的工單選擇
+    """
+    try:
+        equipment_id = request.GET.get('equipment_id')
+        
+        if not equipment_id:
+            return JsonResponse({
+                'success': False,
+                'message': '缺少設備ID參數'
+            })
+        
+        # 取得該設備的相關工單
+        from equip.models import Equipment
+        equipment = Equipment.objects.get(id=equipment_id)
+        
+        # 取得該設備的工單（這裡可以根據實際業務邏輯調整）
+        workorders = WorkOrder.objects.filter(
+            status__in=['in_progress', 'completed']
+        ).order_by('-created_at')[:50]  # 限制數量避免過載
+        
+        workorder_list = []
+        for workorder in workorders:
+            workorder_list.append({
+                'id': workorder.id,
+                'order_number': workorder.order_number,
+                'product_code': workorder.product_code,
+                'quantity': workorder.quantity,
+                'status': workorder.get_status_display(),
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'workorders': workorder_list,
+            'equipment_name': equipment.name
+        })
+        
+    except Equipment.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的設備'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'取得工單列表失敗: {str(e)}'
         })
 
 

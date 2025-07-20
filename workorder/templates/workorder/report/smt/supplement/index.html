@@ -1,0 +1,383 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}SMT補登報工管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    .smt-supplement-card {
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .smt-supplement-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .smt-supplement-table {
+        font-size: 0.9rem;
+    }
+    
+    .smt-supplement-table th {
+        background-color: #f8f9fa;
+        border-top: none;
+        font-weight: 600;
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-weight: 500;
+    }
+    
+    .status-start {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-pause {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .status-complete {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    
+    .filter-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+    }
+    
+    .stats-card .card-body {
+        padding: 1.5rem;
+    }
+    
+    .stats-number {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stats-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-history text-warning"></i> SMT補登報工管理
+                    </h2>
+                    <p class="text-muted mb-0">管理SMT生產線的歷史報工記錄和補登資料</p>
+                </div>
+                <div>
+                    <a href="{% url 'workorder:smt_supplement_report_create' %}" class="btn btn-warning">
+                        <i class="fas fa-plus"></i> 新增補登記錄
+                    </a>
+                    <a href="{% url 'workorder:smt_report_index' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回SMT報工
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <div class="stats-number">{{ today_reports }}</div>
+                    <div class="stats-label">今日補登記錄</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <div class="stats-number">{{ today_quantity }}</div>
+                    <div class="stats-label">今日補登數量</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <div class="stats-number">{{ week_quantity }}</div>
+                    <div class="stats-label">本週補登數量</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <div class="stats-number">{{ page_obj.paginator.count }}</div>
+                    <div class="stats-label">總補登記錄</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 篩選區域 -->
+    <div class="filter-section">
+        <form method="get" class="row g-3">
+            <div class="col-md-2">
+                <label for="equipment" class="form-label">設備</label>
+                <select name="equipment" id="equipment" class="form-select">
+                    <option value="">全部設備</option>
+                    {% for equipment in equipment_list %}
+                        <option value="{{ equipment.id }}" {% if selected_equipment == equipment.id|stringformat:"s" %}selected{% endif %}>
+                            {{ equipment.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="start_date" class="form-label">開始日期</label>
+                <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date|default:'' }}">
+            </div>
+            <div class="col-md-2">
+                <label for="end_date" class="form-label">結束日期</label>
+                <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date|default:'' }}">
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> 搜尋
+                    </button>
+                    <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i> 清除
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 補登記錄列表 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card smt-supplement-card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> 補登記錄列表
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if page_obj %}
+                        <div class="table-responsive">
+                            <table class="table table-hover smt-supplement-table">
+                                <thead>
+                                    <tr>
+                                        <th>工作日期</th>
+                                        <th>設備名稱</th>
+                                        <th>工單號</th>
+                                        <th>產品編號</th>
+                                        <th>工作數量</th>
+                                        <th>工作時數</th>
+                                        <th>核准狀態</th>
+                                        <th>備註</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in page_obj %}
+                                    <tr>
+                                        <td>{{ report.work_date|date:"Y-m-d" }}</td>
+                                        <td>{{ report.equipment.name }}</td>
+                                        <td>{{ report.workorder.order_number }}</td>
+                                        <td>{{ report.workorder.product_code }}</td>
+                                        <td>{{ report.work_quantity }}</td>
+                                        <td>{{ report.work_hours }}小時</td>
+                                        <td>
+                                            {% if report.approval_status == 'approved' %}
+                                                <span class="badge bg-success">已核准</span>
+                                            {% elif report.approval_status == 'rejected' %}
+                                                <span class="badge bg-danger">已駁回</span>
+                                            {% else %}
+                                                <span class="badge bg-warning">待核准</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.remarks %}
+                                                <span class="text-muted" title="{{ report.remarks }}">
+                                                    {{ report.remarks|truncatechars:20 }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="{% url 'workorder:smt_supplement_report_detail' report.id %}" 
+                                                   class="btn btn-outline-primary" title="查看詳情">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                {% if report.can_edit %}
+                                                <a href="{% url 'workorder:smt_supplement_report_edit' report.id %}" 
+                                                   class="btn btn-outline-warning" title="編輯">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                {% endif %}
+                                                {% if report.can_delete %}
+                                                <a href="{% url 'workorder:smt_supplement_report_delete' report.id %}" 
+                                                   class="btn btn-outline-danger" title="刪除"
+                                                   onclick="return confirm('確定要刪除這筆補登記錄嗎？')">
+                                                    <i class="fas fa-trash"></i>
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 分頁 -->
+                        {% if page_obj.has_other_pages %}
+                        <nav aria-label="補登記錄分頁">
+                            <ul class="pagination justify-content-center">
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=1{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">
+                                            <i class="fas fa-angle-double-left"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">
+                                            <i class="fas fa-angle-left"></i>
+                                        </a>
+                                    </li>
+                                {% endif %}
+
+                                {% for num in page_obj.paginator.page_range %}
+                                    {% if page_obj.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ num }}{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">{{ num }}</a>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">
+                                            <i class="fas fa-angle-right"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">
+                                            <i class="fas fa-angle-double-right"></i>
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">目前沒有補登記錄</h5>
+                            <p class="text-muted">點擊上方「新增補登記錄」按鈕開始建立補登資料</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // SMT補登報工專用 JavaScript
+    $(document).ready(function() {
+        // 卡片懸停效果
+        $('.smt-supplement-card').hover(
+            function() {
+                $(this).addClass('shadow-lg');
+            },
+            function() {
+                $(this).removeClass('shadow-lg');
+            }
+        );
+        
+        // 自動隱藏訊息提示
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                if (alert.classList.contains('alert-success') || alert.classList.contains('alert-info')) {
+                    setTimeout(function() {
+                        alert.style.opacity = '0';
+                        setTimeout(function() {
+                            alert.remove();
+                        }, 300);
+                    }, 3000);
+                }
+            });
+        }, 1000);
+        
+        // 日期範圍驗證
+        $('#start_date, #end_date').on('change', function() {
+            const startDate = $('#start_date').val();
+            const endDate = $('#end_date').val();
+            
+            if (startDate && endDate && startDate > endDate) {
+                alert('開始日期不能晚於結束日期');
+                $(this).val('');
+            }
+        });
+    });
+    
+    // 確認操作函數
+    function confirmAction(message) {
+        return confirm(message || '確定要執行此操作嗎？');
+    }
+    
+    // 顯示載入中
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 處理中...</div>';
+        loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.2);z-index:9999;';
+        document.body.appendChild(loadingDiv);
+    }
+    
+    // 隱藏載入中
+    function hideLoading() {
+        const loadingDiv = document.getElementById('loading');
+        if (loadingDiv) {
+            loadingDiv.remove();
+        }
+    }
+</script>
+{% endblock %} 

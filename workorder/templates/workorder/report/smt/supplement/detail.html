@@ -1,0 +1,411 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}SMT補登報工詳情{% endblock %}
+
+{% block extra_css %}
+<style>
+    .smt-supplement-detail-card {
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .smt-supplement-detail-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .detail-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .detail-section h6 {
+        color: #495057;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 8px;
+    }
+    
+    .detail-item {
+        margin-bottom: 15px;
+    }
+    
+    .detail-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 5px;
+    }
+    
+    .detail-value {
+        color: #212529;
+        padding: 8px 12px;
+        background-color: white;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-weight: 500;
+    }
+    
+    .status-start {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-pause {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .status-complete {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    
+    .timeline-item {
+        position: relative;
+        padding-left: 30px;
+        margin-bottom: 20px;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: #007bff;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 2px #007bff;
+    }
+    
+    .timeline-item::after {
+        content: '';
+        position: absolute;
+        left: 5px;
+        top: 12px;
+        width: 2px;
+        height: calc(100% + 8px);
+        background-color: #dee2e6;
+    }
+    
+    .timeline-item:last-child::after {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-eye text-info"></i> SMT補登報工詳情
+                    </h2>
+                    <p class="text-muted mb-0">查看SMT補登報工記錄的完整資訊</p>
+                </div>
+                <div>
+                    {% if can_edit %}
+                    <a href="{% url 'workorder:smt_supplement_report_edit' supplement_report.id %}" class="btn btn-warning">
+                        <i class="fas fa-edit"></i> 編輯記錄
+                    </a>
+                    {% endif %}
+                    {% if supplement_report.approval_status == 'pending' %}
+                    <a href="{% url 'workorder:smt_supplement_report_approve' supplement_report.id %}" class="btn btn-success">
+                        <i class="fas fa-check"></i> 核准記錄
+                    </a>
+                    <a href="{% url 'workorder:smt_supplement_report_reject' supplement_report.id %}" class="btn btn-danger">
+                        <i class="fas fa-times"></i> 駁回記錄
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 基本資訊 -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card smt-supplement-detail-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle"></i> 基本資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <div class="detail-item">
+                            <div class="detail-label">設備名稱</div>
+                            <div class="detail-value">{{ supplement_report.equipment.name }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">設備型號</div>
+                            <div class="detail-value">{{ supplement_report.equipment.model|default:"未設定" }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">工單號</div>
+                            <div class="detail-value">{{ supplement_report.workorder.order_number }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">產品編號</div>
+                            <div class="detail-value">{{ supplement_report.workorder.product_code }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">產品名稱</div>
+                            <div class="detail-value">{{ supplement_report.workorder.product_name|default:"未設定" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card smt-supplement-detail-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line"></i> 報工資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <div class="detail-item">
+                            <div class="detail-label">工作日期</div>
+                            <div class="detail-value">{{ supplement_report.work_date|date:"Y-m-d" }}</div>
+                        </div>
+
+                        <div class="detail-item">
+                            <div class="detail-label">工作數量</div>
+                            <div class="detail-value">{{ supplement_report.work_quantity }} 件</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">工作時數</div>
+                            <div class="detail-value">{{ supplement_report.work_hours }} 小時</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">效率計算</div>
+                            <div class="detail-value">
+                                {% if supplement_report.work_hours > 0 %}
+                                    {% widthratio supplement_report.work_quantity supplement_report.work_hours 1 as efficiency %}
+                                    {{ supplement_report.work_quantity|floatformat:0 }} 件 ÷ {{ supplement_report.work_hours }} 小時 = {{ efficiency|floatformat:1 }} 件/小時
+                                {% else %}
+                                    無法計算（工作時數為0）
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">核准狀態</div>
+                            <div class="detail-value">
+                                {% if supplement_report.approval_status == 'approved' %}
+                                    <span class="badge bg-success">已核准</span>
+                                    {% if supplement_report.approved_by %}
+                                        <br><small class="text-muted">核准人員：{{ supplement_report.approved_by }}</small>
+                                    {% endif %}
+                                    {% if supplement_report.approved_at %}
+                                        <br><small class="text-muted">核准時間：{{ supplement_report.approved_at|date:"Y-m-d H:i:s" }}</small>
+                                    {% endif %}
+                                {% elif supplement_report.approval_status == 'rejected' %}
+                                    <span class="badge bg-danger">已駁回</span>
+                                    {% if supplement_report.approved_by %}
+                                        <br><small class="text-muted">駁回人員：{{ supplement_report.approved_by }}</small>
+                                    {% endif %}
+                                    {% if supplement_report.approved_at %}
+                                        <br><small class="text-muted">駁回時間：{{ supplement_report.approved_at|date:"Y-m-d H:i:s" }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-warning">待核准</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 備註說明 -->
+    {% if supplement_report.remarks %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card smt-supplement-detail-card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-sticky-note"></i> 備註說明
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <div class="detail-item">
+                            <div class="detail-value" style="white-space: pre-wrap;">{{ supplement_report.remarks }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 時間軸 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card smt-supplement-detail-card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock"></i> 時間軸
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline-item">
+                        <div class="detail-label">記錄建立</div>
+                        <div class="detail-value">{{ supplement_report.created_at|date:"Y-m-d H:i:s" }}</div>
+                        <small class="text-muted">補登記錄建立時間</small>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="detail-label">工作時間</div>
+                        <div class="detail-value">{{ supplement_report.start_time|time:"H:i" }} - {{ supplement_report.end_time|time:"H:i" }}</div>
+                        <small class="text-muted">實際工作時間</small>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="detail-label">最後更新</div>
+                        <div class="detail-value">{{ supplement_report.updated_at|date:"Y-m-d H:i:s" }}</div>
+                        <small class="text-muted">記錄最後修改時間</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 相關資訊 -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card smt-supplement-detail-card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-link"></i> 相關工單資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <div class="detail-item">
+                            <div class="detail-label">工單狀態</div>
+                            <div class="detail-value">
+                                <span class="badge {% if supplement_report.workorder.status == 'completed' %}bg-success{% elif supplement_report.workorder.status == 'in_progress' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ supplement_report.workorder.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">工單數量</div>
+                            <div class="detail-value">{{ supplement_report.workorder.quantity }} 件</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">工單建立時間</div>
+                            <div class="detail-value">{{ supplement_report.workorder.created_at|date:"Y-m-d H:i" }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">完成進度</div>
+                            <div class="detail-value">
+                                {% if supplement_report.workorder.quantity > 0 %}
+                                    {% widthratio supplement_report.work_quantity supplement_report.workorder.quantity 100 as progress %}
+                                    {{ progress|floatformat:1 }}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card smt-supplement-detail-card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cogs"></i> 設備資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <div class="detail-item">
+                            <div class="detail-label">設備狀態</div>
+                            <div class="detail-value">
+                                <span class="status-badge status-{{ supplement_report.equipment.status }}">
+                                    {{ supplement_report.equipment.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">設備類型</div>
+                            <div class="detail-value">{{ supplement_report.equipment.equipment_type|default:"未設定" }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">設備位置</div>
+                            <div class="detail-value">{{ supplement_report.equipment.location|default:"未設定" }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">設備建立時間</div>
+                            <div class="detail-value">{{ supplement_report.equipment.created_at|date:"Y-m-d H:i" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // SMT補登報工詳情專用 JavaScript
+    $(document).ready(function() {
+        // 卡片懸停效果
+        $('.smt-supplement-detail-card').hover(
+            function() {
+                $(this).addClass('shadow-lg');
+            },
+            function() {
+                $(this).removeClass('shadow-lg');
+            }
+        );
+        
+        // 自動隱藏訊息提示
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                if (alert.classList.contains('alert-success') || alert.classList.contains('alert-info')) {
+                    setTimeout(function() {
+                        alert.style.opacity = '0';
+                        setTimeout(function() {
+                            alert.remove();
+                        }, 300);
+                    }, 3000);
+                }
+            });
+        }, 1000);
+    });
+    
+    // 確認操作函數
+    function confirmAction(message) {
+        return confirm(message || '確定要執行此操作嗎？');
+    }
+</script>
+{% endblock %} 

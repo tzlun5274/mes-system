@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}駁回SMT補登報工記錄{% endblock %}
+
+{% block extra_css %}
+<style>
+    .reject-confirm-card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        transition: all 0.3s ease;
+    }
+    
+    .reject-confirm-card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .detail-section {
+        margin-bottom: 1rem;
+    }
+    
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f8f9fa;
+    }
+    
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+    
+    .detail-label {
+        font-weight: 600;
+        color: #495057;
+        min-width: 120px;
+    }
+    
+    .detail-value {
+        color: #212529;
+        text-align: right;
+    }
+    
+    .warning-alert {
+        border-left: 4px solid #dc3545;
+        background-color: #f8d7da;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-times-circle text-danger"></i> 駁回SMT補登報工記錄
+                    </h2>
+                    <p class="text-muted mb-0">確認駁回此筆補登報工記錄</p>
+                </div>
+                <div>
+                    <a href="{% url 'workorder:smt_supplement_report_detail' supplement_report.id %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回詳情
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 警告提示 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert warning-alert" role="alert">
+                <h5 class="alert-heading">
+                    <i class="fas fa-exclamation-triangle text-danger"></i> 重要提醒
+                </h5>
+                <p class="mb-0">
+                    駁回後此記錄將標記為已駁回狀態，建議在駁回備註中說明駁回原因，以便後續修正。
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 記錄資訊 -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card reject-confirm-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle"></i> 基本資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <div class="detail-item">
+                            <div class="detail-label">設備名稱</div>
+                            <div class="detail-value">{{ supplement_report.equipment.name }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">工單號</div>
+                            <div class="detail-value">{{ supplement_report.workorder.order_number }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">產品編號</div>
+                            <div class="detail-value">{{ supplement_report.workorder.product_code }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">工作日期</div>
+                            <div class="detail-value">{{ supplement_report.work_date|date:"Y-m-d" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card reject-confirm-card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line"></i> 報工資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <div class="detail-item">
+                            <div class="detail-label">工作數量</div>
+                            <div class="detail-value">{{ supplement_report.work_quantity }} 件</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">工作時數</div>
+                            <div class="detail-value">{{ supplement_report.work_hours }} 小時</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">開始時間</div>
+                            <div class="detail-value">{{ supplement_report.start_time|time:"H:i" }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">結束時間</div>
+                            <div class="detail-value">{{ supplement_report.end_time|time:"H:i" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 駁回表單 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card reject-confirm-card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-times"></i> 駁回確認
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="rejection_remarks" class="form-label">駁回原因 <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="rejection_remarks" name="rejection_remarks" rows="3" 
+                                      placeholder="請輸入駁回原因，例如：資料不正確、數量異常、時間錯誤等" required></textarea>
+                            <div class="form-text">請詳細說明駁回原因，以便後續修正</div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'workorder:smt_supplement_report_detail' supplement_report.id %}" 
+                               class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> 取消
+                            </a>
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('確定要駁回此記錄嗎？')">
+                                <i class="fas fa-times"></i> 確認駁回
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // 卡片懸停效果
+        $('.reject-confirm-card').hover(
+            function() {
+                $(this).addClass('shadow-lg');
+            },
+            function() {
+                $(this).removeClass('shadow-lg');
+            }
+        );
+        
+        // 表單驗證
+        $('form').on('submit', function(e) {
+            const remarks = $('#rejection_remarks').val().trim();
+            if (!remarks) {
+                alert('請輸入駁回原因');
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
+</script>
+{% endblock %} 

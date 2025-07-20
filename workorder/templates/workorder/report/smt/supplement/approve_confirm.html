@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}核准SMT補登報工記錄{% endblock %}
+
+{% block extra_css %}
+<style>
+    .approve-confirm-card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        transition: all 0.3s ease;
+    }
+    
+    .approve-confirm-card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .detail-section {
+        margin-bottom: 1rem;
+    }
+    
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f8f9fa;
+    }
+    
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+    
+    .detail-label {
+        font-weight: 600;
+        color: #495057;
+        min-width: 120px;
+    }
+    
+    .detail-value {
+        color: #212529;
+        text-align: right;
+    }
+    
+    .warning-alert {
+        border-left: 4px solid #ffc107;
+        background-color: #fff3cd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-check-circle text-success"></i> 核准SMT補登報工記錄
+                    </h2>
+                    <p class="text-muted mb-0">確認核准此筆補登報工記錄</p>
+                </div>
+                <div>
+                    <a href="{% url 'workorder:smt_supplement_report_detail' supplement_report.id %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回詳情
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 警告提示 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert warning-alert" role="alert">
+                <h5 class="alert-heading">
+                    <i class="fas fa-exclamation-triangle text-warning"></i> 重要提醒
+                </h5>
+                <p class="mb-0">
+                    核准後此記錄將無法修改，只有超級管理員可以強制刪除。請確認所有資訊正確後再進行核准。
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 記錄資訊 -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card approve-confirm-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle"></i> 基本資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <div class="detail-item">
+                            <div class="detail-label">設備名稱</div>
+                            <div class="detail-value">{{ supplement_report.equipment.name }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">工單號</div>
+                            <div class="detail-value">{{ supplement_report.workorder.order_number }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">產品編號</div>
+                            <div class="detail-value">{{ supplement_report.workorder.product_code }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">工作日期</div>
+                            <div class="detail-value">{{ supplement_report.work_date|date:"Y-m-d" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card approve-confirm-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line"></i> 報工資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <div class="detail-item">
+                            <div class="detail-label">工作數量</div>
+                            <div class="detail-value">{{ supplement_report.work_quantity }} 件</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">工作時數</div>
+                            <div class="detail-value">{{ supplement_report.work_hours }} 小時</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">開始時間</div>
+                            <div class="detail-value">{{ supplement_report.start_time|time:"H:i" }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">結束時間</div>
+                            <div class="detail-value">{{ supplement_report.end_time|time:"H:i" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 核准表單 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card approve-confirm-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-check"></i> 核准確認
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="approval_remarks" class="form-label">核准備註（可選）</label>
+                            <textarea class="form-control" id="approval_remarks" name="approval_remarks" rows="3" 
+                                      placeholder="請輸入核准備註，例如：資料確認無誤、符合生產標準等"></textarea>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'workorder:smt_supplement_report_detail' supplement_report.id %}" 
+                               class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> 取消
+                            </a>
+                            <button type="submit" class="btn btn-success" onclick="return confirm('確定要核准此記錄嗎？核准後將無法修改。')">
+                                <i class="fas fa-check"></i> 確認核准
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // 卡片懸停效果
+        $('.approve-confirm-card').hover(
+            function() {
+                $(this).addClass('shadow-lg');
+            },
+            function() {
+                $(this).removeClass('shadow-lg');
+            }
+        );
+    });
+</script>
+{% endblock %} 

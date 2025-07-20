@@ -85,4 +85,17 @@ urlpatterns = [
     path('report/smt/on_site/', views.smt_on_site_report, name='smt_on_site_report'),
     path('report/smt/submit/', views.submit_smt_report, name='submit_smt_report'),
     path('api/get_workorders_by_equipment/', views.get_workorders_by_equipment, name='get_workorders_by_equipment'),
+    
+    # SMT補登報工功能
+    path('report/smt/supplement/', views.smt_supplement_report_index, name='smt_supplement_report_index'),
+    path('report/smt/supplement/create/', views.smt_supplement_report_create, name='smt_supplement_report_create'),
+    path('report/smt/supplement/edit/<int:report_id>/', views.smt_supplement_report_edit, name='smt_supplement_report_edit'),
+    path('report/smt/supplement/delete/<int:report_id>/', views.smt_supplement_report_delete, name='smt_supplement_report_delete'),
+    path('report/smt/supplement/detail/<int:report_id>/', views.smt_supplement_report_detail, name='smt_supplement_report_detail'),
+    path('report/smt/supplement/approve/<int:report_id>/', views.smt_supplement_report_approve, name='smt_supplement_report_approve'),
+    path('report/smt/supplement/reject/<int:report_id>/', views.smt_supplement_report_reject, name='smt_supplement_report_reject'),
+    path('api/smt/supplement/batch_create/', views.smt_supplement_batch_create, name='smt_supplement_batch_create'),
+    path('api/smt/get_workorders_by_equipment/', views.get_smt_workorders_by_equipment, name='get_smt_workorders_by_equipment'),
+    path('api/get_workorders_by_product/', views.get_workorders_by_product, name='get_workorders_by_product'),
+    path('api/get_workorder_details/', views.get_workorder_details, name='get_workorder_details'),
 ]

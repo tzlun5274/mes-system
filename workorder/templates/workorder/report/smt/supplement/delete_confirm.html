@@ -1,0 +1,348 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}刪除SMT補登報工記錄{% endblock %}
+
+{% block extra_css %}
+<style>
+    .delete-confirm-card {
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .delete-confirm-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .warning-section {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .detail-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .detail-item {
+        margin-bottom: 15px;
+    }
+    
+    .detail-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 5px;
+    }
+    
+    .detail-value {
+        color: #212529;
+        padding: 8px 12px;
+        background-color: white;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-weight: 500;
+    }
+    
+    .status-start {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-pause {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .status-complete {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-trash text-danger"></i> 刪除SMT補登報工記錄
+                    </h2>
+                    <p class="text-muted mb-0">確認刪除這筆SMT補登報工記錄</p>
+                </div>
+                <div>
+                    <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 警告訊息 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="warning-section">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exclamation-triangle text-warning fa-2x me-3"></i>
+                    <div>
+                        <h5 class="mb-1">⚠️ 刪除確認</h5>
+                        <p class="mb-0">您即將刪除一筆SMT補登報工記錄，此操作無法復原。請仔細確認以下資訊後再進行刪除。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 記錄資訊 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card delete-confirm-card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle"></i> 要刪除的記錄資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="detail-section">
+                                <h6><i class="fas fa-cogs"></i> 設備資訊</h6>
+                                <div class="detail-item">
+                                    <div class="detail-label">設備名稱</div>
+                                    <div class="detail-value">{{ supplement_report.equipment.name }}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">設備型號</div>
+                                    <div class="detail-value">{{ supplement_report.equipment.model|default:"未設定" }}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">設備狀態</div>
+                                    <div class="detail-value">
+                                        <span class="status-badge status-{{ supplement_report.equipment.status }}">
+                                            {{ supplement_report.equipment.get_status_display }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="detail-section">
+                                <h6><i class="fas fa-file-alt"></i> 工單資訊</h6>
+                                <div class="detail-item">
+                                    <div class="detail-label">工單號</div>
+                                    <div class="detail-value">{{ supplement_report.workorder.order_number }}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">產品編號</div>
+                                    <div class="detail-value">{{ supplement_report.workorder.product_code }}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">工單狀態</div>
+                                    <div class="detail-value">
+                                        <span class="badge {% if supplement_report.workorder.status == 'completed' %}bg-success{% elif supplement_report.workorder.status == 'in_progress' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                            {{ supplement_report.workorder.get_status_display }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="detail-section">
+                                <h6><i class="fas fa-chart-line"></i> 報工資訊</h6>
+                                <div class="detail-item">
+                                    <div class="detail-label">報工時間</div>
+                                    <div class="detail-value">{{ supplement_report.report_time|date:"Y-m-d H:i:s" }}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">報工狀態</div>
+                                    <div class="detail-value">
+                                        <span class="status-badge status-{{ supplement_report.production_status }}">
+                                            {{ supplement_report.get_production_status_display }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">報工數量</div>
+                                    <div class="detail-value">{{ supplement_report.quantity }} 件</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">工作時數</div>
+                                    <div class="detail-value">{{ supplement_report.hours }} 小時</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="detail-section">
+                                <h6><i class="fas fa-clock"></i> 時間資訊</h6>
+                                <div class="detail-item">
+                                    <div class="detail-label">記錄建立時間</div>
+                                    <div class="detail-value">{{ supplement_report.created_at|date:"Y-m-d H:i:s" }}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">最後更新時間</div>
+                                    <div class="detail-value">{{ supplement_report.updated_at|date:"Y-m-d H:i:s" }}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">記錄ID</div>
+                                    <div class="detail-value">#{{ supplement_report.id }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if supplement_report.notes %}
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="detail-section">
+                                <h6><i class="fas fa-sticky-note"></i> 備註說明</h6>
+                                <div class="detail-item">
+                                    <div class="detail-value" style="white-space: pre-wrap;">{{ supplement_report.notes }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 刪除確認表單 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card delete-confirm-card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-check-circle"></i> 確認刪除
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="delete_form">
+                        {% csrf_token %}
+                        
+                        <div class="alert alert-danger">
+                            <h6><i class="fas fa-exclamation-triangle"></i> 重要提醒</h6>
+                            <ul class="mb-0">
+                                <li>刪除後此記錄將無法復原</li>
+                                <li>相關的統計資料可能會受到影響</li>
+                                <li>請確認您真的要刪除這筆記錄</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="confirm_delete" required>
+                            <label class="form-check-label" for="confirm_delete">
+                                我確認要刪除這筆SMT補登報工記錄，並了解此操作無法復原
+                            </label>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <button type="submit" class="btn btn-danger" id="delete_btn" disabled>
+                                    <i class="fas fa-trash"></i> 確認刪除
+                                </button>
+                                <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times"></i> 取消
+                                </a>
+                            </div>
+                            <div>
+                                <a href="{% url 'workorder:smt_supplement_report_edit' supplement_report.id %}" class="btn btn-warning">
+                                    <i class="fas fa-edit"></i> 編輯記錄
+                                </a>
+                                <a href="{% url 'workorder:smt_supplement_report_detail' supplement_report.id %}" class="btn btn-info">
+                                    <i class="fas fa-eye"></i> 查看詳情
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 刪除確認專用 JavaScript
+    $(document).ready(function() {
+        // 卡片懸停效果
+        $('.delete-confirm-card').hover(
+            function() {
+                $(this).addClass('shadow-lg');
+            },
+            function() {
+                $(this).removeClass('shadow-lg');
+            }
+        );
+        
+        // 確認勾選框控制刪除按鈕
+        $('#confirm_delete').on('change', function() {
+            if ($(this).is(':checked')) {
+                $('#delete_btn').prop('disabled', false);
+            } else {
+                $('#delete_btn').prop('disabled', true);
+            }
+        });
+        
+        // 表單提交確認
+        $('#delete_form').on('submit', function(e) {
+            if (!$('#confirm_delete').is(':checked')) {
+                e.preventDefault();
+                alert('請先勾選確認刪除選項');
+                return false;
+            }
+            
+            // 最終確認
+            if (!confirm('確定要刪除這筆SMT補登報工記錄嗎？此操作無法復原！')) {
+                e.preventDefault();
+                return false;
+            }
+            
+            // 顯示載入中
+            showLoading();
+        });
+    });
+    
+    // 顯示載入中
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 刪除中...</div>';
+        loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.2);z-index:9999;';
+        document.body.appendChild(loadingDiv);
+    }
+    
+    // 隱藏載入中
+    function hideLoading() {
+        const loadingDiv = document.getElementById('loading');
+        if (loadingDiv) {
+            loadingDiv.remove();
+        }
+    }
+</script>
+{% endblock %} 
