@@ -4321,7 +4321,6 @@ def operator_supplement_report_index(request):
     pending_reports = OperatorSupplementReport.objects.filter(approval_status='pending').count()
     approved_reports = OperatorSupplementReport.objects.filter(approval_status='approved').count()
     rejected_reports = OperatorSupplementReport.objects.filter(approval_status='rejected').count()
-    draft_reports = OperatorSupplementReport.objects.filter(approval_status='draft').count()
     
     # 取得篩選選項
     from process.models import Operator, ProcessName
@@ -4336,7 +4335,6 @@ def operator_supplement_report_index(request):
         'pending_reports': pending_reports,
         'approved_reports': approved_reports,
         'rejected_reports': rejected_reports,
-        'draft_reports': draft_reports,
         'operator_list': operator_list,
         'process_list': process_list,
         'selected_operator': operator,
@@ -4692,7 +4690,7 @@ def operator_supplement_batch_create(request):
                 is_completed=False,
                 remarks=notes,
                 abnormal_notes='',
-                approval_status='draft',
+                approval_status='pending',
                 created_by=request.user.username
             )
             supplement_report.save()

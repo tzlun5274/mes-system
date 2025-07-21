@@ -908,7 +908,6 @@ class OperatorSupplementReport(models.Model):
     
     # 核准狀態
     APPROVAL_STATUS_CHOICES = [
-        ('draft', '草稿'),
         ('pending', '待審核'),
         ('approved', '已審核'),
         ('rejected', '已駁回'),
@@ -917,7 +916,7 @@ class OperatorSupplementReport(models.Model):
     approval_status = models.CharField(
         max_length=20,
         choices=APPROVAL_STATUS_CHOICES,
-        default='draft',
+        default='pending',
         verbose_name="審核狀態",
         help_text="補登記錄的審核狀態，已審核的記錄不可修改"
     )

@@ -78,10 +78,7 @@
         color: #721c24;
     }
     
-    .status-draft {
-        background-color: #e2e3e5;
-        color: #383d41;
-    }
+
     
     .action-buttons {
         display: flex;
@@ -146,6 +143,10 @@
         background-color: #6c757d;
     }
     
+    .timeline-item.pending::before {
+        background-color: #ffc107;
+    }
+    
     .timeline-content {
         background-color: #fff;
         padding: 10px;
@@ -203,7 +204,7 @@
                             <i class="fas fa-info-circle"></i> 報工狀態
                         </h5>
                         <div class="action-buttons">
-                            {% if report.status == 'draft' %}
+                            {% if report.approval_status == 'pending' or report.approval_status == 'draft' or user.is_superuser %}
                             <a href="{% url 'workorder:operator_supplement_report_edit' report.id %}" class="btn btn-warning btn-sm">
                                 <i class="fas fa-edit"></i> 編輯
                             </a>
@@ -211,7 +212,7 @@
                                 <i class="fas fa-trash"></i> 刪除
                             </a>
                             {% endif %}
-                            {% if report.status == 'pending' and user.is_staff %}
+                            {% if report.approval_status == 'pending' and user.is_staff %}
                             <a href="#" class="btn btn-success btn-sm" onclick="approveReport({{ report.id }})">
                                 <i class="fas fa-check"></i> 審核通過
                             </a>
@@ -235,8 +236,8 @@
                             <div class="detail-item">
                                 <span class="detail-label">審核狀態：</span>
                                 <span class="detail-value">
-                                    <span class="status-badge status-{{ report.status }}">
-                                        {{ report.get_status_display }}
+                                    <span class="status-badge status-{{ report.approval_status }}">
+                                        {{ report.get_approval_status_display }}
                                     </span>
                                 </span>
                             </div>
@@ -252,12 +253,12 @@
                         <div class="col-md-6">
                             <div class="detail-item">
                                 <span class="detail-label">建立人員：</span>
-                                <span class="detail-value">{{ report.created_by.get_full_name|default:report.created_by.username }}</span>
+                                <span class="detail-value">{{ report.created_by|default:"系統" }}</span>
                             </div>
                             {% if report.approved_by %}
                             <div class="detail-item">
                                 <span class="detail-label">審核人員：</span>
-                                <span class="detail-value">{{ report.approved_by.get_full_name|default:report.approved_by.username }}</span>
+                                <span class="detail-value">{{ report.approved_by|default:"-" }}</span>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">審核時間：</span>
@@ -293,15 +294,15 @@
                             <div class="col-md-6">
                                 <div class="detail-item">
                                     <span class="detail-label">作業員：</span>
-                                    <span class="detail-value">{{ report.operator.name }} ({{ report.operator.employee_id }})</span>
+                                    <span class="detail-value">{{ report.operator.name }} ({{ report.operator.id }})</span>
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">工單號：</span>
-                                    <span class="detail-value">{{ report.workorder.workorder_number }}</span>
+                                    <span class="detail-value">{{ report.workorder.order_number }}</span>
                                 </div>
                                 <div class="detail-item">
-                                    <span class="detail-label">產品名稱：</span>
-                                    <span class="detail-value">{{ report.workorder.product_name }}</span>
+                                    <span class="detail-label">產品編號：</span>
+                                    <span class="detail-value">{{ report.workorder.product_code }}</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -311,11 +312,11 @@
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">工序代號：</span>
-                                    <span class="detail-value">{{ report.process.code }}</span>
+                                    <span class="detail-value">{{ report.process.id }}</span>
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">工序描述：</span>
-                                    <span class="detail-value">{{ report.process.description|default:"-" }}</span>
+                                    <span class="detail-value">-</span>
                                 </div>
                             </div>
                         </div>
@@ -341,7 +342,7 @@
                             <div class="col-md-6">
                                 <div class="detail-item">
                                     <span class="detail-label">報工日期：</span>
-                                    <span class="detail-value">{{ report.report_time|date:"Y-m-d" }}</span>
+                                    <span class="detail-value">{{ report.work_date|date:"Y-m-d" }}</span>
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">開始時間：</span>
@@ -355,11 +356,11 @@
                             <div class="col-md-6">
                                 <div class="detail-item">
                                     <span class="detail-label">工時：</span>
-                                    <span class="detail-value">{{ report.work_hours }} 小時</span>
+                                    <span class="detail-value">{{ report.work_hours|floatformat:2 }} 小時</span>
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">報工時間：</span>
-                                    <span class="detail-value">{{ report.report_time|date:"Y-m-d H:i" }}</span>
+                                    <span class="detail-value">{{ report.work_date|date:"Y-m-d" }} {{ report.start_time|time:"H:i" }}</span>
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">時間區間：</span>
@@ -388,30 +389,30 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="detail-item">
-                                    <span class="detail-label">報工數量：</span>
-                                    <span class="detail-value">{{ report.quantity }}</span>
+                                    <span class="detail-label">工作數量：</span>
+                                    <span class="detail-value">{{ report.work_quantity }}</span>
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">良品數量：</span>
-                                    <span class="detail-value">{{ report.good_quantity|default:"-" }}</span>
+                                    <span class="detail-value">{{ report.work_quantity }}</span>
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">不良品數量：</span>
-                                    <span class="detail-value">{{ report.defect_quantity|default:"-" }}</span>
+                                    <span class="detail-value">{{ report.defect_quantity }}</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="detail-item">
                                     <span class="detail-label">良率：</span>
-                                    <span class="detail-value">{{ report.yield_rate|default:"-" }}%</span>
+                                    <span class="detail-value">{{ report.yield_rate|floatformat:2 }}%</span>
                                 </div>
                                 <div class="detail-item">
-                                    <span class="detail-label">效率：</span>
-                                    <span class="detail-value">{{ report.efficiency|default:"-" }}%</span>
+                                    <span class="detail-label">總數量：</span>
+                                    <span class="detail-value">{{ report.total_quantity }}</span>
                                 </div>
                                 <div class="detail-item">
-                                    <span class="detail-label">單位產出：</span>
-                                    <span class="detail-value">{{ report.unit_output|default:"-" }}</span>
+                                    <span class="detail-label">是否完工：</span>
+                                    <span class="detail-value">{{ report.is_completed|yesno:"是,否" }}</span>
                                 </div>
                             </div>
                         </div>
@@ -432,10 +433,10 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    {% if report.notes %}
+                    {% if report.remarks %}
                     <div class="notes-section">
                         <h6>報工備註</h6>
-                        <div class="notes-content">{{ report.notes }}</div>
+                        <div class="notes-content">{{ report.remarks }}</div>
                     </div>
                     {% endif %}
                     
@@ -452,7 +453,6 @@
     {% endif %}
 
     <!-- 審核歷程 -->
-    {% if report.audit_logs %}
     <div class="row mb-4">
         <div class="col-12">
             <div class="card operator-supplement-detail-card">
@@ -463,39 +463,52 @@
                 </div>
                 <div class="card-body">
                     <div class="timeline">
-                        {% for log in report.audit_logs %}
-                        <div class="timeline-item {{ log.action }}">
+                        <div class="timeline-item {% if not report.approved_by %}{% if report.approval_status == 'pending' %}pending{% elif report.approval_status == 'approved' %}approved{% elif report.approval_status == 'rejected' %}rejected{% endif %}{% else %}draft{% endif %}">
                             <div class="timeline-content">
-                                <div class="timeline-title">{{ log.get_action_display }}</div>
-                                <div class="timeline-time">{{ log.created_at|date:"Y-m-d H:i:s" }}</div>
+                                <div class="timeline-title">建立記錄</div>
+                                <div class="timeline-time">{{ report.created_at|date:"Y-m-d H:i:s" }}</div>
                                 <div class="timeline-description">
-                                    {% if log.action == 'created' %}
-                                        由 {{ log.user.get_full_name|default:log.user.username }} 建立
-                                    {% elif log.action == 'updated' %}
-                                        由 {{ log.user.get_full_name|default:log.user.username }} 更新
-                                    {% elif log.action == 'approved' %}
-                                        由 {{ log.user.get_full_name|default:log.user.username }} 審核通過
-                                    {% elif log.action == 'rejected' %}
-                                        由 {{ log.user.get_full_name|default:log.user.username }} 駁回
-                                        {% if log.notes %}<br>駁回原因：{{ log.notes }}{% endif %}
+                                    由 {{ report.created_by }} 建立
+                                </div>
+                            </div>
+                        </div>
+                        {% if report.approved_by %}
+                        <div class="timeline-item {% if report.approval_status == 'approved' %}approved{% elif report.approval_status == 'rejected' %}rejected{% else %}draft{% endif %}">
+                            <div class="timeline-content">
+                                <div class="timeline-title">
+                                    {% if report.approval_status == 'approved' %}
+                                        審核通過
+                                    {% elif report.approval_status == 'rejected' %}
+                                        審核駁回
+                                    {% else %}
+                                        狀態更新
+                                    {% endif %}
+                                </div>
+                                <div class="timeline-time">{{ report.approved_at|date:"Y-m-d H:i:s" }}</div>
+                                <div class="timeline-description">
+                                    由 {{ report.approved_by }} 
+                                    {% if report.approval_status == 'approved' %}
+                                        審核通過
+                                    {% elif report.approval_status == 'rejected' %}
+                                        駁回
+                                        {% if report.rejection_reason %}<br>駁回原因：{{ report.rejection_reason }}{% endif %}
                                     {% endif %}
                                 </div>
                             </div>
                         </div>
-                        {% endfor %}
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
     // 作業員補登報工詳情專用 JavaScript
-    $(document).ready(function() {
+    document.addEventListener('DOMContentLoaded', function() {
         // 自動隱藏訊息提示
         setTimeout(function() {
             const alerts = document.querySelectorAll('.alert');
@@ -516,23 +529,33 @@
     function deleteReport(reportId) {
         if (confirmAction('確定要刪除此補登報工記錄嗎？此操作無法復原。')) {
             showLoading();
-            $.post('/workorder/report/operator/supplement/delete/' + reportId + '/', {
-                csrfmiddlewaretoken: '{{ csrf_token }}'
+            
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch('/workorder/report/operator/supplement/delete/' + reportId + '/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
             })
-            .done(function(response) {
+            .then(response => response.json())
+            .then(data => {
                 hideLoading();
-                if (response.success) {
+                if (data.success) {
                     showAlert('刪除成功！', 'success');
                     setTimeout(function() {
                         window.location.href = '/workorder/report/operator/supplement/';
                     }, 1500);
                 } else {
-                    showAlert(response.message || '刪除失敗！', 'danger');
+                    showAlert(data.message || '刪除失敗！', 'danger');
                 }
             })
-            .fail(function() {
+            .catch(error => {
                 hideLoading();
                 showAlert('系統錯誤，請稍後再試！', 'danger');
+                console.error('Error:', error);
             });
         }
     }
@@ -541,23 +564,33 @@
     function approveReport(reportId) {
         if (confirmAction('確定要審核通過此補登報工記錄嗎？')) {
             showLoading();
-            $.post('/workorder/report/operator/supplement/approve/' + reportId + '/', {
-                csrfmiddlewaretoken: '{{ csrf_token }}'
+            
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch('/workorder/report/operator/supplement/approve/' + reportId + '/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
             })
-            .done(function(response) {
+            .then(response => response.json())
+            .then(data => {
                 hideLoading();
-                if (response.success) {
+                if (data.success) {
                     showAlert('審核通過成功！', 'success');
                     setTimeout(function() {
                         location.reload();
                     }, 1500);
                 } else {
-                    showAlert(response.message || '審核失敗！', 'danger');
+                    showAlert(data.message || '審核失敗！', 'danger');
                 }
             })
-            .fail(function() {
+            .catch(error => {
                 hideLoading();
                 showAlert('系統錯誤，請稍後再試！', 'danger');
+                console.error('Error:', error);
             });
         }
     }
@@ -567,24 +600,34 @@
         const reason = prompt('請輸入駁回原因：');
         if (reason !== null) {
             showLoading();
-            $.post('/workorder/report/operator/supplement/reject/' + reportId + '/', {
-                reason: reason,
-                csrfmiddlewaretoken: '{{ csrf_token }}'
+            
+            const formData = new FormData();
+            formData.append('reason', reason);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch('/workorder/report/operator/supplement/reject/' + reportId + '/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
             })
-            .done(function(response) {
+            .then(response => response.json())
+            .then(data => {
                 hideLoading();
-                if (response.success) {
+                if (data.success) {
                     showAlert('駁回成功！', 'success');
                     setTimeout(function() {
                         location.reload();
                     }, 1500);
                 } else {
-                    showAlert(response.message || '駁回失敗！', 'danger');
+                    showAlert(data.message || '駁回失敗！', 'danger');
                 }
             })
-            .fail(function() {
+            .catch(error => {
                 hideLoading();
                 showAlert('系統錯誤，請稍後再試！', 'danger');
+                console.error('Error:', error);
             });
         }
     }

@@ -251,7 +251,7 @@
                                 </div>
                                 <div class="summary-item">
                                     <span class="summary-label">建立人員：</span>
-                                    <span class="summary-value">{{ report.created_by.get_full_name|default:report.created_by.username }}</span>
+                                    <span class="summary-value">{{ report.created_by|default:"系統" }}</span>
                                 </div>
                             </div>
                         </div>

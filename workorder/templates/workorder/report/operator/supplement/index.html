@@ -81,10 +81,7 @@
         color: #721c24;
     }
     
-    .status-draft {
-        background-color: #e2e3e5;
-        color: #383d41;
-    }
+
     
     .search-filters {
         background-color: #f8f9fa;
@@ -152,12 +149,7 @@
                 <div class="operator-stat-label">已駁回</div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="operator-stat-card">
-                <div class="operator-stat-number text-info">{{ draft_reports|default:0 }}</div>
-                <div class="operator-stat-label">草稿</div>
-            </div>
-        </div>
+
     </div>
 
     <!-- 功能按鈕 -->
@@ -243,7 +235,6 @@
                                     <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>待審核</option>
                                     <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>已審核</option>
                                     <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>已駁回</option>
-                                    <option value="draft" {% if selected_status == 'draft' %}selected{% endif %}>草稿</option>
                                 </select>
                             </div>
                         </div>
@@ -321,7 +312,7 @@
                                                 <a href="{% url 'workorder:operator_supplement_report_detail' report.id %}" class="btn btn-outline-primary">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
-                                                {% if report.status == 'draft' %}
+                                                {% if report.status == 'pending' or report.status == 'rejected' %}
                                                 <a href="{% url 'workorder:operator_supplement_report_edit' report.id %}" class="btn btn-outline-warning">
                                                     <i class="fas fa-edit"></i>
                                                 </a>
