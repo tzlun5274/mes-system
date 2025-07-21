@@ -4282,6 +4282,8 @@ def operator_supplement_report_index(request):
     """
     from datetime import date
     from django.core.paginator import Paginator
+    from django.db.models import Q
+    from .models import OperatorSupplementReport
     
     # 取得篩選參數
     operator = request.GET.get('operator')
@@ -4291,9 +4293,24 @@ def operator_supplement_report_index(request):
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
     
-    # 這裡需要根據實際的補登報工記錄模型進行查詢
-    # 暫時使用空的查詢集
-    supplement_reports = []
+    # 查詢補登報工記錄
+    supplement_reports = OperatorSupplementReport.objects.select_related(
+        'operator', 'workorder', 'process'
+    ).all()
+    
+    # 應用篩選條件
+    if operator:
+        supplement_reports = supplement_reports.filter(operator__name__icontains=operator)
+    if workorder:
+        supplement_reports = supplement_reports.filter(workorder__order_number__icontains=workorder)
+    if process:
+        supplement_reports = supplement_reports.filter(process__name__icontains=process)
+    if status:
+        supplement_reports = supplement_reports.filter(approval_status=status)
+    if date_from:
+        supplement_reports = supplement_reports.filter(work_date__gte=date_from)
+    if date_to:
+        supplement_reports = supplement_reports.filter(work_date__lte=date_to)
     
     # 分頁
     paginator = Paginator(supplement_reports, 20)
@@ -4301,10 +4318,10 @@ def operator_supplement_report_index(request):
     page_obj = paginator.get_page(page_number)
     
     # 取得統計資料
-    pending_reports = 0
-    approved_reports = 0
-    rejected_reports = 0
-    draft_reports = 0
+    pending_reports = OperatorSupplementReport.objects.filter(approval_status='pending').count()
+    approved_reports = OperatorSupplementReport.objects.filter(approval_status='approved').count()
+    rejected_reports = OperatorSupplementReport.objects.filter(approval_status='rejected').count()
+    draft_reports = OperatorSupplementReport.objects.filter(approval_status='draft').count()
     
     # 取得篩選選項
     from process.models import Operator, ProcessName
@@ -4339,27 +4356,44 @@ def operator_supplement_report_create(request):
     """
     from datetime import date, time
     from process.models import Operator, ProcessName
+    from .forms import OperatorSupplementReportForm
     
     if request.method == 'POST':
-        # 這裡需要實作表單處理邏輯
-        messages.success(request, '補登報工記錄建立成功！')
-        return redirect('workorder:operator_supplement_report_index')
-    
-    # 取得選項資料
-    operator_list = Operator.objects.all().order_by('name')
-    workorder_list = WorkOrder.objects.filter(
-        status__in=['in_progress', 'completed']
-    ).order_by('-created_at')
-    process_list = ProcessName.objects.filter(
-        ~Q(name__icontains='SMT')  # 排除SMT相關工序
-    ).order_by('name')
+        form = OperatorSupplementReportForm(request.POST)
+        form.request = request  # 傳遞request給表單
+        
+        if form.is_valid():
+            # 處理時間欄位
+            start_time_str = form.cleaned_data['start_time']
+            end_time_str = form.cleaned_data['end_time']
+            
+            try:
+                from datetime import datetime
+                start_time = datetime.strptime(start_time_str, '%H:%M').time()
+                end_time = datetime.strptime(end_time_str, '%H:%M').time()
+                
+                # 創建補登記錄
+                supplement_report = form.save(commit=False)
+                supplement_report.start_time = start_time
+                supplement_report.end_time = end_time
+                supplement_report.created_by = request.user.username
+                supplement_report.save()
+                
+                messages.success(request, '作業員補登報工記錄建立成功！')
+                return redirect('workorder:operator_supplement_report_index')
+                
+            except ValueError:
+                form.add_error('start_time', '時間格式錯誤')
+                form.add_error('end_time', '時間格式錯誤')
+        else:
+            messages.error(request, '表單驗證失敗，請檢查輸入資料')
+    else:
+        form = OperatorSupplementReportForm()
     
     context = {
-        'operator_list': operator_list,
-        'workorder_list': workorder_list,
-        'process_list': process_list,
-        'today': date.today().strftime('%Y-%m-%d'),
-        'current_time': datetime.now().time().strftime('%H:%M'),
+        'form': form,
+        'is_create': True,
+        'page_title': '新增作業員補登報工記錄',
     }
     
     return render(request, 'workorder/report/operator/supplement/form.html', context)
@@ -4371,36 +4405,61 @@ def operator_supplement_report_edit(request, report_id):
     """
     from datetime import date, time
     from process.models import Operator, ProcessName
+    from .models import OperatorSupplementReport
+    from .forms import OperatorSupplementReportForm
     
-    # 這裡需要根據實際的補登報工記錄模型取得資料
-    # 暫時使用None
-    report = None
-    
-    if not report:
+    try:
+        report = OperatorSupplementReport.objects.get(id=report_id)
+    except OperatorSupplementReport.DoesNotExist:
         messages.error(request, '找不到指定的補登報工記錄')
         return redirect('workorder:operator_supplement_report_index')
     
-    if request.method == 'POST':
-        # 這裡需要實作表單處理邏輯
-        messages.success(request, '補登報工記錄更新成功！')
-        return redirect('workorder:operator_supplement_report_index')
+    # 檢查權限
+    if not report.can_edit(request.user):
+        messages.error(request, '您沒有權限編輯此記錄')
+        return redirect('workorder:operator_supplement_report_detail', report_id=report_id)
     
-    # 取得選項資料
-    operator_list = Operator.objects.all().order_by('name')
-    workorder_list = WorkOrder.objects.filter(
-        status__in=['in_progress', 'completed']
-    ).order_by('-created_at')
-    process_list = ProcessName.objects.filter(
-        ~Q(name__icontains='SMT')  # 排除SMT相關工序
-    ).order_by('name')
+    if request.method == 'POST':
+        form = OperatorSupplementReportForm(request.POST, instance=report)
+        form.request = request  # 傳遞request給表單
+        
+        if form.is_valid():
+            # 處理時間欄位
+            start_time_str = form.cleaned_data['start_time']
+            end_time_str = form.cleaned_data['end_time']
+            
+            try:
+                from datetime import datetime
+                start_time = datetime.strptime(start_time_str, '%H:%M').time()
+                end_time = datetime.strptime(end_time_str, '%H:%M').time()
+                
+                # 更新補登記錄
+                supplement_report = form.save(commit=False)
+                supplement_report.start_time = start_time
+                supplement_report.end_time = end_time
+                supplement_report.save()
+                
+                messages.success(request, '作業員補登報工記錄更新成功！')
+                return redirect('workorder:operator_supplement_report_index')
+                
+            except ValueError:
+                form.add_error('start_time', '時間格式錯誤')
+                form.add_error('end_time', '時間格式錯誤')
+        else:
+            messages.error(request, '表單驗證失敗，請檢查輸入資料')
+    else:
+        # 初始化表單，將時間轉換為字串格式
+        initial_data = {
+            'start_time': report.start_time.strftime('%H:%M') if report.start_time else '',
+            'end_time': report.end_time.strftime('%H:%M') if report.end_time else '',
+        }
+        form = OperatorSupplementReportForm(instance=report, initial=initial_data)
     
     context = {
+        'form': form,
         'report': report,
-        'operator_list': operator_list,
-        'workorder_list': workorder_list,
-        'process_list': process_list,
-        'today': date.today().strftime('%Y-%m-%d'),
-        'current_time': datetime.now().time().strftime('%H:%M'),
+        'is_create': False,
+        'page_title': '編輯作業員補登報工記錄',
     }
     
     return render(request, 'workorder/report/operator/supplement/form.html', context)
@@ -4413,14 +4472,30 @@ def operator_supplement_report_delete(request, report_id):
     AJAX：刪除作業員補登報工記錄
     """
     try:
-        # 這裡需要根據實際的補登報工記錄模型進行刪除
-        # 暫時返回成功訊息
+        from .models import OperatorSupplementReport
+        
+        report = OperatorSupplementReport.objects.get(id=report_id)
+        
+        # 檢查權限
+        if not report.can_delete(request.user):
+            return JsonResponse({
+                'success': False,
+                'message': '您沒有權限刪除此記錄'
+            })
+        
+        # 刪除記錄
+        report.delete()
         
         return JsonResponse({
             'success': True,
             'message': '刪除成功！'
         })
         
+    except OperatorSupplementReport.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的補登報工記錄'
+        })
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -4432,11 +4507,13 @@ def operator_supplement_report_detail(request, report_id):
     """
     作業員補登報工詳情頁面
     """
-    # 這裡需要根據實際的補登報工記錄模型取得資料
-    # 暫時使用None
-    report = None
+    from .models import OperatorSupplementReport
     
-    if not report:
+    try:
+        report = OperatorSupplementReport.objects.select_related(
+            'operator', 'workorder', 'process'
+        ).get(id=report_id)
+    except OperatorSupplementReport.DoesNotExist:
         messages.error(request, '找不到指定的補登報工記錄')
         return redirect('workorder:operator_supplement_report_index')
     
@@ -4447,60 +4524,88 @@ def operator_supplement_report_detail(request, report_id):
     return render(request, 'workorder/report/operator/supplement/detail.html', context)
 
 
+@require_POST
+@csrf_exempt
 def operator_supplement_report_approve(request, report_id):
     """
-    作業員補登報工審核通過頁面
+    AJAX：作業員補登報工審核通過
     """
-    from datetime import date, time
-    
-    # 這裡需要根據實際的補登報工記錄模型取得資料
-    # 暫時使用None
-    report = None
-    
-    if not report:
-        messages.error(request, '找不到指定的補登報工記錄')
-        return redirect('workorder:operator_supplement_report_index')
-    
-    if request.method == 'POST':
-        # 這裡需要實作審核邏輯
-        messages.success(request, '審核通過成功！')
-        return redirect('workorder:operator_supplement_report_detail', report_id=report_id)
-    
-    context = {
-        'report': report,
-        'today': date.today().strftime('%Y-%m-%d'),
-        'current_time': time.now().strftime('%H:%M'),
-    }
-    
-    return render(request, 'workorder/report/operator/supplement/approve_confirm.html', context)
+    try:
+        from .models import OperatorSupplementReport
+        
+        report = OperatorSupplementReport.objects.get(id=report_id)
+        
+        # 檢查權限
+        if not report.can_approve(request.user):
+            return JsonResponse({
+                'success': False,
+                'message': '您沒有權限審核此記錄'
+            })
+        
+        # 審核通過
+        remarks = request.POST.get('remarks', '')
+        report.approve(request.user, remarks)
+        
+        return JsonResponse({
+            'success': True,
+            'message': '審核通過成功！'
+        })
+        
+    except OperatorSupplementReport.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的補登報工記錄'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'審核失敗：{str(e)}'
+        })
 
 
+@require_POST
+@csrf_exempt
 def operator_supplement_report_reject(request, report_id):
     """
-    作業員補登報工駁回頁面
+    AJAX：作業員補登報工駁回
     """
-    from datetime import date, time
-    
-    # 這裡需要根據實際的補登報工記錄模型取得資料
-    # 暫時使用None
-    report = None
-    
-    if not report:
-        messages.error(request, '找不到指定的補登報工記錄')
-        return redirect('workorder:operator_supplement_report_index')
-    
-    if request.method == 'POST':
-        # 這裡需要實作駁回邏輯
-        messages.success(request, '駁回成功！')
-        return redirect('workorder:operator_supplement_report_detail', report_id=report_id)
-    
-    context = {
-        'report': report,
-        'today': date.today().strftime('%Y-%m-%d'),
-        'current_time': time.now().strftime('%H:%M'),
-    }
-    
-    return render(request, 'workorder/report/operator/supplement/reject_confirm.html', context)
+    try:
+        from .models import OperatorSupplementReport
+        
+        report = OperatorSupplementReport.objects.get(id=report_id)
+        
+        # 檢查權限
+        if not report.can_approve(request.user):
+            return JsonResponse({
+                'success': False,
+                'message': '您沒有權限駁回此記錄'
+            })
+        
+        # 駁回
+        reason = request.POST.get('reason', '')
+        if not reason:
+            return JsonResponse({
+                'success': False,
+                'message': '請填寫駁回原因'
+            })
+        
+        report.reject(request.user, reason)
+        
+        return JsonResponse({
+            'success': True,
+            'message': '駁回成功！'
+        })
+        
+    except OperatorSupplementReport.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的補登報工記錄'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'駁回失敗：{str(e)}'
+        })
 
 
 def operator_supplement_batch(request):
@@ -4541,11 +4646,65 @@ def operator_supplement_batch_create(request):
     AJAX：批量建立作業員補登報工記錄
     """
     try:
-        # 這裡需要實作批量建立邏輯
+        from .models import OperatorSupplementReport
+        from .forms import OperatorSupplementBatchForm
+        from datetime import datetime, timedelta
+        
+        form = OperatorSupplementBatchForm(request.POST)
+        
+        if not form.is_valid():
+            return JsonResponse({
+                'success': False,
+                'message': '表單驗證失敗',
+                'errors': form.errors
+            })
+        
+        # 取得表單資料
+        operator = form.cleaned_data['operator']
+        workorder = form.cleaned_data['workorder']
+        process = form.cleaned_data['process']
+        start_date = form.cleaned_data['start_date']
+        end_date = form.cleaned_data['end_date']
+        daily_quantity = form.cleaned_data['daily_quantity']
+        start_time_str = form.cleaned_data['start_time']
+        end_time_str = form.cleaned_data['end_time']
+        notes = form.cleaned_data.get('notes', '')
+        
+        # 解析時間
+        start_time = datetime.strptime(start_time_str, '%H:%M').time()
+        end_time = datetime.strptime(end_time_str, '%H:%M').time()
+        
+        # 計算日期範圍
+        current_date = start_date
+        created_count = 0
+        
+        while current_date <= end_date:
+            # 創建補登記錄
+            supplement_report = OperatorSupplementReport(
+                operator=operator,
+                workorder=workorder,
+                process=process,
+                work_date=current_date,
+                start_time=start_time,
+                end_time=end_time,
+                work_quantity=daily_quantity,
+                defect_quantity=0,
+                is_completed=False,
+                remarks=notes,
+                abnormal_notes='',
+                approval_status='draft',
+                created_by=request.user.username
+            )
+            supplement_report.save()
+            created_count += 1
+            
+            # 移到下一天
+            current_date += timedelta(days=1)
         
         return JsonResponse({
             'success': True,
-            'message': '批量建立成功！'
+            'message': f'批量建立成功！共建立 {created_count} 筆記錄',
+            'created_count': created_count
         })
         
     except Exception as e:

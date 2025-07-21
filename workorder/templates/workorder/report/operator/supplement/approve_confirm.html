@@ -96,8 +96,8 @@
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:operator_report_index' %}">作業員報工</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_index' %}">補登報工</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_detail' report.id %}">詳情</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_report_index' %}">補登報工</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_report_detail' report.id %}">詳情</a></li>
                         <li class="breadcrumb-item active" aria-current="page">審核通過</li>
                     </ol>
                 </nav>
@@ -257,7 +257,7 @@
                             <button type="submit" class="btn btn-success btn-lg">
                                 <i class="fas fa-check"></i> 確認審核通過
                             </button>
-                            <a href="{% url 'workorder:operator_supplement_detail' report.id %}" class="btn btn-secondary btn-lg">
+                            <a href="{% url 'workorder:operator_supplement_report_detail' report.id %}" class="btn btn-secondary btn-lg">
                                 <i class="fas fa-times"></i> 取消
                             </a>
                         </div>

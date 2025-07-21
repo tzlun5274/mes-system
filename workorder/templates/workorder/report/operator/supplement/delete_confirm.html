@@ -129,8 +129,8 @@
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:operator_report_index' %}">作業員報工</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_index' %}">補登報工</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_detail' report.id %}">詳情</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_report_index' %}">補登報工</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_report_detail' report.id %}">詳情</a></li>
                         <li class="breadcrumb-item active" aria-current="page">刪除</li>
                     </ol>
                 </nav>
@@ -323,7 +323,7 @@
                             <button type="submit" class="btn btn-danger btn-lg" id="deleteButton" disabled>
                                 <i class="fas fa-trash"></i> 確認永久刪除
                             </button>
-                            <a href="{% url 'workorder:operator_supplement_detail' report.id %}" class="btn btn-secondary btn-lg">
+                            <a href="{% url 'workorder:operator_supplement_report_detail' report.id %}" class="btn btn-secondary btn-lg">
                                 <i class="fas fa-arrow-left"></i> 取消
                             </a>
                         </div>

@@ -773,3 +773,388 @@ class SMTProductionReport(models.Model):
 
 
 
+
+class OperatorSupplementReport(models.Model):
+    """
+    作業員補登報工記錄模型
+    專為作業員的歷史報工記錄管理而設計，支援離線數據輸入、歷史數據修正和批量數據處理
+    """
+    
+    # 基本資訊
+    operator = models.ForeignKey(
+        'process.Operator',
+        on_delete=models.CASCADE,
+        verbose_name="作業員",
+        help_text="請選擇進行補登報工的作業員"
+    )
+    
+    workorder = models.ForeignKey(
+        WorkOrder,
+        on_delete=models.CASCADE,
+        verbose_name="工單號碼",
+        help_text="請選擇要補登的工單號碼"
+    )
+    
+    # 工單預設生產數量（唯讀）
+    planned_quantity = models.IntegerField(
+        verbose_name="工單預設生產數量",
+        help_text="此為工單規劃的總生產數量，不可修改",
+        default=0
+    )
+    
+    process = models.ForeignKey(
+        'process.ProcessName',
+        on_delete=models.CASCADE,
+        verbose_name="工序",
+        help_text="請選擇此次補登的工序（排除SMT相關工序）"
+    )
+    
+    # 設備資訊（可選）
+    equipment = models.ForeignKey(
+        'equip.Equipment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="設備",
+        help_text="請選擇此次補登的設備（排除SMT相關設備）"
+    )
+    
+    # 時間資訊
+    work_date = models.DateField(
+        verbose_name="日期",
+        help_text="請選擇實際報工日期",
+        default=timezone.now
+    )
+    
+    start_time = models.TimeField(
+        verbose_name="開始時間",
+        help_text="請輸入實際開始時間 (24小時制)，例如 16:00",
+        default=timezone.now
+    )
+    
+    end_time = models.TimeField(
+        verbose_name="結束時間",
+        help_text="請輸入實際結束時間 (24小時制)，例如 18:30",
+        default=timezone.now
+    )
+    
+    # 數量資訊
+    work_quantity = models.IntegerField(
+        verbose_name="工作數量",
+        help_text="請輸入該時段內實際完成的合格產品數量",
+        default=0
+    )
+    
+    defect_quantity = models.IntegerField(
+        default=0,
+        verbose_name="不良品數量",
+        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0"
+    )
+    
+    # 狀態資訊
+    is_completed = models.BooleanField(
+        default=False,
+        verbose_name="是否已完工",
+        help_text="若此工單在此工序上已全部完成，請勾選"
+    )
+    
+    # 完工判斷方式
+    COMPLETION_METHOD_CHOICES = [
+        ('manual', '手動勾選'),
+        ('auto_quantity', '自動依數量判斷'),
+        ('auto_time', '自動依工時判斷'),
+        ('auto_operator', '作業員確認'),
+        ('auto_system', '系統自動判斷'),
+    ]
+    
+    completion_method = models.CharField(
+        max_length=20,
+        choices=COMPLETION_METHOD_CHOICES,
+        default='manual',
+        verbose_name="完工判斷方式",
+        help_text="選擇如何判斷此筆記錄是否代表工單完工"
+    )
+    
+    # 自動完工狀態（系統計算）
+    auto_completed = models.BooleanField(
+        default=False,
+        verbose_name="自動完工狀態",
+        help_text="系統根據累積數量或工時自動判斷的完工狀態"
+    )
+    
+    # 完工確認時間
+    completion_time = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="完工確認時間",
+        help_text="系統記錄的完工確認時間"
+    )
+    
+    # 累積完成數量（用於自動完工判斷）
+    cumulative_quantity = models.IntegerField(
+        default=0,
+        verbose_name="累積完成數量",
+        help_text="此工單在此工序上的累積完成數量"
+    )
+    
+    # 累積工時（用於自動完工判斷）
+    cumulative_hours = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=0,
+        verbose_name="累積工時",
+        help_text="此工單在此工序上的累積工時"
+    )
+    
+    # 核准狀態
+    APPROVAL_STATUS_CHOICES = [
+        ('draft', '草稿'),
+        ('pending', '待審核'),
+        ('approved', '已審核'),
+        ('rejected', '已駁回'),
+    ]
+    
+    approval_status = models.CharField(
+        max_length=20,
+        choices=APPROVAL_STATUS_CHOICES,
+        default='draft',
+        verbose_name="審核狀態",
+        help_text="補登記錄的審核狀態，已審核的記錄不可修改"
+    )
+    
+    approved_by = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="審核人員",
+        help_text="審核此補登記錄的人員"
+    )
+    
+    approved_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="審核時間",
+        help_text="此補登記錄的審核時間"
+    )
+    
+    approval_remarks = models.TextField(
+        blank=True,
+        verbose_name="審核備註",
+        help_text="審核時的備註說明"
+    )
+    
+    rejection_reason = models.TextField(
+        blank=True,
+        verbose_name="駁回原因",
+        help_text="駁回時的原因說明"
+    )
+    
+    # 備註
+    remarks = models.TextField(
+        blank=True,
+        verbose_name="備註",
+        help_text="請輸入任何需要補充的資訊，如異常、停機等"
+    )
+    
+    abnormal_notes = models.TextField(
+        blank=True,
+        verbose_name="異常記錄",
+        help_text="記錄生產過程中的異常情況"
+    )
+    
+    # 系統欄位
+    created_by = models.CharField(
+        max_length=100,
+        verbose_name="建立人員",
+        default="system"
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="建立時間"
+    )
+    
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="更新時間"
+    )
+
+    class Meta:
+        verbose_name = "作業員補登報工記錄"
+        verbose_name_plural = "作業員補登報工記錄"
+        db_table = 'workorder_operator_supplement_report'
+        ordering = ['-work_date', '-start_time']
+
+    def __str__(self):
+        return f"{self.operator.name} - {self.workorder.order_number} - {self.work_date}"
+
+    @property
+    def operator_name(self):
+        """取得作業員名稱"""
+        return self.operator.name if self.operator else ""
+
+    @property
+    def workorder_number(self):
+        """取得工單號碼"""
+        return self.workorder.order_number if self.workorder else ""
+
+    @property
+    def process_name(self):
+        """取得工序名稱"""
+        return self.process.name if self.process else ""
+
+    @property
+    def total_quantity(self):
+        """取得總數量（工作數量 + 不良品數量）"""
+        return self.work_quantity + self.defect_quantity
+
+    @property
+    def work_hours(self):
+        """計算工作時數"""
+        if self.start_time and self.end_time:
+            from datetime import datetime, timedelta
+            start_dt = datetime.combine(self.work_date, self.start_time)
+            end_dt = datetime.combine(self.work_date, self.end_time)
+            if end_dt < start_dt:
+                end_dt += timedelta(days=1)
+            duration = end_dt - start_dt
+            return round(duration.total_seconds() / 3600, 2)
+        return 0.0
+
+    @property
+    def yield_rate(self):
+        """計算良率"""
+        if self.total_quantity > 0:
+            return round((self.work_quantity / self.total_quantity) * 100, 2)
+        return 0.0
+
+    def can_edit(self, user):
+        """
+        檢查記錄是否可以編輯
+        已審核的記錄只有超級管理員可以編輯
+        """
+        if self.approval_status == 'approved':
+            return user.is_superuser
+        return True
+
+    def can_delete(self, user):
+        """
+        檢查記錄是否可以刪除
+        只有超級管理員可以刪除已審核的記錄
+        """
+        if self.approval_status == 'approved':
+            return user.is_superuser
+        return True
+
+    def can_approve(self, user):
+        """
+        檢查記錄是否可以審核
+        只有管理員和超級管理員可以審核
+        """
+        return user.is_staff or user.is_superuser
+
+    def approve(self, user, remarks=''):
+        """
+        審核通過補登記錄
+        """
+        self.approval_status = 'approved'
+        self.approved_by = user.username
+        self.approved_at = timezone.now()
+        self.approval_remarks = remarks
+        self.save()
+
+    def reject(self, user, reason=''):
+        """
+        駁回補登記錄
+        """
+        self.approval_status = 'rejected'
+        self.approved_by = user.username
+        self.approved_at = timezone.now()
+        self.rejection_reason = reason
+        self.save()
+
+    def submit_for_approval(self):
+        """提交審核"""
+        self.approval_status = 'pending'
+        self.save()
+    
+    def check_auto_completion(self):
+        """檢查是否自動完工"""
+        from django.utils import timezone
+        
+        # 取得此工單在此工序上的所有記錄
+        all_reports = OperatorSupplementReport.objects.filter(
+            workorder=self.workorder,
+            process=self.process
+        ).order_by('work_date', 'start_time')
+        
+        # 計算累積數量
+        total_quantity = sum(report.work_quantity for report in all_reports if report.work_quantity)
+        
+        # 計算累積工時
+        total_hours = sum(report.work_hours for report in all_reports)
+        
+        # 更新累積數據
+        self.cumulative_quantity = total_quantity
+        self.cumulative_hours = total_hours
+        
+        # 自動完工判斷邏輯
+        auto_completed = False
+        completion_method = 'manual'
+        
+        # 1. 依數量判斷：累積數量 >= 工單預設數量
+        if total_quantity >= self.workorder.quantity:
+            auto_completed = True
+            completion_method = 'auto_quantity'
+        
+        # 2. 依工時判斷：累積工時 >= 預估工時（假設每小時產出 50 件）
+        estimated_hours = self.workorder.quantity / 50  # 可調整的預估標準
+        if total_hours >= estimated_hours:
+            auto_completed = True
+            completion_method = 'auto_time'
+        
+        # 3. 作業員確認：在備註中提及完工
+        if '完工' in (self.remarks or '') or '完成' in (self.remarks or ''):
+            auto_completed = True
+            completion_method = 'auto_operator'
+        
+        # 更新自動完工狀態
+        self.auto_completed = auto_completed
+        self.completion_method = completion_method
+        
+        # 如果自動完工，設定完工時間
+        if auto_completed and not self.completion_time:
+            self.completion_time = timezone.now()
+        
+        self.save()
+        
+        return auto_completed
+    
+    def get_completion_status_display(self):
+        """取得完工狀態顯示文字"""
+        if self.is_completed:
+            return "手動完工"
+        elif self.auto_completed:
+            method_display = dict(self.COMPLETION_METHOD_CHOICES).get(self.completion_method, '')
+            return f"自動完工({method_display})"
+        else:
+            return "未完工"
+    
+    def get_completion_summary(self):
+        """取得完工摘要資訊"""
+        return {
+            'is_completed': self.is_completed,
+            'auto_completed': self.auto_completed,
+            'completion_method': self.completion_method,
+            'completion_time': self.completion_time,
+            'cumulative_quantity': self.cumulative_quantity,
+            'cumulative_hours': self.cumulative_hours,
+            'planned_quantity': self.workorder.quantity,
+            'completion_rate': (self.cumulative_quantity / self.workorder.quantity * 100) if self.workorder.quantity > 0 else 0
+        }
+
+
+
+
+
+
