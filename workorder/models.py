@@ -14,6 +14,7 @@ class WorkOrder(models.Model):
     STATUS_CHOICES = [
         ("pending", "待生產"),
         ("in_progress", "生產中"),
+        ("paused", "暫停"),
         ("completed", "已完成"),
     ]
 
@@ -43,6 +44,49 @@ class WorkOrder(models.Model):
 
     def __str__(self):
         return f"[{self.company_code}] 製令單 {self.order_number}"
+    
+    @property
+    def completed_quantity(self):
+        """計算工單總完成數量"""
+        return sum(process.completed_quantity for process in self.processes.all())
+    
+    @property
+    def progress(self):
+        """計算工單進度百分比"""
+        if self.quantity > 0:
+            return round((self.completed_quantity / self.quantity) * 100, 1)
+        return 0.0
+    
+    @property
+    def current_operator(self):
+        """取得當前負責的作業員"""
+        current_process = self.processes.filter(status='in_progress').first()
+        if current_process and current_process.assigned_operator:
+            return current_process.assigned_operator
+        return "未分配"
+    
+    @property
+    def current_process(self):
+        """取得當前進行的工序"""
+        current_process = self.processes.filter(status='in_progress').first()
+        if current_process:
+            return current_process.process_name
+        return "無進行中工序"
+    
+    @property
+    def start_time(self):
+        """取得工單開始時間（第一個工序的開始時間或工單狀態變更時間）"""
+        # 優先顯示第一個工序的實際開始時間
+        first_process = self.processes.filter(actual_start_time__isnull=False).order_by('actual_start_time').first()
+        if first_process and first_process.actual_start_time:
+            return first_process.actual_start_time
+        
+        # 如果工單狀態是生產中或暫停，則顯示工單的更新時間（狀態變更時間）
+        if self.status in ['in_progress', 'paused']:
+            return self.updated_at
+        
+        # 如果都沒有，則顯示工單建立時間
+        return self.created_at
 
 
 # 製令主檔（prdMKOrdMain）
@@ -381,6 +425,8 @@ class WorkOrderProcessLog(models.Model):
             ("quantity_update", "數量更新"),
             ("note", "備註"),
             ("auto_assignment", "自動分配"),
+            ("status_change", "狀態變更"),
+            ("quick_report", "快速報工"),
         ],
     )
     quantity_before = models.PositiveIntegerField(default=0, verbose_name="操作前數量")

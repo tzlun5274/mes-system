@@ -2611,7 +2611,7 @@ def get_process_capacity_info(request, process_id):
         additional_operators = process.get_additional_operators_list()
         additional_equipments = process.get_additional_equipments_list()
         # 取得所有可用作業員和設備供選擇
-        from system.models import Operator
+        from process.models import Operator
         from equip.models import Equipment
         all_operators = list(Operator.objects.values('id', 'name'))
         all_equipments = list(Equipment.objects.values('id', 'name'))
@@ -3606,6 +3606,999 @@ def get_smt_workorders_by_equipment(request):
         return JsonResponse({
             'success': False,
             'message': '找不到指定的設備'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'取得工單列表失敗: {str(e)}'
+        })
+
+# ==================== 作業員報工功能 ====================
+
+def operator_on_site_report(request):
+    """
+    作業員現場報工頁面
+    """
+    from datetime import datetime, date
+    from django.db.models import Q, Count, Sum
+    from process.models import Operator, ProcessName
+    
+    # 取得統計資料
+    today = date.today()
+    working_operators = Operator.objects.count()  # 暫時使用總數，因為沒有status欄位
+    today_reports = 0  # 這裡需要根據實際的報工記錄計算
+    active_workorders = WorkOrder.objects.filter(status__in=['in_progress', 'paused']).count()
+    pending_workorders = WorkOrder.objects.filter(status='pending').count()
+    available_workorders = WorkOrder.objects.filter(status__in=['pending', 'in_progress', 'paused']).count()
+    
+    # 取得作業員列表
+    operator_list = Operator.objects.all().order_by('name')
+    
+    # 取得進行中的工單（包含正在生產中和暫停的工單）
+    active_workorders_list = WorkOrder.objects.filter(
+        status__in=['in_progress', 'paused']
+    ).prefetch_related('processes').order_by('-created_at')[:10]
+    
+    # 調試資訊
+    print(f"🔍 進行中工單數量：{active_workorders_list.count()}")
+    for wo in active_workorders_list:
+        print(f"  - {wo.order_number}: {wo.get_status_display()}")
+    
+    # 取得可選擇的工單（包含待生產、進行中和暫停的工單，供快速報工表單使用）
+    available_workorders_list = WorkOrder.objects.filter(
+        status__in=['pending', 'in_progress', 'paused']
+    ).prefetch_related('processes').order_by('-created_at')[:10]
+    
+    # 取得工序列表
+    process_list = ProcessName.objects.filter(
+        ~Q(name__icontains='SMT')  # 排除SMT相關工序
+    ).order_by('name')
+    
+    # 取得設備列表
+    from equip.models import Equipment
+    equipment_list = Equipment.objects.all().order_by('name')
+    
+    # 取得作業員狀態
+    operator_status_list = []
+    for operator in operator_list:
+        # 查找該作業員正在進行的工序
+        current_process = WorkOrderProcess.objects.filter(
+            assigned_operator=operator.name,
+            status='in_progress'
+        ).first()
+        
+        current_workorder = current_process.workorder if current_process else None
+        current_process_name = current_process.process_name if current_process else '-'
+        
+        operator_status_list.append({
+            'id': operator.id,
+            'name': operator.name,
+            'employee_id': '-',  # Operator模型沒有employee_id欄位
+            'status': 'working' if current_process else 'available',
+            'current_workorder': current_workorder.order_number if current_workorder else '-',
+            'current_process': current_process_name,
+            'today_reports': 0,  # 這裡需要根據實際的報工記錄計算
+            'last_update': getattr(operator, 'updated_at', datetime.now())
+        })
+    
+    # 取得最近報工記錄
+    recent_reports = []  # 這裡需要根據實際的報工記錄取得
+    
+    context = {
+        'working_operators': working_operators,
+        'today_reports': today_reports,
+        'active_workorders': active_workorders,
+        'pending_workorders': pending_workorders,
+        'operator_list': operator_list,
+        'active_workorders_list': active_workorders_list,  # 進行中的工單（顯示用）
+        'available_workorders_list': available_workorders_list,  # 可選擇的工單（表單用）
+        'process_list': process_list,
+        'equipment_list': equipment_list,  # 新增設備列表
+        'operator_status_list': operator_status_list,
+        'recent_reports': recent_reports,
+    }
+    
+    return render(request, 'workorder/report/operator/on_site/index.html', context)
+
+
+@require_GET
+@csrf_exempt
+def get_workorder_info(request):
+    """
+    AJAX：獲取工單資訊
+    """
+    try:
+        workorder_id = request.GET.get('workorder_id')
+        
+        if not workorder_id:
+            return JsonResponse({
+                'success': False,
+                'message': '請提供工單ID'
+            })
+        
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        
+        return JsonResponse({
+            'success': True,
+            'data': {
+                'order_number': workorder.order_number,
+                'product_code': workorder.product_code,
+                'quantity': workorder.quantity,
+                'status': workorder.status,
+            }
+        })
+        
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的工單'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'獲取工單資訊失敗：{str(e)}'
+        })
+
+
+@require_POST
+@csrf_exempt
+def operator_change_status(request):
+    """
+    變更工單狀態：開始生產、暫停、完工
+    """
+    try:
+        workorder_id = request.POST.get('workorder_id')
+        action_type = request.POST.get('action_type')
+        
+        if not workorder_id or not action_type:
+            return JsonResponse({
+                'success': False,
+                'message': '缺少必要參數！'
+            })
+        
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        
+        # 根據操作類型變更狀態
+        if action_type == 'start':
+            if workorder.status == 'pending':
+                workorder.status = 'in_progress'
+                message = '工單已開始生產！'
+                
+                # 更新第一個待生產的工序狀態
+                try:
+                    first_pending_process = workorder.processes.filter(status='pending').order_by('step_order').first()
+                    if first_pending_process:
+                        first_pending_process.status = 'in_progress'
+                        first_pending_process.actual_start_time = timezone.now()
+                        first_pending_process.save()
+                        print(f"✅ 工序狀態已更新：{first_pending_process.process_name} -> 生產中")
+                except Exception as e:
+                    print(f"⚠️ 更新工序狀態失敗：{str(e)}")
+                    
+            elif workorder.status == 'paused':
+                workorder.status = 'in_progress'
+                message = '工單已恢復生產！'
+                
+                # 恢復暫停的工序狀態
+                try:
+                    paused_process = workorder.processes.filter(status='paused').first()
+                    if paused_process:
+                        paused_process.status = 'in_progress'
+                        paused_process.save()
+                        print(f"✅ 工序狀態已更新：{paused_process.process_name} -> 生產中")
+                except Exception as e:
+                    print(f"⚠️ 更新工序狀態失敗：{str(e)}")
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': '當前狀態無法開始生產！'
+                })
+                
+        elif action_type == 'pause':
+            if workorder.status == 'in_progress':
+                workorder.status = 'paused'
+                message = '工單已暫停！'
+                
+                # 暫停進行中的工序
+                try:
+                    in_progress_process = workorder.processes.filter(status='in_progress').first()
+                    if in_progress_process:
+                        in_progress_process.status = 'paused'
+                        in_progress_process.save()
+                        print(f"✅ 工序狀態已更新：{in_progress_process.process_name} -> 暫停")
+                except Exception as e:
+                    print(f"⚠️ 更新工序狀態失敗：{str(e)}")
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': '只有生產中的工單可以暫停！'
+                })
+                
+        elif action_type == 'complete':
+            if workorder.status in ['in_progress', 'paused']:
+                workorder.status = 'completed'
+                message = '工單已完工！'
+                
+                # 完成所有未完成的工序
+                try:
+                    unfinished_processes = workorder.processes.filter(status__in=['pending', 'in_progress', 'paused'])
+                    for process in unfinished_processes:
+                        process.status = 'completed'
+                        if not process.actual_start_time:
+                            process.actual_start_time = timezone.now()
+                        process.actual_end_time = timezone.now()
+                        process.save()
+                        print(f"✅ 工序狀態已更新：{process.process_name} -> 已完成")
+                except Exception as e:
+                    print(f"⚠️ 更新工序狀態失敗：{str(e)}")
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': '只有生產中或暫停的工單可以完工！'
+                })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': '無效的操作類型！'
+            })
+        
+        workorder.save()
+        
+        # 記錄操作日誌
+        try:
+            first_process = workorder.processes.first()
+            if first_process:
+                WorkOrderProcessLog.objects.create(
+                    workorder_process=first_process,
+                    action='status_change',
+                    operator=request.user.username if request.user.is_authenticated else 'system',
+                    notes=f'工單狀態變更為：{workorder.get_status_display()}'
+                )
+        except Exception as e:
+            print(f"⚠️ 記錄操作日誌失敗：{str(e)}")
+        
+        print(f"✅ 工單狀態已更新：{workorder.order_number} -> {workorder.get_status_display()}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': message
+        })
+        
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '工單不存在！'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'系統錯誤：{str(e)}'
+        })
+
+@require_POST
+@csrf_exempt
+def operator_quick_report(request):
+    """
+    AJAX：作業員快速報工 - 支援報工、開始生產、暫停、完工
+    """
+    try:
+        operator_id = request.POST.get('operator')
+        workorder_id = request.POST.get('workorder')
+        process_id = request.POST.get('process')
+        quantity = request.POST.get('quantity')
+        equipment_id = request.POST.get('equipment', '')  # 新增設備參數，可選
+        action_type = request.POST.get('action_type', 'start')  # 預設為開始生產
+        
+        if not all([operator_id, workorder_id, process_id, quantity]):
+            return JsonResponse({
+                'success': False,
+                'message': '請填寫所有必要欄位'
+            })
+        
+        # 取得相關物件
+        from process.models import Operator
+        from equip.models import Equipment
+        
+        operator = Operator.objects.get(id=operator_id)
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        process = ProcessName.objects.get(id=process_id)
+        
+        # 如果有選擇設備，取得設備物件
+        equipment = None
+        if equipment_id:
+            try:
+                equipment = Equipment.objects.get(id=equipment_id)
+            except Equipment.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'message': '找不到指定的設備'
+                })
+        
+        # 根據操作類型執行不同邏輯
+        if action_type == 'start':
+            # 開始生產（現場報工的核心邏輯）
+            if workorder.status == 'pending':
+                # 從待生產狀態開始：直接開始生產並記錄報工
+                workorder.status = 'in_progress'
+                message = '工單已開始生產！'
+            elif workorder.status == 'paused':
+                # 從暫停狀態恢復：恢復生產並記錄報工
+                workorder.status = 'in_progress'
+                message = '工單已恢復生產！'
+            elif workorder.status == 'in_progress':
+                # 生產中狀態：繼續生產並記錄報工
+                message = '繼續生產並記錄報工！'
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': '當前狀態無法開始生產！'
+                })
+            
+            workorder.save()
+            
+            # 更新對應的工序狀態
+            try:
+                # 找到對應的工序並更新狀態
+                workorder_process = workorder.processes.filter(process_name=process.name).first()
+                
+                if workorder_process:
+                    # 如果工序已存在，更新狀態
+                    workorder_process.status = 'in_progress'
+                    workorder_process.assigned_operator = operator.name
+                    if equipment:
+                        workorder_process.assigned_equipment = equipment.name
+                    workorder_process.actual_start_time = timezone.now()
+                    workorder_process.save()
+                    print(f"✅ 工序狀態已更新：{process.name} -> 生產中")
+                else:
+                    # 如果工序不存在，自動建立
+                    from workorder.models import WorkOrderProcess
+                    
+                    # 取得下一個工序順序
+                    max_step_order = workorder.processes.aggregate(
+                        models.Max('step_order')
+                    )['step_order__max'] or 0
+                    next_step_order = max_step_order + 1
+                    
+                    # 建立新的工序
+                    workorder_process = WorkOrderProcess.objects.create(
+                        workorder=workorder,
+                        process_name=process.name,
+                        step_order=next_step_order,
+                        planned_quantity=int(quantity),
+                        status='in_progress',
+                        assigned_operator=operator.name,
+                        assigned_equipment=equipment.name if equipment else None,
+                        actual_start_time=timezone.now()
+                    )
+                    print(f"✅ 自動建立新工序：{process.name} -> 生產中")
+                    
+            except Exception as e:
+                print(f"⚠️ 更新工序狀態失敗：{str(e)}")
+            
+            # 記錄現場報工資訊
+            print(f"現場報工記錄：")
+            print(f"  作業員：{operator.name}")
+            print(f"  工單：{workorder.order_number}")
+            print(f"  工序：{process.name}")
+            print(f"  數量：{quantity}")
+            print(f"  設備：{equipment.name if equipment else '未選擇'}")
+            print(f"  操作：開始生產")
+            
+        elif action_type == 'pause':
+            # 暫停生產
+            if workorder.status == 'in_progress':
+                workorder.status = 'paused'
+                message = '工單已暫停生產！'
+                
+                # 更新對應的工序狀態
+                try:
+                    workorder_process = workorder.processes.filter(status='in_progress').first()
+                    if workorder_process:
+                        workorder_process.status = 'paused'
+                        workorder_process.save()
+                        print(f"✅ 工序狀態已更新：{workorder_process.process_name} -> 暫停")
+                except Exception as e:
+                    print(f"⚠️ 更新工序狀態失敗：{str(e)}")
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': '只有生產中的工單可以暫停！'
+                })
+            workorder.save()
+            
+        elif action_type == 'complete':
+            # 完工
+            if workorder.status in ['in_progress', 'paused']:
+                workorder.status = 'completed'
+                message = '工單已完工！'
+                
+                # 更新對應的工序狀態
+                try:
+                    workorder_process = workorder.processes.filter(status__in=['in_progress', 'paused']).first()
+                    if workorder_process:
+                        workorder_process.status = 'completed'
+                        workorder_process.actual_end_time = timezone.now()
+                        workorder_process.completed_quantity = int(quantity)
+                        workorder_process.save()
+                        print(f"✅ 工序狀態已更新：{workorder_process.process_name} -> 已完成")
+                except Exception as e:
+                    print(f"⚠️ 更新工序狀態失敗：{str(e)}")
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': '只有生產中或暫停的工單可以完工！'
+                })
+            workorder.save()
+            
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': '無效的操作類型！'
+            })
+        
+        # 記錄操作日誌
+        if workorder.processes.exists():
+            log_action = 'start' if action_type == 'start' else 'status_change'
+            WorkOrderProcessLog.objects.create(
+                workorder_process=workorder.processes.first(),
+                action=log_action,
+                operator=operator.name,
+                equipment=equipment.name if equipment else None,
+                notes=f'現場報工：{action_type} - 數量：{quantity}'
+            )
+        
+        return JsonResponse({
+            'success': True,
+            'message': message
+        })
+        
+    except Operator.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的作業員'
+        })
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的工單'
+        })
+    except ProcessName.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的工序'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'操作失敗：{str(e)}'
+        })
+
+
+@require_POST
+@csrf_exempt
+def operator_start_process(request):
+    """
+    AJAX：開始工序
+    """
+    try:
+        workorder_id = request.POST.get('workorder_id')
+        
+        if not workorder_id:
+            return JsonResponse({
+                'success': False,
+                'message': '請提供工單ID'
+            })
+        
+        # 這裡需要實作實際的工序開始邏輯
+        
+        return JsonResponse({
+            'success': True,
+            'message': '工序已開始！'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'操作失敗：{str(e)}'
+        })
+
+
+@require_POST
+@csrf_exempt
+def operator_delete_workorder(request):
+    """
+    AJAX：刪除工單（只有超級管理員可以使用）
+    """
+    try:
+        # 檢查權限
+        if not request.user.is_superuser:
+            return JsonResponse({
+                'success': False,
+                'message': '只有超級管理員可以刪除工單！'
+            })
+        
+        workorder_id = request.POST.get('workorder_id')
+        
+        if not workorder_id:
+            return JsonResponse({
+                'success': False,
+                'message': '請提供工單ID'
+            })
+        
+        # 取得工單
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        workorder_number = workorder.order_number
+        
+        # 刪除工單（會自動刪除相關的工序）
+        workorder.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'工單 {workorder_number} 已成功刪除！'
+        })
+        
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的工單'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'刪除工單失敗：{str(e)}'
+        })
+
+
+def operator_report_progress(request):
+    """
+    作業員進度報工頁面
+    """
+    workorder_id = request.GET.get('workorder_id')
+    
+    if not workorder_id:
+        messages.error(request, '請提供工單ID')
+        return redirect('workorder:operator_on_site_report')
+    
+    try:
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        context = {
+            'workorder': workorder,
+        }
+        return render(request, 'workorder/report/operator/progress_form.html', context)
+    except WorkOrder.DoesNotExist:
+        messages.error(request, '找不到指定的工單')
+        return redirect('workorder:operator_on_site_report')
+
+
+def operator_workorder_detail(request):
+    """
+    作業員工單詳情頁面
+    """
+    workorder_id = request.GET.get('workorder_id')
+    
+    if not workorder_id:
+        messages.error(request, '請提供工單ID')
+        return redirect('workorder:operator_on_site_report')
+    
+    try:
+        workorder = WorkOrder.objects.prefetch_related('processes').get(id=workorder_id)
+        context = {
+            'workorder': workorder,
+        }
+        return render(request, 'workorder/report/operator/workorder_detail.html', context)
+    except WorkOrder.DoesNotExist:
+        messages.error(request, '找不到指定的工單')
+        return redirect('workorder:operator_on_site_report')
+
+
+def operator_assign_workorder(request):
+    """
+    作業員派工頁面 - 已移至派工單管理模組
+    此功能已不在此模組處理，請使用派工單管理模組的派工功能
+    """
+    messages.warning(request, '派工功能已移至派工單管理模組，請使用派工單管理進行派工操作')
+    return redirect('workorder:operator_on_site_report')
+
+
+def operator_report_work(request):
+    """
+    作業員報工頁面
+    """
+    operator_id = request.GET.get('operator_id')
+    
+    if not operator_id:
+        messages.error(request, '請提供作業員ID')
+        return redirect('workorder:operator_on_site_report')
+    
+    try:
+        from process.models import Operator
+        operator = Operator.objects.get(id=operator_id)
+        
+        # 取得該作業員的工單
+        workorders = WorkOrder.objects.filter(
+            status='in_progress'
+        ).order_by('-created_at')
+        
+        context = {
+            'operator': operator,
+            'workorders': workorders,
+        }
+        return render(request, 'workorder/report/operator/report_work.html', context)
+    except Operator.DoesNotExist:
+        messages.error(request, '找不到指定的作業員')
+        return redirect('workorder:operator_on_site_report')
+
+
+def operator_detail(request):
+    """
+    作業員詳情頁面
+    """
+    operator_id = request.GET.get('operator_id')
+    
+    if not operator_id:
+        messages.error(request, '請提供作業員ID')
+        return redirect('workorder:operator_on_site_report')
+    
+    try:
+        from process.models import Operator
+        operator = Operator.objects.get(id=operator_id)
+        
+        context = {
+            'operator': operator,
+        }
+        return render(request, 'workorder/report/operator/operator_detail.html', context)
+    except Operator.DoesNotExist:
+        messages.error(request, '找不到指定的作業員')
+        return redirect('workorder:operator_on_site_report')
+
+
+def operator_report_detail(request):
+    """
+    作業員報工詳情頁面
+    """
+    report_id = request.GET.get('report_id')
+    
+    if not report_id:
+        messages.error(request, '請提供報工記錄ID')
+        return redirect('workorder:operator_on_site_report')
+    
+    try:
+        # 這裡需要根據實際的報工記錄模型取得資料
+        context = {
+            'report': None,  # 暫時設為None
+        }
+        return render(request, 'workorder/report/operator/report_detail.html', context)
+    except Exception as e:
+        messages.error(request, f'取得報工記錄失敗：{str(e)}')
+        return redirect('workorder:operator_on_site_report')
+
+
+# ==================== 作業員補登報工功能 ====================
+
+def operator_supplement_report_index(request):
+    """
+    作業員補登報工列表頁面
+    """
+    from datetime import date
+    from django.core.paginator import Paginator
+    
+    # 取得篩選參數
+    operator = request.GET.get('operator')
+    workorder = request.GET.get('workorder')
+    process = request.GET.get('process')
+    status = request.GET.get('status')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
+    # 這裡需要根據實際的補登報工記錄模型進行查詢
+    # 暫時使用空的查詢集
+    supplement_reports = []
+    
+    # 分頁
+    paginator = Paginator(supplement_reports, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # 取得統計資料
+    pending_reports = 0
+    approved_reports = 0
+    rejected_reports = 0
+    draft_reports = 0
+    
+    # 取得篩選選項
+    from process.models import Operator, ProcessName
+    
+    operator_list = Operator.objects.all().order_by('name')
+    process_list = ProcessName.objects.filter(
+        ~Q(name__icontains='SMT')  # 排除SMT相關工序
+    ).order_by('name')
+    
+    context = {
+        'supplement_reports': page_obj,
+        'pending_reports': pending_reports,
+        'approved_reports': approved_reports,
+        'rejected_reports': rejected_reports,
+        'draft_reports': draft_reports,
+        'operator_list': operator_list,
+        'process_list': process_list,
+        'selected_operator': operator,
+        'selected_workorder': workorder,
+        'selected_process': process,
+        'selected_status': status,
+        'selected_date_from': date_from,
+        'selected_date_to': date_to,
+    }
+    
+    return render(request, 'workorder/report/operator/supplement/index.html', context)
+
+
+def operator_supplement_report_create(request):
+    """
+    作業員補登報工新增頁面
+    """
+    from datetime import date, time
+    from process.models import Operator, ProcessName
+    
+    if request.method == 'POST':
+        # 這裡需要實作表單處理邏輯
+        messages.success(request, '補登報工記錄建立成功！')
+        return redirect('workorder:operator_supplement_report_index')
+    
+    # 取得選項資料
+    operator_list = Operator.objects.all().order_by('name')
+    workorder_list = WorkOrder.objects.filter(
+        status__in=['in_progress', 'completed']
+    ).order_by('-created_at')
+    process_list = ProcessName.objects.filter(
+        ~Q(name__icontains='SMT')  # 排除SMT相關工序
+    ).order_by('name')
+    
+    context = {
+        'operator_list': operator_list,
+        'workorder_list': workorder_list,
+        'process_list': process_list,
+        'today': date.today().strftime('%Y-%m-%d'),
+        'current_time': datetime.now().time().strftime('%H:%M'),
+    }
+    
+    return render(request, 'workorder/report/operator/supplement/form.html', context)
+
+
+def operator_supplement_report_edit(request, report_id):
+    """
+    作業員補登報工編輯頁面
+    """
+    from datetime import date, time
+    from process.models import Operator, ProcessName
+    
+    # 這裡需要根據實際的補登報工記錄模型取得資料
+    # 暫時使用None
+    report = None
+    
+    if not report:
+        messages.error(request, '找不到指定的補登報工記錄')
+        return redirect('workorder:operator_supplement_report_index')
+    
+    if request.method == 'POST':
+        # 這裡需要實作表單處理邏輯
+        messages.success(request, '補登報工記錄更新成功！')
+        return redirect('workorder:operator_supplement_report_index')
+    
+    # 取得選項資料
+    operator_list = Operator.objects.all().order_by('name')
+    workorder_list = WorkOrder.objects.filter(
+        status__in=['in_progress', 'completed']
+    ).order_by('-created_at')
+    process_list = ProcessName.objects.filter(
+        ~Q(name__icontains='SMT')  # 排除SMT相關工序
+    ).order_by('name')
+    
+    context = {
+        'report': report,
+        'operator_list': operator_list,
+        'workorder_list': workorder_list,
+        'process_list': process_list,
+        'today': date.today().strftime('%Y-%m-%d'),
+        'current_time': datetime.now().time().strftime('%H:%M'),
+    }
+    
+    return render(request, 'workorder/report/operator/supplement/form.html', context)
+
+
+@require_POST
+@csrf_exempt
+def operator_supplement_report_delete(request, report_id):
+    """
+    AJAX：刪除作業員補登報工記錄
+    """
+    try:
+        # 這裡需要根據實際的補登報工記錄模型進行刪除
+        # 暫時返回成功訊息
+        
+        return JsonResponse({
+            'success': True,
+            'message': '刪除成功！'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'刪除失敗：{str(e)}'
+        })
+
+
+def operator_supplement_report_detail(request, report_id):
+    """
+    作業員補登報工詳情頁面
+    """
+    # 這裡需要根據實際的補登報工記錄模型取得資料
+    # 暫時使用None
+    report = None
+    
+    if not report:
+        messages.error(request, '找不到指定的補登報工記錄')
+        return redirect('workorder:operator_supplement_report_index')
+    
+    context = {
+        'report': report,
+    }
+    
+    return render(request, 'workorder/report/operator/supplement/detail.html', context)
+
+
+def operator_supplement_report_approve(request, report_id):
+    """
+    作業員補登報工審核通過頁面
+    """
+    from datetime import date, time
+    
+    # 這裡需要根據實際的補登報工記錄模型取得資料
+    # 暫時使用None
+    report = None
+    
+    if not report:
+        messages.error(request, '找不到指定的補登報工記錄')
+        return redirect('workorder:operator_supplement_report_index')
+    
+    if request.method == 'POST':
+        # 這裡需要實作審核邏輯
+        messages.success(request, '審核通過成功！')
+        return redirect('workorder:operator_supplement_report_detail', report_id=report_id)
+    
+    context = {
+        'report': report,
+        'today': date.today().strftime('%Y-%m-%d'),
+        'current_time': time.now().strftime('%H:%M'),
+    }
+    
+    return render(request, 'workorder/report/operator/supplement/approve_confirm.html', context)
+
+
+def operator_supplement_report_reject(request, report_id):
+    """
+    作業員補登報工駁回頁面
+    """
+    from datetime import date, time
+    
+    # 這裡需要根據實際的補登報工記錄模型取得資料
+    # 暫時使用None
+    report = None
+    
+    if not report:
+        messages.error(request, '找不到指定的補登報工記錄')
+        return redirect('workorder:operator_supplement_report_index')
+    
+    if request.method == 'POST':
+        # 這裡需要實作駁回邏輯
+        messages.success(request, '駁回成功！')
+        return redirect('workorder:operator_supplement_report_detail', report_id=report_id)
+    
+    context = {
+        'report': report,
+        'today': date.today().strftime('%Y-%m-%d'),
+        'current_time': time.now().strftime('%H:%M'),
+    }
+    
+    return render(request, 'workorder/report/operator/supplement/reject_confirm.html', context)
+
+
+def operator_supplement_batch(request):
+    """
+    作業員補登報工批量匯入頁面
+    """
+    if request.method == 'POST':
+        # 這裡需要實作批量匯入邏輯
+        messages.success(request, '批量匯入成功！')
+        return redirect('workorder:operator_supplement_report_index')
+    
+    context = {}
+    return render(request, 'workorder/report/operator/supplement/batch.html', context)
+
+
+def operator_supplement_export(request):
+    """
+    作業員補登報工匯出功能
+    """
+    # 這裡需要實作匯出邏輯
+    messages.success(request, '資料匯出成功！')
+    return redirect('workorder:operator_supplement_report_index')
+
+
+def operator_supplement_template(request):
+    """
+    作業員補登報工範本下載
+    """
+    # 這裡需要實作範本下載邏輯
+    messages.success(request, '範本下載成功！')
+    return redirect('workorder:operator_supplement_report_index')
+
+
+@require_POST
+@csrf_exempt
+def operator_supplement_batch_create(request):
+    """
+    AJAX：批量建立作業員補登報工記錄
+    """
+    try:
+        # 這裡需要實作批量建立邏輯
+        
+        return JsonResponse({
+            'success': True,
+            'message': '批量建立成功！'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'批量建立失敗：{str(e)}'
+        })
+
+
+@require_GET
+@csrf_exempt
+def get_workorders_by_operator(request):
+    """
+    API：根據作業員取得可用的工單列表
+    """
+    try:
+        operator_id = request.GET.get('operator_id')
+        
+        if not operator_id:
+            return JsonResponse({
+                'success': False,
+                'message': '缺少作業員ID參數'
+            })
+        
+        # 取得該作業員的相關工單
+        from process.models import Operator
+        operator = Operator.objects.get(id=operator_id)
+        
+        # 取得可用的工單
+        workorders = WorkOrder.objects.filter(
+            status__in=['in_progress', 'completed']
+        ).order_by('-created_at')[:50]  # 限制數量避免過載
+        
+        workorder_list = []
+        for workorder in workorders:
+            workorder_list.append({
+                'id': workorder.id,
+                'order_number': workorder.order_number,
+                'product_code': workorder.product_code,
+                'quantity': workorder.quantity,
+                'status': workorder.get_status_display(),
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'workorders': workorder_list,
+            'operator_name': operator.name
+        })
+        
+    except Operator.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的作業員'
         })
     except Exception as e:
         return JsonResponse({

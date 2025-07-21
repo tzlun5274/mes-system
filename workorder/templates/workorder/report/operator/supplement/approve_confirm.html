@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}審核通過確認{% endblock %}
+
+{% block extra_head %}
+<style>
+    .approve-confirm-container {
+        padding: 20px;
+    }
+    
+    .approve-confirm-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .approve-confirm-card .card-header {
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+    }
+    
+    .report-summary {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .summary-item:last-child {
+        border-bottom: none;
+    }
+    
+    .summary-label {
+        font-weight: bold;
+        color: #495057;
+        min-width: 120px;
+    }
+    
+    .summary-value {
+        color: #6c757d;
+        text-align: right;
+        flex: 1;
+    }
+    
+    .approval-form {
+        background-color: #e9ecef;
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+    
+    .approval-form h6 {
+        color: #495057;
+        margin-bottom: 15px;
+    }
+    
+    .warning-box {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .warning-box h6 {
+        color: #856404;
+        margin-bottom: 10px;
+    }
+    
+    .warning-box p {
+        color: #856404;
+        margin-bottom: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-check-circle text-success"></i>
+                    審核通過確認
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_report_index' %}">作業員報工</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_index' %}">補登報工</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_detail' report.id %}">詳情</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">審核通過</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 警告提示 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="warning-box">
+                <h6><i class="fas fa-exclamation-triangle"></i> 審核確認</h6>
+                <p>您即將審核通過此補登報工記錄。審核通過後，此記錄將正式生效並影響相關的生產統計數據。請確認以下資訊無誤後再進行審核。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報工摘要 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card approve-confirm-card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-alt"></i> 報工記錄摘要
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="report-summary">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="summary-item">
+                                    <span class="summary-label">報工編號：</span>
+                                    <span class="summary-value">{{ report.id }}</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">作業員：</span>
+                                    <span class="summary-value">{{ report.operator.name }} ({{ report.operator.employee_id }})</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">工單號：</span>
+                                    <span class="summary-value">{{ report.workorder.workorder_number }}</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">產品名稱：</span>
+                                    <span class="summary-value">{{ report.workorder.product_name }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="summary-item">
+                                    <span class="summary-label">工序：</span>
+                                    <span class="summary-value">{{ report.process.name }}</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">報工日期：</span>
+                                    <span class="summary-value">{{ report.report_time|date:"Y-m-d" }}</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">報工時間：</span>
+                                    <span class="summary-value">{{ report.start_time|time:"H:i" }} - {{ report.end_time|time:"H:i" }}</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">工時：</span>
+                                    <span class="summary-value">{{ report.work_hours }} 小時</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="summary-item">
+                                    <span class="summary-label">報工數量：</span>
+                                    <span class="summary-value">{{ report.quantity }}</span>
+                                </div>
+                                {% if report.good_quantity %}
+                                <div class="summary-item">
+                                    <span class="summary-label">良品數量：</span>
+                                    <span class="summary-value">{{ report.good_quantity }}</span>
+                                </div>
+                                {% endif %}
+                                {% if report.defect_quantity %}
+                                <div class="summary-item">
+                                    <span class="summary-label">不良品數量：</span>
+                                    <span class="summary-value">{{ report.defect_quantity }}</span>
+                                </div>
+                                {% endif %}
+                                {% if report.yield_rate %}
+                                <div class="summary-item">
+                                    <span class="summary-label">良率：</span>
+                                    <span class="summary-value">{{ report.yield_rate }}%</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if report.notes %}
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="summary-item">
+                                    <span class="summary-label">報工備註：</span>
+                                    <span class="summary-value">{{ report.notes }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if report.abnormal_notes %}
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="summary-item">
+                                    <span class="summary-label">異常記錄：</span>
+                                    <span class="summary-value">{{ report.abnormal_notes }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 審核表單 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card approve-confirm-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-check"></i> 審核確認
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="approveForm">
+                        {% csrf_token %}
+                        <div class="approval-form">
+                            <h6>審核資訊</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="approval_notes">審核備註（選填）</label>
+                                        <textarea class="form-control" id="approval_notes" name="approval_notes" rows="3" 
+                                                  placeholder="請輸入審核備註..."></textarea>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="approval_date">審核日期</label>
+                                        <input type="date" class="form-control" id="approval_date" name="approval_date" 
+                                               value="{{ today }}" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="approval_time">審核時間</label>
+                                        <input type="time" class="form-control" id="approval_time" name="approval_time" 
+                                               value="{{ current_time }}" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-check"></i> 確認審核通過
+                            </button>
+                            <a href="{% url 'workorder:operator_supplement_detail' report.id %}" class="btn btn-secondary btn-lg">
+                                <i class="fas fa-times"></i> 取消
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 審核通過確認專用 JavaScript
+    $(document).ready(function() {
+        // 表單提交前確認
+        $('#approveForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            if (confirmAction('確定要審核通過此補登報工記錄嗎？此操作將正式生效並影響生產統計數據。')) {
+                showLoading();
+                this.submit();
+            }
+        });
+        
+        // 自動隱藏訊息提示
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                if (alert.classList.contains('alert-success') || alert.classList.contains('alert-info')) {
+                    setTimeout(function() {
+                        alert.style.opacity = '0';
+                        setTimeout(function() {
+                            alert.remove();
+                        }, 300);
+                    }, 3000);
+                }
+            });
+        }, 1000);
+    });
+    
+    // 確認操作函數
+    function confirmAction(message) {
+        return confirm(message || '確定要執行此操作嗎？');
+    }
+    
+    // 顯示載入中
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 處理中...</div>';
+        loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.2);z-index:9999;';
+        document.body.appendChild(loadingDiv);
+    }
+    
+    // 隱藏載入中
+    function hideLoading() {
+        const loadingDiv = document.getElementById('loading');
+        if (loadingDiv) {
+            loadingDiv.remove();
+        }
+    }
+</script>
+{% endblock %} 

@@ -244,16 +244,17 @@
 {% block extra_js %}
 <script>
     // 報工管理專用 JavaScript
-    $(document).ready(function() {
+    document.addEventListener('DOMContentLoaded', function() {
         // 卡片懸停效果
-        $('.report-card').hover(
-            function() {
-                $(this).addClass('shadow-lg');
-            },
-            function() {
-                $(this).removeClass('shadow-lg');
-            }
-        );
+        const cards = document.querySelectorAll('.report-card');
+        cards.forEach(function(card) {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow-lg');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow-lg');
+            });
+        });
         
         // 自動隱藏訊息提示
         setTimeout(function() {

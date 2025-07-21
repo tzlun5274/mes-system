@@ -1,0 +1,794 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}作業員現場報工{% endblock %}
+
+{% block extra_head %}
+<style>
+    .operator-on-site-container {
+        padding: 20px;
+    }
+    
+    .operator-on-site-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .operator-on-site-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .operator-on-site-card .card-header {
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+    }
+    
+    .operator-stats {
+        display: flex;
+        justify-content: space-around;
+        margin-bottom: 20px;
+    }
+    
+    .operator-stat-card {
+        text-align: center;
+        padding: 15px;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+    }
+    
+    .operator-stat-number {
+        font-size: 2em;
+        font-weight: bold;
+        color: #28a745;
+    }
+    
+    .operator-stat-label {
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+    
+    .operator-on-site-table {
+        margin-top: 20px;
+    }
+    
+    .operator-on-site-table th {
+        background-color: #f8f9fa;
+        border-top: none;
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+    }
+    
+    .status-working {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-idle {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-break {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-offline {
+        background-color: #e2e3e5;
+        color: #383d41;
+    }
+    
+    .status-working {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-available {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .workorder-card {
+        border-left: 4px solid #28a745;
+        margin-bottom: 15px;
+    }
+    
+    .workorder-card.urgent {
+        border-left-color: #dc3545;
+    }
+    
+    .workorder-card.normal {
+        border-left-color: #17a2b8;
+    }
+    
+    .process-step {
+        display: inline-block;
+        padding: 4px 8px;
+        margin: 2px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        background-color: #e9ecef;
+        color: #495057;
+    }
+    
+    .process-step.active {
+        background-color: #28a745;
+        color: white;
+    }
+    
+    .process-step.completed {
+        background-color: #17a2b8;
+        color: white;
+    }
+    
+    .process-step.pending {
+        background-color: #ffc107;
+        color: #212529;
+    }
+    
+    /* 響應式設計 */
+    @media (max-width: 768px) {
+        .operator-stats {
+            flex-direction: column;
+        }
+        
+        .operator-stat-card {
+            margin-bottom: 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-user-clock text-success"></i>
+                    作業員現場報工
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_report_index' %}">作業員報工</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">現場報工</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計資訊卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="operator-stat-card">
+                <div class="operator-stat-number text-success">{{ working_operators|default:0 }}</div>
+                <div class="operator-stat-label">工作中作業員</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="operator-stat-card">
+                <div class="operator-stat-number text-info">{{ today_reports|default:0 }}</div>
+                <div class="operator-stat-label">今日報工</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="operator-stat-card">
+                <div class="operator-stat-number text-primary">{{ active_workorders|default:0 }}</div>
+                <div class="operator-stat-label">進行中工單</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="operator-stat-card">
+                <div class="operator-stat-number text-warning">{{ pending_workorders|default:0 }}</div>
+                <div class="operator-stat-label">待處理工單</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速報工區域 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card operator-on-site-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt"></i> 快速報工
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="quickReportForm" method="post">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="operator">作業員</label>
+                                    <select class="form-control" id="operator" name="operator" required>
+                                        <option value="">請選擇作業員</option>
+                                        {% for operator in operator_list %}
+                                        <option value="{{ operator.id }}">{{ operator.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="workorder">工單號</label>
+                                    <select class="form-control" id="workorder" name="workorder" required>
+                                        <option value="">請選擇工單</option>
+                                        {% for workorder in available_workorders_list %}
+                                        <option value="{{ workorder.id }}">{{ workorder.order_number }} ({{ workorder.get_status_display }})</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label for="process">工序</label>
+                                    <select class="form-control" id="process" name="process" required>
+                                        <option value="">請選擇工序</option>
+                                        {% for process in process_list %}
+                                        <option value="{{ process.id }}">{{ process.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label for="quantity">數量</label>
+                                    <input type="number" class="form-control" id="quantity" name="quantity" min="1" required readonly>
+                                    <small class="form-text text-muted">自動帶出工單計劃數量</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label for="equipment">使用設備</label>
+                                    <select class="form-control" id="equipment" name="equipment">
+                                        <option value="">請選擇設備（可選）</option>
+                                        {% for equipment in equipment_list %}
+                                        <option value="{{ equipment.id }}">{{ equipment.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label for="action_type">操作類型</label>
+                                    <select class="form-control" id="action_type" name="action_type" required>
+                                        <option value="start">開始生產</option>
+                                        <option value="pause">暫停生產</option>
+                                        <option value="complete">完工</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label>&nbsp;</label>
+                                    <button type="submit" class="btn btn-success btn-block">
+                                        <i class="fas fa-play"></i> 現場報工
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 進行中工單 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card operator-on-site-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tasks"></i> 正在作業中的報工工序
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if active_workorders_list %}
+                        {% for workorder in active_workorders_list %}
+                        <div class="card workorder-card {% if workorder.priority == 'urgent' %}urgent{% else %}normal{% endif %}">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <h6 class="card-title">{{ workorder.order_number }}</h6>
+                                        <p class="card-text text-muted">{{ workorder.product_code }}</p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <p class="card-text">
+                                            <strong>計劃數量：</strong>{{ workorder.quantity }}<br>
+                                            <strong>已完成：</strong>{{ workorder.completed_quantity }}<br>
+                                            <strong>進度：</strong>{{ workorder.progress }}%
+                                        </p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="card-text">
+                                            <strong>開始時間：</strong>{{ workorder.start_time|date:"Y-m-d H:i" }}<br>
+                                            <strong>最後更新：</strong>{{ workorder.updated_at|date:"Y-m-d H:i" }}<br>
+                                            <strong>負責作業員：</strong>{{ workorder.current_operator }}<br>
+                                            <strong>當前工序：</strong>{{ workorder.current_process }}
+                                        </p>
+                                        <div class="btn-group" role="group">
+                                            {% if workorder.status == 'in_progress' %}
+                                                <a href="#" class="btn btn-sm btn-outline-warning" onclick="changeStatus({{ workorder.id }}, 'pause')">
+                                                    <i class="fas fa-pause"></i> 暫停生產
+                                                </a>
+                                            {% elif workorder.status == 'paused' %}
+                                                <a href="#" class="btn btn-sm btn-outline-primary" onclick="changeStatus({{ workorder.id }}, 'start')">
+                                                    <i class="fas fa-play"></i> 繼續生產
+                                                </a>
+                                            {% endif %}
+                                            <a href="#" class="btn btn-sm btn-outline-info" onclick="viewDetails({{ workorder.id }})">
+                                                <i class="fas fa-eye"></i> 詳情
+                                            </a>
+                                            {% if workorder.status == 'in_progress' or workorder.status == 'paused' %}
+                                                <a href="#" class="btn btn-sm btn-outline-success" onclick="changeStatus({{ workorder.id }}, 'complete')">
+                                                    <i class="fas fa-check"></i> 完工
+                                                </a>
+                                            {% endif %}
+                                            {% if user.is_superuser %}
+                                            <a href="#" class="btn btn-sm btn-outline-danger" onclick="deleteWorkorder({{ workorder.id }}, '{{ workorder.order_number }}')">
+                                                <i class="fas fa-trash"></i> 刪除
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <h5>目前沒有進行中的報工工序</h5>
+                            <p>所有工序都已完成或尚未開始</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 作業員狀態 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card operator-on-site-card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users"></i> 作業員狀態
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover operator-on-site-table">
+                            <thead>
+                                <tr>
+                                    <th>作業員姓名</th>
+                                    <th>工號</th>
+                                    <th>工作狀態</th>
+                                    <th>當前工單</th>
+                                    <th>當前工序</th>
+                                    <th>今日報工</th>
+                                    <th>最後更新</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if operator_status_list %}
+                                    {% for operator in operator_status_list %}
+                                    <tr>
+                                        <td>{{ operator.name }}</td>
+                                        <td>{{ operator.employee_id }}</td>
+                                        <td>
+                                            <span class="status-badge status-{{ operator.status }}">
+                                                {% if operator.status == 'working' %}工作中{% elif operator.status == 'available' %}可用{% else %}離線{% endif %}
+                                            </span>
+                                        </td>
+                                        <td>{{ operator.current_workorder|default:"-" }}</td>
+                                        <td>{{ operator.current_process|default:"-" }}</td>
+                                        <td>{{ operator.today_reports }}</td>
+                                        <td>{{ operator.last_update|date:"Y-m-d H:i" }}</td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="#" class="btn btn-sm btn-outline-success" onclick="reportWork({{ operator.id }})">
+                                                    <i class="fas fa-edit"></i> 報工
+                                                </a>
+                                                <a href="#" class="btn btn-sm btn-outline-info" onclick="viewOperatorDetails({{ operator.id }})">
+                                                    <i class="fas fa-eye"></i> 詳情
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted">
+                                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                                            <br>
+                                            目前沒有作業員狀態資料
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近報工記錄 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card operator-on-site-card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock"></i> 最近報工記錄
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover operator-on-site-table">
+                            <thead>
+                                <tr>
+                                    <th>報工時間</th>
+                                    <th>作業員</th>
+                                    <th>工單號</th>
+                                    <th>工序</th>
+                                    <th>報工數量</th>
+                                    <th>工時</th>
+                                    <th>狀態</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if recent_reports %}
+                                    {% for report in recent_reports %}
+                                    <tr>
+                                        <td>{{ report.report_time|date:"Y-m-d H:i" }}</td>
+                                        <td>{{ report.operator_name }}</td>
+                                        <td>{{ report.workorder_number }}</td>
+                                        <td>{{ report.process_name }}</td>
+                                        <td>{{ report.quantity }}</td>
+                                        <td>{{ report.work_hours }}小時</td>
+                                        <td>
+                                            <span class="status-badge status-{{ report.status }}">
+                                                {{ report.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="#" class="btn btn-sm btn-outline-primary" onclick="viewReportDetails({{ report.id }})">
+                                                <i class="fas fa-eye"></i> 查看
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted">
+                                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                                            <br>
+                                            目前沒有報工記錄
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 作業員現場報工專用 JavaScript
+    document.addEventListener('DOMContentLoaded', function() {
+        // 卡片懸停效果
+        const cards = document.querySelectorAll('.operator-on-site-card');
+        cards.forEach(function(card) {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow-lg');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow-lg');
+            });
+        });
+        
+        // 工單選擇變更事件
+        const workorderSelect = document.getElementById('workorder');
+        const quantityField = document.getElementById('quantity');
+        
+        if (workorderSelect) {
+            workorderSelect.addEventListener('change', function() {
+                const workorderId = this.value;
+                
+                if (workorderId) {
+                    // 獲取工單資訊
+                    fetch('{% url "workorder:get_workorder_info" %}?workorder_id=' + workorderId, {
+                        method: 'GET',
+                        headers: {
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            quantityField.value = data.data.quantity;
+                        } else {
+                            showAlert(data.message, 'danger');
+                            quantityField.value = '';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('獲取工單資訊失敗：', error);
+                        showAlert('獲取工單資訊失敗！', 'danger');
+                        quantityField.value = '';
+                    });
+                } else {
+                    // 清空數量欄位
+                    quantityField.value = '';
+                }
+            });
+        }
+        
+        // 快速報工表單提交
+        const quickReportForm = document.getElementById('quickReportForm');
+        if (quickReportForm) {
+            quickReportForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                showLoading();
+                
+                const formData = new FormData(this);
+                
+                fetch('{% url "workorder:operator_quick_report" %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    hideLoading();
+                    if (data.success) {
+                        showAlert('報工成功！', 'success');
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showAlert(data.message || '報工失敗！', 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('報工失敗：', error);
+                    hideLoading();
+                    showAlert('系統錯誤，請稍後再試！', 'danger');
+                });
+            });
+        }
+        
+        // 自動隱藏訊息提示
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                if (alert.classList.contains('alert-success') || alert.classList.contains('alert-info')) {
+                    setTimeout(function() {
+                        alert.style.opacity = '0';
+                        setTimeout(function() {
+                            alert.remove();
+                        }, 300);
+                    }, 3000);
+                }
+            });
+        }, 1000);
+    });
+    
+    // 變更工單狀態
+    function changeStatus(workorderId, action) {
+        let message = '';
+        switch(action) {
+            case 'start':
+                message = '確定要開始生產嗎？';
+                break;
+            case 'pause':
+                message = '確定要暫停生產嗎？';
+                break;
+            case 'complete':
+                message = '確定要完工嗎？';
+                break;
+            default:
+                message = '確定要執行此操作嗎？';
+        }
+        
+        if (confirmAction(message)) {
+            showLoading();
+            
+            const formData = new FormData();
+            formData.append('workorder_id', workorderId);
+            formData.append('action_type', action);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch('{% url "workorder:operator_change_status" %}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    showAlert(data.message || '操作成功！', 'success');
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showAlert(data.message || '操作失敗！', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('操作失敗：', error);
+                hideLoading();
+                showAlert('系統錯誤，請稍後再試！', 'danger');
+            });
+        }
+    }
+    
+    // 開始工序
+    function startProcess(workorderId) {
+        if (confirmAction('確定要開始此工序嗎？')) {
+            showLoading();
+            
+            const formData = new FormData();
+            formData.append('workorder_id', workorderId);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch('{% url "workorder:operator_start_process" %}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    showAlert('工序已開始！', 'success');
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showAlert(data.message || '操作失敗！', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('操作失敗：', error);
+                hideLoading();
+                showAlert('系統錯誤，請稍後再試！', 'danger');
+            });
+        }
+    }
+    
+    // 報工進度
+    function reportProgress(workorderId) {
+        window.location.href = '{% url "workorder:operator_report_progress" %}?workorder_id=' + workorderId;
+    }
+    
+    // 查看詳情
+    function viewDetails(workorderId) {
+        window.location.href = '{% url "workorder:operator_workorder_detail" %}?workorder_id=' + workorderId;
+    }
+    
+    // 刪除工單
+    function deleteWorkorder(workorderId, workorderNumber) {
+        if (confirmAction(`確定要刪除工單 ${workorderNumber} 嗎？\n\n⚠️ 此操作不可復原，工單及其相關資料將被永久刪除！`)) {
+            showLoading();
+            
+            const formData = new FormData();
+            formData.append('workorder_id', workorderId);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch('{% url "workorder:operator_delete_workorder" %}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    showAlert(data.message || '工單已成功刪除！', 'success');
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showAlert(data.message || '刪除失敗！', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('刪除失敗：', error);
+                hideLoading();
+                showAlert('系統錯誤，請稍後再試！', 'danger');
+            });
+        }
+    }
+    
+    // 派工功能已移至派工單管理模組
+    function assignWorkorder(operatorId) {
+        showAlert('派工功能已移至派工單管理模組，請使用派工單管理進行派工操作', 'warning');
+    }
+    
+    // 報工
+    function reportWork(operatorId) {
+        window.location.href = '{% url "workorder:operator_report_work" %}?operator_id=' + operatorId;
+    }
+    
+    // 查看作業員詳情
+    function viewOperatorDetails(operatorId) {
+        window.location.href = '{% url "workorder:operator_detail" %}?operator_id=' + operatorId;
+    }
+    
+    // 查看報工詳情
+    function viewReportDetails(reportId) {
+        window.location.href = '{% url "workorder:operator_report_detail" %}?report_id=' + reportId;
+    }
+    
+    // 確認操作函數
+    function confirmAction(message) {
+        return confirm(message || '確定要執行此操作嗎？');
+    }
+    
+    // 顯示載入中
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 處理中...</div>';
+        loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.2);z-index:9999;';
+        document.body.appendChild(loadingDiv);
+    }
+    
+    // 隱藏載入中
+    function hideLoading() {
+        const loadingDiv = document.getElementById('loading');
+        if (loadingDiv) {
+            loadingDiv.remove();
+        }
+    }
+    
+    // 顯示提示訊息
+    function showAlert(message, type = 'info') {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // 插入到頁面頂部
+        const container = document.querySelector('.container');
+        if (container) {
+            container.insertBefore(alertDiv, container.firstChild);
+        }
+        
+        // 自動隱藏
+        setTimeout(function() {
+            if (alertDiv.parentNode) {
+                alertDiv.style.opacity = '0';
+                setTimeout(function() {
+                    if (alertDiv.parentNode) {
+                        alertDiv.remove();
+                    }
+                }, 300);
+            }
+        }, 5000);
+    }
+</script>
+{% endblock %} 

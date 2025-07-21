@@ -1,0 +1,612 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if report %}編輯補登報工{% else %}新增補登報工{% endif %}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .operator-supplement-form-container {
+        padding: 20px;
+    }
+    
+    .operator-supplement-form-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .operator-supplement-form-card .card-header {
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+    }
+    
+    .form-section {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .form-section h6 {
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 8px;
+        margin-bottom: 15px;
+    }
+    
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+    }
+    
+    .help-text {
+        font-size: 0.875em;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+    
+    .time-input-group {
+        display: flex;
+        align-items: center;
+    }
+    
+    .time-input-group .form-control {
+        flex: 1;
+        margin-right: 10px;
+    }
+    
+    .time-input-group .btn {
+        flex-shrink: 0;
+    }
+    
+    .preview-section {
+        background-color: #e9ecef;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+    
+    .preview-section h6 {
+        color: #495057;
+        margin-bottom: 15px;
+    }
+    
+    .preview-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .preview-item:last-child {
+        border-bottom: none;
+    }
+    
+    .preview-label {
+        font-weight: bold;
+        color: #495057;
+    }
+    
+    .preview-value {
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-edit text-warning"></i>
+                    {% if report %}編輯補登報工{% else %}新增補登報工{% endif %}
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_report_index' %}">作業員報工</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_index' %}">補登報工</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">{% if report %}編輯{% else %}新增{% endif %}</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" id="supplementForm">
+        {% csrf_token %}
+        
+        <!-- 基本資訊 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card operator-supplement-form-card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle"></i> 基本資訊
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-section">
+                            <h6>報工人員與工單資訊</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="operator" class="required-field">作業員</label>
+                                        <select class="form-control" id="operator" name="operator" required>
+                                            <option value="">請選擇作業員</option>
+                                            {% for operator in operator_list %}
+                                            <option value="{{ operator.id }}" {% if report.operator_id == operator.id or form.operator.value == operator.id %}selected{% endif %}>
+                                                {{ operator.name }} ({{ operator.employee_id }})
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                        {% if form.operator.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.operator.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="workorder" class="required-field">工單號</label>
+                                        <select class="form-control" id="workorder" name="workorder" required>
+                                            <option value="">請選擇工單</option>
+                                            {% for workorder in workorder_list %}
+                                            <option value="{{ workorder.id }}" {% if report.workorder_id == workorder.id or form.workorder.value == workorder.id %}selected{% endif %}>
+                                                {{ workorder.workorder_number }} - {{ workorder.product_name }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                        {% if form.workorder.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.workorder.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="process" class="required-field">工序</label>
+                                        <select class="form-control" id="process" name="process" required>
+                                            <option value="">請選擇工序</option>
+                                            {% for process in process_list %}
+                                            <option value="{{ process.id }}" {% if report.process_id == process.id or form.process.value == process.id %}selected{% endif %}>
+                                                {{ process.name }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                        {% if form.process.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.process.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 報工時間 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card operator-supplement-form-card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clock"></i> 報工時間
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-section">
+                            <h6>報工日期與時間</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="report_date" class="required-field">報工日期</label>
+                                        <input type="date" class="form-control" id="report_date" name="report_date" 
+                                               value="{% if report %}{{ report.report_time|date:'Y-m-d' }}{% elif form.report_date.value %}{{ form.report_date.value }}{% else %}{{ today }}{% endif %}" required>
+                                        {% if form.report_date.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.report_date.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="start_time" class="required-field">開始時間</label>
+                                        <div class="time-input-group">
+                                            <input type="time" class="form-control" id="start_time" name="start_time" 
+                                                   value="{% if report %}{{ report.start_time|time:'H:i' }}{% elif form.start_time.value %}{{ form.start_time.value }}{% endif %}" required>
+                                            <button type="button" class="btn btn-outline-secondary" onclick="setCurrentTime('start_time')">
+                                                <i class="fas fa-clock"></i>
+                                            </button>
+                                        </div>
+                                        {% if form.start_time.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.start_time.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="end_time" class="required-field">結束時間</label>
+                                        <div class="time-input-group">
+                                            <input type="time" class="form-control" id="end_time" name="end_time" 
+                                                   value="{% if report %}{{ report.end_time|time:'H:i' }}{% elif form.end_time.value %}{{ form.end_time.value }}{% endif %}" required>
+                                            <button type="button" class="btn btn-outline-secondary" onclick="setCurrentTime('end_time')">
+                                                <i class="fas fa-clock"></i>
+                                            </button>
+                                        </div>
+                                        {% if form.end_time.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.end_time.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="work_hours">工時（小時）</label>
+                                        <input type="number" class="form-control" id="work_hours" name="work_hours" 
+                                               value="{% if report %}{{ report.work_hours }}{% elif form.work_hours.value %}{{ form.work_hours.value }}{% endif %}" 
+                                               step="0.5" min="0" readonly>
+                                        <div class="help-text">系統自動計算</div>
+                                        {% if form.work_hours.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.work_hours.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 報工數量 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card operator-supplement-form-card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-boxes"></i> 報工數量
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-section">
+                            <h6>生產數量與品質</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="quantity" class="required-field">報工數量</label>
+                                        <input type="number" class="form-control" id="quantity" name="quantity" 
+                                               value="{% if report %}{{ report.quantity }}{% elif form.quantity.value %}{{ form.quantity.value }}{% endif %}" 
+                                               min="1" required>
+                                        {% if form.quantity.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.quantity.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="good_quantity">良品數量</label>
+                                        <input type="number" class="form-control" id="good_quantity" name="good_quantity" 
+                                               value="{% if report %}{{ report.good_quantity }}{% elif form.good_quantity.value %}{{ form.good_quantity.value }}{% endif %}" 
+                                               min="0">
+                                        {% if form.good_quantity.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.good_quantity.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="defect_quantity">不良品數量</label>
+                                        <input type="number" class="form-control" id="defect_quantity" name="defect_quantity" 
+                                               value="{% if report %}{{ report.defect_quantity }}{% elif form.defect_quantity.value %}{{ form.defect_quantity.value }}{% endif %}" 
+                                               min="0">
+                                        {% if form.defect_quantity.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.defect_quantity.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="yield_rate">良率（%）</label>
+                                        <input type="number" class="form-control" id="yield_rate" name="yield_rate" 
+                                               value="{% if report %}{{ report.yield_rate }}{% elif form.yield_rate.value %}{{ form.yield_rate.value }}{% endif %}" 
+                                               step="0.01" min="0" max="100" readonly>
+                                        <div class="help-text">系統自動計算</div>
+                                        {% if form.yield_rate.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.yield_rate.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 備註資訊 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card operator-supplement-form-card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-comment"></i> 備註資訊
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-section">
+                            <h6>報工備註與異常記錄</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="notes">報工備註</label>
+                                        <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                                  placeholder="請輸入報工相關備註...">{% if report %}{{ report.notes }}{% elif form.notes.value %}{{ form.notes.value }}{% endif %}</textarea>
+                                        {% if form.notes.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.notes.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="abnormal_notes">異常記錄</label>
+                                        <textarea class="form-control" id="abnormal_notes" name="abnormal_notes" rows="3" 
+                                                  placeholder="請輸入異常情況記錄...">{% if report %}{{ report.abnormal_notes }}{% elif form.abnormal_notes.value %}{{ form.abnormal_notes.value }}{% endif %}</textarea>
+                                        {% if form.abnormal_notes.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.abnormal_notes.errors.0 }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 預覽區域 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="preview-section">
+                    <h6><i class="fas fa-eye"></i> 報工預覽</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="preview-item">
+                                <span class="preview-label">作業員：</span>
+                                <span class="preview-value" id="preview-operator">-</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-label">工單號：</span>
+                                <span class="preview-value" id="preview-workorder">-</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-label">工序：</span>
+                                <span class="preview-value" id="preview-process">-</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="preview-item">
+                                <span class="preview-label">報工時間：</span>
+                                <span class="preview-value" id="preview-time">-</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-label">工時：</span>
+                                <span class="preview-value" id="preview-hours">-</span>
+                            </div>
+                            <div class="preview-item">
+                                <span class="preview-label">報工數量：</span>
+                                <span class="preview-value" id="preview-quantity">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作按鈕 -->
+        <div class="row">
+            <div class="col-12 text-center">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-save"></i> {% if report %}更新補登報工{% else %}儲存補登報工{% endif %}
+                </button>
+                <a href="{% url 'workorder:operator_supplement_index' %}" class="btn btn-secondary btn-lg">
+                    <i class="fas fa-times"></i> 取消
+                </a>
+                {% if report %}
+                <button type="button" class="btn btn-warning btn-lg" onclick="saveAsDraft()">
+                    <i class="fas fa-edit"></i> 儲存為草稿
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 作業員補登報工表單專用 JavaScript
+    $(document).ready(function() {
+        // 初始化預覽
+        updatePreview();
+        
+        // 監聽表單變更
+        $('#supplementForm input, #supplementForm select, #supplementForm textarea').on('change keyup', function() {
+            updatePreview();
+            calculateWorkHours();
+            calculateYieldRate();
+        });
+        
+        // 自動隱藏訊息提示
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                if (alert.classList.contains('alert-success') || alert.classList.contains('alert-info')) {
+                    setTimeout(function() {
+                        alert.style.opacity = '0';
+                        setTimeout(function() {
+                            alert.remove();
+                        }, 300);
+                    }, 3000);
+                }
+            });
+        }, 1000);
+    });
+    
+    // 設定當前時間
+    function setCurrentTime(fieldId) {
+        const now = new Date();
+        const timeString = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        document.getElementById(fieldId).value = timeString;
+        updatePreview();
+        calculateWorkHours();
+    }
+    
+    // 計算工時
+    function calculateWorkHours() {
+        const startTime = document.getElementById('start_time').value;
+        const endTime = document.getElementById('end_time').value;
+        
+        if (startTime && endTime) {
+            const start = new Date('2000-01-01 ' + startTime);
+            const end = new Date('2000-01-01 ' + endTime);
+            
+            if (end < start) {
+                end.setDate(end.getDate() + 1); // 跨日處理
+            }
+            
+            const diffHours = (end - start) / (1000 * 60 * 60);
+            document.getElementById('work_hours').value = diffHours.toFixed(2);
+        }
+    }
+    
+    // 計算良率
+    function calculateYieldRate() {
+        const quantity = parseInt(document.getElementById('quantity').value) || 0;
+        const goodQuantity = parseInt(document.getElementById('good_quantity').value) || 0;
+        
+        if (quantity > 0) {
+            const yieldRate = (goodQuantity / quantity * 100).toFixed(2);
+            document.getElementById('yield_rate').value = yieldRate;
+        } else {
+            document.getElementById('yield_rate').value = '';
+        }
+    }
+    
+    // 更新預覽
+    function updatePreview() {
+        // 作業員
+        const operatorSelect = document.getElementById('operator');
+        const operatorText = operatorSelect.options[operatorSelect.selectedIndex].text;
+        document.getElementById('preview-operator').textContent = operatorText || '-';
+        
+        // 工單號
+        const workorderSelect = document.getElementById('workorder');
+        const workorderText = workorderSelect.options[workorderSelect.selectedIndex].text;
+        document.getElementById('preview-workorder').textContent = workorderText || '-';
+        
+        // 工序
+        const processSelect = document.getElementById('process');
+        const processText = processSelect.options[processSelect.selectedIndex].text;
+        document.getElementById('preview-process').textContent = processText || '-';
+        
+        // 報工時間
+        const reportDate = document.getElementById('report_date').value;
+        const startTime = document.getElementById('start_time').value;
+        const endTime = document.getElementById('end_time').value;
+        if (reportDate && startTime && endTime) {
+            document.getElementById('preview-time').textContent = `${reportDate} ${startTime} - ${endTime}`;
+        } else {
+            document.getElementById('preview-time').textContent = '-';
+        }
+        
+        // 工時
+        const workHours = document.getElementById('work_hours').value;
+        document.getElementById('preview-hours').textContent = workHours ? `${workHours} 小時` : '-';
+        
+        // 報工數量
+        const quantity = document.getElementById('quantity').value;
+        document.getElementById('preview-quantity').textContent = quantity || '-';
+    }
+    
+    // 儲存為草稿
+    function saveAsDraft() {
+        const draftInput = document.createElement('input');
+        draftInput.type = 'hidden';
+        draftInput.name = 'save_as_draft';
+        draftInput.value = '1';
+        document.getElementById('supplementForm').appendChild(draftInput);
+        document.getElementById('supplementForm').submit();
+    }
+    
+    // 表單提交前驗證
+    document.getElementById('supplementForm').addEventListener('submit', function(e) {
+        const quantity = parseInt(document.getElementById('quantity').value) || 0;
+        const goodQuantity = parseInt(document.getElementById('good_quantity').value) || 0;
+        const defectQuantity = parseInt(document.getElementById('defect_quantity').value) || 0;
+        
+        if (goodQuantity + defectQuantity > quantity) {
+            e.preventDefault();
+            alert('良品數量與不良品數量總和不能超過報工數量！');
+            return false;
+        }
+        
+        if (quantity <= 0) {
+            e.preventDefault();
+            alert('報工數量必須大於0！');
+            return false;
+        }
+        
+        const startTime = document.getElementById('start_time').value;
+        const endTime = document.getElementById('end_time').value;
+        
+        if (startTime && endTime && startTime >= endTime) {
+            e.preventDefault();
+            alert('結束時間必須晚於開始時間！');
+            return false;
+        }
+    });
+    
+    // 顯示載入中
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 處理中...</div>';
+        loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.2);z-index:9999;';
+        document.body.appendChild(loadingDiv);
+    }
+    
+    // 隱藏載入中
+    function hideLoading() {
+        const loadingDiv = document.getElementById('loading');
+        if (loadingDiv) {
+            loadingDiv.remove();
+        }
+    }
+</script>
+{% endblock %} 

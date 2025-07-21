@@ -1,0 +1,630 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}補登報工詳情{% endblock %}
+
+{% block extra_head %}
+<style>
+    .operator-supplement-detail-container {
+        padding: 20px;
+    }
+    
+    .operator-supplement-detail-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .operator-supplement-detail-card .card-header {
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+    }
+    
+    .detail-section {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .detail-section h6 {
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 8px;
+        margin-bottom: 15px;
+    }
+    
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+    
+    .detail-label {
+        font-weight: bold;
+        color: #495057;
+        min-width: 120px;
+    }
+    
+    .detail-value {
+        color: #6c757d;
+        text-align: right;
+        flex: 1;
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+    }
+    
+    .status-pending {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-approved {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-rejected {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-draft {
+        background-color: #e2e3e5;
+        color: #383d41;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .notes-section {
+        background-color: #e9ecef;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 15px;
+    }
+    
+    .notes-content {
+        white-space: pre-wrap;
+        color: #495057;
+        line-height: 1.5;
+    }
+    
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+    
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 15px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: #dee2e6;
+    }
+    
+    .timeline-item {
+        position: relative;
+        margin-bottom: 20px;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -22px;
+        top: 5px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: #007bff;
+        border: 2px solid #fff;
+    }
+    
+    .timeline-item.approved::before {
+        background-color: #28a745;
+    }
+    
+    .timeline-item.rejected::before {
+        background-color: #dc3545;
+    }
+    
+    .timeline-item.draft::before {
+        background-color: #6c757d;
+    }
+    
+    .timeline-content {
+        background-color: #fff;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .timeline-title {
+        font-weight: bold;
+        color: #495057;
+        margin-bottom: 5px;
+    }
+    
+    .timeline-time {
+        font-size: 0.8em;
+        color: #6c757d;
+    }
+    
+    .timeline-description {
+        color: #495057;
+        margin-top: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-eye text-info"></i>
+                    補登報工詳情
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_report_index' %}">作業員報工</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_index' %}">補登報工</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">詳情</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 狀態與操作 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card operator-supplement-detail-card">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle"></i> 報工狀態
+                        </h5>
+                        <div class="action-buttons">
+                            {% if report.status == 'draft' %}
+                            <a href="{% url 'workorder:operator_supplement_edit' report.id %}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-edit"></i> 編輯
+                            </a>
+                            <a href="#" class="btn btn-danger btn-sm" onclick="deleteReport({{ report.id }})">
+                                <i class="fas fa-trash"></i> 刪除
+                            </a>
+                            {% endif %}
+                            {% if report.status == 'pending' and user.is_staff %}
+                            <a href="#" class="btn btn-success btn-sm" onclick="approveReport({{ report.id }})">
+                                <i class="fas fa-check"></i> 審核通過
+                            </a>
+                            <a href="#" class="btn btn-danger btn-sm" onclick="rejectReport({{ report.id }})">
+                                <i class="fas fa-times"></i> 駁回
+                            </a>
+                            {% endif %}
+                            <a href="{% url 'workorder:operator_supplement_index' %}" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-arrow-left"></i> 返回列表
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="detail-item">
+                                <span class="detail-label">報工編號：</span>
+                                <span class="detail-value">{{ report.id }}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">審核狀態：</span>
+                                <span class="detail-value">
+                                    <span class="status-badge status-{{ report.status }}">
+                                        {{ report.get_status_display }}
+                                    </span>
+                                </span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">建立時間：</span>
+                                <span class="detail-value">{{ report.created_at|date:"Y-m-d H:i:s" }}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">最後更新：</span>
+                                <span class="detail-value">{{ report.updated_at|date:"Y-m-d H:i:s" }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="detail-item">
+                                <span class="detail-label">建立人員：</span>
+                                <span class="detail-value">{{ report.created_by.get_full_name|default:report.created_by.username }}</span>
+                            </div>
+                            {% if report.approved_by %}
+                            <div class="detail-item">
+                                <span class="detail-label">審核人員：</span>
+                                <span class="detail-value">{{ report.approved_by.get_full_name|default:report.approved_by.username }}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">審核時間：</span>
+                                <span class="detail-value">{{ report.approved_at|date:"Y-m-d H:i:s" }}</span>
+                            </div>
+                            {% endif %}
+                            {% if report.rejection_reason %}
+                            <div class="detail-item">
+                                <span class="detail-label">駁回原因：</span>
+                                <span class="detail-value">{{ report.rejection_reason }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 基本資訊 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card operator-supplement-detail-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user"></i> 基本資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <h6>報工人員與工單資訊</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="detail-item">
+                                    <span class="detail-label">作業員：</span>
+                                    <span class="detail-value">{{ report.operator.name }} ({{ report.operator.employee_id }})</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">工單號：</span>
+                                    <span class="detail-value">{{ report.workorder.workorder_number }}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">產品名稱：</span>
+                                    <span class="detail-value">{{ report.workorder.product_name }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item">
+                                    <span class="detail-label">工序：</span>
+                                    <span class="detail-value">{{ report.process.name }}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">工序代號：</span>
+                                    <span class="detail-value">{{ report.process.code }}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">工序描述：</span>
+                                    <span class="detail-value">{{ report.process.description|default:"-" }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報工時間 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card operator-supplement-detail-card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock"></i> 報工時間
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <h6>報工日期與時間</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="detail-item">
+                                    <span class="detail-label">報工日期：</span>
+                                    <span class="detail-value">{{ report.report_time|date:"Y-m-d" }}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">開始時間：</span>
+                                    <span class="detail-value">{{ report.start_time|time:"H:i" }}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">結束時間：</span>
+                                    <span class="detail-value">{{ report.end_time|time:"H:i" }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item">
+                                    <span class="detail-label">工時：</span>
+                                    <span class="detail-value">{{ report.work_hours }} 小時</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">報工時間：</span>
+                                    <span class="detail-value">{{ report.report_time|date:"Y-m-d H:i" }}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">時間區間：</span>
+                                    <span class="detail-value">{{ report.start_time|time:"H:i" }} - {{ report.end_time|time:"H:i" }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報工數量 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card operator-supplement-detail-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-boxes"></i> 報工數量
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="detail-section">
+                        <h6>生產數量與品質</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="detail-item">
+                                    <span class="detail-label">報工數量：</span>
+                                    <span class="detail-value">{{ report.quantity }}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">良品數量：</span>
+                                    <span class="detail-value">{{ report.good_quantity|default:"-" }}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">不良品數量：</span>
+                                    <span class="detail-value">{{ report.defect_quantity|default:"-" }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="detail-item">
+                                    <span class="detail-label">良率：</span>
+                                    <span class="detail-value">{{ report.yield_rate|default:"-" }}%</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">效率：</span>
+                                    <span class="detail-value">{{ report.efficiency|default:"-" }}%</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">單位產出：</span>
+                                    <span class="detail-value">{{ report.unit_output|default:"-" }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 備註資訊 -->
+    {% if report.notes or report.abnormal_notes %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card operator-supplement-detail-card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-comment"></i> 備註資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if report.notes %}
+                    <div class="notes-section">
+                        <h6>報工備註</h6>
+                        <div class="notes-content">{{ report.notes }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if report.abnormal_notes %}
+                    <div class="notes-section">
+                        <h6>異常記錄</h6>
+                        <div class="notes-content">{{ report.abnormal_notes }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 審核歷程 -->
+    {% if report.audit_logs %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card operator-supplement-detail-card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history"></i> 審核歷程
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        {% for log in report.audit_logs %}
+                        <div class="timeline-item {{ log.action }}">
+                            <div class="timeline-content">
+                                <div class="timeline-title">{{ log.get_action_display }}</div>
+                                <div class="timeline-time">{{ log.created_at|date:"Y-m-d H:i:s" }}</div>
+                                <div class="timeline-description">
+                                    {% if log.action == 'created' %}
+                                        由 {{ log.user.get_full_name|default:log.user.username }} 建立
+                                    {% elif log.action == 'updated' %}
+                                        由 {{ log.user.get_full_name|default:log.user.username }} 更新
+                                    {% elif log.action == 'approved' %}
+                                        由 {{ log.user.get_full_name|default:log.user.username }} 審核通過
+                                    {% elif log.action == 'rejected' %}
+                                        由 {{ log.user.get_full_name|default:log.user.username }} 駁回
+                                        {% if log.notes %}<br>駁回原因：{{ log.notes }}{% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 作業員補登報工詳情專用 JavaScript
+    $(document).ready(function() {
+        // 自動隱藏訊息提示
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                if (alert.classList.contains('alert-success') || alert.classList.contains('alert-info')) {
+                    setTimeout(function() {
+                        alert.style.opacity = '0';
+                        setTimeout(function() {
+                            alert.remove();
+                        }, 300);
+                    }, 3000);
+                }
+            });
+        }, 1000);
+    });
+    
+    // 刪除報工記錄
+    function deleteReport(reportId) {
+        if (confirmAction('確定要刪除此補登報工記錄嗎？此操作無法復原。')) {
+            showLoading();
+            $.post('{% url "workorder:operator_supplement_delete" %}', {
+                report_id: reportId,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            })
+            .done(function(response) {
+                hideLoading();
+                if (response.success) {
+                    showAlert('刪除成功！', 'success');
+                    setTimeout(function() {
+                        window.location.href = '{% url "workorder:operator_supplement_index" %}';
+                    }, 1500);
+                } else {
+                    showAlert(response.message || '刪除失敗！', 'danger');
+                }
+            })
+            .fail(function() {
+                hideLoading();
+                showAlert('系統錯誤，請稍後再試！', 'danger');
+            });
+        }
+    }
+    
+    // 審核通過
+    function approveReport(reportId) {
+        if (confirmAction('確定要審核通過此補登報工記錄嗎？')) {
+            showLoading();
+            $.post('{% url "workorder:operator_supplement_approve" %}', {
+                report_id: reportId,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            })
+            .done(function(response) {
+                hideLoading();
+                if (response.success) {
+                    showAlert('審核通過成功！', 'success');
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showAlert(response.message || '審核失敗！', 'danger');
+                }
+            })
+            .fail(function() {
+                hideLoading();
+                showAlert('系統錯誤，請稍後再試！', 'danger');
+            });
+        }
+    }
+    
+    // 審核駁回
+    function rejectReport(reportId) {
+        const reason = prompt('請輸入駁回原因：');
+        if (reason !== null) {
+            showLoading();
+            $.post('{% url "workorder:operator_supplement_reject" %}', {
+                report_id: reportId,
+                reason: reason,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            })
+            .done(function(response) {
+                hideLoading();
+                if (response.success) {
+                    showAlert('駁回成功！', 'success');
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showAlert(response.message || '駁回失敗！', 'danger');
+                }
+            })
+            .fail(function() {
+                hideLoading();
+                showAlert('系統錯誤，請稍後再試！', 'danger');
+            });
+        }
+    }
+    
+    // 確認操作函數
+    function confirmAction(message) {
+        return confirm(message || '確定要執行此操作嗎？');
+    }
+    
+    // 顯示載入中
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 處理中...</div>';
+        loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.2);z-index:9999;';
+        document.body.appendChild(loadingDiv);
+    }
+    
+    // 隱藏載入中
+    function hideLoading() {
+        const loadingDiv = document.getElementById('loading');
+        if (loadingDiv) {
+            loadingDiv.remove();
+        }
+    }
+    
+    // 顯示提示訊息
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="close" data-dismiss="alert">
+                <span>&times;</span>
+            </button>
+        `;
+        document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
+    }
+</script>
+{% endblock %} 

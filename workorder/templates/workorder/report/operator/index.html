@@ -142,15 +142,125 @@
         </div>
     </div>
 
+    <!-- 功能卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card operator-report-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clipboard-check"></i> 作業員現場報工
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        作業員生產線現場即時報工功能，支援即時數據輸入和狀態更新。
+                    </p>
+                    <ul class="list-unstyled mb-3">
+                        <li><i class="fas fa-check text-success"></i> 即時生產數據輸入</li>
+                        <li><i class="fas fa-check text-success"></i> 工序狀態監控</li>
+                        <li><i class="fas fa-check text-success"></i> 品質數據記錄</li>
+                        <li><i class="fas fa-check text-success"></i> 異常情況處理</li>
+                    </ul>
+                    <a href="{% url 'workorder:operator_on_site_report' %}" class="btn btn-success">
+                        <i class="fas fa-play"></i> 開始現場報工
+                    </a>
+                </div>
+            </div>
+        </div>
 
+        <div class="col-md-6">
+            <div class="card operator-report-card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history"></i> 作業員補登報工
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        作業員生產線補登歷史報工記錄，支援離線數據輸入和歷史數據修正。
+                    </p>
+                    <ul class="list-unstyled mb-3">
+                        <li><i class="fas fa-check text-warning"></i> 歷史數據補登</li>
+                        <li><i class="fas fa-check text-warning"></i> 批量數據輸入</li>
+                        <li><i class="fas fa-check text-warning"></i> 數據修正功能</li>
+                        <li><i class="fas fa-check text-warning"></i> 離線操作支援</li>
+                    </ul>
+                    <a href="{% url 'workorder:operator_supplement_report_index' %}" class="btn btn-warning">
+                        <i class="fas fa-edit"></i> 開始補登報工
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <!-- 最近報工記錄 -->
+    <!-- 作業員列表 -->
     <div class="row mt-4">
         <div class="col-12">
             <div class="card operator-report-card">
                 <div class="card-header bg-light">
                     <h5 class="mb-0">
-                        <i class="fas fa-clock"></i> 最近報工記錄
+                        <i class="fas fa-list"></i> 作業員列表
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover operator-report-table">
+                            <thead>
+                                <tr>
+                                    <th>作業員姓名</th>
+                                    <th>工號</th>
+                                    <th>工作狀態</th>
+                                    <th>今日報工</th>
+                                    <th>本月報工</th>
+                                    <th>最後更新</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if operator_list %}
+                                    {% for operator in operator_list %}
+                                    <tr>
+                                        <td>{{ operator.name }}</td>
+                                        <td>{{ operator.employee_id }}</td>
+                                        <td>
+                                            <span class="status-badge status-{{ operator.status }}">
+                                                {{ operator.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>{{ operator.today_reports }}</td>
+                                        <td>{{ operator.month_reports }}</td>
+                                        <td>{{ operator.last_update|date:"Y-m-d H:i" }}</td>
+                                        <td>
+                                            <a href="#" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> 查看
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted">
+                                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                                            <br>
+                                            目前沒有作業員資料
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近作業員報工記錄 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card operator-report-card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock"></i> 最近作業員報工記錄
                     </h5>
                 </div>
                 <div class="card-body">
@@ -159,12 +269,12 @@
                             <thead>
                                 <tr>
                                     <th>報工時間</th>
+                                    <th>作業員</th>
                                     <th>工單號</th>
                                     <th>工序</th>
                                     <th>報工數量</th>
                                     <th>工時</th>
                                     <th>審核狀態</th>
-                                    <th>備註</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -173,6 +283,7 @@
                                     {% for report in recent_reports %}
                                     <tr>
                                         <td>{{ report.report_time|date:"Y-m-d H:i" }}</td>
+                                        <td>{{ report.operator_name }}</td>
                                         <td>{{ report.workorder_number }}</td>
                                         <td>{{ report.process_name }}</td>
                                         <td>{{ report.quantity }}</td>
@@ -182,7 +293,6 @@
                                                 {{ report.get_status_display }}
                                             </span>
                                         </td>
-                                        <td>{{ report.notes|truncatechars:20 }}</td>
                                         <td>
                                             <a href="#" class="btn btn-sm btn-outline-primary">
                                                 <i class="fas fa-eye"></i> 查看
@@ -195,7 +305,7 @@
                                         <td colspan="8" class="text-center text-muted">
                                             <i class="fas fa-inbox fa-2x mb-2"></i>
                                             <br>
-                                            目前沒有報工記錄
+                                            目前沒有作業員報工記錄
                                         </td>
                                     </tr>
                                 {% endif %}
@@ -212,16 +322,17 @@
 {% block extra_js %}
 <script>
     // 作業員報工專用 JavaScript
-    $(document).ready(function() {
+    document.addEventListener('DOMContentLoaded', function() {
         // 卡片懸停效果
-        $('.operator-report-card').hover(
-            function() {
-                $(this).addClass('shadow-lg');
-            },
-            function() {
-                $(this).removeClass('shadow-lg');
-            }
-        );
+        const cards = document.querySelectorAll('.operator-report-card');
+        cards.forEach(function(card) {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow-lg');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow-lg');
+            });
+        });
         
         // 自動隱藏訊息提示
         setTimeout(function() {

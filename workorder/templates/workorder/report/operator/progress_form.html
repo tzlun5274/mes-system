@@ -1,0 +1,446 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}進度報工{% endblock %}
+
+{% block extra_head %}
+<style>
+    .progress-form-container {
+        padding: 20px;
+    }
+    
+    .progress-form-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .progress-form-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .workorder-info {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .workorder-info h5 {
+        color: #007bff;
+        margin-bottom: 15px;
+    }
+    
+    .info-row {
+        margin-bottom: 10px;
+    }
+    
+    .info-label {
+        font-weight: bold;
+        color: #495057;
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+    }
+    
+    .status-in-progress {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-label {
+        font-weight: bold;
+        color: #495057;
+        margin-bottom: 8px;
+    }
+    
+    .form-control:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+    
+    .progress-bar {
+        height: 20px;
+        border-radius: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-clipboard-check"></i> 進度報工
+                </h2>
+                <a href="{% url 'workorder:operator_workorder_detail' %}?workorder_id={{ workorder.id }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> 返回工單詳情
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工單基本資訊 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="workorder-info">
+                <h5>
+                    <i class="fas fa-info-circle"></i> 工單資訊
+                </h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-row">
+                            <span class="info-label">工單號：</span>
+                            <strong>{{ workorder.order_number }}</strong>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">產品編號：</span>
+                            {{ workorder.product_code }}
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">產品名稱：</span>
+                            {{ workorder.product_name|default:'未設定' }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-row">
+                            <span class="info-label">計劃數量：</span>
+                            {{ workorder.quantity }}
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">完成數量：</span>
+                            {{ workorder.completed_quantity|default:0 }}
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">狀態：</span>
+                            <span class="status-badge status-{{ workorder.status }}">
+                                {{ workorder.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 進度報工表單 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card progress-form-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit"></i> 進度報工表單
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="progressForm" method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="workorder_id" value="{{ workorder.id }}">
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-calendar"></i> 報工日期
+                                    </label>
+                                    <input type="date" class="form-control" name="report_date" 
+                                           value="{{ today|date:'Y-m-d' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-clock"></i> 報工時間
+                                    </label>
+                                    <input type="time" class="form-control" name="report_time" 
+                                           value="{{ now|date:'H:i' }}" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-boxes"></i> 本次完成數量
+                                    </label>
+                                    <input type="number" class="form-control" name="completed_quantity" 
+                                           min="0" max="{{ workorder.quantity }}" 
+                                           placeholder="請輸入完成數量" required>
+                                    <small class="form-text text-muted">
+                                        剩餘數量：{{ workorder.quantity|add:"-"|add:workorder.completed_quantity|default:0|floatformat:0 }}
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-user"></i> 作業員
+                                    </label>
+                                    <select class="form-control" name="operator_id" required>
+                                        <option value="">請選擇作業員</option>
+                                        <!-- 這裡會透過 AJAX 載入作業員列表 -->
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-cogs"></i> 使用設備
+                                    </label>
+                                    <select class="form-control" name="equipment_id">
+                                        <option value="">請選擇設備（可選）</option>
+                                        <!-- 這裡會透過 AJAX 載入設備列表 -->
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-exclamation-triangle"></i> 不良品數量
+                                    </label>
+                                    <input type="number" class="form-control" name="defect_quantity" 
+                                           min="0" value="0" placeholder="不良品數量">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-sticky-note"></i> 備註
+                            </label>
+                            <textarea class="form-control" name="notes" rows="3" 
+                                      placeholder="請輸入備註資訊（可選）"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-chart-line"></i> 當前進度
+                            </label>
+                            <div class="progress">
+                                <div class="progress-bar bg-success" role="progressbar" 
+                                     style="width: {% if workorder.quantity > 0 %}{% widthratio workorder.completed_quantity|default:0 workorder.quantity 100 %}{% else %}0{% endif %}%"
+                                     aria-valuenow="{% if workorder.quantity > 0 %}{% widthratio workorder.completed_quantity|default:0 workorder.quantity 100 %}{% else %}0{% endif %}" 
+                                     aria-valuemin="0" aria-valuemax="100">
+                                    {% if workorder.quantity > 0 %}
+                                        {% widthratio workorder.completed_quantity|default:0 workorder.quantity 100 %}%
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-center gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> 提交報工
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
+                                <i class="fas fa-times"></i> 取消
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 進度報工專用 JavaScript
+    document.addEventListener('DOMContentLoaded', function() {
+        // 卡片懸停效果
+        const cards = document.querySelectorAll('.progress-form-card');
+        cards.forEach(function(card) {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow-lg');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow-lg');
+            });
+        });
+        
+        // 載入作業員列表
+        loadOperators();
+        
+        // 載入設備列表
+        loadEquipments();
+        
+        // 表單提交處理
+        document.getElementById('progressForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitProgress();
+        });
+        
+        // 自動隱藏訊息提示
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                if (alert.classList.contains('alert-success') || alert.classList.contains('alert-info')) {
+                    setTimeout(function() {
+                        alert.style.opacity = '0';
+                        setTimeout(function() {
+                            alert.remove();
+                        }, 300);
+                    }, 3000);
+                }
+            });
+        }, 1000);
+    });
+    
+    // 載入作業員列表
+    function loadOperators() {
+        fetch('{% url "workorder:get_operators_only" %}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const operatorSelect = document.querySelector('select[name="operator_id"]');
+                data.operators.forEach(function(operator) {
+                    const option = document.createElement('option');
+                    option.value = operator.id;
+                    option.textContent = operator.name;
+                    operatorSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('載入作業員失敗：', error);
+        });
+    }
+    
+    // 載入設備列表
+    function loadEquipments() {
+        fetch('{% url "workorder:get_equipments_only" %}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const equipmentSelect = document.querySelector('select[name="equipment_id"]');
+                data.equipments.forEach(function(equipment) {
+                    const option = document.createElement('option');
+                    option.value = equipment.id;
+                    option.textContent = equipment.name;
+                    equipmentSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('載入設備失敗：', error);
+        });
+    }
+    
+    // 提交進度報工
+    function submitProgress() {
+        const form = document.getElementById('progressForm');
+        const formData = new FormData(form);
+        
+        // 驗證表單
+        if (!validateForm(formData)) {
+            return;
+        }
+        
+        showLoading();
+        
+        fetch('{% url "workorder:operator_quick_report" %}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                showAlert('進度報工成功！', 'success');
+                setTimeout(function() {
+                    window.location.href = '{% url "workorder:operator_workorder_detail" %}?workorder_id={{ workorder.id }}';
+                }, 1500);
+            } else {
+                showAlert(data.message || '報工失敗！', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('報工失敗：', error);
+            hideLoading();
+            showAlert('系統錯誤，請稍後再試！', 'danger');
+        });
+    }
+    
+    // 驗證表單
+    function validateForm(formData) {
+        const completedQuantity = parseInt(formData.get('completed_quantity'));
+        const plannedQuantity = {{ workorder.quantity }};
+        const currentCompleted = {{ workorder.completed_quantity|default:0 }};
+        const remainingQuantity = plannedQuantity - currentCompleted;
+        
+        if (completedQuantity > remainingQuantity) {
+            showAlert(`完成數量不能超過剩餘數量 ${remainingQuantity}！`, 'danger');
+            return false;
+        }
+        
+        if (completedQuantity <= 0) {
+            showAlert('完成數量必須大於0！', 'danger');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // 顯示載入中
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 處理中...</div>';
+        loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.2);z-index:9999;';
+        document.body.appendChild(loadingDiv);
+    }
+    
+    // 隱藏載入中
+    function hideLoading() {
+        const loadingDiv = document.getElementById('loading');
+        if (loadingDiv) {
+            loadingDiv.remove();
+        }
+    }
+    
+    // 顯示提示訊息
+    function showAlert(message, type = 'info') {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // 插入到頁面頂部
+        const container = document.querySelector('.container');
+        if (container) {
+            container.insertBefore(alertDiv, container.firstChild);
+        }
+        
+        // 自動隱藏
+        setTimeout(function() {
+            if (alertDiv.parentNode) {
+                alertDiv.style.opacity = '0';
+                setTimeout(function() {
+                    if (alertDiv.parentNode) {
+                        alertDiv.remove();
+                    }
+                }, 300);
+            }
+        }, 5000);
+    }
+</script>
+{% endblock %} 
