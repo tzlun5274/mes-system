@@ -15,7 +15,7 @@ env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # 僅保留開發環境設定
-DEBUG = False  # 生產模式
+DEBUG = True  # 開發模式
 ALLOWED_HOSTS = ["*"]  # 允許所有主機存取
 
 # API 基礎 URL
