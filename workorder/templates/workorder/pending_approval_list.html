@@ -286,7 +286,7 @@ function getCSRFToken() {
 }
 
 function approveReport(reportType, reportId) {
-    console.log('approveReport 被呼叫:', reportType, reportId);
+            // 審核報告
     currentReportType = reportType;
     currentReportId = reportId;
     document.getElementById('approval_remarks').value = '';
@@ -301,7 +301,7 @@ function approveReport(reportType, reportId) {
 }
 
 function rejectReport(reportType, reportId) {
-    console.log('rejectReport 被呼叫:', reportType, reportId);
+            // 駁回報告
     currentReportType = reportType;
     currentReportId = reportId;
     document.getElementById('rejection_reason').value = '';
@@ -334,7 +334,7 @@ function viewDetail(reportType, reportId) {
 }
 
 function confirmApprove() {
-    console.log('confirmApprove 被呼叫');
+            // 確認審核
     const remarks = document.getElementById('approval_remarks').value;
     let url = '';
     
@@ -350,9 +350,7 @@ function confirmApprove() {
             break;
     }
     
-    console.log('URL:', url);
-    console.log('currentReportType:', currentReportType);
-    console.log('currentReportId:', currentReportId);
+            // 準備請求資料
     
     if (url) {
         const formData = new URLSearchParams();
@@ -367,14 +365,9 @@ function confirmApprove() {
             },
             body: formData
         })
-        .then(response => {
-            console.log('Response status:', response.status);
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            console.log('Response data:', data);
             if (data.success) {
-                console.log('審核成功！');
                 location.reload();
             } else {
                 console.error('審核失敗：' + data.message);
@@ -431,7 +424,6 @@ function confirmReject() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                console.log('駁回成功！');
                 location.reload();
             } else {
                 console.error('駁回失敗：' + data.message);

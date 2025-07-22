@@ -15,7 +15,7 @@ env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # 僅保留開發環境設定
-DEBUG = True  # 開發模式
+DEBUG = False  # 生產模式
 ALLOWED_HOSTS = ["*"]  # 允許所有主機存取
 
 # API 基礎 URL
@@ -237,9 +237,9 @@ elif ENVIRONMENT == "testing":
 
 else:
     # 開發環境：最詳細的日誌
-    LOGGING["loggers"]["django"]["level"] = "DEBUG"
-    LOGGING["loggers"]["mes"]["level"] = "DEBUG"
-    LOGGING["loggers"]["erp_integration"]["level"] = "DEBUG"
+    LOGGING["loggers"]["django"]["level"] = "INFO"
+LOGGING["loggers"]["mes"]["level"] = "INFO"
+LOGGING["loggers"]["erp_integration"]["level"] = "INFO"
 
 # 只需要設置 EMAIL_BACKEND，具體郵件設定從資料庫讀取
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
