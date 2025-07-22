@@ -695,7 +695,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
     """
     作業員補登報工表單
     用於創建和編輯作業員補登報工記錄
-    支援兩種報工模式：正式報工和RD樣品報工
+    支援兩種報工模式：正式報工和作業員RD樣品補登報工
     """
 
     # 隱藏的報工類型欄位（固定為正式報工）
@@ -716,7 +716,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             }
         ),
         required=False,
-        help_text="請選擇產品編號，選擇後會自動帶出相關工單（RD樣品報工時可自由輸入產品編號）",
+        help_text="請選擇產品編號，選擇後會自動帶出相關工單（作業員RD樣品補登報工時可自由輸入產品編號）",
     )
 
     # 工單號碼欄位（根據報工類型動態調整）
@@ -731,7 +731,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             }
         ),
         required=False,
-        help_text="請選擇工單號碼，或透過產品編號自動帶出（RD樣品報工時固定為RD樣品）",
+        help_text="請選擇工單號碼，或透過產品編號自動帶出（作業員RD樣品補登報工時固定為RD樣品）",
     )
 
     # 工單預設生產數量（唯讀）
@@ -746,7 +746,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             }
         ),
         required=False,
-        help_text="此為工單規劃的總生產數量，不可修改（RD樣品報工時預設為0）",
+        help_text="此為工單規劃的總生產數量，不可修改（作業員RD樣品補登報工時預設為0）",
     )
 
     # 作業員選擇
@@ -1879,11 +1879,11 @@ class RDSampleSupplementReportForm(forms.ModelForm):
             attrs={
                 "class": "form-control",
                 "id": "operator_select",
-                "placeholder": "請選擇進行RD樣品報工的作業員",
+                "placeholder": "請選擇進行作業員RD樣品補登報工的作業員",
             }
         ),
         required=True,
-        help_text="請選擇進行RD樣品報工的作業員",
+        help_text="請選擇進行作業員RD樣品補登報工的作業員",
     )
 
     # 工序選擇（排除SMT相關工序）
