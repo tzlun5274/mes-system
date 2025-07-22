@@ -163,22 +163,27 @@
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <a href="{% url 'workorder:operator_supplement_report_create' %}" class="btn btn-warning btn-lg btn-block mb-2">
-                                <i class="fas fa-plus"></i> 新增作業員補登
+                                <i class="fas fa-plus"></i> 新增正式報工
                             </a>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
+                            <a href="{% url 'workorder:rd_sample_supplement_report_create' %}" class="btn btn-success btn-lg btn-block mb-2">
+                                <i class="fas fa-flask"></i> 新增RD樣品報工
+                            </a>
+                        </div>
+                        <div class="col-md-2">
                             <a href="{% url 'workorder:operator_supplement_batch' %}" class="btn btn-info btn-lg btn-block mb-2">
                                 <i class="fas fa-upload"></i> 批量匯入
                             </a>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <a href="{% url 'workorder:operator_supplement_export' %}" class="btn btn-success btn-lg btn-block mb-2">
                                 <i class="fas fa-download"></i> 匯出資料
                             </a>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <a href="{% url 'workorder:operator_supplement_template' %}" class="btn btn-secondary btn-lg btn-block mb-2">
                                 <i class="fas fa-file-excel"></i> 下載範本
                             </a>
@@ -281,8 +286,9 @@
                             <thead>
                                 <tr>
                                     <th>報工時間</th>
+                                    <th>報工類型</th>
                                     <th>作業員</th>
-                                    <th>工單號</th>
+                                    <th>工單號/樣品編號</th>
                                     <th>工序</th>
                                     <th>報工數量</th>
                                     <th>工時</th>
@@ -295,15 +301,28 @@
                                 {% if supplement_reports %}
                                     {% for report in supplement_reports %}
                                     <tr>
-                                        <td>{{ report.report_time|date:"Y-m-d H:i" }}</td>
-                                        <td>{{ report.operator_name }}</td>
-                                        <td>{{ report.workorder_number }}</td>
-                                        <td>{{ report.process_name }}</td>
-                                        <td>{{ report.quantity }}</td>
+                                        <td>{{ report.work_date|date:"Y-m-d" }} {{ report.start_time|time:"H:i" }}-{{ report.end_time|time:"H:i" }}</td>
+                                        <td>
+                                            {% if report.report_type == 'rd_sample' %}
+                                                <span class="badge badge-success">RD樣品</span>
+                                            {% else %}
+                                                <span class="badge badge-warning">正式報工</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ report.operator.name }}</td>
+                                        <td>
+                                            {% if report.report_type == 'rd_sample' %}
+                                                {{ report.rd_sample_code|default:"-" }}
+                                            {% else %}
+                                                {{ report.workorder.order_number|default:"-" }}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ report.process.name }}</td>
+                                        <td>{{ report.work_quantity }}</td>
                                         <td>{{ report.work_hours }}小時</td>
                                         <td>
-                                            <span class="status-badge status-{{ report.status }}">
-                                                {{ report.get_status_display }}
+                                            <span class="status-badge status-{{ report.approval_status }}">
+                                                {{ report.get_approval_status_display }}
                                             </span>
                                         </td>
                                         <td>{{ report.created_at|date:"Y-m-d H:i" }}</td>
@@ -312,15 +331,21 @@
                                                 <a href="{% url 'workorder:operator_supplement_report_detail' report.id %}" class="btn btn-outline-primary">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
-                                                {% if report.status == 'pending' or report.status == 'rejected' %}
+                                                {% if report.approval_status == 'pending' or report.approval_status == 'rejected' %}
+                                                {% if report.report_type == 'rd_sample' %}
+                                                <a href="{% url 'workorder:rd_sample_supplement_report_edit' report.id %}" class="btn btn-outline-warning">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                {% else %}
                                                 <a href="{% url 'workorder:operator_supplement_report_edit' report.id %}" class="btn btn-outline-warning">
                                                     <i class="fas fa-edit"></i>
                                                 </a>
+                                                {% endif %}
                                                 <a href="#" class="btn btn-outline-danger" onclick="deleteReport({{ report.id }})">
                                                     <i class="fas fa-trash"></i>
                                                 </a>
                                                 {% endif %}
-                                                {% if report.status == 'pending' and user.is_staff %}
+                                                {% if report.approval_status == 'pending' and user.is_staff %}
                                                 <a href="#" class="btn btn-outline-success" onclick="approveReport({{ report.id }})">
                                                     <i class="fas fa-check"></i>
                                                 </a>

@@ -1,27 +1,27 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}管理者報工{% endblock %}
+{% block title %}管理者審核管理{% endblock %}
 
-{% block extra_head %}
+{% block extra_css %}
 <style>
-    .manager-report-container {
+    .manager-container {
         padding: 20px;
     }
     
-    .manager-report-card {
+    .manager-card {
         margin-bottom: 20px;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         transition: transform 0.2s ease-in-out;
     }
     
-    .manager-report-card:hover {
+    .manager-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
     
-    .manager-report-card .card-header {
+    .manager-card .card-header {
         border-radius: 8px 8px 0 0;
         font-weight: bold;
     }
@@ -32,7 +32,7 @@
         margin-bottom: 20px;
     }
     
-    .manager-stat-card {
+    .stat-card {
         text-align: center;
         padding: 15px;
         border-radius: 8px;
@@ -40,22 +40,22 @@
         border: 1px solid #dee2e6;
     }
     
-    .manager-stat-number {
+    .stat-number {
         font-size: 2em;
         font-weight: bold;
         color: #007bff;
     }
     
-    .manager-stat-label {
+    .stat-label {
         color: #6c757d;
         font-size: 0.9em;
     }
     
-    .manager-report-table {
+    .manager-table {
         margin-top: 20px;
     }
     
-    .manager-report-table th {
+    .manager-table th {
         background-color: #f8f9fa;
         border-top: none;
     }
@@ -87,7 +87,7 @@
             flex-direction: column;
         }
         
-        .manager-stat-card {
+        .stat-card {
             margin-bottom: 10px;
         }
     }
@@ -101,13 +101,13 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
                     <i class="fas fa-user-tie text-primary"></i>
-                    管理者報工
+                    管理者審核管理
                 </h2>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">管理者報工</li>
+                        <li class="breadcrumb-item active" aria-current="page">管理者審核</li>
                     </ol>
                 </nav>
             </div>
@@ -117,83 +117,159 @@
     <!-- 統計資訊卡片 -->
     <div class="row mb-4">
         <div class="col-md-3">
-            <div class="manager-stat-card">
-                <div class="manager-stat-number text-primary">{{ pending_reviews|default:0 }}</div>
-                <div class="manager-stat-label">待審核報工</div>
+            <div class="stat-card">
+                <div class="stat-number text-primary">{{ stats.total_pending|default:0 }}</div>
+                <div class="stat-label">待審核總數</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="manager-stat-card">
-                <div class="manager-stat-number text-success">{{ today_reviews|default:0 }}</div>
-                <div class="manager-stat-label">今日審核</div>
+            <div class="stat-card">
+                <div class="stat-number text-success">{{ stats.total_today|default:0 }}</div>
+                <div class="stat-label">今日報工數</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="manager-stat-card">
-                <div class="manager-stat-number text-info">{{ month_reviews|default:0 }}</div>
-                <div class="manager-stat-label">本月審核</div>
+            <div class="stat-card">
+                <div class="stat-number text-info">{{ stats.total_month|default:0 }}</div>
+                <div class="stat-label">本月報工數</div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="manager-stat-card">
-                <div class="manager-stat-number text-warning">{{ abnormal_reports|default:0 }}</div>
-                <div class="manager-stat-label">異常報工</div>
+            <div class="stat-card">
+                <div class="stat-number text-warning">{{ stats.total_abnormal|default:0 }}</div>
+                <div class="stat-label">異常報工數</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細統計 -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card manager-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clipboard-check"></i> 管理者審核
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="stat-number text-warning">{{ stats.pending_manager|default:0 }}</div>
+                            <div class="stat-label">待審核</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-number text-success">{{ stats.today_manager|default:0 }}</div>
+                            <div class="stat-label">今日</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-number text-danger">{{ stats.abnormal_manager|default:0 }}</div>
+                            <div class="stat-label">異常</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card manager-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user"></i> 作業員報工
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="stat-number text-warning">{{ stats.pending_operator|default:0 }}</div>
+                            <div class="stat-label">待審核</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-number text-success">{{ stats.today_operator|default:0 }}</div>
+                            <div class="stat-label">今日</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-number text-danger">{{ stats.abnormal_operator|default:0 }}</div>
+                            <div class="stat-label">異常</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card manager-card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-microchip"></i> SMT報工
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="stat-number text-warning">{{ stats.pending_smt|default:0 }}</div>
+                            <div class="stat-label">待審核</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-number text-success">{{ stats.today_smt|default:0 }}</div>
+                            <div class="stat-label">今日</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-number text-danger">{{ stats.abnormal_smt|default:0 }}</div>
+                            <div class="stat-label">異常</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- 功能卡片 -->
     <div class="row">
-        <div class="col-md-4">
-            <div class="card manager-report-card">
+        <div class="col-md-6">
+            <div class="card manager-card">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-clipboard-check"></i> 報工審核
+                        <i class="fas fa-clipboard-list"></i> 管理者生產報工
                     </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        審核作業員提交的報工記錄，確認數量、時間、品質等資訊。
+                        管理者審核報工記錄，包含新增、編輯、審核、統計等功能。
                     </p>
-                    <a href="#" class="btn btn-primary">
-                        <i class="fas fa-check-circle"></i> 開始審核
-                    </a>
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-primary">
+                            <i class="fas fa-list"></i> 查看列表
+                        </a>
+                        <a href="{% url 'workorder:manager_production_create' %}" class="btn btn-success">
+                            <i class="fas fa-plus"></i> 新增記錄
+                        </a>
+                        <a href="{% url 'workorder:manager_production_batch' %}" class="btn btn-info">
+                            <i class="fas fa-layer-group"></i> 批量創建
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div class="col-md-4">
-            <div class="card manager-report-card">
-                <div class="card-header bg-success text-white">
+        <div class="col-md-6">
+            <div class="card manager-card">
+                <div class="card-header bg-warning text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-chart-bar"></i> 報工統計
+                        <i class="fas fa-tasks"></i> 待審核清單
                     </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        查看報工統計報表，分析生產效率、作業員表現等。
+                        查看所有待審核的報工記錄，進行批量審核操作。
                     </p>
-                    <a href="#" class="btn btn-success">
-                        <i class="fas fa-chart-line"></i> 查看統計
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="card manager-report-card">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0">
-                        <i class="fas fa-exclamation-triangle"></i> 異常處理
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        處理異常報工記錄，包含數量異常、時間異常、品質異常等。
-                    </p>
-                    <a href="#" class="btn btn-info">
-                        <i class="fas fa-tools"></i> 處理異常
-                    </a>
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'workorder:pending_approval_list' %}" class="btn btn-warning">
+                            <i class="fas fa-clock"></i> 待審核清單
+                        </a>
+                        <a href="{% url 'workorder:operator_supplement_report_index' %}" class="btn btn-success">
+                            <i class="fas fa-user-check"></i> 作業員報工
+                        </a>
+                        <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-info">
+                            <i class="fas fa-microchip"></i> SMT報工
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -202,52 +278,52 @@
     <!-- 最近審核記錄 -->
     <div class="row mt-4">
         <div class="col-12">
-            <div class="card manager-report-card">
+            <div class="card manager-card">
                 <div class="card-header bg-light">
                     <h5 class="mb-0">
-                        <i class="fas fa-clock"></i> 最近審核記錄
+                        <i class="fas fa-history"></i> 最近審核記錄
                     </h5>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover manager-report-table">
+                        <table class="table table-hover manager-table">
                             <thead>
                                 <tr>
                                     <th>審核時間</th>
-                                    <th>作業員</th>
+                                    <th>報工類型</th>
+                                    <th>操作員</th>
                                     <th>工單號</th>
                                     <th>工序</th>
                                     <th>報工數量</th>
-                                    <th>審核狀態</th>
-                                    <th>審核人</th>
-                                    <th>操作</th>
+                                    <th>審核人員</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% if recent_reviews %}
                                     {% for review in recent_reviews %}
                                     <tr>
-                                        <td>{{ review.review_time|date:"Y-m-d H:i" }}</td>
-                                        <td>{{ review.operator_name }}</td>
-                                        <td>{{ review.workorder_number }}</td>
-                                        <td>{{ review.process_name }}</td>
+                                        <td>{{ review.time|date:"Y-m-d H:i" }}</td>
+                                        <td>
+                                            {% if review.type == '管理者審核' %}
+                                                <span class="badge badge-primary">{{ review.type }}</span>
+                                            {% elif review.type == '作業員報工' %}
+                                                <span class="badge badge-success">{{ review.type }}</span>
+                                            {% elif review.type == 'SMT報工' %}
+                                                <span class="badge badge-info">{{ review.type }}</span>
+                                            {% else %}
+                                                <span class="badge badge-secondary">{{ review.type }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ review.operator }}</td>
+                                        <td>{{ review.workorder }}</td>
+                                        <td>{{ review.process }}</td>
                                         <td>{{ review.quantity }}</td>
-                                        <td>
-                                            <span class="status-badge status-{{ review.status }}">
-                                                {{ review.get_status_display }}
-                                            </span>
-                                        </td>
-                                        <td>{{ review.reviewer_name }}</td>
-                                        <td>
-                                            <a href="#" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i> 查看
-                                            </a>
-                                        </td>
+                                        <td>{{ review.reviewer }}</td>
                                     </tr>
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="8" class="text-center text-muted">
+                                        <td colspan="7" class="text-center text-muted">
                                             <i class="fas fa-inbox fa-2x mb-2"></i>
                                             <br>
                                             目前沒有審核記錄
@@ -266,17 +342,18 @@
 
 {% block extra_js %}
 <script>
-    // 管理者報工專用 JavaScript
-    $(document).ready(function() {
+    // 管理者審核專用 JavaScript
+    document.addEventListener('DOMContentLoaded', function() {
         // 卡片懸停效果
-        $('.manager-report-card').hover(
-            function() {
-                $(this).addClass('shadow-lg');
-            },
-            function() {
-                $(this).removeClass('shadow-lg');
-            }
-        );
+        const cards = document.querySelectorAll('.manager-card');
+        cards.forEach(function(card) {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow-lg');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow-lg');
+            });
+        });
         
         // 自動隱藏訊息提示
         setTimeout(function() {
@@ -294,9 +371,9 @@
         }, 1000);
     });
     
-    // 確認操作函數
-    function confirmAction(message) {
-        return confirm(message || '確定要執行此操作嗎？');
+    // 確認刪除函數
+    function confirmDelete(message) {
+        return confirm(message || '確定要刪除嗎？');
     }
     
     // 顯示載入中

@@ -1,0 +1,277 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}駁回 - 管理者生產報工記錄{% endblock %}
+
+{% block extra_css %}
+<style>
+    .rejection-section {
+        background-color: #f8f9fa;
+        border-radius: 0.375rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .rejection-section h5 {
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .info-row:last-child {
+        border-bottom: none;
+    }
+    .info-label {
+        font-weight: 600;
+        color: #495057;
+        min-width: 120px;
+    }
+    .info-value {
+        color: #212529;
+        text-align: right;
+    }
+    .status-badge {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+    }
+    .form-control:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-times-circle text-danger"></i> 駁回報工記錄
+                </h2>
+                <div>
+                    <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報工記錄資訊 -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clipboard-list"></i> 報工記錄資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- 基本資訊 -->
+                    <div class="rejection-section">
+                        <h5><i class="fas fa-info-circle"></i> 基本資訊</h5>
+                        <div class="info-row">
+                            <span class="info-label">管理者：</span>
+                            <span class="info-value">{{ report.manager }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">工單號碼：</span>
+                            <span class="info-value">{{ report.workorder_number }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">工序：</span>
+                            <span class="info-value">{{ report.process_name }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">設備：</span>
+                            <span class="info-value">{{ report.equipment_name }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">作業員：</span>
+                            <span class="info-value">{{ report.operator_name }}</span>
+                        </div>
+                    </div>
+
+                    <!-- 時間資訊 -->
+                    <div class="rejection-section">
+                        <h5><i class="fas fa-clock"></i> 時間資訊</h5>
+                        <div class="info-row">
+                            <span class="info-label">報工日期：</span>
+                            <span class="info-value">{{ report.work_date|date:"Y-m-d" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">開始時間：</span>
+                            <span class="info-value">{{ report.start_time|time:"H:i" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">結束時間：</span>
+                            <span class="info-value">{{ report.end_time|time:"H:i" }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">工作時數：</span>
+                            <span class="info-value">{{ report.work_hours }} 小時</span>
+                        </div>
+                    </div>
+
+                    <!-- 數量資訊 -->
+                    <div class="rejection-section">
+                        <h5><i class="fas fa-cubes"></i> 數量資訊</h5>
+                        <div class="info-row">
+                            <span class="info-label">工作數量：</span>
+                            <span class="info-value">{{ report.work_quantity }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">不良品數量：</span>
+                            <span class="info-value">{{ report.defect_quantity }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">總數量：</span>
+                            <span class="info-value">{{ report.total_quantity }}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">良率：</span>
+                            <span class="info-value">{{ report.yield_rate }}%</span>
+                        </div>
+                    </div>
+
+                    <!-- 完工狀態 -->
+                    <div class="rejection-section">
+                        <h5><i class="fas fa-flag-checkered"></i> 完工狀態</h5>
+                        <div class="info-row">
+                            <span class="info-label">完工狀態：</span>
+                            <span class="info-value">
+                                {% if report.is_completed %}
+                                    <span class="badge badge-success">已完工</span>
+                                {% elif report.auto_completed %}
+                                    <span class="badge badge-info">自動完工</span>
+                                {% else %}
+                                    <span class="badge badge-warning">未完工</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">完工判斷方式：</span>
+                            <span class="info-value">{{ report.get_completion_method_display }}</span>
+                        </div>
+                        {% if report.completion_time %}
+                        <div class="info-row">
+                            <span class="info-label">完工確認時間：</span>
+                            <span class="info-value">{{ report.completion_time|date:"Y-m-d H:i" }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- 備註資訊 -->
+                    {% if report.remarks or report.abnormal_notes %}
+                    <div class="rejection-section">
+                        <h5><i class="fas fa-sticky-note"></i> 備註資訊</h5>
+                        {% if report.remarks %}
+                        <div class="info-row">
+                            <span class="info-label">備註：</span>
+                            <span class="info-value">{{ report.remarks }}</span>
+                        </div>
+                        {% endif %}
+                        {% if report.abnormal_notes %}
+                        <div class="info-row">
+                            <span class="info-label">異常記錄：</span>
+                            <span class="info-value">{{ report.abnormal_notes }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 駁回表單 -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-times"></i> 駁回報工記錄
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="rejectionForm">
+                        {% csrf_token %}
+                        
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            您即將駁回此筆報工記錄。駁回後，建立者需要重新提交。
+                        </div>
+
+                        <div class="form-group">
+                            <label for="{{ form.rejection_reason.id_for_label }}" class="form-label">
+                                {{ form.rejection_reason.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.rejection_reason }}
+                            {% if form.rejection_reason.help_text %}
+                            <div class="form-text">{{ form.rejection_reason.help_text }}</div>
+                            {% endif %}
+                            {% if form.rejection_reason.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.rejection_reason.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-times"></i> 確認駁回
+                            </button>
+                            <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> 取消
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 表單提交確認
+        const form = document.getElementById('rejectionForm');
+        form.addEventListener('submit', function(e) {
+            const reason = document.getElementById('{{ form.rejection_reason.id_for_label }}').value.trim();
+            
+            if (!reason) {
+                alert('請填寫駁回原因');
+                e.preventDefault();
+                return false;
+            }
+            
+            if (!confirm('確定要駁回此筆報工記錄嗎？駁回後建立者需要重新提交。')) {
+                e.preventDefault();
+                return false;
+            }
+            
+            // 顯示載入中
+            showLoading();
+        });
+    });
+    
+    // 顯示載入中
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 處理中...</div>';
+        loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,0.2);z-index:9999;';
+        document.body.appendChild(loadingDiv);
+    }
+</script>
+{% endblock %} 

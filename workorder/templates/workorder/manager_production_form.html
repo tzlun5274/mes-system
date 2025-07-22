@@ -1,0 +1,615 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background-color: #f8f9fa;
+        border-radius: 0.375rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .form-section h5 {
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+    }
+    .help-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    .form-control:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+    .btn-group-vertical .btn {
+        margin-bottom: 0.5rem;
+    }
+    .preview-section {
+        background-color: #e9ecef;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-edit"></i> {{ title }}
+                </h2>
+                <div>
+                    <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 表單 -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clipboard-list"></i> 報工記錄資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="managerProductionForm">
+                        {% csrf_token %}
+                        
+                        <!-- 基本資訊 -->
+                        <div class="form-section">
+                            <h5><i class="fas fa-info-circle"></i> 基本資訊</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="{{ form.manager.id_for_label }}" class="form-label required-field">
+                                        {{ form.manager.label }}
+                                    </label>
+                                    {{ form.manager }}
+                                    {% if form.manager.help_text %}
+                                    <div class="help-text">{{ form.manager.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.manager.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.manager.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.workorder.id_for_label }}" class="form-label required-field">
+                                        {{ form.workorder.label }}
+                                    </label>
+                                    {{ form.workorder }}
+                                    {% if form.workorder.help_text %}
+                                    <div class="help-text">{{ form.workorder.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.workorder.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.workorder.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <label for="{{ form.planned_quantity.id_for_label }}" class="form-label">
+                                        {{ form.planned_quantity.label }}
+                                    </label>
+                                    {{ form.planned_quantity }}
+                                    {% if form.planned_quantity.help_text %}
+                                    <div class="help-text">{{ form.planned_quantity.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.process.id_for_label }}" class="form-label required-field">
+                                        {{ form.process.label }}
+                                    </label>
+                                    {{ form.process }}
+                                    {% if form.process.help_text %}
+                                    <div class="help-text">{{ form.process.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.process.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.process.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 設備與作業員 -->
+                        <div class="form-section">
+                            <h5><i class="fas fa-cogs"></i> 設備與作業員</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="{{ form.equipment.id_for_label }}" class="form-label">
+                                        {{ form.equipment.label }}
+                                    </label>
+                                    {{ form.equipment }}
+                                    {% if form.equipment.help_text %}
+                                    <div class="help-text">{{ form.equipment.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.equipment.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.equipment.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.operator.id_for_label }}" class="form-label">
+                                        {{ form.operator.label }}
+                                    </label>
+                                    {{ form.operator }}
+                                    {% if form.operator.help_text %}
+                                    <div class="help-text">{{ form.operator.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.operator.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.operator.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 時間資訊 -->
+                        <div class="form-section">
+                            <h5><i class="fas fa-clock"></i> 時間資訊</h5>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label for="{{ form.work_date.id_for_label }}" class="form-label required-field">
+                                        {{ form.work_date.label }}
+                                    </label>
+                                    {{ form.work_date }}
+                                    {% if form.work_date.help_text %}
+                                    <div class="help-text">{{ form.work_date.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.work_date.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.work_date.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="{{ form.start_time.id_for_label }}" class="form-label required-field">
+                                        {{ form.start_time.label }}
+                                    </label>
+                                    {{ form.start_time }}
+                                    {% if form.start_time.help_text %}
+                                    <div class="help-text">{{ form.start_time.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.start_time.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.start_time.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="{{ form.end_time.id_for_label }}" class="form-label required-field">
+                                        {{ form.end_time.label }}
+                                    </label>
+                                    {{ form.end_time }}
+                                    {% if form.end_time.help_text %}
+                                    <div class="help-text">{{ form.end_time.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.end_time.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.end_time.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 數量資訊 -->
+                        <div class="form-section">
+                            <h5><i class="fas fa-boxes"></i> 數量資訊</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="{{ form.work_quantity.id_for_label }}" class="form-label required-field">
+                                        {{ form.work_quantity.label }}
+                                    </label>
+                                    {{ form.work_quantity }}
+                                    {% if form.work_quantity.help_text %}
+                                    <div class="help-text">{{ form.work_quantity.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.work_quantity.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.work_quantity.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.defect_quantity.id_for_label }}" class="form-label">
+                                        {{ form.defect_quantity.label }}
+                                    </label>
+                                    {{ form.defect_quantity }}
+                                    {% if form.defect_quantity.help_text %}
+                                    <div class="help-text">{{ form.defect_quantity.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.defect_quantity.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.defect_quantity.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 完工設定 -->
+                        <div class="form-section">
+                            <h5><i class="fas fa-check-circle"></i> 完工設定</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        {{ form.is_completed }}
+                                        <label class="form-check-label" for="{{ form.is_completed.id_for_label }}">
+                                            {{ form.is_completed.label }}
+                                        </label>
+                                        {% if form.is_completed.help_text %}
+                                        <div class="help-text">{{ form.is_completed.help_text }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.completion_method.id_for_label }}" class="form-label">
+                                        {{ form.completion_method.label }}
+                                    </label>
+                                    {{ form.completion_method }}
+                                    {% if form.completion_method.help_text %}
+                                    <div class="help-text">{{ form.completion_method.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.completion_method.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.completion_method.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 備註資訊 -->
+                        <div class="form-section">
+                            <h5><i class="fas fa-sticky-note"></i> 備註資訊</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="{{ form.remarks.id_for_label }}" class="form-label">
+                                        {{ form.remarks.label }}
+                                    </label>
+                                    {{ form.remarks }}
+                                    {% if form.remarks.help_text %}
+                                    <div class="help-text">{{ form.remarks.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.remarks.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.remarks.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.abnormal_notes.id_for_label }}" class="form-label">
+                                        {{ form.abnormal_notes.label }}
+                                    </label>
+                                    {{ form.abnormal_notes }}
+                                    {% if form.abnormal_notes.help_text %}
+                                    <div class="help-text">{{ form.abnormal_notes.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.abnormal_notes.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.abnormal_notes.errors %}
+                                        {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 提交按鈕 -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-secondary">
+                                        <i class="fas fa-times"></i> 取消
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> {{ submit_text }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 側邊欄 -->
+        <div class="col-lg-4">
+            <!-- 工單資訊預覽 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-info-circle"></i> 工單資訊
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="workorderInfo">
+                        <p class="text-muted">請選擇工單以查看詳細資訊</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 時間計算預覽 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-calculator"></i> 時間計算
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="timeCalculation">
+                        <p class="text-muted">請輸入開始和結束時間以計算工作時數</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 數量統計預覽 -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-chart-bar"></i> 數量統計
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="quantityStats">
+                        <p class="text-muted">請輸入工作數量和不良品數量以查看統計</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('managerProductionForm');
+    const workorderSelect = document.getElementById('{{ form.workorder.id_for_label }}');
+    const startTimeInput = document.getElementById('{{ form.start_time.id_for_label }}');
+    const endTimeInput = document.getElementById('{{ form.end_time.id_for_label }}');
+    const workQuantityInput = document.getElementById('{{ form.work_quantity.id_for_label }}');
+    const defectQuantityInput = document.getElementById('{{ form.defect_quantity.id_for_label }}');
+    
+    // 工單選擇變更時更新工單資訊
+    workorderSelect.addEventListener('change', function() {
+        const workorderId = this.value;
+        if (workorderId) {
+            updateWorkorderInfo(workorderId);
+        } else {
+            document.getElementById('workorderInfo').innerHTML = '<p class="text-muted">請選擇工單以查看詳細資訊</p>';
+        }
+    });
+    
+    // 時間變更時計算工作時數
+    [startTimeInput, endTimeInput].forEach(input => {
+        input.addEventListener('change', calculateWorkHours);
+    });
+    
+    // 數量變更時更新統計
+    [workQuantityInput, defectQuantityInput].forEach(input => {
+        input.addEventListener('input', updateQuantityStats);
+    });
+    
+    // 表單驗證
+    form.addEventListener('submit', function(e) {
+        if (!validateForm()) {
+            e.preventDefault();
+        }
+    });
+    
+    // 更新工單資訊
+    function updateWorkorderInfo(workorderId) {
+        fetch(`/workorder/api/get_workorder_details/?workorder_id=${workorderId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const workorder = data.workorder;
+                    document.getElementById('workorderInfo').innerHTML = `
+                        <div class="mb-2">
+                            <strong>工單號碼：</strong> ${workorder.order_number}
+                        </div>
+                        <div class="mb-2">
+                            <strong>產品編號：</strong> ${workorder.product_code}
+                        </div>
+                        <div class="mb-2">
+                            <strong>計劃數量：</strong> ${workorder.quantity}
+                        </div>
+                        <div class="mb-2">
+                            <strong>狀態：</strong> <span class="badge bg-${getStatusBadgeColor(workorder.status)}">${workorder.status_display}</span>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('workorderInfo').innerHTML = '<p class="text-danger">載入工單資訊失敗</p>';
+            });
+    }
+    
+    // 計算工作時數
+    function calculateWorkHours() {
+        const startTime = startTimeInput.value;
+        const endTime = endTimeInput.value;
+        
+        if (startTime && endTime) {
+            const start = new Date(`2000-01-01T${startTime}`);
+            const end = new Date(`2000-01-01T${endTime}`);
+            
+            if (end <= start) {
+                end.setDate(end.getDate() + 1); // 跨日處理
+            }
+            
+            const diffMs = end - start;
+            const diffHours = diffMs / (1000 * 60 * 60);
+            
+            document.getElementById('timeCalculation').innerHTML = `
+                <div class="mb-2">
+                    <strong>開始時間：</strong> ${startTime}
+                </div>
+                <div class="mb-2">
+                    <strong>結束時間：</strong> ${endTime}
+                </div>
+                <div class="mb-2">
+                    <strong>工作時數：</strong> <span class="badge bg-info">${diffHours.toFixed(2)} 小時</span>
+                </div>
+            `;
+        } else {
+            document.getElementById('timeCalculation').innerHTML = '<p class="text-muted">請輸入開始和結束時間以計算工作時數</p>';
+        }
+    }
+    
+    // 更新數量統計
+    function updateQuantityStats() {
+        const workQuantity = parseInt(workQuantityInput.value) || 0;
+        const defectQuantity = parseInt(defectQuantityInput.value) || 0;
+        const totalQuantity = workQuantity + defectQuantity;
+        
+        if (totalQuantity > 0) {
+            const yieldRate = totalQuantity > 0 ? ((workQuantity / totalQuantity) * 100).toFixed(2) : 0;
+            
+            document.getElementById('quantityStats').innerHTML = `
+                <div class="mb-2">
+                    <strong>工作數量：</strong> <span class="badge bg-success">${workQuantity}</span>
+                </div>
+                <div class="mb-2">
+                    <strong>不良品數量：</strong> <span class="badge bg-danger">${defectQuantity}</span>
+                </div>
+                <div class="mb-2">
+                    <strong>總數量：</strong> <span class="badge bg-primary">${totalQuantity}</span>
+                </div>
+                <div class="mb-2">
+                    <strong>良率：</strong> <span class="badge bg-info">${yieldRate}%</span>
+                </div>
+            `;
+        } else {
+            document.getElementById('quantityStats').innerHTML = '<p class="text-muted">請輸入工作數量和不良品數量以查看統計</p>';
+        }
+    }
+    
+    // 表單驗證
+    function validateForm() {
+        let isValid = true;
+        
+        // 清除之前的錯誤提示
+        document.querySelectorAll('.is-invalid').forEach(element => {
+            element.classList.remove('is-invalid');
+        });
+        
+        // 驗證必填欄位
+        const requiredFields = [
+            { element: document.getElementById('{{ form.manager.id_for_label }}'), name: '管理者' },
+            { element: document.getElementById('{{ form.workorder.id_for_label }}'), name: '工單號碼' },
+            { element: document.getElementById('{{ form.process.id_for_label }}'), name: '工序' },
+            { element: document.getElementById('{{ form.work_date.id_for_label }}'), name: '日期' },
+            { element: document.getElementById('{{ form.start_time.id_for_label }}'), name: '開始時間' },
+            { element: document.getElementById('{{ form.end_time.id_for_label }}'), name: '結束時間' },
+            { element: document.getElementById('{{ form.work_quantity.id_for_label }}'), name: '工作數量' }
+        ];
+        
+        requiredFields.forEach(field => {
+            if (!field.element.value.trim()) {
+                field.element.classList.add('is-invalid');
+                isValid = false;
+            }
+        });
+        
+        // 驗證時間
+        if (startTimeInput.value && endTimeInput.value) {
+            const start = new Date(`2000-01-01T${startTimeInput.value}`);
+            const end = new Date(`2000-01-01T${endTimeInput.value}`);
+            
+            if (end <= start) {
+                endTimeInput.classList.add('is-invalid');
+                isValid = false;
+            }
+        }
+        
+        // 驗證數量
+        const workQuantity = parseInt(workQuantityInput.value) || 0;
+        const defectQuantity = parseInt(defectQuantityInput.value) || 0;
+        
+        if (workQuantity <= 0) {
+            workQuantityInput.classList.add('is-invalid');
+            isValid = false;
+        }
+        
+        if (defectQuantity < 0) {
+            defectQuantityInput.classList.add('is-invalid');
+            isValid = false;
+        }
+        
+        return isValid;
+    }
+    
+    // 取得狀態徽章顏色
+    function getStatusBadgeColor(status) {
+        const colors = {
+            'pending': 'warning',
+            'in_progress': 'primary',
+            'paused': 'info',
+            'completed': 'success'
+        };
+        return colors[status] || 'secondary';
+    }
+    
+    // 初始化
+    if (workorderSelect.value) {
+        updateWorkorderInfo(workorderSelect.value);
+    }
+    calculateWorkHours();
+    updateQuantityStats();
+});
+</script>
+{% endblock %} 

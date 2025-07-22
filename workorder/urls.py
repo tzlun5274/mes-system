@@ -82,6 +82,7 @@ urlpatterns = [
     path('report/manager/', views.manager_report_index, name='manager_report_index'),
     path('report/operator/', views.operator_report_index, name='operator_report_index'),
     path('report/smt/', views.smt_report_index, name='smt_report_index'),
+    path('pending_approval_list/', views.pending_approval_list, name='pending_approval_list'),
     path('report/smt/on_site/', views.smt_on_site_report, name='smt_on_site_report'),
     path('report/smt/submit/', views.submit_smt_report, name='submit_smt_report'),
     path('api/get_workorders_by_equipment/', views.get_workorders_by_equipment, name='get_workorders_by_equipment'),
@@ -127,4 +128,24 @@ urlpatterns = [
     path('report/operator/supplement/template/', views.operator_supplement_template, name='operator_supplement_template'),
     path('api/operator/supplement/batch_create/', views.operator_supplement_batch_create, name='operator_supplement_batch_create'),
     path('api/operator/get_workorders_by_operator/', views.get_workorders_by_operator, name='get_workorders_by_operator'),
+    
+    # RD樣品補登報工功能
+    path('report/operator/supplement/rd_sample/create/', views.rd_sample_supplement_report_create, name='rd_sample_supplement_report_create'),
+    path('report/operator/supplement/rd_sample/edit/<int:report_id>/', views.rd_sample_supplement_report_edit, name='rd_sample_supplement_report_edit'),
+
+    # 管理者審核功能
+    path('report/manager/production/', views.ManagerProductionReportListView.as_view(), name='manager_production_list'),
+    path('report/manager/production/create/', views.ManagerProductionReportCreateView.as_view(), name='manager_production_create'),
+    path('report/manager/production/edit/<int:pk>/', views.ManagerProductionReportUpdateView.as_view(), name='manager_production_edit'),
+    path('report/manager/production/detail/<int:pk>/', views.ManagerProductionReportDetailView.as_view(), name='manager_production_detail'),
+    path('report/manager/production/delete/<int:pk>/', views.ManagerProductionReportDeleteView.as_view(), name='manager_production_delete'),
+    path('report/manager/production/approve/<int:pk>/', views.ManagerProductionReportApproveView.as_view(), name='manager_production_approve'),
+    path('report/manager/production/reject/<int:pk>/', views.ManagerProductionReportRejectView.as_view(), name='manager_production_reject'),
+    path('report/manager/production/batch/', views.ManagerProductionReportBatchView.as_view(), name='manager_production_batch'),
+    path('api/manager/production/get_workorders_by_product/', views.manager_get_workorders_by_product, name='manager_get_workorders_by_product'),
+    path('api/manager/production/batch_create/', views.manager_batch_create_api, name='manager_batch_create_api'),
+    
+    # 管理者生產報工記錄 AJAX 版本
+    path('report/manager/production/approve-ajax/<int:report_id>/', views.manager_production_report_approve_ajax, name='manager_production_approve_ajax'),
+    path('report/manager/production/reject-ajax/<int:report_id>/', views.manager_production_report_reject_ajax, name='manager_production_reject_ajax'),
 ]
