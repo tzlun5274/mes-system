@@ -298,28 +298,34 @@
                 <div id="rd_sample_fields" class="form-block" style="display: none;">
                             <h6><i class="fas fa-flask"></i> RD樣品資訊</h6>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
                         <!-- RD產品編號 -->
                         <div class="form-field">
-                                        <label for="rd_sample_product_id" class="form-label">
+                            <label for="{{ form.rd_product_code.id_for_label }}" class="form-label">
                                 RD產品編號 <span class="required">*</span>
-                                        </label>
-                                        <input type="text" class="form-control" id="rd_sample_product_id" name="rd_sample_product_id" 
-                                   placeholder="請輸入RD樣品產品編號" value="PFP-CCT">
-                                        <div class="help-text">請輸入RD樣品的產品編號，預設為「PFP-CCT」</div>
-                                    </div>
-
+                            </label>
+                            {{ form.rd_product_code }}
+                            {% if form.rd_product_code.help_text %}
+                                <div class="help-text">{{ form.rd_product_code.help_text }}</div>
+                            {% endif %}
+                            {% if form.rd_product_code.errors %}
+                                <div class="error-text">{{ form.rd_product_code.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
                         <!-- RD工單號碼 -->
                         <div class="form-field">
-                                        <label for="rd_sample_workorder" class="form-label">
-                                RD工單號碼 <span class="required">*</span>
-                                        </label>
-                                        <input type="text" class="form-control" id="rd_sample_workorder" name="rd_sample_workorder" 
-                                               value="RD樣品" readonly>
-                                        <div class="help-text">RD樣品模式下的工單號碼固定為「RD樣品」</div>
-                                    </div>
-                                </div>
-                            </div>
+                            <label for="rd_sample_workorder" class="form-label">
+                                RD工單號碼
+                            </label>
+                            <input type="text" class="form-control" id="rd_sample_workorder" name="rd_sample_workorder" 
+                                   value="RD樣品" readonly>
+                            <div class="help-text">RD樣品模式下的工單號碼固定為「RD樣品」</div>
+                        </div>
+                    </div>
+                </div>
                             
                                 <!-- 工序與設備資訊區塊 -->
                 <div class="form-block">
@@ -394,7 +400,9 @@
                                         <label for="{{ form.start_time.id_for_label }}" class="form-label">
                                 開始時間 <span class="required">*</span>
                                         </label>
-                                        {{ form.start_time }}
+                                        <input type="text" class="form-control" id="{{ form.start_time.id_for_label }}" 
+                                               name="{{ form.start_time.name }}" value="10:00" 
+                                               placeholder="例如：16:00" autocomplete="off">
                                         {% if form.start_time.help_text %}
                                             <div class="help-text">{{ form.start_time.help_text }}</div>
                                         {% endif %}
@@ -408,7 +416,9 @@
                                         <label for="{{ form.end_time.id_for_label }}" class="form-label">
                                 結束時間 <span class="required">*</span>
                                         </label>
-                                        {{ form.end_time }}
+                                        <input type="text" class="form-control" id="{{ form.end_time.id_for_label }}" 
+                                               name="{{ form.end_time.name }}" value="12:00" 
+                                               placeholder="例如：18:30" autocomplete="off">
                                         {% if form.end_time.help_text %}
                                             <div class="help-text">{{ form.end_time.help_text }}</div>
                                         {% endif %}
@@ -648,9 +658,17 @@ document.addEventListener('DOMContentLoaded', function() {
             rdSampleInfo.style.display = 'block';
             
             // RD樣品模式下，工單預設生產數量設為0
-            const plannedQuantityInput = document.getElementById('planned_quantity_input');
+            const plannedQuantityInput = document.getElementById('{{ form.planned_quantity.id_for_label }}');
             if (plannedQuantityInput) {
                 plannedQuantityInput.value = '0';
+            }
+            
+
+            
+            // 設定預設RD產品編號（如果沒有填寫）
+            const rdProductCodeInput = document.getElementById('{{ form.rd_product_code.id_for_label }}');
+            if (rdProductCodeInput && !rdProductCodeInput.value) {
+                rdProductCodeInput.value = 'PFP-CCT';
             }
         } else {
             // 切換到一般模式
@@ -659,7 +677,7 @@ document.addEventListener('DOMContentLoaded', function() {
             rdSampleInfo.style.display = 'none';
             
             // 一般模式下，清空工單預設生產數量
-            const plannedQuantityInput = document.getElementById('planned_quantity_input');
+            const plannedQuantityInput = document.getElementById('{{ form.planned_quantity.id_for_label }}');
             if (plannedQuantityInput) {
                 plannedQuantityInput.value = '';
             }
@@ -684,9 +702,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 取得DOM元素
-    const productInput = document.getElementById('product_id_select');
-    const workorderSelect = document.getElementById('workorder_select');
-    const plannedQuantityInput = document.getElementById('planned_quantity_input');
+    const productInput = document.getElementById('{{ form.product_id.id_for_label }}');
+    const workorderSelect = document.getElementById('{{ form.workorder.id_for_label }}');
+    const plannedQuantityInput = document.getElementById('{{ form.planned_quantity.id_for_label }}');
     
     // 除錯：檢查元素是否存在
     console.log('DOM元素檢查:');
@@ -702,9 +720,22 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (productCode) {
                 // 呼叫API取得相關工單
-                fetch(`{% url 'workorder:get_workorders_by_product' %}?product_code=${encodeURIComponent(productCode)}`)
-                    .then(response => response.json())
+                fetch(`{% url 'workorder:get_workorders_by_product' %}?product_id=${encodeURIComponent(productCode)}`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json',
+                    },
+                })
+                    .then(response => {
+                        console.log('API回應狀態:', response.status);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
+                        console.log('API回應資料:', data);
                         if (data.status === 'success' && data.workorders.length > 0) {
                             // 更新工單下拉選單
                             workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
@@ -712,7 +743,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             data.workorders.forEach(workorder => {
                                 const option = document.createElement('option');
                                 option.value = workorder.id;
-                                option.textContent = `${workorder.order_number} - ${workorder.product_code}`;
+                                option.textContent = `${workorder.company_code} - ${workorder.order_number}`;
                                 workorderSelect.appendChild(option);
                             });
                             
@@ -723,10 +754,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         } else {
                             workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                            console.log('沒有找到相關工單');
                         }
                     })
                     .catch(error => {
                         console.error('API錯誤:', error);
+                        workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
                     });
             } else {
                 workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
@@ -742,10 +775,22 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (workorderId) {
                 // 載入工單詳細資訊
-                fetch(`{% url 'workorder:get_workorder_details' %}?workorder_id=${workorderId}`)
-                    .then(response => response.json())
+                fetch(`{% url 'workorder:get_workorder_details' %}?workorder_id=${workorderId}`, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json',
+                    },
+                })
+                    .then(response => {
+                        console.log('工單詳情API回應狀態:', response.status);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
-                        console.log('API回應:', data);
+                        console.log('工單詳情API回應:', data);
                         if (data.status === 'success') {
                             const workorder = data.workorder;
                             

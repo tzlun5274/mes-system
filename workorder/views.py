@@ -3862,6 +3862,7 @@ def get_workorders_by_product(request):
                 'id': workorder.id,
                 'order_number': workorder.order_number,
                 'company_code': workorder.company_code,
+                'product_code': workorder.product_code,
                 'quantity': workorder.quantity,
                 'status': workorder.get_status_display(),
                 'created_at': workorder.created_at.strftime('%Y-%m-%d %H:%M:%S')
@@ -4856,7 +4857,7 @@ def operator_supplement_report_edit(request, report_id):
         # 根據記錄類型設定初始值
         if report.report_type == 'rd_sample':
             initial_data['report_type'] = 'rd_sample'
-            initial_data['product_id'] = report.rd_sample_code or ''
+            initial_data['product_id'] = report.rd_product_code or ''
         else:
             initial_data['report_type'] = 'normal'
             if report.workorder:
@@ -5760,7 +5761,6 @@ def rd_sample_supplement_report_create(request):
                 supplement_report.report_type = 'rd_sample'
                 supplement_report.workorder = None
                 supplement_report.planned_quantity = 0
-                supplement_report.rd_sample_code = form.cleaned_data.get('rd_sample_code')
                 
                 supplement_report.save()
                 
@@ -5854,7 +5854,6 @@ def rd_sample_supplement_report_edit(request, report_id):
                 supplement_report.report_type = 'rd_sample'
                 supplement_report.workorder = None
                 supplement_report.planned_quantity = 0
-                supplement_report.rd_sample_code = form.cleaned_data.get('rd_sample_code')
                 
                 supplement_report.save()
                 

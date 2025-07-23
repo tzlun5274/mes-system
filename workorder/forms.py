@@ -114,7 +114,6 @@ class SMTSupplementReportForm(forms.ModelForm):
         widget=forms.Select(
             attrs={
                 "class": "form-control",
-                "id": "product_id_select",
                 "placeholder": "請選擇產品編號",
             }
         ),
@@ -129,7 +128,6 @@ class SMTSupplementReportForm(forms.ModelForm):
         widget=forms.Select(
             attrs={
                 "class": "form-control",
-                "id": "workorder_select",
                 "placeholder": "請選擇工單號碼，或透過產品編號自動帶出",
             }
         ),
@@ -143,7 +141,6 @@ class SMTSupplementReportForm(forms.ModelForm):
         widget=forms.NumberInput(
             attrs={
                 "class": "form-control",
-                "id": "planned_quantity_input",
                 "readonly": "readonly",
                 "placeholder": "此為工單規劃的總生產數量，不可修改",
             }
@@ -207,7 +204,6 @@ class SMTSupplementReportForm(forms.ModelForm):
                 "type": "text",
                 "id": "start_time_input",
                 "placeholder": "例如：16:00",
-                "readonly": "readonly",
                 "autocomplete": "off",
             }
         ),
@@ -224,7 +220,6 @@ class SMTSupplementReportForm(forms.ModelForm):
                 "type": "text",
                 "id": "end_time_input",
                 "placeholder": "例如：18:30",
-                "readonly": "readonly",
                 "autocomplete": "off",
             }
         ),
@@ -288,6 +283,21 @@ class SMTSupplementReportForm(forms.ModelForm):
         help_text="請輸入任何需要補充的資訊，如異常、停機等",
     )
 
+    # RD產品編號欄位
+    rd_product_code = forms.CharField(
+        max_length=100,
+        label="RD產品編號",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "id": "rd_product_code_input",
+                "placeholder": "請輸入RD樣品的產品編號",
+            }
+        ),
+        required=False,
+        help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊",
+    )
+
 
 
     class Meta:
@@ -304,6 +314,7 @@ class SMTSupplementReportForm(forms.ModelForm):
             "defect_quantity",
             "is_completed",
             "remarks",
+            "rd_product_code",
         ]
 
     def __init__(self, *args, **kwargs):
@@ -340,7 +351,7 @@ class SMTSupplementReportForm(forms.ModelForm):
         except Exception as e:
             print(f"SMT表單初始化失敗: {e}")
             # 如果任何查詢失敗，設置空的查詢集
-            self.fields["workorder"].queryset = WorkOrder.objects.none()
+            self.fields["workorder"].choices = [("", "請選擇工單號碼")]
             self.fields["equipment"].queryset = Equipment.objects.none()
 
         # 如果是編輯現有記錄，檢查核准狀態
@@ -396,14 +407,14 @@ class SMTSupplementReportForm(forms.ModelForm):
             rd_sample_product_id = self.data.get('rd_sample_product_id')
             
             if not rd_sample_product_id:
-                raise forms.ValidationError("RD樣品模式下，RD產品編號為必填欄位")
+                raise forms.ValidationError("RD樣品模式下，產品編號為必填欄位")
             
             # 設定RD樣品模式的資料
             cleaned_data['product_id'] = rd_sample_product_id
             cleaned_data['planned_quantity'] = 0
             cleaned_data['workorder'] = None
             
-            print(f"DEBUG: clean() - RD樣品模式，產品編號: {rd_sample_product_id}")
+            print(f"DEBUG: clean() - RD樣品模式，產品編號: {rd_sample_product_id}, 工單號碼: RD樣品")
             
         else:
             # 正常模式驗證
@@ -457,23 +468,28 @@ class SMTSupplementReportForm(forms.ModelForm):
             except ValueError:
                 pass
         
-        # 檢查是否為RD樣品模式
-        rd_sample_mode = self.data.get('rd_sample_mode') == 'on'
-        
-        if rd_sample_mode:
-            # RD樣品模式設定
-            instance.product_id = self.cleaned_data.get('product_id', '')
-            instance.workorder = None
-            instance.planned_quantity = 0
-            instance.report_type = 'rd_sample'
+        # 正常模式設定
+        workorder = self.cleaned_data.get('workorder')
+        if workorder:
+            instance.workorder = workorder
+            instance.planned_quantity = workorder.quantity
+            instance.product_id = workorder.product_code if workorder.product_code else ''
+            
+            # 根據工單號碼自動判斷是否為RD樣品
+            if instance.is_rd_sample_by_workorder():
+                instance.report_type = 'rd_sample'
+                instance.rd_workorder_number = workorder.order_number
+                instance.rd_product_code = workorder.product_code if workorder.product_code else ''
+                print(f"DEBUG: save() - 自動識別為RD樣品，工單號碼: {workorder.order_number}")
+            else:
+                instance.report_type = 'normal'
+                instance.rd_workorder_number = ''
+                instance.rd_product_code = ''
         else:
-            # 正常模式設定
-            workorder = self.cleaned_data.get('workorder')
-            if workorder:
-                instance.workorder = workorder
-                instance.planned_quantity = workorder.quantity
-                instance.product_id = workorder.product_code if workorder.product_code else ''
+            # 沒有選擇工單的情況
             instance.report_type = 'normal'
+            instance.rd_workorder_number = ''
+            instance.rd_product_code = ''
         
         # 設定建立人員
         if not instance.pk:  # 新增時才設置
@@ -538,7 +554,7 @@ class SMTSupplementReportForm(forms.ModelForm):
         try:
             workorders = self.get_workorder_queryset()
             for workorder in workorders:
-                choices.append((workorder.id, f"{workorder.order_number} - {workorder.product_code}"))
+                choices.append((workorder.id, f"{workorder.company_code} - {workorder.order_number}"))
         except Exception as e:
             print(f"取得工單選項失敗: {e}")
         return choices
@@ -923,6 +939,22 @@ class OperatorSupplementReportForm(forms.ModelForm):
         ),
         required=False,
         help_text="請輸入備註說明（可選）",
+    )
+
+
+    
+    rd_product_code = forms.CharField(
+        max_length=100,
+        label="RD產品編號",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "id": "rd_product_code_input",
+                "placeholder": "請輸入RD樣品的產品編號",
+            }
+        ),
+        required=False,
+        help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊",
     )
 
     # 異常記錄
@@ -1903,20 +1935,7 @@ class RDSampleSupplementReportForm(forms.ModelForm):
     專門用於RD樣品的報工記錄，包含RD樣品特有的欄位
     """
 
-    # RD樣品專用欄位
-    rd_sample_code = forms.CharField(
-        max_length=100,
-        label="RD樣品編號",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "id": "rd_sample_code",
-                "placeholder": "請輸入RD樣品編號，例如：RD-2025-001",
-            }
-        ),
-        required=True,
-        help_text="請輸入RD樣品的專用編號，建議格式：RD-年份-序號",
-    )
+
 
     # 作業員選擇
     operator = forms.ModelChoiceField(
@@ -2157,15 +2176,12 @@ class RDSampleSupplementReportForm(forms.ModelForm):
         """表單驗證"""
         cleaned_data = super().clean()
 
-        rd_sample_code = cleaned_data.get("rd_sample_code")
+
         start_time = cleaned_data.get("start_time")
         end_time = cleaned_data.get("end_time")
         work_quantity = cleaned_data.get("work_quantity")
 
-        # 驗證RD樣品編號格式
-        if rd_sample_code:
-            if not rd_sample_code.startswith("RD-"):
-                raise forms.ValidationError("RD樣品編號必須以'RD-'開頭")
+
 
         # 驗證時間格式
         if start_time:
@@ -2219,7 +2235,6 @@ class RDSampleSupplementReportForm(forms.ModelForm):
     class Meta:
         model = OperatorSupplementReport
         fields = [
-            "rd_sample_code",
             "operator",
             "process",
             "equipment",
@@ -2236,7 +2251,6 @@ class RDSampleSupplementReportForm(forms.ModelForm):
         ]
 
         labels = {
-            "rd_sample_code": "RD樣品編號",
             "operator": "作業員",
             "process": "工序",
             "equipment": "設備",
@@ -2253,7 +2267,6 @@ class RDSampleSupplementReportForm(forms.ModelForm):
         }
 
         help_texts = {
-            "rd_sample_code": "請輸入RD樣品的專用編號，建議格式：RD-年份-序號",
             "operator": "請選擇進行RD樣品報工的作業員",
             "process": "請選擇此次RD樣品報工的工序（排除SMT相關工序）",
             "equipment": "請選擇此次RD樣品報工的設備（排除SMT相關設備）",

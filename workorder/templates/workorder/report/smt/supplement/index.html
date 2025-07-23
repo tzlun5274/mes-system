@@ -231,10 +231,30 @@
                                     <tr>
                                         <td>{{ report.work_date|date:"Y-m-d" }}</td>
                                         <td>{{ report.equipment.name }}</td>
-                                        <td>{{ report.workorder.order_number }}</td>
-                                        <td>{{ report.workorder.product_code }}</td>
+                                        <td>
+                                            {% if report.report_type == 'rd_sample' %}
+                                                {{ report.workorder_number }}
+                                            {% elif report.workorder %}
+                                                {{ report.workorder.company_code }} - {{ report.workorder.order_number }}
+                                            {% elif report.workorder_number %}
+                                                {{ report.workorder_number }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.report_type == 'rd_sample' %}
+                                                {{ report.rd_product_code|default:report.product_id|default:"-" }}
+                                            {% elif report.workorder %}
+                                                {{ report.workorder.product_code }}
+                                            {% elif report.product_id %}
+                                                {{ report.product_id }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
                                         <td>{{ report.work_quantity }}</td>
-                                        <td>{{ report.work_hours }}小時</td>
+                                        <td>{{ report.work_duration|floatformat:2 }}小時</td>
                                         <td>
                                             {% if report.approval_status == 'approved' %}
                                                 <span class="badge bg-success">已核准</span>

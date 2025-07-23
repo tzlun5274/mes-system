@@ -329,7 +329,7 @@
                                         <td>{{ report.operator.name }}</td>
                                         <td>
                                             {% if report.report_type == 'rd_sample' %}
-                                                {{ report.rd_sample_code|default:"-" }}
+                                                {{ report.rd_product_code|default:"-" }}
                                             {% else %}
                                                 {{ report.workorder.order_number|default:"-" }}
                                             {% endif %}
