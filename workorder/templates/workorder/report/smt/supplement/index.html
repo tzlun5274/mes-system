@@ -21,9 +21,30 @@
     }
     
     .smt-supplement-table th {
-        background-color: #f8f9fa;
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+        color: white;
         border-top: none;
         font-weight: 600;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .page-header h2 {
+        margin: 0;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    
+    .page-header p {
+        margin: 5px 0 0 0;
+        opacity: 0.9;
     }
     
     .status-badge {
@@ -86,13 +107,14 @@
     <!-- 頁面標題 -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="mb-0">
-                        <i class="fas fa-history text-warning"></i> SMT補登報工管理
-                    </h2>
-                    <p class="text-muted mb-0">管理SMT生產線的歷史報工記錄和補登資料</p>
-                </div>
+            <div class="page-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-0">
+                            <i class="fas fa-history"></i> SMT補登報工管理
+                        </h2>
+                        <p class="mb-0">管理SMT生產線的歷史報工記錄和補登資料</p>
+                    </div>
                 <div>
                     <a href="{% url 'workorder:smt_supplement_report_create' %}" class="btn btn-warning">
                         <i class="fas fa-plus"></i> 新增補登記錄

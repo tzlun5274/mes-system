@@ -183,6 +183,59 @@
     .workorder-info strong {
         color: #495057;
     }
+    
+    /* 時間選擇器樣式 */
+    .time-picker-container {
+        position: absolute;
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        z-index: 1000;
+        display: none;
+        padding: 10px;
+        min-width: 200px;
+    }
+    
+    .time-picker-container select {
+        width: 80px;
+        display: inline-block;
+        margin-right: 10px;
+    }
+    
+    .time-picker-container button {
+        margin-left: 5px;
+    }
+    
+    /* 強制覆蓋Bootstrap的響應式樣式 */
+    @media (max-width: 768px) {
+        .time-select-group {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+        }
+        
+        .time-hour-select, .time-minute-select {
+            width: 80px !important;
+            min-width: 80px !important;
+            max-width: 80px !important;
+            display: inline-block !important;
+            float: none !important;
+        }
+    }
+    
+    /* 唯讀欄位樣式 */
+    .form-control[readonly] {
+        background-color: #f8f9fa;
+        color: #6c757d;
+        cursor: not-allowed;
+    }
+    
+    /* 必填欄位標記 */
+    .required-field {
+        color: #dc3545;
+        font-weight: bold;
+    }
 </style>
 {% endblock %}
 
@@ -235,13 +288,14 @@
                         
                         <!-- 基本資訊區塊 -->
                         <div class="form-section">
+                            <h6><i class="fas fa-info-circle"></i> 基本資訊</h6>
 
                             <!-- 產品編號和工單號碼欄位 -->
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="{{ form.product_id.id_for_label }}" class="form-label">
-                                            產品編號 <span class="text-danger">*</span>
+                                            產品編號 <span class="required-field">*</span>
                                         </label>
                                         {{ form.product_id }}
                                         {% if form.product_id.help_text %}
@@ -255,7 +309,7 @@
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="{{ form.workorder.id_for_label }}" class="form-label">
-                                            工單號碼 <span class="text-danger">*</span>
+                                            工單號碼 <span class="required-field">*</span>
                                         </label>
                                         {{ form.workorder }}
                                         {% if form.workorder.help_text %}
@@ -291,7 +345,7 @@
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <label for="{{ form.operator.id_for_label }}" class="form-label">
-                                            作業員 <span class="text-danger">*</span>
+                                            作業員 <span class="required-field">*</span>
                                         </label>
                                         {{ form.operator }}
                                         {% if form.operator.help_text %}
@@ -305,7 +359,7 @@
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <label for="{{ form.process.id_for_label }}" class="form-label">
-                                            工序 <span class="text-danger">*</span>
+                                            工序 <span class="required-field">*</span>
                                         </label>
                                         {{ form.process }}
                                         {% if form.process.help_text %}
@@ -343,12 +397,13 @@
                                             工單預設生產數量
                                         </label>
                                         {{ form.planned_quantity }}
+                                        <div class="help-text">此為工單規劃的總生產數量，不可修改</div>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <label for="{{ form.work_quantity.id_for_label }}" class="form-label">
-                                            工作數量 <span class="text-danger">*</span>
+                                            工作數量 <span class="required-field">*</span>
                                         </label>
                                         {{ form.work_quantity }}
                                         {% if form.work_quantity.help_text %}
@@ -380,7 +435,7 @@
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <label for="{{ form.work_date.id_for_label }}" class="form-label">
-                                            日期 <span class="text-danger">*</span>
+                                            日期 <span class="required-field">*</span>
                                         </label>
                                         {{ form.work_date }}
                                         {% if form.work_date.help_text %}
@@ -394,7 +449,7 @@
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <label for="{{ form.start_time.id_for_label }}" class="form-label">
-                                            開始時間 <span class="text-danger">*</span>
+                                            開始時間 <span class="required-field">*</span>
                                         </label>
                                         {{ form.start_time }}
                                         {% if form.start_time.help_text %}
@@ -408,7 +463,7 @@
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <label for="{{ form.end_time.id_for_label }}" class="form-label">
-                                            結束時間 <span class="text-danger">*</span>
+                                            結束時間 <span class="required-field">*</span>
                                         </label>
                                         {{ form.end_time }}
                                         {% if form.end_time.help_text %}
@@ -511,6 +566,120 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // 自定義24小時制時間選擇器
+    const startTimeInput = document.getElementById('{{ form.start_time.id_for_label }}');
+    const endTimeInput = document.getElementById('{{ form.end_time.id_for_label }}');
+    
+    // 創建時間選擇器
+    function createTimePicker(inputElement) {
+        // 創建時間選擇器容器
+        const pickerContainer = document.createElement('div');
+        pickerContainer.className = 'time-picker-container';
+        pickerContainer.style.cssText = `
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: none;
+            padding: 10px;
+            min-width: 200px;
+        `;
+        
+        // 創建小時選擇器
+        const hourSelect = document.createElement('select');
+        hourSelect.className = 'form-control mb-2';
+        hourSelect.style.width = '80px';
+        hourSelect.style.display = 'inline-block';
+        hourSelect.style.marginRight = '10px';
+        
+        for (let i = 0; i < 24; i++) {
+            const option = document.createElement('option');
+            option.value = i.toString().padStart(2, '0');
+            option.textContent = i.toString().padStart(2, '0');
+            hourSelect.appendChild(option);
+        }
+        
+        // 創建分鐘選擇器
+        const minuteSelect = document.createElement('select');
+        minuteSelect.className = 'form-control mb-2';
+        minuteSelect.style.width = '80px';
+        minuteSelect.style.display = 'inline-block';
+        
+        for (let i = 0; i < 60; i += 5) {
+            const option = document.createElement('option');
+            option.value = i.toString().padStart(2, '0');
+            option.textContent = i.toString().padStart(2, '0');
+            minuteSelect.appendChild(option);
+        }
+        
+        // 創建確定按鈕
+        const confirmBtn = document.createElement('button');
+        confirmBtn.type = 'button';
+        confirmBtn.className = 'btn btn-primary btn-sm';
+        confirmBtn.textContent = '確定';
+        confirmBtn.style.marginLeft = '10px';
+        
+        // 創建取消按鈕
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'btn btn-secondary btn-sm';
+        cancelBtn.textContent = '取消';
+        cancelBtn.style.marginLeft = '5px';
+        
+        // 組裝選擇器
+        pickerContainer.appendChild(hourSelect);
+        pickerContainer.appendChild(minuteSelect);
+        pickerContainer.appendChild(confirmBtn);
+        pickerContainer.appendChild(cancelBtn);
+        
+        // 插入到頁面
+        inputElement.parentNode.style.position = 'relative';
+        inputElement.parentNode.appendChild(pickerContainer);
+        
+        // 點擊輸入框顯示選擇器
+        inputElement.addEventListener('click', function(e) {
+            e.preventDefault();
+            pickerContainer.style.display = 'block';
+            
+            // 設定當前值
+            const currentValue = inputElement.value;
+            if (currentValue) {
+                const [hour, minute] = currentValue.split(':');
+                hourSelect.value = hour;
+                minuteSelect.value = minute;
+            }
+        });
+        
+        // 確定按鈕事件
+        confirmBtn.addEventListener('click', function() {
+            const timeValue = `${hourSelect.value}:${minuteSelect.value}`;
+            inputElement.value = timeValue;
+            pickerContainer.style.display = 'none';
+        });
+        
+        // 取消按鈕事件
+        cancelBtn.addEventListener('click', function() {
+            pickerContainer.style.display = 'none';
+        });
+        
+        // 點擊外部關閉選擇器
+        document.addEventListener('click', function(e) {
+            if (!pickerContainer.contains(e.target) && e.target !== inputElement) {
+                pickerContainer.style.display = 'none';
+            }
+        });
+    }
+    
+    // 初始化時間選擇器
+    if (startTimeInput) {
+        createTimePicker(startTimeInput);
+    }
+    if (endTimeInput) {
+        createTimePicker(endTimeInput);
+    }
+    
     // 取得DOM元素
     const productInput = document.getElementById('product_id_input');
     const workorderSelect = document.getElementById('workorder_select');
@@ -618,28 +787,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('operator_supplement_form');
     if (form) {
         form.addEventListener('submit', function(e) {
-            const startTime = document.getElementById('start_time_input').value;
-            const endTime = document.getElementById('end_time_input').value;
+            const startTimeInput = document.getElementById('{{ form.start_time.id_for_label }}');
+            const endTimeInput = document.getElementById('{{ form.end_time.id_for_label }}');
             
-            if (startTime && endTime && startTime >= endTime) {
-                e.preventDefault();
-                alert('結束時間必須大於開始時間');
-                return false;
+            if (startTimeInput && endTimeInput && startTimeInput.value && endTimeInput.value) {
+                if (startTimeInput.value >= endTimeInput.value) {
+                    e.preventDefault();
+                    alert('結束時間必須大於開始時間');
+                    return false;
+                }
             }
             
-            const workQuantity = document.getElementById('work_quantity_input').value;
-            if (workQuantity && parseInt(workQuantity) <= 0) {
+            const workQuantity = document.getElementById('work_quantity_input');
+            if (workQuantity && workQuantity.value && parseInt(workQuantity.value) <= 0) {
                 e.preventDefault();
                 alert('工作數量必須大於0');
                 return false;
             }
             
-            const defectQuantity = document.getElementById('defect_quantity_input').value;
-            if (defectQuantity && parseInt(defectQuantity) < 0) {
+            const defectQuantity = document.getElementById('defect_quantity_input');
+            if (defectQuantity && defectQuantity.value && parseInt(defectQuantity.value) < 0) {
                 e.preventDefault();
                 alert('不良品數量不能為負數');
                 return false;
             }
+            
+            // 驗證通過，允許表單提交
+            return true;
         });
     }
 });

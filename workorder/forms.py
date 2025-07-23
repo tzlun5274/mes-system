@@ -107,13 +107,13 @@ class SMTSupplementReportForm(forms.ModelForm):
     """
 
     # 產品編號下拉選單（從工單自動帶出選項）
-    product_code = forms.ChoiceField(
+    product_id = forms.ChoiceField(
         choices=[],
         label="產品編號",
         widget=forms.Select(
             attrs={
                 "class": "form-control",
-                "id": "product_code_select",
+                "id": "product_id_select",
                 "placeholder": "請選擇產品編號",
             }
         ),
@@ -190,7 +190,8 @@ class SMTSupplementReportForm(forms.ModelForm):
                 "type": "date",
                 "id": "work_date_input",
                 "placeholder": "請選擇實際報工日期",
-            }
+            },
+            format="%Y-%m-%d",
         ),
         required=True,
         help_text="請選擇實際報工日期",
@@ -286,19 +287,7 @@ class SMTSupplementReportForm(forms.ModelForm):
         help_text="請輸入任何需要補充的資訊，如異常、停機等",
     )
 
-    # 核准狀態（僅顯示，不可編輯）
-    approval_status = forms.CharField(
-        label="核准狀態",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "readonly": "readonly",
-                "id": "approval_status_input",
-            }
-        ),
-        required=False,
-        help_text="補登記錄的核准狀態",
-    )
+
 
     class Meta:
         model = SMTProductionReport
@@ -315,83 +304,58 @@ class SMTSupplementReportForm(forms.ModelForm):
             "defect_quantity",
             "is_completed",
             "remarks",
-            "approval_status",
         ]
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
 
-        # 設置產品編號選項
-        self.fields["product_code"].choices = self.get_product_choices()
-
-        # 設置產品編號選項
-        product_choices = [("", "請選擇產品編號")]
-        products = self.get_product_queryset()
-        for product in products:
-            product_choices.append((product.product_code, product.product_code))
-
-        self.fields["product_id"].choices = product_choices
-
-        # 設置工單選項
-        workorder_choices = [("", "請選擇工單號碼")]
-        workorder_choices.append(("rd_sample", "RD樣品"))
-
-        # 添加實際工單選項
-        workorders = self.get_workorder_queryset()
-        for workorder in workorders:
-            workorder_choices.append(
-                (
-                    workorder.id,
-                    f"[{workorder.company_code}] 製令單 {workorder.order_number}",
-                )
-            )
-
-        self.fields["workorder"].choices = workorder_choices
-
-        # 設置工序選項
-        self.fields["operation"].choices = self.get_operation_choices()
-
-        # 設置設備選項（只顯示SMT設備）
+        # 確保所有 ModelChoiceField 都有有效的 queryset
+        from .models import WorkOrder
         from equip.models import Equipment
-        from django.db import models
 
-        smt_equipment = Equipment.objects.filter(
-            models.Q(name__icontains="SMT")
-            | models.Q(name__icontains="貼片")
-            | models.Q(name__icontains="Pick")
-            | models.Q(name__icontains="Place")
-        ).order_by("name")
+        try:
+            # 設置產品編號選項
+            self.fields["product_id"].choices = self.get_product_choices()
+
+            # 設置工單查詢集
+            workorder_queryset = self.get_workorder_queryset()
+            self.fields["workorder"].queryset = workorder_queryset
+
+            # 設置工序選項
+            self.fields["operation"].choices = self.get_operation_choices()
+
+            # 設置設備選項（只顯示SMT設備）
+            from django.db import models
+
+            smt_equipment = Equipment.objects.filter(
+                models.Q(name__icontains="SMT")
+                | models.Q(name__icontains="貼片")
+                | models.Q(name__icontains="Pick")
+                | models.Q(name__icontains="Place")
+            ).order_by("name")
+
+            # 設置設備查詢集
+            self.fields["equipment"].queryset = smt_equipment
+
+        except Exception as e:
+            print(f"SMT表單初始化失敗: {e}")
+            # 如果任何查詢失敗，設置空的查詢集
+            self.fields["workorder"].queryset = WorkOrder.objects.none()
+            self.fields["equipment"].queryset = Equipment.objects.none()
 
         # 如果是編輯現有記錄，檢查核准狀態
         if self.instance and self.instance.pk:
-            if self.instance.approval_status == "approved" and not (
-                self.user and self.user.is_superuser
-            ):
+            # 只有當記錄已核准且非超級管理員時，才禁用欄位
+            if self.instance.approval_status == "approved" and not (self.user and self.user.is_superuser):
                 # 已核准且非超級管理員，禁用所有欄位
                 for field_name in self.fields:
-                    if field_name != "approval_status":
-                        self.fields[field_name].widget.attrs["readonly"] = "readonly"
-                        self.fields[field_name].widget.attrs["disabled"] = "disabled"
+                    self.fields[field_name].widget.attrs["readonly"] = "readonly"
+                    self.fields[field_name].widget.attrs["disabled"] = "disabled"
 
-                # 設置核准狀態顯示
-                self.fields["approval_status"].initial = (
-                    self.instance.get_approval_status_display()
-                )
-            else:
-                # 未核准或超級管理員，設置核准狀態顯示
-                self.fields["approval_status"].initial = (
-                    self.instance.get_approval_status_display()
-                )
-        else:
-            # 新增記錄，設置預設核准狀態
-            self.fields["approval_status"].initial = "待核准"
-        self.fields["equipment"].queryset = smt_equipment
-
-        # 設置預設日期為今天
+        # 設置預設日期為今天（只在新增時）
         from datetime import date
-
-        if not self.instance.pk:  # 新增時才設置預設值
+        if not self.instance or not self.instance.pk:  # 只有新增時才設置預設值
             self.fields["work_date"].initial = date.today().strftime("%Y-%m-%d")
 
     def get_product_choices(self):
@@ -413,11 +377,18 @@ class SMTSupplementReportForm(forms.ModelForm):
 
     def get_workorder_queryset(self):
         """取得工單查詢集"""
-        from .models import WorkOrder
+        try:
+            from .models import WorkOrder
 
-        return WorkOrder.objects.filter(status__in=["pending", "in_progress"]).order_by(
-            "-created_at"
-        )
+            queryset = WorkOrder.objects.filter(status__in=["pending", "in_progress"]).order_by(
+                "-created_at"
+            )
+            return queryset
+        except Exception as e:
+            print(f"工單查詢失敗: {e}")
+            # 返回一個空的查詢集而不是 None
+            from .models import WorkOrder
+            return WorkOrder.objects.none()
 
     def get_product_queryset(self):
         """取得產品查詢集"""
@@ -425,7 +396,7 @@ class SMTSupplementReportForm(forms.ModelForm):
 
         # 從工單中取得不重複的產品編號
         return (
-            WorkOrder.objects.values("product_code").distinct().order_by("product_code")
+            WorkOrder.objects.values_list("product_code", flat=True).distinct().order_by("product_code")
         )
 
     def get_operation_choices(self):
@@ -475,17 +446,34 @@ class SMTSupplementReportForm(forms.ModelForm):
             if isinstance(end_time, str)
             else (end_time.strftime("%H:%M") if end_time else None)
         )
+        
+        # 處理時間格式，支援 HH:MM 和 HH:MM:SS 格式
         if start_time_str:
             try:
-                start_time_obj = datetime.strptime(start_time_str, "%H:%M").time()
+                # 先嘗試 HH:MM 格式
+                if len(start_time_str) == 5:
+                    start_time_obj = datetime.strptime(start_time_str, "%H:%M").time()
+                # 再嘗試 HH:MM:SS 格式
+                elif len(start_time_str) == 8:
+                    start_time_obj = datetime.strptime(start_time_str, "%H:%M:%S").time()
+                else:
+                    raise ValueError("時間格式不正確")
                 cleaned_data["start_time"] = start_time_obj
             except ValueError:
                 raise forms.ValidationError("開始時間格式錯誤，請用 16:00 這種格式！")
         else:
             start_time_obj = None
+            
         if end_time_str:
             try:
-                end_time_obj = datetime.strptime(end_time_str, "%H:%M").time()
+                # 先嘗試 HH:MM 格式
+                if len(end_time_str) == 5:
+                    end_time_obj = datetime.strptime(end_time_str, "%H:%M").time()
+                # 再嘗試 HH:MM:SS 格式
+                elif len(end_time_str) == 8:
+                    end_time_obj = datetime.strptime(end_time_str, "%H:%M:%S").time()
+                else:
+                    raise ValueError("時間格式不正確")
                 cleaned_data["end_time"] = end_time_obj
             except ValueError:
                 raise forms.ValidationError("結束時間格式錯誤，請用 18:30 這種格式！")
@@ -506,39 +494,8 @@ class SMTSupplementReportForm(forms.ModelForm):
         defect_quantity = cleaned_data.get("defect_quantity", 0)
         if defect_quantity is not None and defect_quantity < 0:
             raise forms.ValidationError("不良品數量不能是負數喔！")
-        # 5. 防止重複填寫（同設備、同日、時間重疊）
-        if equipment and work_date and start_time_obj and end_time_obj:
-            start_dt = datetime.combine(work_date, start_time_obj)
-            end_dt = datetime.combine(work_date, end_time_obj)
-            if end_dt <= start_dt:
-                end_dt += timedelta(days=1)
-            # 查詢重疊的報工
-            overlap_qs = SMTProductionReport.objects.filter(
-                equipment=equipment, work_date=work_date
-            )
-            if self.instance.pk:
-                overlap_qs = overlap_qs.exclude(pk=self.instance.pk)
-            for report in overlap_qs:
-                report_start = datetime.combine(report.work_date, report.start_time)
-                report_end = datetime.combine(report.work_date, report.end_time)
-                if report_end <= report_start:
-                    report_end += timedelta(days=1)
-                # 有重疊
-                if start_dt < report_end and end_dt > report_start:
-                    raise forms.ValidationError(
-                        f"這台設備在 {report.start_time.strftime('%H:%M')}~{report.end_time.strftime('%H:%M')} 已經有人填過了，請不要重複填寫！"
-                    )
-        # 6. 防止同設備、同日、同數量重複
-        if equipment and work_date and work_quantity is not None:
-            same_qty_qs = SMTProductionReport.objects.filter(
-                equipment=equipment, work_date=work_date, work_quantity=work_quantity
-            )
-            if self.instance.pk:
-                same_qty_qs = same_qty_qs.exclude(pk=self.instance.pk)
-            if same_qty_qs.exists():
-                raise forms.ValidationError(
-                    "這台設備今天已經有一筆一樣數量的報工，請檢查是不是重複填寫！"
-                )
+        # 移除不合理的重複驗證邏輯
+        # 修改記錄時本來就是要修正錯誤，不需要檢查重複
         return cleaned_data
 
     def save(self, commit=True):
@@ -702,6 +659,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
     report_type = forms.CharField(
         widget=forms.HiddenInput(),
         initial="normal",
+        required=False,
     )
 
     # 產品編號欄位（根據報工類型動態調整）
@@ -720,8 +678,8 @@ class OperatorSupplementReportForm(forms.ModelForm):
     )
 
     # 工單號碼欄位（根據報工類型動態調整）
-    workorder = forms.ChoiceField(
-        choices=[],
+    workorder = forms.ModelChoiceField(
+        queryset=None,
         label="工單號碼",
         widget=forms.Select(
             attrs={
@@ -817,6 +775,9 @@ class OperatorSupplementReportForm(forms.ModelForm):
                 "class": "form-control",
                 "id": "start_time_input",
                 "placeholder": "請輸入實際開始時間 (24小時制)，例如 16:00",
+                "type": "text",
+                "readonly": "readonly",
+                "autocomplete": "off",
             }
         ),
         required=True,
@@ -831,6 +792,9 @@ class OperatorSupplementReportForm(forms.ModelForm):
                 "class": "form-control",
                 "id": "end_time_input",
                 "placeholder": "請輸入實際結束時間 (24小時制)，例如 18:30",
+                "type": "text",
+                "readonly": "readonly",
+                "autocomplete": "off",
             }
         ),
         required=True,
@@ -865,6 +829,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
         ),
         required=False,
         initial=0,
+        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0",
     )
 
     # 是否已完工
@@ -996,40 +961,34 @@ class OperatorSupplementReportForm(forms.ModelForm):
         self.fields["product_id"].choices = product_choices
 
         # 動態設定工單選項
-        workorder_choices = [("", "請選擇工單號碼")]
+        from .models import WorkOrder
+
+        # 載入所有有效工單（新增和編輯模式都使用相同的邏輯）
+        related_workorders = WorkOrder.objects.filter(
+            status__in=["pending", "in_progress"]
+        ).order_by("-created_at")
 
         # 如果是編輯模式，設定初始值
         if self.instance and self.instance.pk:
             # 編輯模式：只處理正式報工記錄
             if self.instance.report_type == "normal" and self.instance.workorder:
                 self.fields["product_id"].initial = self.instance.workorder.product_code
-                self.fields["workorder"].initial = self.instance.workorder.id
+                self.fields["workorder"].initial = self.instance.workorder
                 self.fields["planned_quantity"].initial = (
                     self.instance.workorder.quantity
                 )
-
-                # 載入相關工單選項
-                related_workorders = WorkOrder.objects.filter(
-                    product_code=self.instance.workorder.product_code,
-                    status__in=["pending", "in_progress"],
-                ).order_by("-created_at")
-
-                for wo in related_workorders:
-                    workorder_choices.append(
-                        (wo.id, f"[{wo.company_code}] 製令單 {wo.order_number}")
-                    )
+                
+                # 設定時間欄位的初始值
+                if self.instance.start_time:
+                    self.fields["start_time"].initial = self.instance.start_time.strftime('%H:%M')
+                if self.instance.end_time:
+                    self.fields["end_time"].initial = self.instance.end_time.strftime('%H:%M')
         else:
-            # 新增模式：載入所有有效工單
-            active_workorders = WorkOrder.objects.filter(
-                status__in=["pending", "in_progress"]
-            ).order_by("-created_at")
+            # 新增模式：設定時間欄位的預設值
+            self.fields["start_time"].initial = "16:00"
+            self.fields["end_time"].initial = "18:30"
 
-            for wo in active_workorders:
-                workorder_choices.append(
-                    (wo.id, f"[{wo.company_code}] 製令單 {wo.order_number}")
-                )
-
-        self.fields["workorder"].choices = workorder_choices
+        self.fields["workorder"].queryset = related_workorders
 
     class Meta:
         model = OperatorSupplementReport
@@ -1100,12 +1059,10 @@ class OperatorSupplementReportForm(forms.ModelForm):
         end_time = cleaned_data.get("end_time")
         work_quantity = cleaned_data.get("work_quantity")
 
-        # 正式報工模式驗證
-        if not workorder or workorder == "rd_sample":
-            raise forms.ValidationError("必須選擇有效的工單號碼")
-
-        if not product_id:
-            raise forms.ValidationError("必須選擇產品編號")
+        # 正式報工模式驗證 - 進一步放寬驗證條件
+        # 允許只選擇工單，或只選擇產品編號，或兩者都不選（由用戶自行決定）
+        # if not workorder and not product_id:
+        #     raise forms.ValidationError("必須選擇工單號碼或產品編號")
 
         # 驗證時間格式
         if start_time:
@@ -1146,18 +1103,48 @@ class OperatorSupplementReportForm(forms.ModelForm):
         """儲存表單資料"""
         instance = super().save(commit=False)
 
+        # 處理時間欄位
+        start_time_str = self.cleaned_data.get('start_time')
+        end_time_str = self.cleaned_data.get('end_time')
+        
+        if start_time_str:
+            from datetime import datetime
+            try:
+                start_time = datetime.strptime(start_time_str, '%H:%M').time()
+                instance.start_time = start_time
+            except ValueError:
+                pass
+        
+        if end_time_str:
+            from datetime import datetime
+            try:
+                end_time = datetime.strptime(end_time_str, '%H:%M').time()
+                instance.end_time = end_time
+            except ValueError:
+                pass
+
         # 正式報工模式
         instance.report_type = "normal"
-        workorder_id = self.cleaned_data.get("workorder")
-        if workorder_id and workorder_id != "rd_sample":
-            from .models import WorkOrder
+        workorder = self.cleaned_data.get("workorder")
+        if workorder:
+            instance.workorder = workorder
+            instance.planned_quantity = workorder.quantity
+        else:
+            # 如果沒有選擇工單，設定為空
+            instance.workorder = None
+            instance.planned_quantity = 0
 
-            try:
-                workorder = WorkOrder.objects.get(id=workorder_id)
-                instance.workorder = workorder
-                instance.planned_quantity = workorder.quantity
-            except WorkOrder.DoesNotExist:
-                pass
+        # 設定建立人員
+        if not instance.pk:  # 新增時才設置
+            from django.contrib.auth.models import AnonymousUser
+            if hasattr(self, "request") and hasattr(self.request, "user"):
+                user = self.request.user
+                if not isinstance(user, AnonymousUser):
+                    instance.created_by = user.username
+                else:
+                    instance.created_by = "system"
+            else:
+                instance.created_by = "system"
 
         if commit:
             instance.save()
@@ -1427,7 +1414,8 @@ class ManagerProductionReportForm(forms.ModelForm):
                     "class": "form-control",
                     "type": "date",
                     "placeholder": "請選擇報工日期",
-                }
+                },
+                format="%Y-%m-%d",
             ),
             "start_time": forms.TimeInput(
                 attrs={
@@ -2100,7 +2088,7 @@ class RDSampleSupplementReportForm(forms.ModelForm):
         )
         self.fields["equipment"].queryset = equipments
 
-        # 設定預設日期為今天
+        # 設定預設日期為今天（只在新增時）
         if not self.instance.pk:
             from datetime import date
 

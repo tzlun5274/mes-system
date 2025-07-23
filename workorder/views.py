@@ -3636,6 +3636,9 @@ def smt_supplement_report_detail(request, report_id):
     return render(request, 'workorder/report/smt/supplement/detail.html', context)
 
 
+
+
+
 @require_POST
 @csrf_exempt
 def smt_supplement_report_approve(request, report_id):
@@ -4695,7 +4698,7 @@ def operator_supplement_report_index(request):
     # 分頁
     paginator = Paginator(supplement_reports, 20)
     page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    supplement_reports_page = paginator.get_page(page_number)
     
     # 取得統計資料
     pending_reports = OperatorSupplementReport.objects.filter(approval_status='pending').count()
@@ -4711,7 +4714,7 @@ def operator_supplement_report_index(request):
     ).order_by('name')
     
     context = {
-        'supplement_reports': page_obj,
+        'supplement_reports': supplement_reports_page,
         'pending_reports': pending_reports,
         'approved_reports': approved_reports,
         'rejected_reports': rejected_reports,
@@ -4743,39 +4746,25 @@ def operator_supplement_report_create(request):
         form.request = request  # 傳遞request給表單
         
         if form.is_valid():
-            # 處理時間欄位
-            start_time_str = form.cleaned_data['start_time']
-            end_time_str = form.cleaned_data['end_time']
-            
             try:
-                from datetime import datetime
-                start_time = datetime.strptime(start_time_str, '%H:%M').time()
-                end_time = datetime.strptime(end_time_str, '%H:%M').time()
-                
-                # 創建補登記錄
-                supplement_report = form.save(commit=False)
-                supplement_report.start_time = start_time
-                supplement_report.end_time = end_time
-                supplement_report.created_by = request.user.username
-                
-                # 正式報工模式
-                supplement_report.report_type = 'normal'
-                workorder_id = form.cleaned_data.get('workorder')
-                if workorder_id:
-                    try:
-                        workorder = WorkOrder.objects.get(id=workorder_id)
-                        supplement_report.workorder = workorder
-                        supplement_report.planned_quantity = workorder.quantity
-                    except WorkOrder.DoesNotExist:
-                        pass
-                
-                supplement_report.save()
+                # 直接儲存表單，時間欄位已在表單的save()方法中處理
+                supplement_report = form.save()
                 
                 messages.success(request, '作業員補登報工記錄建立成功！')
                 return redirect('workorder:operator_supplement_report_index')
-            except ValueError:
-                form.add_error("start_time", "時間格式錯誤")
-                form.add_error("end_time", "時間格式錯誤")
+            except Exception as e:
+                messages.error(request, f'儲存失敗：{str(e)}')
+        else:
+            # 顯示表單驗證錯誤
+            error_messages = []
+            for field, errors in form.errors.items():
+                for error in errors:
+                    error_messages.append(f"{form.fields[field].label}: {error}")
+            
+            if error_messages:
+                messages.error(request, f'表單驗證失敗：{"；".join(error_messages)}')
+            else:
+                messages.error(request, '表單驗證失敗，請檢查輸入資料')
     else:
         form = OperatorSupplementReportForm()
         form.request = request  # 傳遞request給表單
@@ -4815,46 +4804,21 @@ def operator_supplement_report_edit(request, report_id):
         form.request = request  # 傳遞request給表單
         
         if form.is_valid():
-            # 處理時間欄位
-            start_time_str = form.cleaned_data['start_time']
-            end_time_str = form.cleaned_data['end_time']
-            
             try:
-                from datetime import datetime
-                start_time = datetime.strptime(start_time_str, '%H:%M').time()
-                end_time = datetime.strptime(end_time_str, '%H:%M').time()
-                
-                # 更新補登記錄
-                supplement_report = form.save(commit=False)
-                supplement_report.start_time = start_time
-                supplement_report.end_time = end_time
-                
-                # 正式報工模式
-                supplement_report.report_type = 'normal'
-                workorder_id = form.cleaned_data.get('workorder')
-                if workorder_id and workorder_id != 'rd_sample':
-                    try:
-                        workorder = WorkOrder.objects.get(id=workorder_id)
-                        supplement_report.workorder = workorder
-                        supplement_report.planned_quantity = workorder.quantity
-                    except WorkOrder.DoesNotExist:
-                        pass
-                
-                supplement_report.save()
+                # 直接儲存表單，時間欄位已在表單的save()方法中處理
+                supplement_report = form.save()
                 
                 messages.success(request, '作業員補登報工記錄更新成功！')
                 return redirect('workorder:operator_supplement_report_index')
-                
-            except ValueError:
-                form.add_error('start_time', '時間格式錯誤')
-                form.add_error('end_time', '時間格式錯誤')
+            except Exception as e:
+                messages.error(request, f'更新失敗：{str(e)}')
         else:
             messages.error(request, '表單驗證失敗，請檢查輸入資料')
     else:
         # 初始化表單，將時間轉換為字串格式
         initial_data = {
-            'start_time': report.start_time.strftime('%H:%M') if report.start_time else '',
-            'end_time': report.end_time.strftime('%H:%M') if report.end_time else '',
+            'start_time': report.start_time.strftime('%H:%M') if report.start_time else '16:00',
+            'end_time': report.end_time.strftime('%H:%M') if report.end_time else '18:30',
         }
         
         # 根據記錄類型設定初始值
@@ -4868,6 +4832,7 @@ def operator_supplement_report_edit(request, report_id):
                 initial_data['workorder'] = report.workorder.id
         
         form = OperatorSupplementReportForm(instance=report, initial=initial_data)
+        form.request = request  # 傳遞request給表單
     
     context = {
         'form': form,
@@ -5783,6 +5748,34 @@ def rd_sample_supplement_report_create(request):
     }
     
     return render(request, 'workorder/report/operator/supplement/rd_sample_form.html', context)
+
+
+def smt_rd_sample_supplement_index(request):
+    """
+    SMTRD樣品補登管理頁面
+    顯示SMT生產線的RD樣品補登記錄列表
+    """
+    from .models import SMTProductionReport
+    
+    # 取得RD樣品補登記錄（目前為空，因為還沒有實作）
+    rd_sample_reports = []
+    
+    # 計算統計資料
+    total_count = len(rd_sample_reports)
+    pending_count = len([r for r in rd_sample_reports if r.approval_status == 'pending'])
+    approved_count = len([r for r in rd_sample_reports if r.approval_status == 'approved'])
+    rejected_count = len([r for r in rd_sample_reports if r.approval_status == 'rejected'])
+    
+    context = {
+        'rd_sample_reports': rd_sample_reports,
+        'total_count': total_count,
+        'pending_count': pending_count,
+        'approved_count': approved_count,
+        'rejected_count': rejected_count,
+        'page_title': 'SMTRD樣品補登管理',
+    }
+    
+    return render(request, 'workorder/report/smt/rd_sample_supplement/index.html', context)
 
 
 def rd_sample_supplement_report_edit(request, report_id):

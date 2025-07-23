@@ -95,6 +95,10 @@ urlpatterns = [
     path('report/smt/supplement/detail/<int:report_id>/', views.smt_supplement_report_detail, name='smt_supplement_report_detail'),
     path('report/smt/supplement/approve/<int:report_id>/', views.smt_supplement_report_approve, name='smt_supplement_report_approve'),
     path('report/smt/supplement/reject/<int:report_id>/', views.smt_supplement_report_reject, name='smt_supplement_report_reject'),
+    
+    # SMTRD樣品補登功能
+    path('report/smt/rd_sample_supplement/', views.smt_rd_sample_supplement_index, name='smt_rd_sample_supplement_index'),
+
     path('api/smt/supplement/batch_create/', views.smt_supplement_batch_create, name='smt_supplement_batch_create'),
     path('api/smt/get_workorders_by_equipment/', views.get_smt_workorders_by_equipment, name='get_smt_workorders_by_equipment'),
     path('api/get_workorders_by_product/', views.get_workorders_by_product, name='get_workorders_by_product'),

@@ -73,6 +73,50 @@
         color: #0c5460;
         border: 1px solid #bee5eb;
     }
+    
+    /* 確保刪除按鈕可見 */
+    #delete_btn {
+        display: inline-block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: relative !important;
+        z-index: 1000 !important;
+        pointer-events: auto !important;
+        cursor: pointer !important;
+    }
+    
+    #delete_btn:disabled {
+        opacity: 0.6 !important;
+        cursor: not-allowed !important;
+    }
+    
+    #delete_btn:not(:disabled) {
+        opacity: 1 !important;
+        cursor: pointer !important;
+    }
+    
+    /* 強制顯示按鈕 */
+    .btn-danger#delete_btn {
+        display: inline-block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: relative !important;
+        z-index: 1000 !important;
+        pointer-events: auto !important;
+    }
+    
+    /* 確保表單可以提交 */
+    #delete_form {
+        display: block !important;
+    }
+    
+    /* 確保勾選框正常工作 */
+    #confirm_delete {
+        display: inline-block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
 </style>
 {% endblock %}
 
@@ -262,7 +306,7 @@
                         
                         <div class="d-flex justify-content-between">
                             <div>
-                                <button type="submit" class="btn btn-danger" id="delete_btn" disabled>
+                                <button type="submit" class="btn btn-danger" id="delete_btn" disabled style="display: inline-block !important;">
                                     <i class="fas fa-trash"></i> 確認刪除
                                 </button>
                                 <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-outline-secondary">
@@ -288,44 +332,101 @@
 
 {% block extra_js %}
 <script>
-    // 刪除確認專用 JavaScript
-    $(document).ready(function() {
+    // 刪除確認專用 JavaScript - 使用原生 JavaScript
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Delete confirmation page loaded');
+        
+        // 獲取元素
+        const confirmCheckbox = document.getElementById('confirm_delete');
+        const deleteBtn = document.getElementById('delete_btn');
+        const deleteForm = document.getElementById('delete_form');
+        const deleteConfirmCard = document.querySelector('.delete-confirm-card');
+        
         // 卡片懸停效果
-        $('.delete-confirm-card').hover(
-            function() {
-                $(this).addClass('shadow-lg');
-            },
-            function() {
-                $(this).removeClass('shadow-lg');
-            }
-        );
+        if (deleteConfirmCard) {
+            deleteConfirmCard.addEventListener('mouseenter', function() {
+                this.classList.add('shadow-lg');
+            });
+            
+            deleteConfirmCard.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow-lg');
+            });
+        }
         
         // 確認勾選框控制刪除按鈕
-        $('#confirm_delete').on('change', function() {
-            if ($(this).is(':checked')) {
-                $('#delete_btn').prop('disabled', false);
-            } else {
-                $('#delete_btn').prop('disabled', true);
-            }
-        });
+        if (confirmCheckbox) {
+            confirmCheckbox.addEventListener('change', function() {
+                console.log('Checkbox changed:', this.checked);
+                if (this.checked) {
+                    deleteBtn.disabled = false;
+                    deleteBtn.classList.remove('disabled');
+                    deleteBtn.style.display = 'inline-block';
+                    console.log('Delete button enabled');
+                } else {
+                    deleteBtn.disabled = true;
+                    deleteBtn.classList.add('disabled');
+                    console.log('Delete button disabled');
+                }
+            });
+        }
+        
+        // 頁面載入時檢查勾選框狀態
+        if (confirmCheckbox && confirmCheckbox.checked) {
+            deleteBtn.disabled = false;
+            deleteBtn.classList.remove('disabled');
+            deleteBtn.style.display = 'inline-block';
+            console.log('Delete button enabled on page load');
+        }
         
         // 表單提交確認
-        $('#delete_form').on('submit', function(e) {
-            if (!$('#confirm_delete').is(':checked')) {
-                e.preventDefault();
-                alert('請先勾選確認刪除選項');
-                return false;
-            }
-            
-            // 最終確認
-            if (!confirm('確定要刪除這筆SMT補登報工記錄嗎？此操作無法復原！')) {
-                e.preventDefault();
-                return false;
-            }
-            
-            // 顯示載入中
-            showLoading();
-        });
+        if (deleteForm) {
+            deleteForm.addEventListener('submit', function(e) {
+                console.log('Form submit triggered');
+                
+                if (!confirmCheckbox.checked) {
+                    e.preventDefault();
+                    alert('請先勾選確認刪除選項');
+                    return false;
+                }
+                
+                // 最終確認
+                if (!confirm('確定要刪除這筆SMT補登報工記錄嗎？此操作無法復原！')) {
+                    e.preventDefault();
+                    return false;
+                }
+                
+                // 顯示載入中
+                showLoading();
+                
+                // 確保表單可以提交
+                return true;
+            });
+        }
+        
+        // 直接點擊刪除按鈕的處理
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function(e) {
+                console.log('Delete button clicked');
+                
+                if (!confirmCheckbox.checked) {
+                    e.preventDefault();
+                    alert('請先勾選確認刪除選項');
+                    return false;
+                }
+                
+                // 最終確認
+                if (!confirm('確定要刪除這筆SMT補登報工記錄嗎？此操作無法復原！')) {
+                    e.preventDefault();
+                    return false;
+                }
+                
+                // 顯示載入中
+                showLoading();
+                
+                // 提交表單
+                deleteForm.submit();
+            });
+        }
     });
     
     // 顯示載入中
@@ -344,5 +445,7 @@
             loadingDiv.remove();
         }
     }
+    
+
 </script>
 {% endblock %} 

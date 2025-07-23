@@ -95,28 +95,71 @@
     .workorder-info strong {
         color: #495057;
     }
+    
+    .page-header {
+        background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .page-header h2 {
+        margin: 0;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    
+    .page-header p {
+        margin: 5px 0 0 0;
+        opacity: 0.9;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid">
+    <!-- 錯誤/成功訊息顯示區塊 -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}" role="alert">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    {% if form.errors %}
+        <div class="alert alert-danger" role="alert">
+            <strong>更新失敗，請檢查下方欄位內容！</strong>
+            <ul class="mb-0">
+                {% for field in form %}
+                    {% for error in field.errors %}
+                        <li>{{ field.label }}：{{ error }}</li>
+                    {% endfor %}
+                {% endfor %}
+                {% for error in form.non_field_errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
     <!-- 頁面標題 -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="mb-0">
-                        <i class="fas fa-edit text-warning"></i> 
-                        {% if supplement_report %}編輯SMT補登報工{% else %}新增SMT補登報工{% endif %}
-                    </h2>
-                    <p class="text-muted mb-0">
-                        {% if supplement_report %}
-                            修改SMT補登報工記錄的詳細資訊
-                        {% else %}
-                            建立新的SMT補登報工記錄
-                        {% endif %}
-                    </p>
-                </div>
+            <div class="page-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-0">
+                            <i class="fas fa-edit"></i> 
+                            {% if supplement_report %}編輯SMT補登報工{% else %}新增SMT補登報工{% endif %}
+                        </h2>
+                        <p class="mb-0">
+                            {% if supplement_report %}
+                                修改SMT補登報工記錄的詳細資訊
+                            {% else %}
+                                建立新的SMT補登報工記錄
+                            {% endif %}
+                        </p>
+                    </div>
                 <div>
                     <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left"></i> 返回列表
@@ -130,11 +173,18 @@
     <div class="row">
         <div class="col-12">
             <div class="card smt-supplement-form-card">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">
-                        <i class="fas fa-clipboard-list"></i> 
-                        {% if supplement_report %}編輯補登記錄{% else %}新增補登記錄{% endif %}
-                    </h5>
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clipboard-list"></i> 
+                            {% if supplement_report %}編輯補登記錄{% else %}新增補登記錄{% endif %}
+                        </h5>
+                        <div>
+                            <a href="{% url 'workorder:smt_rd_sample_supplement_index' %}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-flask"></i> 切換到RD樣品補登報工
+                            </a>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     <form method="post" id="smt_supplement_form">
@@ -142,7 +192,6 @@
                         
                         <!-- 基本資訊區塊 -->
                         <div class="form-section">
-                            <h6><i class="fas fa-info-circle"></i> 基本資訊</h6>
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
@@ -546,6 +595,27 @@ document.addEventListener('DOMContentLoaded', function() {
                         // 更新工單預設生產數量
                         plannedQuantityInput.value = workorder.quantity;
                         
+                        // 自動填入產品編號
+                        if (productSelect && workorder.product_code) {
+                            // 檢查產品編號是否在選項中
+                            let found = false;
+                            for (let i = 0; i < productSelect.options.length; i++) {
+                                if (productSelect.options[i].value === workorder.product_code) {
+                                    productSelect.value = workorder.product_code;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            // 如果產品編號不在選項中，動態添加
+                            if (!found) {
+                                const option = document.createElement('option');
+                                option.value = workorder.product_code;
+                                option.textContent = workorder.product_code;
+                                productSelect.appendChild(option);
+                                productSelect.value = workorder.product_code;
+                            }
+                        }
+                        
                         // 顯示工單資訊
                         document.getElementById('display_order_number').textContent = workorder.order_number;
                         document.getElementById('display_company_code').textContent = workorder.company_code;
@@ -565,47 +635,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 表單驗證
-    const form = document.getElementById('smt_supplement_form');
-    form.addEventListener('submit', function(e) {
-        const startTime = document.getElementById('start_time_input').value;
-        const endTime = document.getElementById('end_time_input').value;
-        
-        if (startTime && endTime && startTime >= endTime) {
-            e.preventDefault();
-            alert('結束時間必須大於開始時間');
-            return false;
-        }
-        
-        const workQuantity = document.getElementById('work_quantity_input').value;
-        if (workQuantity && parseInt(workQuantity) <= 0) {
-            e.preventDefault();
-            alert('工作數量必須大於0');
-            return false;
-        }
-        
-        const defectQuantity = document.getElementById('defect_quantity_input').value;
-        if (defectQuantity && parseInt(defectQuantity) < 0) {
-            e.preventDefault();
-            alert('不良品數量不能為負數');
-            return false;
-        }
-    });
+    // 移除前端驗證，讓後端處理驗證邏輯
+    // 表單驗證已移至後端處理
     
-    // 時間輸入驗證
-    startTimeInput.addEventListener('change', validateTime);
-    endTimeInput.addEventListener('change', validateTime);
-    
-    function validateTime() {
-        const startTime = startTimeInput.value;
-        const endTime = endTimeInput.value;
-        
-        if (startTime && endTime && startTime >= endTime) {
-            endTimeInput.setCustomValidity('結束時間必須大於開始時間');
-        } else {
-            endTimeInput.setCustomValidity('');
-        }
-    }
+    // 移除時間驗證，讓後端處理
+    // 時間驗證已移至後端處理
 });
 </script>
 {% endblock %} 
