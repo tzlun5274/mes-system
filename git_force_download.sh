@@ -40,20 +40,7 @@ git status
 if ! git diff-index --quiet HEAD --; then
     echo -e "${YELLOW}檢測到本機有未提交的變更！${NC}"
     echo -e "${YELLOW}這些變更將在強制下載後丟失！${NC}"
-    echo -e "${YELLOW}建議先備份重要變更${NC}"
-    
-    read -p "是否要備份當前變更？(y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        # 建立備份分支
-        BACKUP_BRANCH="backup_$(date +%Y%m%d_%H%M%S)"
-        echo -e "${BLUE}建立備份分支：${BACKUP_BRANCH}${NC}"
-        git checkout -b "$BACKUP_BRANCH"
-        git add .
-        git commit -m "備份變更 - $(date '+%Y-%m-%d %H:%M:%S')"
-        git checkout "$CURRENT_BRANCH"
-        echo -e "${GREEN}變更已備份到分支：${BACKUP_BRANCH}${NC}"
-    fi
+    echo -e "${YELLOW}請確認您要繼續執行強制下載${NC}"
 fi
 
 # 確認操作
@@ -109,14 +96,7 @@ git status
 echo -e "${BLUE}6. 顯示最近提交記錄...${NC}"
 git log --oneline -5
 
-# 檢查是否有備份分支
-if [ ! -z "$BACKUP_BRANCH" ]; then
-    echo -e "${YELLOW}========================================${NC}"
-    echo -e "${YELLOW}    備份資訊${NC}"
-    echo -e "${YELLOW}========================================${NC}"
-    echo -e "${YELLOW}您的變更已備份到分支：${BACKUP_BRANCH}${NC}"
-    echo -e "${YELLOW}如需恢復，請執行：git checkout ${BACKUP_BRANCH}${NC}"
-fi
+
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}    Git 強制下載腳本執行完成${NC}"

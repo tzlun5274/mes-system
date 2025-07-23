@@ -46,31 +46,43 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# 添加所有變更到暫存區
-echo -e "${BLUE}2. 添加所有變更到暫存區...${NC}"
+# 強制添加所有檔案到暫存區（包括未追蹤的檔案）
+echo -e "${BLUE}2. 強制添加所有檔案到暫存區...${NC}"
+echo -e "${YELLOW}注意：將添加所有檔案，包括未追蹤的檔案${NC}"
+
+# 添加所有已追蹤的變更
 git add .
 
-# 檢查是否有變更需要提交
-if git diff --cached --quiet; then
-    echo -e "${YELLOW}沒有變更需要提交${NC}"
-else
-    # 提交變更
-    echo -e "${BLUE}3. 提交變更...${NC}"
-    COMMIT_MESSAGE="強制更新 - $(date '+%Y-%m-%d %H:%M:%S')"
-    git commit -m "$COMMIT_MESSAGE"
-    echo -e "${GREEN}變更已提交：$COMMIT_MESSAGE${NC}"
-fi
+# 添加所有未追蹤的檔案（除了 .gitignore 中排除的）
+echo -e "${BLUE}添加未追蹤的檔案...${NC}"
+git add -A
 
-# 獲取遠端最新變更（可選）
+# 顯示暫存區狀態
+echo -e "${BLUE}暫存區狀態：${NC}"
+git status --porcelain
+
+# 強制提交所有變更
+echo -e "${BLUE}3. 強制提交所有變更...${NC}"
+COMMIT_MESSAGE="完整專案強制更新 - $(date '+%Y-%m-%d %H:%M:%S')"
+git commit -m "$COMMIT_MESSAGE" --allow-empty
+echo -e "${GREEN}所有變更已提交：$COMMIT_MESSAGE${NC}"
+
+# 獲取遠端最新變更
 echo -e "${BLUE}4. 獲取遠端最新變更...${NC}"
 git fetch origin
 
-# 檢查是否有衝突
-if git merge-base --is-ancestor HEAD origin/$CURRENT_BRANCH 2>/dev/null; then
-    echo -e "${GREEN}本機分支與遠端分支沒有衝突${NC}"
+# 顯示本機與遠端的差異
+echo -e "${BLUE}檢查本機與遠端的差異...${NC}"
+LOCAL_COMMIT=$(git rev-parse HEAD)
+REMOTE_COMMIT=$(git rev-parse origin/$CURRENT_BRANCH 2>/dev/null || echo "無遠端分支")
+
+echo -e "${YELLOW}本機提交：${LOCAL_COMMIT:0:8}${NC}"
+echo -e "${YELLOW}遠端提交：${REMOTE_COMMIT:0:8}${NC}"
+
+if [ "$LOCAL_COMMIT" != "$REMOTE_COMMIT" ]; then
+    echo -e "${YELLOW}檢測到本機與遠端有差異，將執行強制推送${NC}"
 else
-    echo -e "${YELLOW}檢測到本機分支與遠端分支有差異${NC}"
-    echo -e "${YELLOW}將執行強制推送覆蓋遠端內容${NC}"
+    echo -e "${GREEN}本機與遠端已同步${NC}"
 fi
 
 # 強制推送到遠端
@@ -84,15 +96,17 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # 執行強制推送
+echo -e "${BLUE}執行強制推送...${NC}"
 git push origin $CURRENT_BRANCH --force
 
 # 檢查推送結果
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}    強制推送成功！${NC}"
+    echo -e "${GREEN}    完整專案強制推送成功！${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}分支 ${CURRENT_BRANCH} 已成功推送到遠端倉庫${NC}"
-    echo -e "${GREEN}遠端倉庫內容已被本機內容覆蓋${NC}"
+    echo -e "${GREEN}遠端倉庫內容已被本機完整專案內容覆蓋${NC}"
+    echo -e "${GREEN}所有檔案和變更都已上傳${NC}"
 else
     echo -e "${RED}========================================${NC}"
     echo -e "${RED}    強制推送失敗！${NC}"
