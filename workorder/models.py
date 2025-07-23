@@ -748,11 +748,15 @@ class SMTProductionReport(models.Model):
     def can_delete(self, user):
         """
         檢查記錄是否可以刪除
-        只有超級管理員可以刪除已核准的記錄
+        只有建立記錄的用戶和超級管理者可以刪除待核准和已駁回的記錄
+        已核准的記錄只有超級管理者可以刪除
         """
+        # 已核准的記錄只有超級管理者可以刪除
         if self.approval_status == 'approved':
             return user.is_superuser
-        return True
+        
+        # 待核准和已駁回的記錄，只有建立者或超級管理者可以刪除
+        return user.is_superuser or self.created_by == user.username
 
     def can_approve(self, user):
         """檢查是否可以審核"""
@@ -1095,11 +1099,15 @@ class OperatorSupplementReport(models.Model):
     def can_delete(self, user):
         """
         檢查記錄是否可以刪除
-        只有超級管理員可以刪除已審核的記錄
+        只有建立記錄的用戶和超級管理者可以刪除待核准和已駁回的記錄
+        已核准的記錄只有超級管理者可以刪除
         """
+        # 已核准的記錄只有超級管理者可以刪除
         if self.approval_status == 'approved':
             return user.is_superuser
-        return True
+        
+        # 待核准和已駁回的記錄，只有建立者或超級管理者可以刪除
+        return user.is_superuser or self.created_by == user.username
 
     def can_approve(self, user):
         """
@@ -1494,12 +1502,16 @@ class ManagerProductionReport(models.Model):
         return user.is_superuser or self.created_by == user.username
     
     def can_delete(self, user):
-        """檢查是否可以刪除"""
-        # 已審核的記錄不可刪除
+        """
+        檢查是否可以刪除
+        只有建立記錄的用戶和超級管理者可以刪除待核准和已駁回的記錄
+        已核准的記錄只有超級管理者可以刪除
+        """
+        # 已核准的記錄只有超級管理者可以刪除
         if self.approval_status == 'approved':
-            return False
+            return user.is_superuser
         
-        # 建立者或超級用戶可以刪除
+        # 待核准和已駁回的記錄，只有建立者或超級管理者可以刪除
         return user.is_superuser or self.created_by == user.username
     
     def can_approve(self, user):
