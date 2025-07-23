@@ -615,7 +615,7 @@ def manual_convert_orders(request):
             
             # 建立工單
             workorder = WorkOrder.objects.create(
-                order_number=company_order.mkordno,  # 使用 mkordno 作為工單號
+                order_number=WorkOrder.generate_order_number(company_order.company_code),  # 自動生成工單號碼
                 product_code=company_order.product_id,  # 使用 product_id
                 quantity=company_order.prodt_qty,  # 使用 prodt_qty
                 status="pending",
@@ -2973,7 +2973,7 @@ def report_index(request):
             'workorder': report.workorder.order_number if report.workorder else '-',
             'process': report.operation,
             'quantity': report.work_quantity,
-            'work_hours': report.work_hours,
+            'work_hours': report.work_duration,
             'status': report.get_approval_status_display(),
             'type': 'SMT報工'
         })
@@ -3516,7 +3516,21 @@ def smt_supplement_report_create(request):
     from .forms import SMTSupplementReportForm
     
     if request.method == 'POST':
-        form = SMTSupplementReportForm(request.POST)
+        # 處理 RD樣品模式下的產品編號
+        post_data = request.POST.copy()
+        
+        # 只有在 RD樣品模式下才處理 rd_sample_product_id
+        if post_data.get('rd_sample_mode') == 'on':
+            # RD樣品模式：使用 rd_sample_product_id 的值
+            rd_sample_product_id = post_data.get('rd_sample_product_id')
+            if rd_sample_product_id:
+                post_data['product_id'] = rd_sample_product_id
+        else:
+            # 非RD樣品模式：移除 rd_sample_product_id，避免驗證錯誤
+            if 'rd_sample_product_id' in post_data:
+                del post_data['rd_sample_product_id']
+        
+        form = SMTSupplementReportForm(post_data, user=request.user)
         if form.is_valid():
             supplement_report = form.save(commit=False)
             supplement_report.created_by = request.user.username
@@ -3525,7 +3539,7 @@ def smt_supplement_report_create(request):
             messages.success(request, 'SMT補登報工記錄已成功創建！')
             return redirect('workorder:smt_supplement_report_index')
     else:
-        form = SMTSupplementReportForm()
+        form = SMTSupplementReportForm(user=request.user)
     
     # 取得 SMT 設備列表
     equipment_list = Equipment.objects.filter(
@@ -3560,7 +3574,21 @@ def smt_supplement_report_edit(request, report_id):
         return redirect('workorder:smt_supplement_report_index')
     
     if request.method == 'POST':
-        form = SMTSupplementReportForm(request.POST, instance=supplement_report, user=request.user)
+        # 處理 RD樣品模式下的產品編號
+        post_data = request.POST.copy()
+        
+        # 只有在 RD樣品模式下才處理 rd_sample_product_id
+        if post_data.get('rd_sample_mode') == 'on':
+            # RD樣品模式：使用 rd_sample_product_id 的值
+            rd_sample_product_id = post_data.get('rd_sample_product_id')
+            if rd_sample_product_id:
+                post_data['product_id'] = rd_sample_product_id
+        else:
+            # 非RD樣品模式：移除 rd_sample_product_id，避免驗證錯誤
+            if 'rd_sample_product_id' in post_data:
+                del post_data['rd_sample_product_id']
+        
+        form = SMTSupplementReportForm(post_data, instance=supplement_report, user=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, 'SMT補登報工記錄已成功更新！')
@@ -3823,10 +3851,9 @@ def get_workorders_by_product(request):
     try:
         from .models import WorkOrder
         
-        # 查詢該產品編號的所有工單
+        # 查詢該產品編號的所有工單（補登報工應該能選擇所有派工單，不限狀態）
         workorders = WorkOrder.objects.filter(
-            product_code=product_id,
-            status__in=['pending', 'in_progress']
+            product_code=product_id
         ).order_by('-created_at')
         
         workorder_list = []
@@ -3857,21 +3884,26 @@ def get_workorders_by_product(request):
 @csrf_exempt
 def get_workorder_details(request):
     """
-    AJAX 視圖：根據工單ID取得工單詳細資訊
+    AJAX 視圖：根據工單ID或工單編號取得工單詳細資訊
     用於 SMT 補登報工表單的工單資訊顯示
     """
     workorder_id = request.GET.get('workorder_id')
+    workorder_number = request.GET.get('workorder_number')
     
-    if not workorder_id:
+    if not workorder_id and not workorder_number:
         return JsonResponse({
             'status': 'error',
-            'message': '請提供工單ID'
+            'message': '請提供工單ID或工單編號'
         })
     
     try:
         from .models import WorkOrder
         
-        workorder = WorkOrder.objects.get(id=workorder_id)
+        # 優先使用工單編號查詢，如果沒有則使用ID
+        if workorder_number:
+            workorder = WorkOrder.objects.get(order_number=workorder_number)
+        else:
+            workorder = WorkOrder.objects.get(id=workorder_id)
         
         return JsonResponse({
             'status': 'success',

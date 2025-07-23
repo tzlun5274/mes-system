@@ -1,3 +1,4 @@
+
 {% extends 'base.html' %}
 {% load static %}
 
@@ -7,119 +8,185 @@
 
 {% block extra_css %}
 <style>
-    .smt-supplement-form-card {
-        transition: all 0.3s ease;
-        border: none;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    /* 重置所有樣式衝突 */
+    * {
+        box-sizing: border-box;
     }
     
-    .smt-supplement-form-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    .container {
+        padding: 20px !important;
+        max-width: none !important;
     }
     
-    .form-section {
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 20px;
+    /* 表單容器樣式 */
+    .form-container {
+        background: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin: 20px 0;
+        overflow: hidden;
     }
     
-    .form-section h6 {
-        color: #495057;
-        margin-bottom: 15px;
-        border-bottom: 2px solid #dee2e6;
-        padding-bottom: 8px;
-    }
-    
-    .help-text {
-        font-size: 0.875rem;
-        color: #6c757d;
-        margin-top: 0.25rem;
-    }
-    
-    .error-text {
-        font-size: 0.875rem;
-        color: #dc3545;
-        margin-top: 0.25rem;
-    }
-    
-    .status-badge {
-        font-size: 0.8em;
-        padding: 4px 8px;
-        border-radius: 12px;
-        font-weight: 500;
-    }
-    
-    .status-start {
-        background-color: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-    }
-    
-    .status-pause {
-        background-color: #fff3cd;
-        color: #856404;
-        border: 1px solid #ffeaa7;
-    }
-    
-    .status-complete {
-        background-color: #d1ecf1;
-        color: #0c5460;
-        border: 1px solid #bee5eb;
-    }
-    
-    .form-check-input:checked {
-        background-color: #28a745;
-        border-color: #28a745;
-    }
-    
-    .workorder-info {
-        background-color: #e9ecef;
-        border-radius: 6px;
-        padding: 15px;
-        margin-top: 10px;
-        border-left: 4px solid #007bff;
-    }
-    
-    .workorder-info h6 {
-        color: #495057;
-        margin-bottom: 10px;
-    }
-    
-    .workorder-info p {
-        margin-bottom: 5px;
-        color: #6c757d;
-    }
-    
-    .workorder-info strong {
-        color: #495057;
-    }
-    
-    .page-header {
-        background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    /* 表單標題區域 */
+    .form-header {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
         color: white;
         padding: 20px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-bottom: 3px solid #004085;
     }
     
-    .page-header h2 {
+    .form-header h2 {
         margin: 0;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        font-size: 1.5rem;
+        font-weight: 600;
     }
     
-    .page-header p {
+    .form-header p {
         margin: 5px 0 0 0;
         opacity: 0.9;
+    }
+    
+    /* 表單內容區域 */
+    .form-content {
+        padding: 30px;
+    }
+    
+    /* 表單區塊樣式 */
+    .form-block {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 25px;
+        margin-bottom: 25px;
+    }
+    
+    .form-block h6 {
+        color: #495057;
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    /* 表單欄位樣式 */
+    .form-field {
+        margin-bottom: 20px;
+    }
+    
+    .form-label {
+        display: block;
+        color: #212529;
+        font-weight: 600;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #ced4da;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        color: #495057;
+        background-color: #ffffff;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+    
+    .form-control:focus {
+        border-color: #80bdff;
+        outline: 0;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+    
+    /* 說明文字樣式 */
+    .help-text {
+        display: block;
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 5px;
+        line-height: 1.4;
+    }
+    
+    /* 錯誤文字樣式 */
+    .error-text {
+        display: block;
+        font-size: 0.85rem;
+        color: #dc3545;
+        margin-top: 5px;
+    }
+    
+    /* 必填欄位標記 */
+    .required {
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    /* 按鈕樣式 */
+    .btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+        border: none;
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background-color: #0056b3;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #545b62;
+    }
+    
+    /* RD樣品模式樣式 */
+    .rd-sample-toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .rd-sample-toggle input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .rd-sample-toggle label {
+        color: white;
+        font-weight: 500;
+        margin: 0;
+    }
+    
+    /* 響應式設計 */
+    @media (max-width: 768px) {
+        .form-content {
+            padding: 20px;
+        }
+        
+        .form-block {
+            padding: 20px;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- 錯誤/成功訊息顯示區塊 -->
+<div class="container">
+    <!-- 錯誤/成功訊息顯示 -->
     {% if messages %}
         {% for message in messages %}
             <div class="alert alert-{{ message.tags }}" role="alert">
@@ -127,10 +194,11 @@
             </div>
         {% endfor %}
     {% endif %}
+    
     {% if form.errors %}
         <div class="alert alert-danger" role="alert">
-            <strong>更新失敗，請檢查下方欄位內容！</strong>
-            <ul class="mb-0">
+            <strong>表單驗證失敗，請檢查以下錯誤：</strong>
+            <ul class="mb-0 mt-2">
                 {% for field in form %}
                     {% for error in field.errors %}
                         <li>{{ field.label }}：{{ error }}</li>
@@ -142,17 +210,18 @@
             </ul>
         </div>
     {% endif %}
-    <!-- 頁面標題 -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="page-header">
-                <div class="d-flex justify-content-between align-items-center">
+
+    <!-- 表單容器 -->
+    <div class="form-container">
+        <!-- 表單標題 -->
+        <div class="form-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <h2 class="mb-0">
+                    <h2>
                             <i class="fas fa-edit"></i> 
                             {% if supplement_report %}編輯SMT補登報工{% else %}新增SMT補登報工{% endif %}
                         </h2>
-                        <p class="mb-0">
+                    <p>
                             {% if supplement_report %}
                                 修改SMT補登報工記錄的詳細資訊
                             {% else %}
@@ -160,43 +229,45 @@
                             {% endif %}
                         </p>
                     </div>
-                <div>
-                    <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-outline-secondary">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <!-- RD樣品模式切換 -->
+                    <div class="rd-sample-toggle">
+                        <input type="checkbox" id="rd_sample_mode" name="rd_sample_mode" value="on" 
+                               {% if request.GET.rd_sample_mode == 'on' %}checked{% endif %}>
+                        <label for="rd_sample_mode">
+                            <i class="fas fa-flask"></i> RD樣品補登報工
+                        </label>
+                    </div>
+                    <!-- 返回按鈕 -->
+                    <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> 返回列表
                     </a>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- 表單區域 -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card smt-supplement-form-card">
-                <div class="card-header bg-primary text-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-clipboard-list"></i> 
-                            {% if supplement_report %}編輯補登記錄{% else %}新增補登記錄{% endif %}
-                        </h5>
-                        <div>
-                            <a href="{% url 'workorder:smt_rd_sample_supplement_index' %}" class="btn btn-warning btn-sm">
-                                <i class="fas fa-flask"></i> 切換到RD樣品補登報工
-                            </a>
-                        </div>
+        <!-- 表單內容 -->
+        <div class="form-content">
+            <form method="post" id="smt_supplement_form">
+                {% csrf_token %}
+                
+                <!-- RD樣品模式說明 -->
+                <div id="rd_sample_mode_info" style="display: none; margin-bottom: 20px;">
+                    <div style="background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 6px; padding: 15px; color: #0c5460;">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>RD樣品模式已啟用：</strong>產品編號預設為「PFP-CCT」，可手動修改，工單號碼固定為「RD樣品」
                     </div>
                 </div>
-                <div class="card-body">
-                    <form method="post" id="smt_supplement_form">
-                        {% csrf_token %}
-                        
-                        <!-- 基本資訊區塊 -->
-                        <div class="form-section">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
+
+                <!-- 一般工單資訊區塊 -->
+                <div id="normal_fields" class="form-block">
+                    <h6><i class="fas fa-cogs"></i> 一般工單資訊</h6>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <!-- 產品編號 -->
+                        <div class="form-field">
                                         <label for="{{ form.product_id.id_for_label }}" class="form-label">
-                                            產品編號 <span class="text-danger">*</span>
+                                產品編號 <span class="required">*</span>
                                         </label>
                                         {{ form.product_id }}
                                         {% if form.product_id.help_text %}
@@ -206,11 +277,11 @@
                                             <div class="error-text">{{ form.product_id.errors.0 }}</div>
                                         {% endif %}
                                     </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
+
+                        <!-- 工單號碼 -->
+                        <div class="form-field">
                                         <label for="{{ form.workorder.id_for_label }}" class="form-label">
-                                            工單號碼 <span class="text-danger">*</span>
+                                工單號碼 <span class="required">*</span>
                                         </label>
                                         {{ form.workorder }}
                                         {% if form.workorder.help_text %}
@@ -219,32 +290,44 @@
                                         {% if form.workorder.errors %}
                                             <div class="error-text">{{ form.workorder.errors.0 }}</div>
                                         {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RD樣品模式欄位 -->
+                <div id="rd_sample_fields" class="form-block" style="display: none;">
+                            <h6><i class="fas fa-flask"></i> RD樣品資訊</h6>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <!-- RD產品編號 -->
+                        <div class="form-field">
+                                        <label for="rd_sample_product_id" class="form-label">
+                                RD產品編號 <span class="required">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="rd_sample_product_id" name="rd_sample_product_id" 
+                                   placeholder="請輸入RD樣品產品編號" value="PFP-CCT">
+                                        <div class="help-text">請輸入RD樣品的產品編號，預設為「PFP-CCT」</div>
+                                    </div>
+
+                        <!-- RD工單號碼 -->
+                        <div class="form-field">
+                                        <label for="rd_sample_workorder" class="form-label">
+                                RD工單號碼 <span class="required">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="rd_sample_workorder" name="rd_sample_workorder" 
+                                               value="RD樣品" readonly>
+                                        <div class="help-text">RD樣品模式下的工單號碼固定為「RD樣品」</div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <!-- 工單資訊顯示區域 -->
-                            <div id="workorder_info" class="workorder-info" style="display: none;">
-                                <h6><i class="fas fa-file-alt"></i> 工單資訊</h6>
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <p><strong>工單號碼：</strong><span id="display_order_number"></span></p>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <p><strong>公司代號：</strong><span id="display_company_code"></span></p>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <p><strong>產品編號：</strong><span id="display_product_code"></span></p>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <p><strong>狀態：</strong><span id="display_status"></span></p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="mb-3">
+                                <!-- 工序與設備資訊區塊 -->
+                <div class="form-block">
+                    <h6><i class="fas fa-tools"></i> 工序與設備資訊</h6>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                        <!-- 工單預設生產數量 -->
+                        <div class="form-field">
                                         <label for="{{ form.planned_quantity.id_for_label }}" class="form-label">
                                             工單預設生產數量
                                         </label>
@@ -252,12 +335,15 @@
                                         {% if form.planned_quantity.help_text %}
                                             <div class="help-text">{{ form.planned_quantity.help_text }}</div>
                                         {% endif %}
+                                        {% if form.planned_quantity.errors %}
+                                            <div class="error-text">{{ form.planned_quantity.errors.0 }}</div>
+                                        {% endif %}
                                     </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="mb-3">
+
+                        <!-- 工序 -->
+                        <div class="form-field">
                                         <label for="{{ form.operation.id_for_label }}" class="form-label">
-                                            工序 <span class="text-danger">*</span>
+                                工序 <span class="required">*</span>
                                         </label>
                                         {{ form.operation }}
                                         {% if form.operation.help_text %}
@@ -267,11 +353,11 @@
                                             <div class="error-text">{{ form.operation.errors.0 }}</div>
                                         {% endif %}
                                     </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="mb-3">
+
+                        <!-- 設備 -->
+                        <div class="form-field">
                                         <label for="{{ form.equipment.id_for_label }}" class="form-label">
-                                            設備 <span class="text-danger">*</span>
+                                設備 <span class="required">*</span>
                                         </label>
                                         {{ form.equipment }}
                                         {% if form.equipment.help_text %}
@@ -282,17 +368,17 @@
                                         {% endif %}
                                     </div>
                                 </div>
-                            </div>
                         </div>
 
                         <!-- 時間資訊區塊 -->
-                        <div class="form-section">
+                <div class="form-block">
                             <h6><i class="fas fa-clock"></i> 時間資訊</h6>
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="mb-3">
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                        <!-- 日期 -->
+                        <div class="form-field">
                                         <label for="{{ form.work_date.id_for_label }}" class="form-label">
-                                            日期 <span class="text-danger">*</span>
+                                日期 <span class="required">*</span>
                                         </label>
                                         {{ form.work_date }}
                                         {% if form.work_date.help_text %}
@@ -302,11 +388,11 @@
                                             <div class="error-text">{{ form.work_date.errors.0 }}</div>
                                         {% endif %}
                                     </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="mb-3">
+
+                        <!-- 開始時間 -->
+                        <div class="form-field">
                                         <label for="{{ form.start_time.id_for_label }}" class="form-label">
-                                            開始時間 <span class="text-danger">*</span>
+                                開始時間 <span class="required">*</span>
                                         </label>
                                         {{ form.start_time }}
                                         {% if form.start_time.help_text %}
@@ -316,11 +402,11 @@
                                             <div class="error-text">{{ form.start_time.errors.0 }}</div>
                                         {% endif %}
                                     </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="mb-3">
+
+                        <!-- 結束時間 -->
+                        <div class="form-field">
                                         <label for="{{ form.end_time.id_for_label }}" class="form-label">
-                                            結束時間 <span class="text-danger">*</span>
+                                結束時間 <span class="required">*</span>
                                         </label>
                                         {{ form.end_time }}
                                         {% if form.end_time.help_text %}
@@ -329,19 +415,19 @@
                                         {% if form.end_time.errors %}
                                             <div class="error-text">{{ form.end_time.errors.0 }}</div>
                                         {% endif %}
-                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- 數量資訊區塊 -->
-                        <div class="form-section">
+                <div class="form-block">
                             <h6><i class="fas fa-chart-line"></i> 數量資訊</h6>
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="mb-3">
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                        <!-- 工作數量 -->
+                        <div class="form-field">
                                         <label for="{{ form.work_quantity.id_for_label }}" class="form-label">
-                                            工作數量 <span class="text-danger">*</span>
+                                工作數量 <span class="required">*</span>
                                         </label>
                                         {{ form.work_quantity }}
                                         {% if form.work_quantity.help_text %}
@@ -351,9 +437,9 @@
                                             <div class="error-text">{{ form.work_quantity.errors.0 }}</div>
                                         {% endif %}
                                     </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="mb-3">
+
+                        <!-- 不良品數量 -->
+                        <div class="form-field">
                                         <label for="{{ form.defect_quantity.id_for_label }}" class="form-label">
                                             不良品數量
                                         </label>
@@ -365,32 +451,32 @@
                                             <div class="error-text">{{ form.defect_quantity.errors.0 }}</div>
                                         {% endif %}
                                     </div>
-                                </div>
 
-                            </div>
-                        </div>
-
-                        <!-- 狀態與備註區塊 -->
-                        <div class="form-section">
-                            <h6><i class="fas fa-check-circle"></i> 狀態與備註</h6>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <div class="form-check">
+                        <!-- 是否已完工 -->
+                        <div class="form-field">
+                                        <label for="{{ form.is_completed.id_for_label }}" class="form-label">
+                                            是否已完工？
+                                        </label>
+                                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
                                             {{ form.is_completed }}
-                                            <label class="form-check-label" for="{{ form.is_completed.id_for_label }}">
-                                                {{ form.is_completed.label }}
-                                            </label>
+                                            <span style="font-size: 14px; color: #666;">若此工單在此工序上已全部完成，請勾選</span>
                                         </div>
                                         {% if form.is_completed.help_text %}
                                             <div class="help-text">{{ form.is_completed.help_text }}</div>
                                         {% endif %}
                                     </div>
-                                </div>
+
+
                             </div>
-                            <div class="row">
-                                <div class="col-12">
-                                    <div class="mb-3">
+                        </div>
+
+                        
+
+                        <!-- 備註區塊 -->
+                <div class="form-block">
+                            <h6><i class="fas fa-comment"></i> 備註</h6>
+                    
+                    <div class="form-field">
                                         <label for="{{ form.remarks.id_for_label }}" class="form-label">
                                             備註
                                         </label>
@@ -401,15 +487,11 @@
                                         {% if form.remarks.errors %}
                                             <div class="error-text">{{ form.remarks.errors.0 }}</div>
                                         {% endif %}
-                                    </div>
-                                </div>
                             </div>
                         </div>
 
                         <!-- 按鈕區域 -->
-                        <div class="row">
-                            <div class="col-12">
-                                <div class="d-flex justify-content-end gap-2">
+                <div style="display: flex; justify-content: flex-end; gap: 15px; margin-top: 30px;">
                                     <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-secondary">
                                         <i class="fas fa-times"></i> 取消
                                     </a>
@@ -417,47 +499,57 @@
                                         <i class="fas fa-save"></i> 
                                         {% if supplement_report %}更新{% else %}儲存{% endif %}
                                     </button>
-                                </div>
-                            </div>
                         </div>
                     </form>
-                </div>
-            </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<style>
+.time-picker-container {
+    position: absolute;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+    display: none;
+    padding: 10px;
+    min-width: 200px;
+}
+
+.time-picker-container select {
+    width: 80px;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.time-picker-container button {
+    margin-left: 5px;
+}
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 自定義24小時制時間選擇器
-    const startTimeInput = document.getElementById('start_time_input');
-    const endTimeInput = document.getElementById('end_time_input');
+    console.log('=== SMT 補登報工表單初始化 ===');
+    
+    // 全域變數
+    const rdSampleModeCheckbox = document.getElementById('rd_sample_mode');
+    const normalFields = document.getElementById('normal_fields');
+    const rdSampleFields = document.getElementById('rd_sample_fields');
+    const rdSampleInfo = document.getElementById('rd_sample_mode_info');
     
     // 創建時間選擇器
     function createTimePicker(inputElement) {
         // 創建時間選擇器容器
         const pickerContainer = document.createElement('div');
         pickerContainer.className = 'time-picker-container';
-        pickerContainer.style.cssText = `
-            position: absolute;
-            background: white;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            z-index: 1000;
-            display: none;
-            padding: 10px;
-            min-width: 200px;
-        `;
         
         // 創建小時選擇器
         const hourSelect = document.createElement('select');
         hourSelect.className = 'form-control mb-2';
-        hourSelect.style.width = '80px';
-        hourSelect.style.display = 'inline-block';
-        hourSelect.style.marginRight = '10px';
         
         for (let i = 0; i < 24; i++) {
             const option = document.createElement('option');
@@ -469,8 +561,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // 創建分鐘選擇器
         const minuteSelect = document.createElement('select');
         minuteSelect.className = 'form-control mb-2';
-        minuteSelect.style.width = '80px';
-        minuteSelect.style.display = 'inline-block';
         
         for (let i = 0; i < 60; i += 5) {
             const option = document.createElement('option');
@@ -484,14 +574,12 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmBtn.type = 'button';
         confirmBtn.className = 'btn btn-primary btn-sm';
         confirmBtn.textContent = '確定';
-        confirmBtn.style.marginLeft = '10px';
         
         // 創建取消按鈕
         const cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
         cancelBtn.className = 'btn btn-secondary btn-sm';
         cancelBtn.textContent = '取消';
-        cancelBtn.style.marginLeft = '5px';
         
         // 組裝選擇器
         pickerContainer.appendChild(hourSelect);
@@ -538,6 +626,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 初始化時間選擇器
+    const startTimeInput = document.getElementById('{{ form.start_time.id_for_label }}');
+    const endTimeInput = document.getElementById('{{ form.end_time.id_for_label }}');
+    
     if (startTimeInput) {
         createTimePicker(startTimeInput);
     }
@@ -545,101 +636,163 @@ document.addEventListener('DOMContentLoaded', function() {
         createTimePicker(endTimeInput);
     }
     
-    // 產品編號變更事件
-    const productSelect = document.getElementById('product_id_select');
+    // RD樣品模式切換功能
+    function toggleRDSampleMode() {
+        const isChecked = rdSampleModeCheckbox.checked;
+        console.log('RD樣品模式切換:', isChecked);
+        
+        if (isChecked) {
+            // 切換到RD樣品模式
+            normalFields.style.display = 'none';
+            rdSampleFields.style.display = 'block';
+            rdSampleInfo.style.display = 'block';
+            
+            // RD樣品模式下，工單預設生產數量設為0
+            const plannedQuantityInput = document.getElementById('planned_quantity_input');
+            if (plannedQuantityInput) {
+                plannedQuantityInput.value = '0';
+            }
+        } else {
+            // 切換到一般模式
+            normalFields.style.display = 'block';
+            rdSampleFields.style.display = 'none';
+            rdSampleInfo.style.display = 'none';
+            
+            // 一般模式下，清空工單預設生產數量
+            const plannedQuantityInput = document.getElementById('planned_quantity_input');
+            if (plannedQuantityInput) {
+                plannedQuantityInput.value = '';
+            }
+        }
+    }
+    
+    // 綁定事件
+    if (rdSampleModeCheckbox) {
+        rdSampleModeCheckbox.addEventListener('change', toggleRDSampleMode);
+        
+        // 初始化狀態
+        toggleRDSampleMode();
+    }
+    
+    // 檢查URL參數
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('rd_sample_mode') === 'on') {
+        if (rdSampleModeCheckbox) {
+            rdSampleModeCheckbox.checked = true;
+            toggleRDSampleMode();
+        }
+    }
+    
+    // 取得DOM元素
+    const productInput = document.getElementById('product_id_select');
     const workorderSelect = document.getElementById('workorder_select');
     const plannedQuantityInput = document.getElementById('planned_quantity_input');
-    const workorderInfo = document.getElementById('workorder_info');
     
-    // 產品編號選擇事件
-    productSelect.addEventListener('change', function() {
-        const productId = this.value;
-        if (productId) {
-            // 清空工單選項
-            workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-            plannedQuantityInput.value = '';
-            workorderInfo.style.display = 'none';
+    // 除錯：檢查元素是否存在
+    console.log('DOM元素檢查:');
+    console.log('productInput:', productInput);
+    console.log('workorderSelect:', workorderSelect);
+    console.log('plannedQuantityInput:', plannedQuantityInput);
+    
+    // 產品編號選擇事件（自動帶出工單）
+    if (productInput) {
+        productInput.addEventListener('change', function() {
+            const productCode = this.value;
+            console.log('產品編號變更:', productCode);
             
-            // 載入相關工單
-            fetch(`{% url 'workorder:get_workorders_by_product' %}?product_id=${productId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        data.workorders.forEach(workorder => {
-                            const option = document.createElement('option');
-                            option.value = workorder.id;
-                            option.textContent = `${workorder.order_number} (${workorder.company_code}) - ${workorder.status}`;
-                            workorderSelect.appendChild(option);
-                        });
-                    } else {
-                        console.error('載入工單失敗:', data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('AJAX 錯誤:', error);
-                });
-        }
-    });
-    
-    // 工單選擇事件
-    workorderSelect.addEventListener('change', function() {
-        const workorderId = this.value;
-        if (workorderId) {
-            // 載入工單詳細資訊
-            fetch(`{% url 'workorder:get_workorder_details' %}?workorder_id=${workorderId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        const workorder = data.workorder;
-                        
-                        // 更新工單預設生產數量
-                        plannedQuantityInput.value = workorder.quantity;
-                        
-                        // 自動填入產品編號
-                        if (productSelect && workorder.product_code) {
-                            // 檢查產品編號是否在選項中
-                            let found = false;
-                            for (let i = 0; i < productSelect.options.length; i++) {
-                                if (productSelect.options[i].value === workorder.product_code) {
-                                    productSelect.value = workorder.product_code;
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            // 如果產品編號不在選項中，動態添加
-                            if (!found) {
+            if (productCode) {
+                // 呼叫API取得相關工單
+                fetch(`{% url 'workorder:get_workorders_by_product' %}?product_code=${encodeURIComponent(productCode)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success' && data.workorders.length > 0) {
+                            // 更新工單下拉選單
+                            workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                            
+                            data.workorders.forEach(workorder => {
                                 const option = document.createElement('option');
-                                option.value = workorder.product_code;
-                                option.textContent = workorder.product_code;
-                                productSelect.appendChild(option);
-                                productSelect.value = workorder.product_code;
+                                option.value = workorder.id;
+                                option.textContent = `${workorder.order_number} - ${workorder.product_code}`;
+                                workorderSelect.appendChild(option);
+                            });
+                            
+                            // 如果只有一個工單，自動選擇
+                            if (data.workorders.length === 1) {
+                                workorderSelect.value = data.workorders[0].id;
+                                workorderSelect.dispatchEvent(new Event('change'));
                             }
+                        } else {
+                            workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
                         }
-                        
-                        // 顯示工單資訊
-                        document.getElementById('display_order_number').textContent = workorder.order_number;
-                        document.getElementById('display_company_code').textContent = workorder.company_code;
-                        document.getElementById('display_product_code').textContent = workorder.product_code;
-                        document.getElementById('display_status').textContent = workorder.status;
-                        workorderInfo.style.display = 'block';
-                    } else {
-                        console.error('載入工單詳細資訊失敗:', data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('AJAX 錯誤:', error);
-                });
-        } else {
-            plannedQuantityInput.value = '';
-            workorderInfo.style.display = 'none';
-        }
-    });
+                    })
+                    .catch(error => {
+                        console.error('API錯誤:', error);
+                    });
+            } else {
+                workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+            }
+        });
+    }
     
-    // 移除前端驗證，讓後端處理驗證邏輯
-    // 表單驗證已移至後端處理
+    // 工單選擇事件（自動帶出產品編號和數量）
+    if (workorderSelect) {
+        workorderSelect.addEventListener('change', function() {
+            const workorderId = this.value;
+            console.log('工單選擇變更:', workorderId);
+            
+            if (workorderId) {
+                // 載入工單詳細資訊
+                fetch(`{% url 'workorder:get_workorder_details' %}?workorder_id=${workorderId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('API回應:', data);
+                        if (data.status === 'success') {
+                            const workorder = data.workorder;
+                            
+                            // 更新工單預設生產數量
+                            if (plannedQuantityInput) {
+                                plannedQuantityInput.value = workorder.quantity || '';
+                                // 觸發 change 事件以確保表單驗證
+                                plannedQuantityInput.dispatchEvent(new Event('change', { bubbles: true }));
+                                console.log('更新工單預設生產數量:', workorder.quantity);
+                            }
+                            
+                            // 自動填入產品編號
+                            if (productInput && workorder.product_code) {
+                                productInput.value = workorder.product_code;
+                                console.log('更新產品編號:', workorder.product_code);
+                            }
+                        } else {
+                            console.error('API回傳錯誤:', data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('AJAX 錯誤:', error);
+                    });
+            } else {
+                if (plannedQuantityInput) {
+                    plannedQuantityInput.value = '';
+                    console.log('清空工單預設生產數量');
+                }
+            }
+        });
+    }
     
-    // 移除時間驗證，讓後端處理
-    // 時間驗證已移至後端處理
+    // 表單驗證
+    const form = document.getElementById('smt_supplement_form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (startTimeInput && endTimeInput && startTimeInput.value && endTimeInput.value) {
+                if (startTimeInput.value >= endTimeInput.value) {
+                    e.preventDefault();
+                    alert('結束時間必須大於開始時間');
+                    return false;
+                }
+            }
+        });
+    }
+    
+    console.log('=== SMT 補登報工表單初始化完成 ===');
 });
 </script>
 {% endblock %} 

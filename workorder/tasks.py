@@ -102,7 +102,7 @@ def auto_convert_orders():
                 
                 # 建立工單
                 workorder = WorkOrder.objects.create(
-                    order_number=company_order.order_number,
+                    order_number=WorkOrder.generate_order_number(company_order.company_code),
                     product_code=company_order.product_code,
                     product_name=company_order.product_name,
                     quantity=company_order.quantity,

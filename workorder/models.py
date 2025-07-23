@@ -3,6 +3,7 @@ from django.utils import timezone
 from process.models import Operator
 from equip.models import Equipment
 import logging
+from datetime import datetime
 
 
 class WorkOrder(models.Model):
@@ -21,7 +22,7 @@ class WorkOrder(models.Model):
     company_code = models.CharField(
         max_length=10, verbose_name="公司代號", null=True, blank=True
     )  # 例如 01、02、03，可為空，方便資料庫遷移
-    order_number = models.CharField(max_length=50, verbose_name="製令單號")
+    order_number = models.CharField(max_length=50, verbose_name="工單號碼")
     product_code = models.CharField(
         max_length=100, verbose_name="產品編號"
     )  # 產品編號，原本是 product_name
@@ -40,10 +41,41 @@ class WorkOrder(models.Model):
     class Meta:
         verbose_name = "工單"
         verbose_name_plural = "工單管理"
-        unique_together = (("company_code", "order_number"),)  # 公司代號+製令單號唯一
+        unique_together = (("company_code", "order_number"),)  # 公司代號+工單號碼唯一
 
     def __str__(self):
-        return f"[{self.company_code}] 製令單 {self.order_number}"
+        return f"[{self.company_code}] 工單 {self.order_number}"
+    
+    @classmethod
+    def generate_order_number(cls, company_code):
+        """
+        自動生成工單號碼
+        格式：WO-{公司代號}-{年份}{月份}{序號}
+        例如：WO-01-202501001
+        """
+        today = datetime.now()
+        year_month = today.strftime("%Y%m")
+        
+        # 取得當月最後一個工單號碼
+        last_order = cls.objects.filter(
+            company_code=company_code,
+            order_number__startswith=f"WO-{company_code}-{year_month}"
+        ).order_by('-order_number').first()
+        
+        if last_order:
+            # 從最後一個號碼中提取序號
+            try:
+                last_sequence = int(last_order.order_number[-3:])
+                new_sequence = last_sequence + 1
+            except ValueError:
+                new_sequence = 1
+        else:
+            new_sequence = 1
+        
+        # 格式化序號為3位數
+        sequence_str = f"{new_sequence:03d}"
+        
+        return f"WO-{company_code}-{year_month}{sequence_str}"
     
     @property
     def completed_quantity(self):
@@ -553,6 +585,20 @@ class SMTProductionReport(models.Model):
     SMT 設備為自動化運作，不需要作業員
     """
     
+    # 報工類型
+    REPORT_TYPE_CHOICES = [
+        ('normal', '正式工單'),
+        ('rd_sample', 'RD樣品'),
+    ]
+    
+    report_type = models.CharField(
+        max_length=20,
+        choices=REPORT_TYPE_CHOICES,
+        default='normal',
+        verbose_name="報工類型",
+        help_text="請選擇報工類型：正式工單或RD樣品"
+    )
+    
     # 基本資訊
     product_id = models.CharField(
         max_length=100,
@@ -631,53 +677,51 @@ class SMTProductionReport(models.Model):
         help_text="若此工單在此工序上已全部完成，請勾選"
     )
     
-    # 核准狀態
-    APPROVAL_STATUS_CHOICES = [
-        ('pending', '待核准'),
-        ('approved', '已核准'),
-        ('rejected', '已駁回'),
-    ]
+    # 備註
+    remarks = models.TextField(
+        blank=True,
+        verbose_name="備註",
+        help_text="請輸入任何需要補充的資訊，如異常、停機等"
+    )
     
+    # 審核相關欄位
     approval_status = models.CharField(
         max_length=20,
-        choices=APPROVAL_STATUS_CHOICES,
+        choices=[
+            ('pending', '待審核'),
+            ('approved', '已核准'),
+            ('rejected', '已駁回'),
+        ],
         default='pending',
-        verbose_name="核准狀態",
-        help_text="補登記錄的核准狀態，已核准的記錄不可修改"
+        verbose_name="審核狀態",
+        help_text="此補登記錄的審核狀態"
     )
     
     approved_by = models.CharField(
         max_length=100,
         blank=True,
         null=True,
-        verbose_name="核准人員",
-        help_text="核准此補登記錄的人員"
+        verbose_name="審核人員",
+        help_text="此補登記錄的審核人員"
     )
     
     approved_at = models.DateTimeField(
         blank=True,
         null=True,
-        verbose_name="核准時間",
-        help_text="此補登記錄的核准時間"
+        verbose_name="審核時間",
+        help_text="此補登記錄的審核時間"
     )
     
     approval_remarks = models.TextField(
         blank=True,
-        verbose_name="核准備註",
-        help_text="核准時的備註說明"
+        verbose_name="審核備註",
+        help_text="審核時的備註說明"
     )
     
     rejection_reason = models.TextField(
         blank=True,
         verbose_name="駁回原因",
         help_text="駁回時的原因說明"
-    )
-    
-    # 備註
-    remarks = models.TextField(
-        blank=True,
-        verbose_name="備註",
-        help_text="請輸入任何需要補充的資訊，如異常、停機等"
     )
     
     # 系統欄位
@@ -698,15 +742,23 @@ class SMTProductionReport(models.Model):
     )
 
     class Meta:
-        verbose_name = "SMT 補登報工記錄"
-        verbose_name_plural = "SMT 補登報工記錄"
+        verbose_name = "SMT生產報工記錄"
+        verbose_name_plural = "SMT生產報工記錄"
         db_table = 'workorder_smt_production_report'
         ordering = ['-work_date', '-start_time']
 
     def __str__(self):
-        return f"{self.product_id} - {self.workorder.order_number} - {self.work_date}"
+        if self.report_type == 'rd_sample':
+            return f"RD樣品 - {self.product_id} - {self.work_date}"
+        else:
+            return f"{self.workorder.order_number if self.workorder else '無工單'} - {self.work_date}"
 
-
+    @property
+    def workorder_number(self):
+        """取得工單號碼"""
+        if self.report_type == 'rd_sample':
+            return 'RD樣品'
+        return self.workorder.order_number if self.workorder else ""
 
     @property
     def equipment_name(self):
@@ -714,26 +766,34 @@ class SMTProductionReport(models.Model):
         return self.equipment.name if self.equipment else ""
 
     @property
-    def workorder_number(self):
-        """取得工單號碼"""
-        return self.workorder.order_number if self.workorder else ""
-
-    @property
     def total_quantity(self):
         """取得總數量（工作數量 + 不良品數量）"""
         return self.work_quantity + self.defect_quantity
 
     @property
-    def work_hours(self):
-        """計算工作時數"""
+    def work_duration(self):
+        """取得工作時數（小時）"""
         if self.start_time and self.end_time:
             from datetime import datetime, timedelta
+            
+            # 組合日期和時間
             start_dt = datetime.combine(self.work_date, self.start_time)
             end_dt = datetime.combine(self.work_date, self.end_time)
+            
+            # 如果結束時間小於開始時間，表示跨日
             if end_dt < start_dt:
                 end_dt += timedelta(days=1)
+            
             duration = end_dt - start_dt
-            return round(duration.total_seconds() / 3600, 2)
+            return duration.total_seconds() / 3600  # 轉換為小時
+        
+        return 0.0
+
+    @property
+    def efficiency_rate(self):
+        """取得效率率（合格品數量 / 總數量）"""
+        if self.total_quantity > 0:
+            return (self.work_quantity / self.total_quantity) * 100
         return 0.0
 
     def can_edit(self, user):

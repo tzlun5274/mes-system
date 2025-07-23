@@ -26,6 +26,20 @@
         font-weight: bold;
     }
     
+    /* 確保標題文字可見性 */
+    .operator-supplement-card .card-header h5,
+    .operator-supplement-card .card-header h5.mb-0 {
+        color: inherit !important;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+        font-weight: 700 !important;
+    }
+    
+    .operator-supplement-card .card-header.bg-light h5,
+    .operator-supplement-card .card-header.bg-light h5.mb-0 {
+        color: #495057 !important;
+        text-shadow: none !important;
+    }
+    
     .operator-stats {
         display: flex;
         justify-content: space-around;
@@ -56,8 +70,11 @@
     }
     
     .operator-supplement-table th {
-        background-color: #f8f9fa;
+        background-color: #6c757d !important;
+        color: white !important;
         border-top: none;
+        font-weight: 600;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
     }
     
     .status-badge {
@@ -275,7 +292,7 @@
     <div class="row">
         <div class="col-12">
             <div class="card operator-supplement-card">
-                <div class="card-header bg-light">
+                <div class="card-header bg-secondary text-white">
                     <h5 class="mb-0">
                         <i class="fas fa-list"></i> 作業員補登報工列表
                     </h5>
