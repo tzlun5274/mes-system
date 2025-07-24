@@ -1385,8 +1385,8 @@ class OperatorSupplementBatchForm(forms.Form):
         self.fields["end_date"].initial = today
 
         # 設置預設時間
-        self.fields["start_time"].initial = "08:00"
-        self.fields["end_time"].initial = "17:00"
+        self.fields["start_time"].initial = "08:30"
+        self.fields["end_time"].initial = "17:30"
 
     def clean(self):
         cleaned_data = super().clean()

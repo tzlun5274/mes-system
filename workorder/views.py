@@ -4799,7 +4799,12 @@ def operator_supplement_report_create(request):
             else:
                 messages.error(request, '表單驗證失敗，請檢查輸入資料')
     else:
-        form = OperatorSupplementReportForm()
+        # 設定預設值
+        initial_data = {
+            'start_time': '08:30',
+            'end_time': '17:30',
+        }
+        form = OperatorSupplementReportForm(initial=initial_data)
         form.request = request  # 傳遞request給表單
     
     context = {
@@ -5770,7 +5775,12 @@ def rd_sample_supplement_report_create(request):
                 form.add_error("start_time", "時間格式錯誤")
                 form.add_error("end_time", "時間格式錯誤")
     else:
-        form = RDSampleSupplementReportForm()
+        # 設定預設值
+        initial_data = {
+            'start_time': '08:30',
+            'end_time': '17:30',
+        }
+        form = RDSampleSupplementReportForm(initial=initial_data)
     
     context = {
         "form": form,
