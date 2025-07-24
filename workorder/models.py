@@ -939,7 +939,13 @@ class OperatorSupplementReport(models.Model):
         blank=True
     )
     
-
+    # 產品編號欄位（用於資料庫相容性）
+    product_id = models.CharField(
+        max_length=100,
+        verbose_name="產品編號",
+        help_text="產品編號（自動從工單取得）",
+        default=""
+    )
     
     # 工單預設生產數量（唯讀）
     planned_quantity = models.IntegerField(
@@ -955,6 +961,14 @@ class OperatorSupplementReport(models.Model):
         blank=True,
         verbose_name="工序",
         help_text="請選擇此次補登的工序（排除SMT相關工序）"
+    )
+    
+    # 工序名稱欄位（用於資料庫相容性）
+    operation = models.CharField(
+        max_length=100,
+        verbose_name="工序名稱",
+        help_text="工序名稱（自動從 process 欄位取得）",
+        default=""
     )
     
     # 設備資訊（可選）

@@ -1,10 +1,11 @@
 from django import forms
 from django.db.models import Q
+from django.utils import timezone
 from .models import WorkOrder, CompanyOrder, WorkOrderProcess, SMTProductionReport
 from process.models import Operator
 from equip.models import Equipment
 from .models import WorkOrderAssignment
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, date, timedelta
 from .models import ManagerProductionReport
 from .models import OperatorSupplementReport
 
@@ -738,6 +739,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             }
         ),
         required=False,
+        initial="",
         help_text="請選擇產品編號，選擇後會自動帶出相關工單（作業員RD樣品補登報工時可自由輸入產品編號）",
     )
 
@@ -787,13 +789,13 @@ class OperatorSupplementReportForm(forms.ModelForm):
     )
 
     # 工序選擇（排除SMT相關工序）
-    operation = forms.ModelChoiceField(
+    process = forms.ModelChoiceField(
         queryset=None,
         label="工序",
         widget=forms.Select(
             attrs={
                 "class": "form-control",
-                "id": "operation_select",
+                "id": "process_select",
                 "placeholder": "請選擇此次補登的工序（排除SMT相關工序）",
             }
         ),
@@ -828,6 +830,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             }
         ),
         required=True,
+        initial=timezone.now().date(),
         help_text="請選擇實際報工日期",
     )
 
@@ -840,11 +843,11 @@ class OperatorSupplementReportForm(forms.ModelForm):
                 "id": "start_time_input",
                 "placeholder": "請輸入實際開始時間 (24小時制)，例如 16:00",
                 "type": "text",
-                "readonly": "readonly",
                 "autocomplete": "off",
             }
         ),
         required=True,
+        initial="08:30",
         help_text="請輸入實際開始時間 (24小時制)，例如 16:00",
     )
 
@@ -857,11 +860,11 @@ class OperatorSupplementReportForm(forms.ModelForm):
                 "id": "end_time_input",
                 "placeholder": "請輸入實際結束時間 (24小時制)，例如 18:30",
                 "type": "text",
-                "readonly": "readonly",
                 "autocomplete": "off",
             }
         ),
         required=True,
+        initial="17:30",
         help_text="請輸入實際結束時間 (24小時制)，例如 18:30",
     )
 
@@ -877,6 +880,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             }
         ),
         required=True,
+        initial=1,
         help_text="請輸入該時段內實際完成的合格產品數量",
     )
 
@@ -923,6 +927,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             }
         ),
         required=False,
+        initial="manual",
         help_text="請選擇完工判斷方式",
     )
 
@@ -938,6 +943,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             }
         ),
         required=False,
+        initial="",
         help_text="請輸入備註說明（可選）",
     )
 
@@ -954,6 +960,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             }
         ),
         required=False,
+        initial="",
         help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊",
     )
 
@@ -961,10 +968,9 @@ class OperatorSupplementReportForm(forms.ModelForm):
 
     # 核准狀態
     APPROVAL_STATUS_CHOICES = [
-        ("draft", "草稿"),
         ("pending", "待核准"),
-        ("approved", "核准通過"),
-        ("rejected", "駁回"),
+        ("approved", "已核准"),
+        ("rejected", "已駁回"),
     ]
 
     approval_status = forms.ChoiceField(
@@ -978,7 +984,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             }
         ),
         required=True,
-        initial="draft",
+        initial="pending",
         help_text="請選擇核准狀態",
     )
 
@@ -994,7 +1000,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
         # 動態設定工序選項（排除SMT相關工序）
         from process.models import ProcessName
 
-        self.fields["operation"].queryset = (
+        self.fields["process"].queryset = (
             ProcessName.objects.all()
             .exclude(name__icontains="SMT")
             .exclude(name__icontains="表面貼裝")
@@ -1018,8 +1024,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
 
         product_choices = [("", "請選擇產品編號")]
         products = (
-            WorkOrder.objects.filter(status__in=["pending", "in_progress"])
-            .exclude(order_number__icontains='RD樣品')  # 排除RD樣品工單
+            WorkOrder.objects.exclude(order_number__icontains='RD樣品')  # 排除RD樣品工單
             .exclude(order_number__icontains='RD-樣品')  # 排除RD-樣品工單
             .exclude(order_number__icontains='RD樣本')   # 排除RD樣本工單
             .values_list("product_code", "product_code")
@@ -1043,7 +1048,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             order_number__icontains='RD-樣品'  # 排除RD-樣品工單
         ).exclude(
             order_number__icontains='RD樣本'   # 排除RD樣本工單
-        ).order_by("-created_at")[:200]
+        ).order_by("-created_at")
 
         # 如果是編輯模式，設定初始值
         if self.instance and self.instance.pk:
@@ -1062,9 +1067,16 @@ class OperatorSupplementReportForm(forms.ModelForm):
                     self.fields["end_time"].initial = self.instance.end_time.strftime('%H:%M')
         else:
             # 新增模式：設定時間欄位的預設值
-            self.fields["start_time"].initial = "16:00"
-            self.fields["end_time"].initial = "18:30"
+            self.fields["start_time"].initial = "08:30"
+            self.fields["end_time"].initial = "17:30"
 
+        # 設定工單選項，確保包含當前實例的工單（如果存在）
+        if self.instance and self.instance.pk and self.instance.workorder:
+            # 如果是編輯模式，確保當前工單在選項中
+            if self.instance.workorder not in related_workorders:
+                related_workorders = list(related_workorders) + [self.instance.workorder]
+
+        # 設定工單選項，使用 ModelChoiceField 的 queryset
         self.fields["workorder"].queryset = related_workorders
 
     class Meta:
@@ -1075,7 +1087,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "workorder",
             "planned_quantity",
             "operator",
-            "operation",
+            "process",
             "equipment",
             "work_date",
             "start_time",
@@ -1093,7 +1105,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "workorder": "工單號碼",
             "planned_quantity": "工單預設生產數量",
             "operator": "作業員",
-            "operation": "工序",
+            "process": "工序",
             "equipment": "設備",
             "work_date": "日期",
             "start_time": "開始時間",
@@ -1172,7 +1184,56 @@ class OperatorSupplementReportForm(forms.ModelForm):
         if work_quantity is not None and work_quantity <= 0:
             raise forms.ValidationError("工作數量必須大於0")
 
+        # 驗證核准狀態
+        approval_status = cleaned_data.get("approval_status")
+        if not approval_status:
+            raise forms.ValidationError("核准狀態為必填欄位")
+
         return cleaned_data
+
+    def clean_workorder(self):
+        """工單號碼驗證 - 處理工單選擇"""
+        workorder = self.cleaned_data.get('workorder')
+        
+        # 如果沒有選擇工單，返回None（允許空值）
+        if not workorder:
+            return None
+        
+        # 如果選擇了工單，確保它是有效的
+        try:
+            from .models import WorkOrder
+            if isinstance(workorder, WorkOrder):
+                return workorder
+            else:
+                # 如果是ID，嘗試查找工單
+                workorder_obj = WorkOrder.objects.get(id=workorder)
+                return workorder_obj
+        except WorkOrder.DoesNotExist:
+            raise forms.ValidationError("選擇的工單不存在")
+        except Exception as e:
+            raise forms.ValidationError(f"工單驗證錯誤：{str(e)}")
+
+    def clean_workorder(self):
+        """工單號碼驗證 - 處理工單選擇"""
+        workorder = self.cleaned_data.get('workorder')
+        
+        # 如果沒有選擇工單，返回None（允許空值）
+        if not workorder:
+            return None
+        
+        # 如果選擇了工單，確保它是有效的
+        try:
+            from .models import WorkOrder
+            if isinstance(workorder, WorkOrder):
+                return workorder
+            else:
+                # 如果是ID，嘗試查找工單
+                workorder_obj = WorkOrder.objects.get(id=workorder)
+                return workorder_obj
+        except WorkOrder.DoesNotExist:
+            raise forms.ValidationError("選擇的工單不存在")
+        except Exception as e:
+            raise forms.ValidationError(f"工單驗證錯誤：{str(e)}")
 
     def save(self, commit=True):
         """儲存表單資料"""
@@ -1204,10 +1265,20 @@ class OperatorSupplementReportForm(forms.ModelForm):
         if workorder:
             instance.workorder = workorder
             instance.planned_quantity = workorder.quantity
+            # 設定產品編號
+            instance.product_id = workorder.product_code
         else:
             # 如果沒有選擇工單，設定為空
             instance.workorder = None
             instance.planned_quantity = 0
+            instance.product_id = ""
+
+        # 設定 operation 欄位（從 process 欄位取得工序名稱）
+        process = self.cleaned_data.get("process")
+        if process:
+            instance.operation = process.name
+        else:
+            instance.operation = ""
 
         # 設定建立人員
         if not instance.pk:  # 新增時才設置
@@ -1253,11 +1324,11 @@ class OperatorSupplementBatchForm(forms.Form):
         help_text="請選擇要補登的工單",
     )
 
-    operation = forms.ModelChoiceField(
+    process = forms.ModelChoiceField(
         queryset=None,
         label="工序",
         widget=forms.Select(
-            attrs={"class": "form-control", "id": "batch_operation_select"}
+            attrs={"class": "form-control", "id": "batch_process_select"}
         ),
         required=True,
         help_text="請選擇工序（排除SMT相關工序）",
@@ -1359,7 +1430,7 @@ class OperatorSupplementBatchForm(forms.Form):
         processes = ProcessName.objects.filter(
             ~Q(name__icontains="SMT")  # 排除SMT相關工序
         ).order_by("name")
-        self.fields["operation"].queryset = processes
+        self.fields["process"].queryset = processes
 
         # 設置預設日期為今天
         from datetime import date

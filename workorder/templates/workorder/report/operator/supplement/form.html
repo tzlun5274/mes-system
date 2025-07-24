@@ -72,6 +72,57 @@
         color: #495057;
     }
     
+    /* Messages 樣式 */
+    .messages-container {
+        margin-bottom: 1.5rem;
+    }
+    
+    .messages-container .alert {
+        border-radius: 8px;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        font-weight: 500;
+        padding: 1rem 1.25rem;
+    }
+    
+    .messages-container .alert-success {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        color: #155724;
+        border-left: 4px solid #28a745;
+    }
+    
+    .messages-container .alert-error {
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        color: #721c24;
+        border-left: 4px solid #dc3545;
+    }
+    
+    .messages-container .alert-warning {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        color: #856404;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .messages-container .alert-info {
+        background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+        color: #0c5460;
+        border-left: 4px solid #17a2b8;
+    }
+    
+    .messages-container .alert i {
+        margin-right: 0.5rem;
+        font-size: 1.1rem;
+    }
+    
+    .messages-container .btn-close {
+        opacity: 0.7;
+        transition: opacity 0.3s ease;
+    }
+    
+    .messages-container .btn-close:hover {
+        opacity: 1;
+    }
+    
     /* 卡片標題樣式 - 強制覆蓋Bootstrap */
     .operator-supplement-form-card .card-header,
     .operator-supplement-form-card .card-header.bg-light {
@@ -161,28 +212,7 @@
         color: #ffffff !important;
     }
     
-    /* 工單資訊樣式 */
-    .workorder-info {
-        background-color: #e9ecef;
-        border-radius: 6px;
-        padding: 15px;
-        margin-top: 10px;
-        border-left: 4px solid #007bff;
-    }
-    
-    .workorder-info h6 {
-        color: #495057;
-        margin-bottom: 10px;
-    }
-    
-    .workorder-info p {
-        margin-bottom: 5px;
-        color: #6c757d;
-    }
-    
-    .workorder-info strong {
-        color: #495057;
-    }
+
     
     /* 時間選擇器樣式 */
     .time-picker-container {
@@ -286,6 +316,19 @@
                     </div>
                 </div>
                 <div class="card-body">
+                    <!-- Django Messages 顯示區域 -->
+                    {% if messages %}
+                        <div class="messages-container mb-4">
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                    <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
                     <form method="post" id="operator_supplement_form">
                         {% csrf_token %}
                         
@@ -361,24 +404,7 @@
                                 此模式下，產品編號為手動輸入，工單號碼固定為「RD樣品」，工單預設生產數量設為0。
                             </div>
 
-                            <!-- 工單資訊顯示區域 -->
-                            <div id="workorder_info" class="workorder-info" style="display: none;">
-                                <h6><i class="fas fa-file-alt"></i> 工單資訊</h6>
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <p><strong>工單號碼：</strong><span id="display_order_number"></span></p>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <p><strong>公司代號：</strong><span id="display_company_code"></span></p>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <p><strong>產品編號：</strong><span id="display_product_code"></span></p>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <p><strong>狀態：</strong><span id="display_status"></span></p>
-                                    </div>
-                                </div>
-                            </div>
+
                             
                             <div class="row">
                                 <div class="col-md-4">
@@ -490,9 +516,7 @@
                                         <label for="{{ form.start_time.id_for_label }}" class="form-label">
                                             開始時間 <span class="required-field">*</span>
                                         </label>
-                                        <input type="text" class="form-control" id="{{ form.start_time.id_for_label }}" 
-                                               name="{{ form.start_time.name }}" value="08:30" 
-                                               placeholder="例如：16:00" autocomplete="off">
+                                        {{ form.start_time }}
                                         {% if form.start_time.help_text %}
                                             <div class="help-text">{{ form.start_time.help_text }}</div>
                                         {% endif %}
@@ -506,9 +530,7 @@
                                         <label for="{{ form.end_time.id_for_label }}" class="form-label">
                                             結束時間 <span class="required-field">*</span>
                                         </label>
-                                        <input type="text" class="form-control" id="{{ form.end_time.id_for_label }}" 
-                                               name="{{ form.end_time.name }}" value="17:30" 
-                                               placeholder="例如：18:30" autocomplete="off">
+                                        {{ form.end_time }}
                                         {% if form.end_time.help_text %}
                                             <div class="help-text">{{ form.end_time.help_text }}</div>
                                         {% endif %}
@@ -567,6 +589,8 @@
                                         {% endif %}
                                     </div>
                                 </div>
+                                <!-- 核准狀態欄位已隱藏，預設為待核准 -->
+                                <input type="hidden" name="{{ form.approval_status.name }}" value="pending">
                             </div>
                         </div>
 
@@ -704,7 +728,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const productInput = document.getElementById('{{ form.product_id.id_for_label }}');
     const workorderSelect = document.getElementById('{{ form.workorder.id_for_label }}');
     const plannedQuantityInput = document.getElementById('{{ form.planned_quantity.id_for_label }}');
-    const workorderInfo = document.getElementById('workorder_info');
+
     
     // 除錯：檢查元素是否存在
     console.log('DOM元素檢查:');
@@ -823,14 +847,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 }
                             }
                             
-                            // 顯示工單資訊
-                            if (workorderInfo) {
-                                document.getElementById('display_order_number').textContent = workorder.order_number;
-                                document.getElementById('display_company_code').textContent = workorder.company_code;
-                                document.getElementById('display_product_code').textContent = workorder.product_code;
-                                document.getElementById('display_status').textContent = workorder.status;
-                                workorderInfo.style.display = 'block';
-                            }
+
                         } else {
                             console.error('API回傳錯誤:', data.message);
                         }
@@ -843,7 +860,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     plannedQuantityInput.value = '';
                     console.log('清空工單預設生產數量');
                 }
-                if (workorderInfo) workorderInfo.style.display = 'none';
             }
         });
     }

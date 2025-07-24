@@ -16,7 +16,7 @@ from .tasks import get_standard_processes
 from .forms import WorkOrderForm
 from django.contrib import messages
 from reporting.models import ProductionDailyReport
-from datetime import datetime, timedelta, timezone as dt_timezone, date
+from datetime import datetime, timedelta, date
 from django.db import models
 import psycopg2
 from django.core.management.base import BaseCommand
@@ -5125,7 +5125,17 @@ def operator_supplement_report_create(request):
             error_messages = []
             for field, errors in form.errors.items():
                 for error in errors:
-                    error_messages.append(f"{form.fields[field].label}: {error}")
+                    if field == '__all__':
+                        # 處理全域錯誤
+                        error_messages.append(f"表單錯誤: {error}")
+                    else:
+                        # 處理特定欄位錯誤
+                        try:
+                            field_label = form.fields[field].label
+                            error_messages.append(f"{field_label}: {error}")
+                        except KeyError:
+                            # 如果找不到欄位，使用欄位名稱
+                            error_messages.append(f"{field}: {error}")
             
             if error_messages:
                 messages.error(request, f'表單驗證失敗：{"；".join(error_messages)}')
