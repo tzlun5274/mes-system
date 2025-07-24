@@ -120,22 +120,24 @@
                     </h2>
                     <p class="text-muted mb-0">查看SMT補登報工記錄的完整資訊</p>
                 </div>
-                <div>
-                    {% if can_edit %}
+                <div class="d-flex gap-2">
+                    <!-- 修改按鈕 - 只有待核准或已駁回時顯示 -->
+                    {% if supplement_report.approval_status == 'pending' or supplement_report.approval_status == 'rejected' %}
                     <a href="{% url 'workorder:smt_supplement_report_edit' supplement_report.id %}" class="btn btn-warning">
-                        <i class="fas fa-edit"></i> 編輯記錄
+                        <i class="fas fa-edit me-1"></i>修改
                     </a>
                     {% endif %}
-                    {% if supplement_report.approval_status == 'pending' %}
-                    <a href="{% url 'workorder:smt_supplement_report_approve' supplement_report.id %}" class="btn btn-success">
-                        <i class="fas fa-check"></i> 核准記錄
-                    </a>
-                    <a href="{% url 'workorder:smt_supplement_report_reject' supplement_report.id %}" class="btn btn-danger">
-                        <i class="fas fa-times"></i> 駁回記錄
+                    
+                    <!-- 刪除按鈕 - 核准後只有超級管理員可以刪除 -->
+                    {% if supplement_report.approval_status == 'pending' or supplement_report.approval_status == 'rejected' or user.is_superuser %}
+                    <a href="{% url 'workorder:smt_supplement_report_delete' supplement_report.id %}" class="btn btn-danger" onclick="return confirm('確定要刪除這筆補登記錄嗎？')">
+                        <i class="fas fa-trash me-1"></i>刪除
                     </a>
                     {% endif %}
-                    <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left"></i> 返回列表
+                    
+                    <!-- 返回列表按鈕 -->
+                    <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>返回列表
                     </a>
                 </div>
             </div>

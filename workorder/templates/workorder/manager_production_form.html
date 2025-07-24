@@ -551,10 +551,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 驗證時間
         if (startTimeInput.value && endTimeInput.value) {
-            const start = new Date(`2000-01-01T${startTimeInput.value}`);
-            const end = new Date(`2000-01-01T${endTimeInput.value}`);
+            // 將時間字串轉換為分鐘數進行比較
+            const startTime = startTimeInput.value;
+            const endTime = endTimeInput.value;
             
-            if (end <= start) {
+            const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
+            const endMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
+            
+            if (endMinutes <= startMinutes) {
                 endTimeInput.classList.add('is-invalid');
                 isValid = false;
             }

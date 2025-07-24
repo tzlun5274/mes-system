@@ -826,7 +826,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (form) {
         form.addEventListener('submit', function(e) {
             if (startTimeInput && endTimeInput && startTimeInput.value && endTimeInput.value) {
-                if (startTimeInput.value >= endTimeInput.value) {
+                // 將時間字串轉換為分鐘數進行比較
+                const startTime = startTimeInput.value;
+                const endTime = endTimeInput.value;
+                
+                const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
+                const endMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
+                
+                if (endMinutes <= startMinutes) {
                     e.preventDefault();
                     alert('結束時間必須大於開始時間');
                     return false;
