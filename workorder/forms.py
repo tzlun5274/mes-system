@@ -787,13 +787,13 @@ class OperatorSupplementReportForm(forms.ModelForm):
     )
 
     # 工序選擇（排除SMT相關工序）
-    process = forms.ModelChoiceField(
+    operation = forms.ModelChoiceField(
         queryset=None,
         label="工序",
         widget=forms.Select(
             attrs={
                 "class": "form-control",
-                "id": "process_select",
+                "id": "operation_select",
                 "placeholder": "請選擇此次補登的工序（排除SMT相關工序）",
             }
         ),
@@ -908,7 +908,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
         ("manual", "手動勾選"),
         ("auto_quantity", "自動依數量判斷"),
         ("auto_time", "自動依工時判斷"),
-        ("manager_confirm", "管理者確認"),
+        ("auto_operator", "作業員確認"),
         ("auto_system", "系統自動判斷"),
     ]
 
@@ -957,20 +957,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
         help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊",
     )
 
-    # 異常記錄
-    abnormal_notes = forms.CharField(
-        label="異常記錄",
-        widget=forms.Textarea(
-            attrs={
-                "class": "form-control",
-                "id": "abnormal_notes_input",
-                "rows": "3",
-                "placeholder": "請記錄生產過程中的異常情況（可選）",
-            }
-        ),
-        required=False,
-        help_text="請記錄生產過程中的異常情況（可選）",
-    )
+
 
     # 審核狀態
     APPROVAL_STATUS_CHOICES = [
@@ -1007,7 +994,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
         # 動態設定工序選項（排除SMT相關工序）
         from process.models import ProcessName
 
-        self.fields["process"].queryset = (
+        self.fields["operation"].queryset = (
             ProcessName.objects.all()
             .exclude(name__icontains="SMT")
             .exclude(name__icontains="表面貼裝")
@@ -1088,7 +1075,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "workorder",
             "planned_quantity",
             "operator",
-            "process",
+            "operation",
             "equipment",
             "work_date",
             "start_time",
@@ -1098,7 +1085,6 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "is_completed",
             "completion_method",
             "remarks",
-            "abnormal_notes",
             "approval_status",
         ]
 
@@ -1107,7 +1093,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "workorder": "工單號碼",
             "planned_quantity": "工單預設生產數量",
             "operator": "作業員",
-            "process": "工序",
+            "operation": "工序",
             "equipment": "設備",
             "work_date": "日期",
             "start_time": "開始時間",
@@ -1117,7 +1103,6 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "is_completed": "是否已完工",
             "completion_method": "完工判斷方式",
             "remarks": "備註",
-            "abnormal_notes": "異常記錄",
             "approval_status": "審核狀態",
         }
         help_texts = {
@@ -1135,7 +1120,6 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "is_completed": "若此工單在此工序上已全部完成，請勾選",
             "completion_method": "請選擇完工判斷方式",
             "remarks": "請輸入備註說明（可選）",
-            "abnormal_notes": "請記錄生產過程中的異常情況（可選）",
             "approval_status": "請選擇審核狀態",
         }
 
@@ -1269,11 +1253,11 @@ class OperatorSupplementBatchForm(forms.Form):
         help_text="請選擇要補登的工單",
     )
 
-    process = forms.ModelChoiceField(
+    operation = forms.ModelChoiceField(
         queryset=None,
         label="工序",
         widget=forms.Select(
-            attrs={"class": "form-control", "id": "batch_process_select"}
+            attrs={"class": "form-control", "id": "batch_operation_select"}
         ),
         required=True,
         help_text="請選擇工序（排除SMT相關工序）",
@@ -1375,7 +1359,7 @@ class OperatorSupplementBatchForm(forms.Form):
         processes = ProcessName.objects.filter(
             ~Q(name__icontains="SMT")  # 排除SMT相關工序
         ).order_by("name")
-        self.fields["process"].queryset = processes
+        self.fields["operation"].queryset = processes
 
         # 設置預設日期為今天
         from datetime import date
@@ -1475,7 +1459,6 @@ class ManagerProductionReportForm(forms.ModelForm):
             "is_completed",
             "completion_method",
             "remarks",
-            "abnormal_notes",
         ]
         widgets = {
             "manager": forms.TextInput(
@@ -1547,13 +1530,6 @@ class ManagerProductionReportForm(forms.ModelForm):
                     "placeholder": "請輸入備註說明",
                 }
             ),
-            "abnormal_notes": forms.Textarea(
-                attrs={
-                    "class": "form-control",
-                    "rows": "3",
-                    "placeholder": "請輸入異常記錄",
-                }
-            ),
         }
         labels = {
             "manager": "管理者",
@@ -1570,7 +1546,6 @@ class ManagerProductionReportForm(forms.ModelForm):
             "is_completed": "是否已完工",
             "completion_method": "完工判斷方式",
             "remarks": "備註",
-            "abnormal_notes": "異常記錄",
         }
         help_texts = {
             "manager": "請輸入管理者姓名",
@@ -1587,7 +1562,6 @@ class ManagerProductionReportForm(forms.ModelForm):
             "is_completed": "若此工單在此工序上已全部完成，請勾選",
             "completion_method": "選擇如何判斷此筆記錄是否代表工單完工",
             "remarks": "請輸入任何需要補充的資訊，如異常、停機等",
-            "abnormal_notes": "記錄生產過程中的異常情況",
         }
 
     def __init__(self, *args, **kwargs):
@@ -2105,20 +2079,6 @@ class RDSampleSupplementReportForm(forms.ModelForm):
         help_text="請輸入備註說明（可選）",
     )
 
-    abnormal_notes = forms.CharField(
-        label="異常記錄",
-        widget=forms.Textarea(
-            attrs={
-                "class": "form-control",
-                "id": "abnormal_notes_input",
-                "rows": "3",
-                "placeholder": "請記錄製作過程中的異常情況（可選）",
-            }
-        ),
-        required=False,
-        help_text="請記錄製作過程中的異常情況（可選）",
-    )
-
     # 審核狀態
     approval_status = forms.ChoiceField(
         choices=[
@@ -2246,7 +2206,6 @@ class RDSampleSupplementReportForm(forms.ModelForm):
             "is_completed",
             "completion_method",
             "remarks",
-            "abnormal_notes",
             "approval_status",
         ]
 
@@ -2262,7 +2221,6 @@ class RDSampleSupplementReportForm(forms.ModelForm):
             "is_completed": "是否已完工",
             "completion_method": "完工判斷方式",
             "remarks": "備註",
-            "abnormal_notes": "異常記錄",
             "approval_status": "審核狀態",
         }
 
@@ -2278,6 +2236,5 @@ class RDSampleSupplementReportForm(forms.ModelForm):
             "is_completed": "若此RD樣品製作已全部完成，請勾選",
             "completion_method": "請選擇完工判斷方式",
             "remarks": "請輸入備註說明（可選）",
-            "abnormal_notes": "請記錄製作過程中的異常情況（可選）",
             "approval_status": "請選擇審核狀態",
         }

@@ -265,7 +265,7 @@ class EquipmentForm(forms.ModelForm):
 - 使用 Bootstrap 5 樣式
 - 客製化樣式請集中於 `static/module_name/` 目錄
 - JavaScript 需模組化，避免全域污染
-- 前端互動建議使用 jQuery 或原生 JS，複雜互動可考慮 Vue.js（如有需求）
+
 
 ### 3. 圖表與看板
 - 優先使用 Chart.js、Plotly 等開源圖表庫

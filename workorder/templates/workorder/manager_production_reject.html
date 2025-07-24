@@ -170,23 +170,15 @@
                     </div>
 
                     <!-- 備註資訊 -->
-                    {% if report.remarks or report.abnormal_notes %}
+                    {% if report.remarks %}
                     <div class="rejection-section">
                         <h5><i class="fas fa-sticky-note"></i> 備註資訊</h5>
-                        {% if report.remarks %}
                         <div class="info-row">
                             <span class="info-label">備註：</span>
                             <span class="info-value">{{ report.remarks }}</span>
                         </div>
                         {% endif %}
-                        {% if report.abnormal_notes %}
-                        <div class="info-row">
-                            <span class="info-label">異常記錄：</span>
-                            <span class="info-value">{{ report.abnormal_notes }}</span>
-                        </div>
-                        {% endif %}
                     </div>
-                    {% endif %}
                 </div>
             </div>
         </div>

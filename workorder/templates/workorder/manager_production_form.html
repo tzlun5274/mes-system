@@ -327,22 +327,6 @@
                                     </div>
                                     {% endif %}
                                 </div>
-                                <div class="col-md-6">
-                                    <label for="{{ form.abnormal_notes.id_for_label }}" class="form-label">
-                                        {{ form.abnormal_notes.label }}
-                                    </label>
-                                    {{ form.abnormal_notes }}
-                                    {% if form.abnormal_notes.help_text %}
-                                    <div class="help-text">{{ form.abnormal_notes.help_text }}</div>
-                                    {% endif %}
-                                    {% if form.abnormal_notes.errors %}
-                                    <div class="invalid-feedback d-block">
-                                        {% for error in form.abnormal_notes.errors %}
-                                        {{ error }}
-                                        {% endfor %}
-                                    </div>
-                                    {% endif %}
-                                </div>
                             </div>
                         </div>
 

@@ -423,7 +423,7 @@
     </div>
 
     <!-- 備註資訊 -->
-    {% if report.notes or report.abnormal_notes %}
+    {% if report.remarks %}
     <div class="row mb-4">
         <div class="col-12">
             <div class="card operator-supplement-detail-card">
@@ -433,19 +433,10 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    {% if report.remarks %}
                     <div class="notes-section">
                         <h6>報工備註</h6>
                         <div class="notes-content">{{ report.remarks }}</div>
                     </div>
-                    {% endif %}
-                    
-                    {% if report.abnormal_notes %}
-                    <div class="notes-section">
-                        <h6>異常記錄</h6>
-                        <div class="notes-content">{{ report.abnormal_notes }}</div>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
         </div>

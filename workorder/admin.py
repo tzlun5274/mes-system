@@ -146,7 +146,7 @@ class OperatorSupplementReportAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('備註資訊', {
-            'fields': ('remarks', 'abnormal_notes')
+            'fields': ('remarks',)
         }),
         ('審核資訊', {
             'fields': ('approval_status', 'approved_by', 'approved_at', 'approval_remarks', 'rejection_reason'),
@@ -229,7 +229,7 @@ class ManagerProductionReportAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('備註資訊', {
-            'fields': ('remarks', 'abnormal_notes')
+            'fields': ('remarks',)
         }),
         ('審核資訊', {
             'fields': ('approval_status', 'approved_by', 'approved_at', 'approval_remarks', 'rejection_reason'),

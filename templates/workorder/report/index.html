@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}報工管理 - MES系統{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3 mb-0 text-gray-800">
+                    <i class="fas fa-clipboard-list mr-2"></i>報工管理
+                </h1>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">報工管理</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <!-- 今日報工數 -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                今日報工數
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ today_reports }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 本月報工數 -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                本月報工數
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ month_reports }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 待審核報工數 -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                待審核報工數
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ pending_reports }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 異常報工數 -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                異常報工數
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ abnormal_reports }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 功能卡片 -->
+    <div class="row mb-4">
+        <!-- 作業員報工 -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-user-cog mr-2"></i>作業員報工
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">作業員補登報工記錄管理，支援歷史數據輸入和批量處理。</p>
+                    <div class="btn-group-vertical w-100" role="group">
+                        <a href="{% url 'workorder:operator_supplement_report_index' %}" class="btn btn-primary mb-2">
+                            <i class="fas fa-list mr-2"></i>報工記錄列表
+                        </a>
+                        <a href="{% url 'workorder:operator_supplement_report_create' %}" class="btn btn-success mb-2">
+                            <i class="fas fa-plus mr-2"></i>新增報工記錄
+                        </a>
+                        <a href="{% url 'workorder:operator_supplement_batch' %}" class="btn btn-info">
+                            <i class="fas fa-upload mr-2"></i>批量匯入
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SMT報工 -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">
+                        <i class="fas fa-cogs mr-2"></i>SMT報工
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">SMT設備自動化報工記錄管理，支援設備狀態監控。</p>
+                    <div class="btn-group-vertical w-100" role="group">
+                        <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-success mb-2">
+                            <i class="fas fa-list mr-2"></i>SMT報工列表
+                        </a>
+                        <a href="{% url 'workorder:smt_supplement_report_create' %}" class="btn btn-primary mb-2">
+                            <i class="fas fa-plus mr-2"></i>新增SMT報工
+                        </a>
+                        <a href="{% url 'workorder:smt_on_site_report' %}" class="btn btn-warning">
+                            <i class="fas fa-desktop mr-2"></i>現場報工
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 管理者報工 -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">
+                        <i class="fas fa-user-tie mr-2"></i>管理者報工
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">管理者生產報工記錄，支援審核流程和權限管理。</p>
+                    <div class="btn-group-vertical w-100" role="group">
+                        <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-info mb-2">
+                            <i class="fas fa-list mr-2"></i>管理者報工列表
+                        </a>
+                        <a href="{% url 'workorder:manager_production_create' %}" class="btn btn-primary mb-2">
+                            <i class="fas fa-plus mr-2"></i>新增管理者報工
+                        </a>
+                        <a href="{% url 'workorder:manager_production_batch' %}" class="btn btn-warning">
+                            <i class="fas fa-upload mr-2"></i>批量創建
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近報工記錄 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-history mr-2"></i>最近報工記錄
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if recent_reports %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>報工時間</th>
+                                        <th>作業員/設備</th>
+                                        <th>工單號碼</th>
+                                        <th>工序</th>
+                                        <th>數量</th>
+                                        <th>工時</th>
+                                        <th>狀態</th>
+                                        <th>類型</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in recent_reports %}
+                                    <tr>
+                                        <td>{{ report.report_time|date:"Y-m-d H:i" }}</td>
+                                        <td>{{ report.operator }}</td>
+                                        <td>{{ report.workorder }}</td>
+                                        <td>{{ report.process }}</td>
+                                        <td>{{ report.quantity }}</td>
+                                        <td>{{ report.work_hours }}</td>
+                                        <td>
+                                            <span class="badge badge-{% if report.status == '已核准' %}success{% elif report.status == '待審核' %}warning{% else %}danger{% endif %}">
+                                                {{ report.status }}
+                                            </span>
+                                        </td>
+                                        <td>{{ report.type }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-inbox fa-3x text-gray-300 mb-3"></i>
+                            <p class="text-gray-500">目前沒有報工記錄</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 自動刷新統計數據（每5分鐘）
+    setInterval(function() {
+        location.reload();
+    }, 300000);
+});
+</script>
+{% endblock %} 

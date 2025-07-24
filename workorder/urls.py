@@ -79,6 +79,7 @@ urlpatterns = [
     
     # 報工管理功能
     path('report/', views.report_index, name='report_index'),
+    path('report/test/', views.test_report_page, name='test_report_page'),
     path('report/manager/', views.manager_report_index, name='manager_report_index'),
     path('report/operator/', views.operator_report_index, name='operator_report_index'),
     path('report/smt/', views.smt_report_index, name='smt_report_index'),

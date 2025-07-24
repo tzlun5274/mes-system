@@ -951,6 +951,8 @@ class OperatorSupplementReport(models.Model):
     process = models.ForeignKey(
         'process.ProcessName',
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         verbose_name="工序",
         help_text="請選擇此次補登的工序（排除SMT相關工序）"
     )
@@ -1099,12 +1101,6 @@ class OperatorSupplementReport(models.Model):
         blank=True,
         verbose_name="備註",
         help_text="請輸入任何需要補充的資訊，如異常、停機等"
-    )
-    
-    abnormal_notes = models.TextField(
-        blank=True,
-        verbose_name="異常記錄",
-        help_text="記錄生產過程中的異常情況"
     )
     
     # 系統欄位
@@ -1496,12 +1492,6 @@ class ManagerProductionReport(models.Model):
         blank=True,
         verbose_name="備註",
         help_text="請輸入任何需要補充的資訊，如異常、停機等"
-    )
-    
-    abnormal_notes = models.TextField(
-        blank=True,
-        verbose_name="異常記錄",
-        help_text="記錄生產過程中的異常情況"
     )
     
     # 系統欄位
