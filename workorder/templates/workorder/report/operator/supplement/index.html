@@ -180,31 +180,28 @@
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <a href="{% url 'workorder:operator_supplement_report_create' %}" class="btn btn-warning btn-lg btn-block mb-2">
                                 <i class="fas fa-plus"></i> 新增正式報工
                             </a>
                         </div>
-                        <div class="col-md-2">
-                            <a href="{% url 'workorder:rd_sample_supplement_report_create' %}" class="btn btn-success btn-lg btn-block mb-2">
-                                <i class="fas fa-flask"></i> 新增作業員RD樣品補登報工
-                            </a>
-                        </div>
-                        <div class="col-md-2">
+                        {% if user.is_staff or user.is_superuser %}
+                        <div class="col-md-3">
                             <a href="{% url 'workorder:operator_supplement_batch' %}" class="btn btn-info btn-lg btn-block mb-2">
                                 <i class="fas fa-upload"></i> 批量匯入
                             </a>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <a href="{% url 'workorder:operator_supplement_export' %}" class="btn btn-success btn-lg btn-block mb-2">
                                 <i class="fas fa-download"></i> 匯出資料
                             </a>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <a href="{% url 'workorder:operator_supplement_template' %}" class="btn btn-secondary btn-lg btn-block mb-2">
                                 <i class="fas fa-file-excel"></i> 下載範本
                             </a>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>

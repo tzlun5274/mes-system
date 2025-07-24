@@ -181,7 +181,7 @@ class PrdMKOrdMain(models.Model):
         max_length=20, verbose_name="製單人", blank=True, null=True
     )
     Permitter = models.CharField(
-        max_length=20, verbose_name="審核人", blank=True, null=True
+        max_length=20, verbose_name="核准人", blank=True, null=True
     )
     updated_at = models.DateTimeField(verbose_name="更新時間")
     BillStatus = models.IntegerField(verbose_name="單況", blank=True, null=True)
@@ -703,38 +703,38 @@ class SMTProductionReport(models.Model):
         help_text="請輸入任何需要補充的資訊，如異常、停機等"
     )
     
-    # 審核相關欄位
+    # 核准相關欄位
     approval_status = models.CharField(
         max_length=20,
         choices=[
-            ('pending', '待審核'),
+            ('pending', '待核准'),
             ('approved', '已核准'),
             ('rejected', '已駁回'),
         ],
         default='pending',
-        verbose_name="審核狀態",
-        help_text="此補登記錄的審核狀態"
+        verbose_name="核准狀態",
+        help_text="此補登記錄的核准狀態"
     )
     
     approved_by = models.CharField(
         max_length=100,
         blank=True,
         null=True,
-        verbose_name="審核人員",
-        help_text="此補登記錄的審核人員"
+        verbose_name="核准人員",
+        help_text="此補登記錄的核准人員"
     )
     
     approved_at = models.DateTimeField(
         blank=True,
         null=True,
-        verbose_name="審核時間",
-        help_text="此補登記錄的審核時間"
+        verbose_name="核准時間",
+        help_text="此補登記錄的核准時間"
     )
     
     approval_remarks = models.TextField(
         blank=True,
-        verbose_name="審核備註",
-        help_text="審核時的備註說明"
+        verbose_name="核准備註",
+        help_text="核准時的備註說明"
     )
     
     rejection_reason = models.TextField(
@@ -868,8 +868,8 @@ class SMTProductionReport(models.Model):
         return user.is_superuser or self.created_by == user.username
 
     def can_approve(self, user):
-        """檢查是否可以審核"""
-        # 只有超級用戶或管理者群組可以審核
+        """檢查是否可以核准"""
+        # 只有超級用戶或管理者群組可以核准
         if user.is_superuser:
             return True
         
@@ -1056,8 +1056,8 @@ class OperatorSupplementReport(models.Model):
     
     # 核准狀態
     APPROVAL_STATUS_CHOICES = [
-        ('pending', '待審核'),
-        ('approved', '已審核'),
+        ('pending', '待核准'),
+        ('approved', '已核准'),
         ('rejected', '已駁回'),
     ]
     
@@ -1065,29 +1065,29 @@ class OperatorSupplementReport(models.Model):
         max_length=20,
         choices=APPROVAL_STATUS_CHOICES,
         default='pending',
-        verbose_name="審核狀態",
-        help_text="補登記錄的審核狀態，已審核的記錄不可修改"
+        verbose_name="核准狀態",
+        help_text="補登記錄的核准狀態，已核准的記錄不可修改"
     )
     
     approved_by = models.CharField(
         max_length=100,
         blank=True,
         null=True,
-        verbose_name="審核人員",
-        help_text="審核此補登記錄的人員"
+        verbose_name="核准人員",
+        help_text="核准此補登記錄的人員"
     )
     
     approved_at = models.DateTimeField(
         blank=True,
         null=True,
-        verbose_name="審核時間",
-        help_text="此補登記錄的審核時間"
+        verbose_name="核准時間",
+        help_text="此補登記錄的核准時間"
     )
     
     approval_remarks = models.TextField(
         blank=True,
-        verbose_name="審核備註",
-        help_text="審核時的備註說明"
+        verbose_name="核准備註",
+        help_text="核准時的備註說明"
     )
     
     rejection_reason = models.TextField(
@@ -1172,7 +1172,7 @@ class OperatorSupplementReport(models.Model):
     def can_edit(self, user):
         """
         檢查記錄是否可以編輯
-        已審核的記錄只有超級管理員可以編輯
+        已核准的記錄只有超級管理員可以編輯
         """
         if self.approval_status == 'approved':
             return user.is_superuser
@@ -1193,14 +1193,14 @@ class OperatorSupplementReport(models.Model):
 
     def can_approve(self, user):
         """
-        檢查記錄是否可以審核
-        只有管理員和超級管理員可以審核
+        檢查記錄是否可以核准
+        只有管理員和超級管理員可以核准
         """
         return user.is_staff or user.is_superuser
 
     def approve(self, user, remarks=''):
         """
-        審核通過補登記錄
+        核准通過補登記錄
         """
         self.approval_status = 'approved'
         self.approved_by = user.username
@@ -1219,7 +1219,7 @@ class OperatorSupplementReport(models.Model):
         self.save()
 
     def submit_for_approval(self):
-        """提交審核"""
+        """提交核准"""
         self.approval_status = 'pending'
         self.save()
     
@@ -1307,7 +1307,7 @@ class OperatorSupplementReport(models.Model):
 class ManagerProductionReport(models.Model):
     """
     管理者生產報工記錄模型
-    專為管理者設計的報工記錄審核模組，結合了 SMT 補登報工和作業員補登報工的功能特點
+    專為管理者設計的報工記錄核准模組，結合了 SMT 補登報工和作業員補登報工的功能特點
     """
     
     # 基本資訊
@@ -1445,10 +1445,10 @@ class ManagerProductionReport(models.Model):
         help_text="此工單在此工序上的累積工時"
     )
     
-    # 審核狀態
+    # 核准狀態
     APPROVAL_STATUS_CHOICES = [
-        ('pending', '待審核'),
-        ('approved', '已審核'),
+        ('pending', '待核准'),
+        ('approved', '已核准'),
         ('rejected', '已駁回'),
     ]
     
@@ -1456,29 +1456,29 @@ class ManagerProductionReport(models.Model):
         max_length=20,
         choices=APPROVAL_STATUS_CHOICES,
         default='pending',
-        verbose_name="審核狀態",
-        help_text="報工記錄的審核狀態，已審核的記錄不可修改"
+        verbose_name="核准狀態",
+        help_text="報工記錄的核准狀態，已核准的記錄不可修改"
     )
     
     approved_by = models.CharField(
         max_length=100,
         blank=True,
         null=True,
-        verbose_name="審核人員",
-        help_text="審核此報工記錄的人員"
+        verbose_name="核准人員",
+        help_text="核准此報工記錄的人員"
     )
     
     approved_at = models.DateTimeField(
         blank=True,
         null=True,
-        verbose_name="審核時間",
-        help_text="此報工記錄的審核時間"
+        verbose_name="核准時間",
+        help_text="此報工記錄的核准時間"
     )
     
     approval_remarks = models.TextField(
         blank=True,
-        verbose_name="審核備註",
-        help_text="審核時的備註說明"
+        verbose_name="核准備註",
+        help_text="核准時的備註說明"
     )
     
     rejection_reason = models.TextField(
@@ -1591,8 +1591,8 @@ class ManagerProductionReport(models.Model):
         return user.is_superuser or self.created_by == user.username
     
     def can_approve(self, user):
-        """檢查是否可以審核"""
-        # 只有超級用戶或管理者群組可以審核
+        """檢查是否可以核准"""
+        # 只有超級用戶或管理者群組可以核准
         if user.is_superuser:
             return True
         
@@ -1600,9 +1600,9 @@ class ManagerProductionReport(models.Model):
         return user.groups.filter(name='管理者').exists()
     
     def approve(self, user, remarks=''):
-        """審核通過"""
+        """核准通過"""
         if not self.can_approve(user):
-            raise PermissionError("您沒有權限進行審核")
+            raise PermissionError("您沒有權限進行核准")
         
         self.approval_status = 'approved'
         self.approved_by = user.username
@@ -1613,7 +1613,7 @@ class ManagerProductionReport(models.Model):
     def reject(self, user, reason=''):
         """駁回"""
         if not self.can_approve(user):
-            raise PermissionError("您沒有權限進行審核")
+            raise PermissionError("您沒有權限進行核准")
         
         self.approval_status = 'rejected'
         self.approved_by = user.username
@@ -1622,7 +1622,7 @@ class ManagerProductionReport(models.Model):
         self.save()
     
     def submit_for_approval(self):
-        """提交審核"""
+        """提交核准"""
         self.approval_status = 'pending'
         self.save()
     

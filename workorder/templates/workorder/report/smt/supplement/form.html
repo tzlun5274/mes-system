@@ -298,7 +298,7 @@
                 <div id="rd_sample_fields" class="form-block" style="display: none;">
                             <h6><i class="fas fa-flask"></i> RD樣品資訊</h6>
                     
-                    <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                         <!-- RD產品編號 -->
                         <div class="form-field">
                             <label for="{{ form.rd_product_code.id_for_label }}" class="form-label">
@@ -312,9 +312,7 @@
                                 <div class="error-text">{{ form.rd_product_code.errors.0 }}</div>
                             {% endif %}
                         </div>
-                    </div>
-                    
-                    <div style="margin-top: 20px;">
+                        
                         <!-- RD工單號碼 -->
                         <div class="form-field">
                             <label for="rd_sample_workorder" class="form-label">

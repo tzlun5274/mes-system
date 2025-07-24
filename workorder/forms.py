@@ -959,27 +959,27 @@ class OperatorSupplementReportForm(forms.ModelForm):
 
 
 
-    # 審核狀態
+    # 核准狀態
     APPROVAL_STATUS_CHOICES = [
         ("draft", "草稿"),
-        ("pending", "待審核"),
-        ("approved", "審核通過"),
+        ("pending", "待核准"),
+        ("approved", "核准通過"),
         ("rejected", "駁回"),
     ]
 
     approval_status = forms.ChoiceField(
         choices=APPROVAL_STATUS_CHOICES,
-        label="審核狀態",
+        label="核准狀態",
         widget=forms.Select(
             attrs={
                 "class": "form-control",
                 "id": "approval_status_select",
-                "placeholder": "請選擇審核狀態",
+                "placeholder": "請選擇核准狀態",
             }
         ),
         required=True,
         initial="draft",
-        help_text="請選擇審核狀態",
+        help_text="請選擇核准狀態",
     )
 
     def __init__(self, *args, **kwargs):
@@ -1103,7 +1103,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "is_completed": "是否已完工",
             "completion_method": "完工判斷方式",
             "remarks": "備註",
-            "approval_status": "審核狀態",
+            "approval_status": "核准狀態",
         }
         help_texts = {
             "product_id": "請選擇產品編號，選擇後會自動帶出相關工單",
@@ -1120,7 +1120,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "is_completed": "若此工單在此工序上已全部完成，請勾選",
             "completion_method": "請選擇完工判斷方式",
             "remarks": "請輸入備註說明（可選）",
-            "approval_status": "請選擇審核狀態",
+            "approval_status": "請選擇核准狀態",
         }
 
     def clean(self):
@@ -1424,7 +1424,7 @@ class OperatorSupplementBatchForm(forms.Form):
 class ManagerProductionReportForm(forms.ModelForm):
     """
     管理者生產報工記錄表單
-    專為管理者設計的報工記錄審核表單，結合了 SMT 補登報工和作業員補登報工的功能特點
+    專為管理者設計的報工記錄核准表單，結合了 SMT 補登報工和作業員補登報工的功能特點
     """
 
     # 產品編號欄位（用於自動帶出工單）
@@ -1647,14 +1647,14 @@ class ManagerProductionReportForm(forms.ModelForm):
 
 class ManagerProductionReportApprovalForm(forms.Form):
     """
-    管理者生產報工記錄審核表單
+    管理者生產報工記錄核准表單
     """
 
     approval_remarks = forms.CharField(
         max_length=500,
         required=False,
-        label="審核備註",
-        help_text="請輸入審核備註（可選）",
+        label="核准備註",
+        help_text="請輸入核准備註（可選）",
         widget=forms.Textarea(
             attrs={
                 "class": "form-control",
@@ -2079,7 +2079,7 @@ class RDSampleSupplementReportForm(forms.ModelForm):
         help_text="請輸入備註說明（可選）",
     )
 
-    # 審核狀態
+    # 核准狀態
     approval_status = forms.ChoiceField(
         choices=[
             ("draft", "草稿"),

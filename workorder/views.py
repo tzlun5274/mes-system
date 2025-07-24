@@ -3259,12 +3259,12 @@ def smt_on_site_report(request):
     # 取得今日的 SMT 報工記錄
     today = date.today()
     today_reports_list = SMTProductionReport.objects.filter(
-        report_time__date=today
-    ).select_related('equipment', 'workorder').order_by('-report_time')
+        work_date=today
+    ).select_related('equipment', 'workorder').order_by('-created_at')
     
     # 計算統計資料
     today_reports_count = today_reports_list.count()
-    current_shift_output = sum(report.quantity for report in today_reports_list)
+    current_shift_output = sum(report.work_quantity for report in today_reports_list)
     
     # 準備統計資料
     context = {
@@ -3307,11 +3307,32 @@ def submit_smt_report(request):
         
         # 建立報工記錄
         from .models import SMTProductionReport
+        from process.models import ProcessName
+        from django.utils import timezone
+        
+        # 取得預設的SMT工序（如果沒有則創建一個）
+        try:
+            smt_process = ProcessName.objects.get(name__icontains='SMT')
+        except ProcessName.DoesNotExist:
+            smt_process = ProcessName.objects.create(
+                name='SMT貼片',
+                description='SMT表面貼裝技術'
+            )
+        
         report = SMTProductionReport.objects.create(
-            equipment=equipment,
+            product_id=workorder.product_code,
             workorder=workorder,
+            planned_quantity=workorder.quantity,
+            operation=smt_process,
+            equipment=equipment,
+            work_date=timezone.now().date(),
+            start_time=timezone.now().time(),
+            end_time=timezone.now().time(),
             work_quantity=int(quantity),
-            remarks=notes
+            defect_quantity=0,
+            is_completed=False,
+            remarks=notes,
+            created_by=request.user.username if request.user.is_authenticated else 'system'
         )
         
         return JsonResponse({
@@ -3442,8 +3463,11 @@ def smt_supplement_report_index(request):
     
     # 取得查詢參數
     equipment_id = request.GET.get('equipment')
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
+    workorder_number = request.GET.get('workorder')
+    product_code = request.GET.get('product')
+    status = request.GET.get('status')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
     
     # 取得 SMT 設備列表
     equipment_list = Equipment.objects.filter(
@@ -3459,10 +3483,23 @@ def smt_supplement_report_index(request):
     # 篩選條件
     if equipment_id:
         supplement_reports = supplement_reports.filter(equipment_id=equipment_id)
-    if start_date:
-        supplement_reports = supplement_reports.filter(work_date__gte=start_date)
-    if end_date:
-        supplement_reports = supplement_reports.filter(work_date__lte=end_date)
+    if workorder_number:
+        supplement_reports = supplement_reports.filter(
+            models.Q(workorder__order_number__icontains=workorder_number) |
+            models.Q(workorder_number__icontains=workorder_number)
+        )
+    if product_code:
+        supplement_reports = supplement_reports.filter(
+            models.Q(workorder__product_code__icontains=product_code) |
+            models.Q(rd_product_code__icontains=product_code) |
+            models.Q(product_id__icontains=product_code)
+        )
+    if status:
+        supplement_reports = supplement_reports.filter(approval_status=status)
+    if date_from:
+        supplement_reports = supplement_reports.filter(work_date__gte=date_from)
+    if date_to:
+        supplement_reports = supplement_reports.filter(work_date__lte=date_to)
     
     # 排序
     supplement_reports = supplement_reports.order_by('-work_date', '-start_time')
@@ -3472,16 +3509,11 @@ def smt_supplement_report_index(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # 統計資訊
-    today = date.today()
-    today_reports = SMTProductionReport.objects.filter(work_date=today)
-    total_quantity = today_reports.aggregate(total=models.Sum('work_quantity'))['total'] or 0
-    total_reports = today_reports.count()
-    
-    # 最近7天統計
-    week_ago = today - timedelta(days=7)
-    week_reports = SMTProductionReport.objects.filter(work_date__gte=week_ago)
-    week_quantity = week_reports.aggregate(total=models.Sum('work_quantity'))['total'] or 0
+    # 統計資訊 - 核准狀態統計
+    pending_reports = SMTProductionReport.objects.filter(approval_status='pending').count()
+    approved_reports = SMTProductionReport.objects.filter(approval_status='approved').count()
+    rejected_reports = SMTProductionReport.objects.filter(approval_status='rejected').count()
+    total_reports = SMTProductionReport.objects.count()
     
     # 為每個記錄添加權限檢查
     for report in page_obj:
@@ -3492,14 +3524,106 @@ def smt_supplement_report_index(request):
         'page_obj': page_obj,
         'equipment_list': equipment_list,
         'selected_equipment': equipment_id,
-        'start_date': start_date,
-        'end_date': end_date,
-        'today_quantity': total_quantity,
-        'today_reports': total_reports,
-        'week_quantity': week_quantity,
+        'selected_workorder': workorder_number,
+        'selected_product': product_code,
+        'selected_status': status,
+        'selected_date_from': date_from,
+        'selected_date_to': date_to,
+        'pending_reports': pending_reports,
+        'approved_reports': approved_reports,
+        'rejected_reports': rejected_reports,
+        'total_reports': total_reports,
     }
     
     return render(request, 'workorder/report/smt/supplement/index.html', context)
+
+
+def smt_supplement_batch(request):
+    """
+    SMT補登報工批量匯入頁面
+    """
+    return render(request, 'workorder/report/smt/supplement/batch.html')
+
+
+def smt_supplement_export(request):
+    """
+    SMT補登報工匯出功能
+    """
+    from django.http import HttpResponse
+    import csv
+    from datetime import datetime
+    
+    # 建立回應
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="smt_supplement_reports_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+    
+    # 寫入 BOM 以支援中文
+    response.write('\ufeff')
+    
+    writer = csv.writer(response)
+    
+    # 寫入標題行
+    writer.writerow([
+        '報工日期', '開始時間', '結束時間', '設備', '工單號', '產品編號', 
+        '報工數量', '工時', '核准狀態', '備註', '建立時間'
+    ])
+    
+    # 查詢資料
+    from .models import SMTProductionReport
+    reports = SMTProductionReport.objects.all().order_by('-work_date', '-start_time')
+    
+    # 寫入資料行
+    for report in reports:
+        writer.writerow([
+            report.work_date.strftime('%Y-%m-%d') if report.work_date else '',
+            report.start_time.strftime('%H:%M') if report.start_time else '',
+            report.end_time.strftime('%H:%M') if report.end_time else '',
+            report.equipment.name if report.equipment else '',
+            report.workorder.order_number if report.workorder else report.workorder_number or '',
+            report.workorder.product_code if report.workorder else report.rd_product_code or '',
+            report.work_quantity,
+            f"{report.work_duration:.2f}" if report.work_duration else '',
+            report.get_approval_status_display(),
+            report.remarks or '',
+            report.created_at.strftime('%Y-%m-%d %H:%M') if report.created_at else '',
+        ])
+    
+    return response
+
+
+def smt_supplement_template(request):
+    """
+    SMT補登報工匯入範本下載
+    """
+    from django.http import HttpResponse
+    import csv
+    
+    # 建立回應
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="smt_supplement_template.csv"'
+    
+    # 寫入 BOM 以支援中文
+    response.write('\ufeff')
+    
+    writer = csv.writer(response)
+    
+    # 寫入標題行
+    writer.writerow([
+        '報工日期', '開始時間', '結束時間', '設備ID', '工單號', '產品編號', 
+        '報工數量', '工時', '備註', '報工類型'
+    ])
+    
+    # 寫入範例資料
+    writer.writerow([
+        '2024-01-15', '08:00', '12:00', '1', 'WO-2024-001', 'PROD-001', 
+        '100', '4.0', '正常生產', '正式報工'
+    ])
+    writer.writerow([
+        '2024-01-15', '13:00', '17:00', '2', '', 'RD-001', 
+        '50', '4.0', 'RD樣品測試', 'RD樣品'
+    ])
+    
+    return response
 
 
 def smt_supplement_report_create(request):
