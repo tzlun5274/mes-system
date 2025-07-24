@@ -5498,10 +5498,10 @@ def operator_supplement_template(request):
         bottom=Side(style='thin')
     )
     
-    # 標題行 - 增加公司代號欄位
+    # 標題行 - 增加設備欄位，使用名稱而不是ID
     headers = [
-        '公司代號', '報工日期', '開始時間', '結束時間', '作業員ID', '工單號', '工序ID', 
-        '報工數量', '不良品數量', '備註', '報工類型'
+        '公司代號', '報工日期', '開始時間', '結束時間', '作業員名稱', '工單號', '工序名稱', 
+        '設備名稱', '報工數量', '不良品數量', '備註', '報工類型'
     ]
     
     for col, header in enumerate(headers, 1):
@@ -5511,11 +5511,11 @@ def operator_supplement_template(request):
         cell.alignment = header_alignment
         cell.border = thin_border
     
-    # 寫入範例資料 - 增加公司代號
+    # 寫入範例資料 - 使用名稱而不是ID，增加設備欄位
     example_data = [
-        ['COMP001', '2024-01-15', '08:00', '12:00', '1', 'WO-2024-001', '1', '100', '5', '正常生產', '正式報工'],
-        ['COMP001', '2024-01-15', '13:00', '17:00', '2', '', '2', '50', '2', 'RD樣品測試', 'RD樣品'],
-        ['COMP002', '2024-01-16', '09:00', '17:00', '3', 'WO-2024-002', '2', '150', '3', '大量生產', '正式報工'],
+        ['COMP001', '2024-01-15', '08:00', '12:00', '張小明', 'WO-2024-001', '目檢', '目檢台A', '100', '5', '正常生產', '正式報工'],
+        ['COMP001', '2024-01-15', '13:00', '17:00', '李美玲', '', '測試', '測試設備B', '50', '2', 'RD樣品測試', 'RD樣品'],
+        ['COMP002', '2024-01-16', '09:00', '17:00', '王大華', 'WO-2024-002', '包裝', '包裝機C', '150', '3', '大量生產', '正式報工'],
     ]
     
     for row, data in enumerate(example_data, 2):
@@ -5581,17 +5581,18 @@ def operator_supplement_batch_create(request):
                         work_date_str = ws.cell(row=row, column=2).value
                         start_time_str = ws.cell(row=row, column=3).value
                         end_time_str = ws.cell(row=row, column=4).value
-                        operator_id = ws.cell(row=row, column=5).value
+                        operator_name = ws.cell(row=row, column=5).value
                         workorder_number = ws.cell(row=row, column=6).value
-                        process_id = ws.cell(row=row, column=7).value
-                        work_quantity = ws.cell(row=row, column=8).value
-                        defect_quantity = ws.cell(row=row, column=9).value
-                        remarks = ws.cell(row=row, column=10).value
-                        report_type = ws.cell(row=row, column=11).value
+                        process_name = ws.cell(row=row, column=7).value
+                        equipment_name = ws.cell(row=row, column=8).value
+                        work_quantity = ws.cell(row=row, column=9).value
+                        defect_quantity = ws.cell(row=row, column=10).value
+                        remarks = ws.cell(row=row, column=11).value
+                        report_type = ws.cell(row=row, column=12).value
                         
                         # 驗證必要欄位
-                        if not company_code or not work_date_str or not operator_id or not work_quantity:
-                            errors.append(f'第 {row} 行：缺少必要欄位（公司代號、報工日期、作業員ID、報工數量）')
+                        if not company_code or not work_date_str or not operator_name or not work_quantity:
+                            errors.append(f'第 {row} 行：缺少必要欄位（公司代號、報工日期、作業員名稱、報工數量）')
                             continue
                         
                         # 解析日期
@@ -5627,21 +5628,32 @@ def operator_supplement_batch_create(request):
                             errors.append(f'第 {row} 行：找不到公司代號 {company_code}')
                             continue
                         
-                        # 取得作業員
+                        # 取得作業員（根據名稱）
                         try:
-                            operator = Operator.objects.get(id=int(operator_id))
+                            operator = Operator.objects.get(name=operator_name)
                         except Operator.DoesNotExist:
-                            errors.append(f'第 {row} 行：找不到作業員 ID {operator_id}')
+                            errors.append(f'第 {row} 行：找不到作業員 {operator_name}')
                             continue
                         
-                        # 取得工序
+                        # 取得工序（根據名稱）
                         process = None
-                        if process_id:
+                        if process_name:
                             try:
-                                process = ProcessName.objects.get(id=int(process_id))
+                                process = ProcessName.objects.get(name=process_name)
                             except ProcessName.DoesNotExist:
-                                errors.append(f'第 {row} 行：找不到工序 ID {process_id}')
+                                errors.append(f'第 {row} 行：找不到工序 {process_name}')
                                 continue
+                        
+                        # 取得設備（根據名稱，可選）
+                        equipment = None
+                        if equipment_name:
+                            try:
+                                from equip.models import Equipment
+                                equipment = Equipment.objects.get(name=equipment_name)
+                            except Equipment.DoesNotExist:
+                                # 設備名稱找不到時，只記錄警告，不中斷處理
+                                print(f'警告：第 {row} 行找不到設備 {equipment_name}，將使用空值')
+                                equipment = None
                         
                         # 處理工單（根據報工類型）
                         workorder = None
@@ -5657,6 +5669,7 @@ def operator_supplement_batch_create(request):
                             operator=operator,
                             workorder=workorder,
                             process=process,
+                            equipment=equipment,
                             work_date=work_date,
                             start_time=start_time,
                             end_time=end_time,

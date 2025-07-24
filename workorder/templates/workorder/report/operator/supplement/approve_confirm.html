@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}審核通過確認{% endblock %}
+{% block title %}核准通過確認{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -89,7 +89,7 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
                     <i class="fas fa-check-circle text-success"></i>
-                    審核通過確認
+                    核准通過確認
                 </h2>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
@@ -98,7 +98,7 @@
                         <li class="breadcrumb-item"><a href="{% url 'workorder:operator_report_index' %}">作業員報工</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_report_index' %}">補登報工</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_report_detail' report.id %}">詳情</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">審核通過</li>
+                        <li class="breadcrumb-item active" aria-current="page">核准通過</li>
                     </ol>
                 </nav>
             </div>
@@ -109,8 +109,8 @@
     <div class="row mb-4">
         <div class="col-12">
             <div class="warning-box">
-                <h6><i class="fas fa-exclamation-triangle"></i> 審核確認</h6>
-                <p>您即將審核通過此補登報工記錄。審核通過後，此記錄將正式生效並影響相關的生產統計數據。請確認以下資訊無誤後再進行審核。</p>
+                <h6><i class="fas fa-exclamation-triangle"></i> 核准確認</h6>
+                <p>您即將核准通過此補登報工記錄。核准通過後，此記錄將正式生效並影響相關的生產統計數據。請確認以下資訊無誤後再進行核准。</p>
             </div>
         </div>
     </div>
@@ -216,36 +216,36 @@
         </div>
     </div>
 
-    <!-- 審核表單 -->
+                    <!-- 核准表單 -->
     <div class="row">
         <div class="col-12">
             <div class="card approve-confirm-card">
                 <div class="card-header bg-success text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-check"></i> 審核確認
+                        <i class="fas fa-check"></i> 核准確認
                     </h5>
                 </div>
                 <div class="card-body">
                     <form method="post" id="approveForm">
                         {% csrf_token %}
                         <div class="approval-form">
-                            <h6>審核資訊</h6>
+                            <h6>核准資訊</h6>
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label for="approval_notes">審核備註（選填）</label>
+                                        <label for="approval_notes">核准備註（選填）</label>
                                         <textarea class="form-control" id="approval_notes" name="approval_notes" rows="3" 
-                                                  placeholder="請輸入審核備註..."></textarea>
+                                                                                                      placeholder="請輸入核准備註..."></textarea>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label for="approval_date">審核日期</label>
+                                        <label for="approval_date">核准日期</label>
                                         <input type="date" class="form-control" id="approval_date" name="approval_date" 
                                                value="{{ today }}" required>
                                     </div>
                                     <div class="form-group">
-                                        <label for="approval_time">審核時間</label>
+                                        <label for="approval_time">核准時間</label>
                                         <input type="time" class="form-control" id="approval_time" name="approval_time" 
                                                value="{{ current_time }}" required>
                                     </div>
@@ -255,7 +255,7 @@
                         
                         <div class="text-center mt-4">
                             <button type="submit" class="btn btn-success btn-lg">
-                                <i class="fas fa-check"></i> 確認審核通過
+                                <i class="fas fa-check"></i> 確認核准通過
                             </button>
                             <a href="{% url 'workorder:operator_supplement_report_detail' report.id %}" class="btn btn-secondary btn-lg">
                                 <i class="fas fa-times"></i> 取消
@@ -271,13 +271,13 @@
 
 {% block extra_js %}
 <script>
-    // 審核通過確認專用 JavaScript
+    // 核准通過確認專用 JavaScript
     $(document).ready(function() {
         // 表單提交前確認
         $('#approveForm').on('submit', function(e) {
             e.preventDefault();
             
-            if (confirmAction('確定要審核通過此補登報工記錄嗎？此操作將正式生效並影響生產統計數據。')) {
+            if (confirmAction('確定要核准通過此補登報工記錄嗎？此操作將正式生效並影響生產統計數據。')) {
                 showLoading();
                 this.submit();
             }

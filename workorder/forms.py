@@ -1259,17 +1259,28 @@ class OperatorSupplementReportForm(forms.ModelForm):
             except ValueError:
                 pass
 
-        # 正式報工模式
-        instance.report_type = "normal"
+        # 處理工單關聯和報工類型
         workorder = self.cleaned_data.get("workorder")
         if workorder:
             instance.workorder = workorder
             instance.planned_quantity = workorder.quantity
-            # 設定產品編號
-            instance.product_id = workorder.product_code
+            instance.product_id = workorder.product_code if workorder.product_code else ""
+            
+            # 根據工單號碼自動判斷是否為RD樣品
+            if instance.is_rd_sample_by_workorder():
+                instance.report_type = 'rd_sample'
+                instance.rd_workorder_number = workorder.order_number
+                instance.rd_product_code = workorder.product_code if workorder.product_code else ''
+                print(f"DEBUG: save() - 自動識別為RD樣品，工單號碼: {workorder.order_number}")
+            else:
+                instance.report_type = 'normal'
+                instance.rd_workorder_number = ''
+                instance.rd_product_code = ''
         else:
-            # 如果沒有選擇工單，設定為空
-            instance.workorder = None
+            # 沒有選擇工單的情況
+            instance.report_type = 'normal'
+            instance.rd_workorder_number = ''
+            instance.rd_product_code = ''
             instance.planned_quantity = 0
             instance.product_id = ""
 

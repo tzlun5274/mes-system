@@ -214,7 +214,7 @@
                             {% endif %}
                             {% if report.approval_status == 'pending' and user.is_staff %}
                             <a href="#" class="btn btn-success btn-sm" onclick="approveReport({{ report.id }})">
-                                <i class="fas fa-check"></i> 審核通過
+                                <i class="fas fa-check"></i> 核准通過
                             </a>
                             <a href="#" class="btn btn-danger btn-sm" onclick="rejectReport({{ report.id }})">
                                 <i class="fas fa-times"></i> 駁回
@@ -234,7 +234,7 @@
                                 <span class="detail-value">{{ report.id }}</span>
                             </div>
                             <div class="detail-item">
-                                <span class="detail-label">審核狀態：</span>
+                                <span class="detail-label">核准狀態：</span>
                                 <span class="detail-value">
                                     <span class="status-badge status-{{ report.approval_status }}">
                                         {{ report.get_approval_status_display }}
@@ -257,11 +257,11 @@
                             </div>
                             {% if report.approved_by %}
                             <div class="detail-item">
-                                <span class="detail-label">審核人員：</span>
+                                <span class="detail-label">核准人員：</span>
                                 <span class="detail-value">{{ report.approved_by|default:"-" }}</span>
                             </div>
                             <div class="detail-item">
-                                <span class="detail-label">審核時間：</span>
+                                <span class="detail-label">核准時間：</span>
                                 <span class="detail-value">{{ report.approved_at|date:"Y-m-d H:i:s" }}</span>
                             </div>
                             {% endif %}
@@ -298,11 +298,23 @@
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">工單號：</span>
-                                    <span class="detail-value">{{ report.workorder.order_number }}</span>
+                                    <span class="detail-value">
+                                        {% if report.report_type == 'rd_sample' %}
+                                            RD樣品
+                                        {% else %}
+                                            {{ report.workorder.order_number|default:"-" }}
+                                        {% endif %}
+                                    </span>
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">產品編號：</span>
-                                    <span class="detail-value">{{ report.workorder.product_code }}</span>
+                                    <span class="detail-value">
+                                        {% if report.report_type == 'rd_sample' %}
+                                            {{ report.product_id|default:"-" }}
+                                        {% else %}
+                                            {{ report.workorder.product_code|default:"-" }}
+                                        {% endif %}
+                                    </span>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -443,13 +455,13 @@
     </div>
     {% endif %}
 
-    <!-- 審核歷程 -->
+    <!-- 核准歷程 -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card operator-supplement-detail-card">
                 <div class="card-header bg-warning text-dark">
                     <h5 class="mb-0">
-                        <i class="fas fa-history"></i> 審核歷程
+                        <i class="fas fa-history"></i> 核准歷程
                     </h5>
                 </div>
                 <div class="card-body">
@@ -468,9 +480,9 @@
                             <div class="timeline-content">
                                 <div class="timeline-title">
                                     {% if report.approval_status == 'approved' %}
-                                        審核通過
+                                        核准通過
                                     {% elif report.approval_status == 'rejected' %}
-                                        審核駁回
+                                        核准駁回
                                     {% else %}
                                         狀態更新
                                     {% endif %}
@@ -479,7 +491,7 @@
                                 <div class="timeline-description">
                                     由 {{ report.approved_by }} 
                                     {% if report.approval_status == 'approved' %}
-                                        審核通過
+                                        核准通過
                                     {% elif report.approval_status == 'rejected' %}
                                         駁回
                                         {% if report.rejection_reason %}<br>駁回原因：{{ report.rejection_reason }}{% endif %}
@@ -551,9 +563,9 @@
         }
     }
     
-    // 審核通過
+    // 核准通過
     function approveReport(reportId) {
-        if (confirmAction('確定要審核通過此補登報工記錄嗎？')) {
+        if (confirmAction('確定要核准通過此補登報工記錄嗎？')) {
             showLoading();
             
             const formData = new FormData();
@@ -570,12 +582,12 @@
             .then(data => {
                 hideLoading();
                 if (data.success) {
-                    showAlert('審核通過成功！', 'success');
+                    showAlert('核准通過成功！', 'success');
                     setTimeout(function() {
                         location.reload();
                     }, 1500);
                 } else {
-                    showAlert(data.message || '審核失敗！', 'danger');
+                    showAlert(data.message || '核准失敗！', 'danger');
                 }
             })
             .catch(error => {
@@ -586,7 +598,7 @@
         }
     }
     
-    // 審核駁回
+    // 核准駁回
     function rejectReport(reportId) {
         const reason = prompt('請輸入駁回原因：');
         if (reason !== null) {

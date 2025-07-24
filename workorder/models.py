@@ -939,6 +939,23 @@ class OperatorSupplementReport(models.Model):
         blank=True
     )
     
+    # RD樣品專用欄位
+    rd_workorder_number = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="RD樣品工單號碼",
+        help_text="RD樣品模式的工單號碼"
+    )
+    
+    rd_product_code = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="RD產品編號",
+        help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊"
+    )
+    
     # 產品編號欄位（用於資料庫相容性）
     product_id = models.CharField(
         max_length=100,
@@ -1151,7 +1168,32 @@ class OperatorSupplementReport(models.Model):
     @property
     def workorder_number(self):
         """取得工單號碼"""
-        return self.workorder.order_number if self.workorder else ""
+        if self.report_type == 'rd_sample':
+            # RD樣品工單號碼，優先使用rd_workorder_number
+            return self.rd_workorder_number or 'RD樣品'
+        elif self.workorder:
+            return self.workorder.order_number
+        elif self.product_id:
+            # 如果有產品編號但沒有工單，可能是手動輸入的產品編號
+            return f"產品編號：{self.product_id}"
+        else:
+            return ""
+
+    def is_rd_sample_by_workorder(self):
+        """根據工單號碼判斷是否為RD樣品"""
+        if self.workorder and self.workorder.order_number:
+            # 檢查工單號碼是否包含RD樣品相關關鍵字
+            order_number = self.workorder.order_number.upper()
+            rd_keywords = ['RD', '樣品', 'SAMPLE', 'RD樣品', 'RD-樣品', 'RD樣本']
+            return any(keyword in order_number for keyword in rd_keywords)
+        return False
+
+    def auto_set_report_type(self):
+        """自動設定報工類型"""
+        if self.is_rd_sample_by_workorder():
+            self.report_type = 'rd_sample'
+        else:
+            self.report_type = 'normal'
 
     @property
     def process_name(self):

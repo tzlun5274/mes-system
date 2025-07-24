@@ -151,13 +151,13 @@
         <div class="col-md-3">
             <div class="operator-stat-card">
                 <div class="operator-stat-number text-warning">{{ pending_reports|default:0 }}</div>
-                <div class="operator-stat-label">待審核</div>
+                                        <div class="operator-stat-label">待核准</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="operator-stat-card">
                 <div class="operator-stat-number text-success">{{ approved_reports|default:0 }}</div>
-                <div class="operator-stat-label">已審核</div>
+                                        <div class="operator-stat-label">已核准</div>
             </div>
         </div>
         <div class="col-md-3">
@@ -248,11 +248,11 @@
                         </div>
                         <div class="col-md-2">
                             <div class="form-group">
-                                <label for="status">審核狀態</label>
+                                <label for="status">核准狀態</label>
                                 <select class="form-control" id="status" name="status">
                                     <option value="">全部狀態</option>
-                                    <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>待審核</option>
-                                    <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>已審核</option>
+                                                                <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>待核准</option>
+                            <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>已核准</option>
                                     <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>已駁回</option>
                                 </select>
                             </div>
@@ -306,7 +306,7 @@
                                     <th>工序</th>
                                     <th>報工數量</th>
                                     <th>工時</th>
-                                    <th>審核狀態</th>
+                                    <th>核准狀態</th>
                                     <th>建立時間</th>
                                     <th>操作</th>
                                 </tr>
@@ -317,7 +317,7 @@
                                     <tr>
                                         <td>{{ report.work_date|date:"Y-m-d" }} {{ report.start_time|time:"H:i" }}-{{ report.end_time|time:"H:i" }}</td>
                                         <td>
-                                            {% if report.report_type == 'rd_sample' %}
+                                            {% if report.report_type == 'rd_sample' or not report.workorder %}
                                                 <span class="badge badge-success">RD樣品</span>
                                             {% else %}
                                                 <span class="badge badge-warning">正式報工</span>
@@ -325,8 +325,8 @@
                                         </td>
                                         <td>{{ report.operator.name }}</td>
                                         <td>
-                                            {% if report.report_type == 'rd_sample' %}
-                                                {{ report.rd_product_code|default:"-" }}
+                                            {% if report.report_type == 'rd_sample' or not report.workorder %}
+                                                {{ report.rd_product_code|default:report.workorder_number|default:"-" }}
                                             {% else %}
                                                 {{ report.workorder.order_number|default:"-" }}
                                             {% endif %}
@@ -497,9 +497,9 @@
         }
     }
     
-    // 審核通過
+    // 核准通過
     function approveReport(reportId) {
-        if (confirmAction('確定要審核通過此補登報工記錄嗎？')) {
+        if (confirmAction('確定要核准通過此補登報工記錄嗎？')) {
             showLoading();
             
             const formData = new FormData();
@@ -516,12 +516,12 @@
             .then(data => {
                 hideLoading();
                 if (data.success) {
-                    showAlert('審核通過成功！', 'success');
+                    showAlert('核准通過成功！', 'success');
                     setTimeout(function() {
                         location.reload();
                     }, 1500);
                 } else {
-                    showAlert(data.message || '審核失敗！', 'danger');
+                    showAlert(data.message || '核准失敗！', 'danger');
                 }
             })
             .catch(error => {
