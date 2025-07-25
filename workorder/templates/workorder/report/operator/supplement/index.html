@@ -388,9 +388,18 @@
                     <nav aria-label="補登報工分頁">
                         <ul class="pagination justify-content-center">
                             {% if supplement_reports.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ supplement_reports.previous_page_number }}&{{ request.GET.urlencode }}">上一頁</a>
-                            </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=1&{{ request.GET.urlencode }}" title="第一頁">
+                                        <i class="fas fa-angle-double-left"></i>
+                                        <span class="d-none d-sm-inline">第一頁</span>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ supplement_reports.previous_page_number }}&{{ request.GET.urlencode }}" title="上一頁">
+                                        <i class="fas fa-angle-left"></i>
+                                        <span class="d-none d-sm-inline">上一頁</span>
+                                    </a>
+                                </li>
                             {% endif %}
                             
                             {% for num in supplement_reports.paginator.page_range %}
@@ -406,9 +415,18 @@
                             {% endfor %}
                             
                             {% if supplement_reports.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ supplement_reports.next_page_number }}&{{ request.GET.urlencode }}">下一頁</a>
-                            </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ supplement_reports.next_page_number }}&{{ request.GET.urlencode }}" title="下一頁">
+                                        <i class="fas fa-angle-right"></i>
+                                        <span class="d-none d-sm-inline">下一頁</span>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ supplement_reports.paginator.num_pages }}&{{ request.GET.urlencode }}" title="最後一頁">
+                                        <i class="fas fa-angle-double-right"></i>
+                                        <span class="d-none d-sm-inline">最後一頁</span>
+                                    </a>
+                                </li>
                             {% endif %}
                         </ul>
                     </nav>

@@ -305,8 +305,15 @@
                             <ul class="pagination">
                                 {% if performances.has_previous %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ performances.previous_page_number }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}">
-                                        <i class="fas fa-chevron-left"></i>
+                                    <a class="page-link" href="?page=1{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}" title="第一頁">
+                                        <i class="fas fa-angle-double-left"></i>
+                                        <span class="d-none d-sm-inline">第一頁</span>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ performances.previous_page_number }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}" title="上一頁">
+                                        <i class="fas fa-angle-left"></i>
+                                        <span class="d-none d-sm-inline">上一頁</span>
                                     </a>
                                 </li>
                                 {% endif %}
@@ -325,8 +332,15 @@
                                 
                                 {% if performances.has_next %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ performances.next_page_number }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}">
-                                        <i class="fas fa-chevron-right"></i>
+                                    <a class="page-link" href="?page={{ performances.next_page_number }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}" title="下一頁">
+                                        <i class="fas fa-angle-right"></i>
+                                        <span class="d-none d-sm-inline">下一頁</span>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ performances.paginator.num_pages }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}{% if equipment_id %}&equipment_id={{ equipment_id }}{% endif %}" title="最後一頁">
+                                        <i class="fas fa-angle-double-right"></i>
+                                        <span class="d-none d-sm-inline">最後一頁</span>
                                     </a>
                                 </li>
                                 {% endif %}

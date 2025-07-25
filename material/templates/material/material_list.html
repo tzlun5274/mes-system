@@ -100,31 +100,49 @@
 <div class="row mt-4">
     <div class="col-12">
         <nav aria-label="材料列表分頁">
-            <ul class="pagination justify-content-center">
-                {% if materials.has_previous %}
+                    <ul class="pagination justify-content-center">
+            {% if materials.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}" title="第一頁">
+                        <i class="fas fa-angle-double-left"></i>
+                        <span class="d-none d-sm-inline">第一頁</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ materials.previous_page_number }}{% if search %}&search={{ search }}{% endif %}" title="上一頁">
+                        <i class="fas fa-angle-left"></i>
+                        <span class="d-none d-sm-inline">上一頁</span>
+                    </a>
+                </li>
+            {% endif %}
+            
+            {% for num in materials.paginator.page_range %}
+                {% if materials.number == num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                {% elif num > materials.number|add:'-3' and num < materials.number|add:'3' %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ materials.previous_page_number }}{% if search %}&search={{ search }}{% endif %}">上一頁</a>
+                        <a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}">{{ num }}</a>
                     </li>
                 {% endif %}
-                
-                {% for num in materials.paginator.page_range %}
-                    {% if materials.number == num %}
-                        <li class="page-item active">
-                            <span class="page-link">{{ num }}</span>
-                        </li>
-                    {% elif num > materials.number|add:'-3' and num < materials.number|add:'3' %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}">{{ num }}</a>
-                        </li>
-                    {% endif %}
-                {% endfor %}
-                
-                {% if materials.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ materials.next_page_number }}{% if search %}&search={{ search }}{% endif %}">下一頁</a>
-                    </li>
-                {% endif %}
-            </ul>
+            {% endfor %}
+            
+            {% if materials.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ materials.next_page_number }}{% if search %}&search={{ search }}{% endif %}" title="下一頁">
+                        <i class="fas fa-angle-right"></i>
+                        <span class="d-none d-sm-inline">下一頁</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ materials.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}" title="最後一頁">
+                        <i class="fas fa-angle-double-right"></i>
+                        <span class="d-none d-sm-inline">最後一頁</span>
+                    </a>
+                </li>
+            {% endif %}
+        </ul>
         </nav>
     </div>
 </div>

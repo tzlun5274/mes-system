@@ -286,13 +286,15 @@
                 <ul class="pagination justify-content-center">
                     {% if page_obj.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.manager %}&manager={{ request.GET.manager }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.approval_status %}&approval_status={{ request.GET.approval_status }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}">
+                        <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.manager %}&manager={{ request.GET.manager }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.approval_status %}&approval_status={{ request.GET.approval_status }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" title="第一頁">
                             <i class="fas fa-angle-double-left"></i>
+                            <span class="d-none d-sm-inline">第一頁</span>
                         </a>
                     </li>
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.manager %}&manager={{ request.GET.manager }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.approval_status %}&approval_status={{ request.GET.approval_status }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.manager %}&manager={{ request.GET.manager }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.approval_status %}&approval_status={{ request.GET.approval_status }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" title="上一頁">
                             <i class="fas fa-angle-left"></i>
+                            <span class="d-none d-sm-inline">上一頁</span>
                         </a>
                     </li>
                     {% endif %}
@@ -305,13 +307,15 @@
 
                     {% if page_obj.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.manager %}&manager={{ request.GET.manager }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.approval_status %}&approval_status={{ request.GET.approval_status }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.manager %}&manager={{ request.GET.manager }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.approval_status %}&approval_status={{ request.GET.approval_status }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" title="下一頁">
                             <i class="fas fa-angle-right"></i>
+                            <span class="d-none d-sm-inline">下一頁</span>
                         </a>
                     </li>
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.manager %}&manager={{ request.GET.manager }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.approval_status %}&approval_status={{ request.GET.approval_status }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.manager %}&manager={{ request.GET.manager }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.approval_status %}&approval_status={{ request.GET.approval_status }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" title="最後一頁">
                             <i class="fas fa-angle-double-right"></i>
+                            <span class="d-none d-sm-inline">最後一頁</span>
                         </a>
                     </li>
                     {% endif %}

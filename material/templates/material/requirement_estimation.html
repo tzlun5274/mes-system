@@ -288,8 +288,15 @@
                 <ul class="pagination justify-content-center">
                     {% if estimations.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ estimations.previous_page_number }}&search={{ search }}&status={{ status }}&estimation_method={{ estimation_method }}">
-                            <i class="bi bi-chevron-left"></i>
+                        <a class="page-link" href="?page=1&search={{ search }}&status={{ status }}&estimation_method={{ estimation_method }}" title="第一頁">
+                            <i class="fas fa-angle-double-left"></i>
+                            <span class="d-none d-sm-inline">第一頁</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ estimations.previous_page_number }}&search={{ search }}&status={{ status }}&estimation_method={{ estimation_method }}" title="上一頁">
+                            <i class="fas fa-angle-left"></i>
+                            <span class="d-none d-sm-inline">上一頁</span>
                         </a>
                     </li>
                     {% endif %}
@@ -304,8 +311,15 @@
                     
                     {% if estimations.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ estimations.next_page_number }}&search={{ search }}&status={{ status }}&estimation_method={{ estimation_method }}">
-                            <i class="bi bi-chevron-right"></i>
+                        <a class="page-link" href="?page={{ estimations.next_page_number }}&search={{ search }}&status={{ status }}&estimation_method={{ estimation_method }}" title="下一頁">
+                            <i class="fas fa-angle-right"></i>
+                            <span class="d-none d-sm-inline">下一頁</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ estimations.paginator.num_pages }}&search={{ search }}&status={{ status }}&estimation_method={{ estimation_method }}" title="最後一頁">
+                            <i class="fas fa-angle-double-right"></i>
+                            <span class="d-none d-sm-inline">最後一頁</span>
                         </a>
                     </li>
                     {% endif %}

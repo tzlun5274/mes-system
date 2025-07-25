@@ -33,6 +33,7 @@
         text-align: center;
         background-color: #f8f9fa;
         transition: all 0.3s ease;
+        position: relative;
     }
     
     .upload-area:hover {
@@ -46,7 +47,14 @@
     }
     
     .file-input {
-        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+        z-index: 10;
     }
     
     .upload-icon {
@@ -78,6 +86,24 @@
     .error-count {
         color: #dc3545;
         font-weight: bold;
+    }
+    
+    .file-info {
+        margin-top: 15px;
+        padding: 15px;
+        background-color: #e8f5e8;
+        border-radius: 5px;
+        border: 1px solid #c3e6c3;
+    }
+    
+    .file-info h6 {
+        color: #155724;
+        margin-bottom: 10px;
+    }
+    
+    .file-info p {
+        color: #155724;
+        margin-bottom: 5px;
     }
 </style>
 {% endblock %}
@@ -130,15 +156,18 @@
                     <form id="uploadForm" enctype="multipart/form-data">
                         {% csrf_token %}
                         <div class="upload-area" id="uploadArea">
-                            <div class="upload-icon">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                            </div>
-                            <h5>拖拽檔案到此處或點擊選擇檔案</h5>
-                            <p class="text-muted">支援 Excel 格式檔案 (.xlsx)，檔案大小不超過 5MB</p>
                             <input type="file" id="fileInput" class="file-input" accept=".xlsx" required>
-                            <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
-                                <i class="fas fa-folder-open"></i> 選擇檔案
-                            </button>
+                            <div class="upload-content" id="uploadContent">
+                                <div class="upload-icon">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                </div>
+                                <h5>拖拽檔案到此處或點擊選擇檔案</h5>
+                                <p class="text-muted">支援 Excel 格式檔案 (.xlsx)，檔案大小不超過 5MB</p>
+                                <p class="text-muted"><small>時間格式支援：08:00:00 AM、02:15:00 PM、14:30、14:30:00 等</small></p>
+                                <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                    <i class="fas fa-folder-open"></i> 選擇檔案
+                                </button>
+                            </div>
                         </div>
                         
                         <div class="text-center mt-3">
@@ -156,72 +185,74 @@
     </div>
 
     <!-- 進度顯示區域 -->
-    <div class="row" id="progressArea" style="display: none;">
+    <div class="row mt-4" id="progressArea" style="display: none;">
         <div class="col-12">
-            <div class="card operator-supplement-card">
+            <div class="card">
                 <div class="card-header bg-info text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-spinner fa-spin"></i> 匯入進度
+                        <i class="fas fa-spinner fa-spin"></i> 正在處理檔案
                     </h5>
                 </div>
                 <div class="card-body">
                     <div class="progress mb-3">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                             role="progressbar" style="width: 0%" id="progressBar">
+                             id="progressBar" role="progressbar" style="width: 0%">
                             0%
                         </div>
                     </div>
-                    <p class="text-muted" id="progressText">準備中...</p>
+                    <p class="text-center" id="progressText">準備中...</p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- 結果顯示區域 -->
-    <div class="row" id="resultArea" style="display: none;">
+    <div class="row mt-4" id="resultArea" style="display: none;">
         <div class="col-12">
-            <div class="card operator-supplement-card">
+            <div class="card">
                 <div class="card-header bg-success text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-check-circle"></i> 匯入結果
+                        <i class="fas fa-check-circle"></i> 匯入完成
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <h3 class="success-count" id="successCount">0</h3>
+                    <div class="row text-center">
+                        <div class="col-md-4">
+                            <div class="success-count">
+                                <h3 id="successCount">0</h3>
                                 <p>成功匯入</p>
                             </div>
                         </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <h3 class="error-count" id="errorCount">0</h3>
+                        <div class="col-md-4">
+                            <div class="error-count">
+                                <h3 id="errorCount">0</h3>
                                 <p>匯入錯誤</p>
                             </div>
                         </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <h3 class="text-info" id="totalCount">0</h3>
-                                <p>總記錄數</p>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center">
-                                <button type="button" class="btn btn-primary" onclick="resetForm()">
-                                    <i class="fas fa-redo"></i> 重新匯入
-                                </button>
+                        <div class="col-md-4">
+                            <div class="text-muted">
+                                <h3 id="totalCount">0</h3>
+                                <p>總計處理</p>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- 錯誤詳情 -->
                     <div id="errorDetails" style="display: none;">
                         <hr>
-                        <h6><i class="fas fa-exclamation-triangle text-warning"></i> 錯誤詳情</h6>
-                        <div class="alert alert-warning">
-                            <div id="errorList"></div>
+                        <h6 class="text-danger">
+                            <i class="fas fa-exclamation-triangle"></i> 錯誤詳情
+                        </h6>
+                        <div id="errorList" class="alert alert-danger">
                         </div>
+                    </div>
+                    
+                    <div class="text-center mt-3">
+                        <a href="{% url 'workorder:operator_supplement_report_index' %}" class="btn btn-primary">
+                            <i class="fas fa-list"></i> 查看匯入結果
+                        </a>
+                        <button type="button" class="btn btn-secondary" onclick="resetForm()">
+                            <i class="fas fa-redo"></i> 重新匯入
+                        </button>
                     </div>
                 </div>
             </div>
@@ -230,22 +261,16 @@
 </div>
 
 <script>
+// 全域變數
+let selectedFile = null;
+
 // 檔案選擇處理
 document.getElementById('fileInput').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (file) {
+        selectedFile = file;
         document.getElementById('uploadBtn').disabled = false;
-        const uploadArea = document.getElementById('uploadArea');
-        uploadArea.innerHTML = `
-            <div class="upload-icon">
-                <i class="fas fa-file-excel text-success"></i>
-            </div>
-            <h5>已選擇檔案：${file.name}</h5>
-            <p class="text-muted">檔案大小：${(file.size / 1024 / 1024).toFixed(2)} MB</p>
-            <button type="button" class="btn btn-outline-secondary" onclick="resetFileInput()">
-                <i class="fas fa-times"></i> 重新選擇
-            </button>
-        `;
+        updateUploadArea(file);
     }
 });
 
@@ -271,22 +296,29 @@ uploadArea.addEventListener('drop', function(e) {
         const file = files[0];
         if (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.name.endsWith('.xlsx')) {
             document.getElementById('fileInput').files = files;
+            selectedFile = file;
             document.getElementById('uploadBtn').disabled = false;
-            uploadArea.innerHTML = `
-                <div class="upload-icon">
-                    <i class="fas fa-file-excel text-success"></i>
-                </div>
-                <h5>已選擇檔案：${file.name}</h5>
-                <p class="text-muted">檔案大小：${(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                <button type="button" class="btn btn-outline-secondary" onclick="resetFileInput()">
-                    <i class="fas fa-times"></i> 重新選擇
-                </button>
-            `;
+            updateUploadArea(file);
         } else {
             alert('請選擇 Excel 格式的檔案 (.xlsx)');
         }
     }
 });
+
+// 更新上傳區域顯示
+function updateUploadArea(file) {
+    const uploadContent = document.getElementById('uploadContent');
+    uploadContent.innerHTML = `
+        <div class="upload-icon">
+            <i class="fas fa-file-excel text-success"></i>
+        </div>
+        <h5>已選擇檔案：${file.name}</h5>
+        <p class="text-muted">檔案大小：${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+        <button type="button" class="btn btn-outline-secondary" onclick="resetFileInput()">
+            <i class="fas fa-times"></i> 重新選擇
+        </button>
+    `;
+}
 
 // 表單提交處理
 document.getElementById('uploadForm').addEventListener('submit', function(e) {
@@ -332,6 +364,10 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     .then(data => {
         clearInterval(progressInterval);
         
+        if (!data.success) {
+            throw new Error(data.message || '匯入失敗');
+        }
+        
         // 完成進度
         progressBar.style.width = '100%';
         progressBar.textContent = '100%';
@@ -355,6 +391,7 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     })
     .catch(error => {
         clearInterval(progressInterval);
+        console.error('匯入錯誤:', error);
         alert('匯入失敗：' + error.message);
         document.getElementById('progressArea').style.display = 'none';
     });
@@ -362,16 +399,22 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
 
 // 重置檔案輸入
 function resetFileInput() {
-    document.getElementById('fileInput').value = '';
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+    selectedFile = null;
     document.getElementById('uploadBtn').disabled = true;
-    document.getElementById('uploadArea').innerHTML = `
+    
+    const uploadContent = document.getElementById('uploadContent');
+    uploadContent.innerHTML = `
         <div class="upload-icon">
             <i class="fas fa-cloud-upload-alt"></i>
         </div>
-        <h5>拖拽檔案到此處或點擊選擇檔案</h5>
-        <p class="text-muted">支援 Excel 格式檔案 (.xlsx)，檔案大小不超過 5MB</p>
-        <input type="file" id="fileInput" class="file-input" accept=".xlsx" required>
-        <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                        <h5>拖拽檔案到此處或點擊選擇檔案</h5>
+                                <p class="text-muted">支援 Excel 格式檔案 (.xlsx)，檔案大小不超過 5MB</p>
+                                <p class="text-muted"><small>時間格式支援：08:00:00 AM、02:15:00 PM、14:30、14:30:00 等</small></p>
+                                <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
             <i class="fas fa-folder-open"></i> 選擇檔案
         </button>
     `;

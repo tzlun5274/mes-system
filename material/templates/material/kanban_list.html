@@ -210,7 +210,16 @@
             <ul class="pagination justify-content-center">
                 {% if kanbans.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ kanbans.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if type %}&type={{ type }}{% endif %}">上一頁</a>
+                        <a class="page-link" href="?page=1{% if status %}&status={{ status }}{% endif %}{% if type %}&type={{ type }}{% endif %}" title="第一頁">
+                            <i class="fas fa-angle-double-left"></i>
+                            <span class="d-none d-sm-inline">第一頁</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ kanbans.previous_page_number }}{% if status %}&status={{ status }}{% endif %}{% if type %}&type={{ type }}{% endif %}" title="上一頁">
+                            <i class="fas fa-angle-left"></i>
+                            <span class="d-none d-sm-inline">上一頁</span>
+                        </a>
                     </li>
                 {% endif %}
                 
@@ -228,7 +237,16 @@
                 
                 {% if kanbans.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ kanbans.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if type %}&type={{ type }}{% endif %}">下一頁</a>
+                        <a class="page-link" href="?page={{ kanbans.next_page_number }}{% if status %}&status={{ status }}{% endif %}{% if type %}&type={{ type }}{% endif %}" title="下一頁">
+                            <i class="fas fa-angle-right"></i>
+                            <span class="d-none d-sm-inline">下一頁</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ kanbans.paginator.num_pages }}{% if status %}&status={{ status }}{% endif %}{% if type %}&type={{ type }}{% endif %}" title="最後一頁">
+                            <i class="fas fa-angle-double-right"></i>
+                            <span class="d-none d-sm-inline">最後一頁</span>
+                        </a>
                     </li>
                 {% endif %}
             </ul>

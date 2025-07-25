@@ -104,7 +104,16 @@
             <ul class="pagination justify-content-center">
                 {% if products.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ products.previous_page_number }}{% if search %}&search={{ search }}{% endif %}">上一頁</a>
+                        <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}" title="第一頁">
+                            <i class="fas fa-angle-double-left"></i>
+                            <span class="d-none d-sm-inline">第一頁</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ products.previous_page_number }}{% if search %}&search={{ search }}{% endif %}" title="上一頁">
+                            <i class="fas fa-angle-left"></i>
+                            <span class="d-none d-sm-inline">上一頁</span>
+                        </a>
                     </li>
                 {% endif %}
                 
@@ -122,7 +131,16 @@
                 
                 {% if products.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ products.next_page_number }}{% if search %}&search={{ search }}{% endif %}">下一頁</a>
+                        <a class="page-link" href="?page={{ products.next_page_number }}{% if search %}&search={{ search }}{% endif %}" title="下一頁">
+                            <i class="fas fa-angle-right"></i>
+                            <span class="d-none d-sm-inline">下一頁</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ products.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}" title="最後一頁">
+                            <i class="fas fa-angle-double-right"></i>
+                            <span class="d-none d-sm-inline">最後一頁</span>
+                        </a>
                     </li>
                 {% endif %}
             </ul>
