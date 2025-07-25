@@ -97,6 +97,7 @@ urlpatterns = [
     path('report/smt/on_site/', views.smt_on_site_report, name='smt_on_site_report'),
     path('report/smt/submit/', views.submit_smt_report, name='submit_smt_report'),
     path('api/get_workorders_by_equipment/', views.get_workorders_by_equipment, name='get_workorders_by_equipment'),
+    path('api/get_processes_by_workorder/', views.get_processes_by_workorder, name='get_processes_by_workorder'),
     
     # SMT補登報工功能
     path('report/smt/supplement/', views.smt_supplement_report_index, name='smt_supplement_report_index'),

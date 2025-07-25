@@ -214,7 +214,7 @@
                     <i class="fas fa-microchip"></i> 選擇報工設備
                 </h5>
                 <div class="row">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label for="equipment_select" class="form-label">設備名稱</label>
                         <select class="form-select" id="equipment_select">
                             <option value="">請選擇設備...</option>
@@ -223,16 +223,22 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label for="workorder_select" class="form-label">工單號</label>
                         <select class="form-select" id="workorder_select">
                             <option value="">請先選擇設備...</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <label for="process_select" class="form-label">工序</label>
+                        <select class="form-select" id="process_select">
+                            <option value="">請先選擇工單...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label">&nbsp;</label>
                         <div class="alert alert-info mb-0">
-                            <i class="fas fa-info-circle"></i> 選擇設備和工單後，下方表單將自動啟用
+                            <i class="fas fa-info-circle"></i> 選擇設備、工單和工序後，下方表單將自動啟用
                         </div>
                     </div>
                 </div>
@@ -255,7 +261,7 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="report_quantity" class="form-label">報工數量</label>
-                                    <input type="number" class="form-control" id="report_quantity" name="quantity" min="1" required>
+                                    <input type="number" class="form-control" id="report_quantity" name="quantity" min="0" required>
                                 </div>
                                 <div class="mb-3">
                                     <label for="report_production_status" class="form-label">報工狀態</label>
@@ -455,10 +461,20 @@
                 if (quantity) {
                     document.getElementById('report_quantity').value = quantity;
                 }
+                // 載入該工單的工序列表
+                loadProcesses(selectedOption.value);
             } else {
-                // 清空報工數量
+                // 清空報工數量和工序
                 document.getElementById('report_quantity').value = '';
+                document.getElementById('process_select').innerHTML = '<option value="">請先選擇工單...</option>';
             }
+            // 檢查並啟用/禁用表單
+            enableReportingForm();
+        });
+        
+        // 工序選擇事件
+        const processSelect = document.getElementById('process_select');
+        processSelect.addEventListener('change', function() {
             // 檢查並啟用/禁用表單
             enableReportingForm();
         });
@@ -467,11 +483,12 @@
         function enableReportingForm() {
             const equipmentId = document.getElementById('equipment_select').value;
             const workorderId = document.getElementById('workorder_select').value;
+            const processId = document.getElementById('process_select').value;
             
             const formElements = document.querySelectorAll('#smt_reporting_form input, #smt_reporting_form select, #smt_reporting_form textarea');
             
-            if (equipmentId && workorderId) {
-                // 有選擇設備和工單時，啟用表單
+            if (equipmentId && workorderId && processId) {
+                // 有選擇設備、工單和工序時，啟用表單
                 formElements.forEach(function(element) {
                     element.disabled = false;
                 });
@@ -491,13 +508,26 @@
             
             const equipmentId = document.getElementById('equipment_select').value;
             const workorderId = document.getElementById('workorder_select').value;
+            const processId = document.getElementById('process_select').value;
             const quantity = document.getElementById('report_quantity').value;
             const productionStatus = document.getElementById('report_production_status').value;
             const notes = document.getElementById('report_notes').value;
             
-            if (!equipmentId || !workorderId || !quantity || !productionStatus) {
+            if (!equipmentId || !workorderId || !processId || !productionStatus) {
                 alert('請填寫所有必要欄位！');
                 return;
+            }
+            
+            // 檢查報工數量，允許為 0
+            if (quantity === '' || quantity === null) {
+                quantity = 0;
+            } else {
+                const quantityNum = parseInt(quantity);
+                if (isNaN(quantityNum) || quantityNum < 0) {
+                    alert('報工數量不能為負數！');
+                    return;
+                }
+                quantity = quantityNum;
             }
             
             if (confirm('確定要提交此 SMT 報工記錄嗎？')) {
@@ -513,6 +543,7 @@
                     body: new URLSearchParams({
                         equipment_id: equipmentId,
                         workorder_id: workorderId,
+                        process_id: processId,
                         quantity: quantity,
                         production_status: productionStatus,
                         notes: notes
@@ -584,6 +615,48 @@
         .catch(error => {
             console.error('Error:', error);
             document.getElementById('workorder_select').innerHTML = '<option value="">載入失敗，請檢查網路連線</option>';
+        });
+    }
+    
+    // 載入工序列表
+    function loadProcesses(workorderId) {
+        // 發送 AJAX 請求獲取該工單的工序列表
+        console.log('開始載入工序，工單ID:', workorderId);
+        document.getElementById('process_select').innerHTML = '<option value="">載入中...</option>';
+        
+        fetch('{% url "workorder:get_processes_by_workorder" %}?workorder_id=' + workorderId, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                let options = '<option value="">請選擇工序...</option>';
+                
+                if (data.processes && data.processes.length > 0) {
+                    data.processes.forEach(function(process) {
+                        const statusText = process.status === 'in_progress' ? 
+                            '[進行中]' : 
+                            '[待執行]';
+                        
+                        options += `<option value="${process.id}" data-status="${process.status}">
+                            ${process.process_name} ${statusText}
+                        </option>`;
+                    });
+                } else {
+                    options += '<option value="" disabled>該工單目前沒有可用的工序</option>';
+                }
+                
+                document.getElementById('process_select').innerHTML = options;
+            } else {
+                document.getElementById('process_select').innerHTML = '<option value="">載入失敗：' + data.message + '</option>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('process_select').innerHTML = '<option value="">載入失敗，請檢查網路連線</option>';
         });
     }
     

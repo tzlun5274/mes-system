@@ -3479,15 +3479,33 @@ def submit_smt_report(request):
     try:
         equipment_id = request.POST.get('equipment_id')
         workorder_id = request.POST.get('workorder_id')
+        process_id = request.POST.get('process_id')
         quantity = request.POST.get('quantity')
         notes = request.POST.get('notes', '')
         
         # 基本驗證
-        if not all([equipment_id, workorder_id, quantity]):
+        if not all([equipment_id, workorder_id, process_id]):
             return JsonResponse({
                 'status': 'error',
                 'message': '請填寫所有必要欄位'
             })
+        
+        # 處理報工數量，允許為 0
+        if quantity is None or quantity == '':
+            quantity = 0
+        else:
+            try:
+                quantity = int(quantity)
+                if quantity < 0:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': '報工數量不能為負數'
+                    })
+            except ValueError:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': '報工數量格式錯誤'
+                })
         
         # 取得設備和工單
         from equip.models import Equipment
@@ -3499,25 +3517,26 @@ def submit_smt_report(request):
         from process.models import ProcessName
         from django.utils import timezone
         
-        # 取得預設的SMT工序（如果沒有則創建一個）
+        # 取得選擇的工序（從 WorkOrderProcess 讀取）
         try:
-            smt_process = ProcessName.objects.get(name__icontains='SMT')
-        except ProcessName.DoesNotExist:
-            smt_process = ProcessName.objects.create(
-                name='SMT貼片',
-                description='SMT表面貼裝技術'
-            )
+            selected_process = WorkOrderProcess.objects.get(id=process_id)
+            process_name = selected_process.process_name
+        except WorkOrderProcess.DoesNotExist:
+            return JsonResponse({
+                'status': 'error',
+                'message': '找不到指定的工序'
+            })
         
         report = SMTProductionReport.objects.create(
             product_id=workorder.product_code,
             workorder=workorder,
             planned_quantity=workorder.quantity,
-            operation=smt_process,
+            operation=process_name,
             equipment=equipment,
             work_date=timezone.now().date(),
             start_time=timezone.now().time(),
             end_time=timezone.now().time(),
-            work_quantity=int(quantity),
+            work_quantity=quantity,
             defect_quantity=0,
             is_completed=False,
             remarks=notes,
@@ -3539,6 +3558,11 @@ def submit_smt_report(request):
         return JsonResponse({
             'status': 'error',
             'message': '找不到指定的工單'
+        })
+    except WorkOrderProcess.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': '找不到指定的工序'
         })
     except ValueError as e:
         return JsonResponse({
@@ -3635,6 +3659,69 @@ def get_workorders_by_equipment(request):
         return JsonResponse({
             'status': 'error',
             'message': f'獲取工單列表失敗：{str(e)}'
+        })
+
+@require_GET
+@csrf_exempt
+def get_processes_by_workorder(request):
+    """
+    API：根據工單 ID 獲取該工單的工序列表
+    用於 SMT 現場報工系統中的工序選擇
+    從派工單（WorkOrderProcess）讀取已派工的工序
+    """
+    try:
+        workorder_id = request.GET.get('workorder_id')
+        
+        if not workorder_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': '請提供工單 ID'
+            })
+        
+        # 取得工單
+        try:
+            workorder = WorkOrder.objects.get(id=workorder_id)
+        except WorkOrder.DoesNotExist:
+            return JsonResponse({
+                'status': 'error',
+                'message': '找不到指定的工單'
+            })
+        
+        # 從派工單讀取該工單的SMT相關工序列表
+        processes = WorkOrderProcess.objects.filter(
+            workorder=workorder
+        ).filter(
+            models.Q(process_name__icontains='SMT') |  # SMT相關工序
+            models.Q(process_name__icontains='貼片') |  # 貼片工序
+            models.Q(process_name__icontains='Pick') |  # Pick工序
+            models.Q(process_name__icontains='Place')   # Place工序
+        ).order_by('step_order')
+        
+        # 整理工序資料
+        process_list = []
+        for process in processes:
+            process_list.append({
+                'id': process.id,
+                'process_name': process.process_name,
+                'status': process.status,
+                'status_display': process.get_status_display(),
+                'step_order': process.step_order,
+                'assigned_equipment': process.assigned_equipment,
+                'assigned_operator': process.assigned_operator,
+            })
+        
+        return JsonResponse({
+            'status': 'success',
+            'workorder_number': workorder.order_number,
+            'product_code': workorder.product_code,
+            'processes': process_list,
+            'count': len(process_list)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'獲取工序列表失敗：{str(e)}'
         })
 
 # ==================== SMT 補登報工功能 ====================

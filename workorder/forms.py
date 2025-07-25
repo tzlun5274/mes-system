@@ -1715,8 +1715,8 @@ class ManagerProductionReportForm(forms.ModelForm):
         # 驗證總數量
         if work_quantity is not None and defect_quantity is not None:
             total_quantity = work_quantity + defect_quantity
-            if total_quantity <= 0:
-                raise forms.ValidationError("總數量（工作數量 + 不良品數量）必須大於0")
+            if total_quantity < 0:
+                raise forms.ValidationError("總數量（工作數量 + 不良品數量）不能為負數")
 
         return cleaned_data
 
