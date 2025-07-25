@@ -28,15 +28,15 @@
     </div>
     <!-- 統計卡片 -->
     <div class="row mb-4">
-        <div class="col-md-1">
+        <div class="col-md-2">
             <div class="card bg-primary text-white">
                 <div class="card-body text-center">
                     <h3 class="card-title">{{ total_workorders }}</h3>
-                    <p class="card-text">總工單數</p>
+                    <p class="card-text">活躍工單數</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-1">
+        <div class="col-md-2">
             <div class="card bg-warning text-dark">
                 <div class="card-body text-center">
                     <h3 class="card-title">{{ pending_count }}</h3>
@@ -44,7 +44,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-1">
+        <div class="col-md-2">
             <div class="card bg-info text-white">
                 <div class="card-body text-center">
                     <h3 class="card-title">{{ in_progress_count }}</h3>
@@ -52,23 +52,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-1">
-            <div class="card bg-success text-white">
-                <div class="card-body text-center">
-                    <h3 class="card-title">{{ completed_count }}</h3>
-                    <p class="card-text">已完成</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-1">
-            <div class="card bg-secondary text-white">
-                <div class="card-body text-center">
-                    <h3 class="card-title">{{ other_count }}</h3>
-                    <p class="card-text">其他狀態</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
             <div class="card bg-success text-white">
                 <div class="card-body text-center">
                     <h3 class="card-title">{{ process_route_set_count }}</h3>
@@ -76,7 +60,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
             <div class="card bg-secondary text-white">
                 <div class="card-body text-center">
                     <h3 class="card-title">{{ assignment_set_count }}</h3>
@@ -225,76 +209,8 @@
                         </td>
                     </tr>
                     {% endfor %}
-                    {# 3. 已完成工單 #}
-                    {% for workorder in completed_orders %}
-                    <tr>
-                        <td>{{ workorder.order_number }}</td>
-                        <td>{{ workorder.product_code }}</td>
-                        <td>{{ workorder.quantity }}</td>
-                        <td>
-                            {% if workorder.has_process_route %}
-                                <span class="badge bg-success">
-                                    <i class="fas fa-check-circle"></i> 已設定
-                                </span>
-                            {% else %}
-                                <span class="badge bg-warning">
-                                    <i class="fas fa-exclamation-triangle"></i> 未設定
-                                </span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if workorder.has_assignment %}
-                                <span class="badge bg-success">已分配</span>
-                            {% else %}
-                                <span class="badge bg-secondary">未分配</span>
-                            {% endif %}
-                        </td>
-                        <td><span class="badge bg-success text-white">已完成</span></td>
-                        <td>{{ workorder.updated_at|date:'Y-m-d H:i' }}</td>
-                        <td>
-                            <a href="{% url 'workorder:edit' workorder.pk %}" class="btn btn-primary btn-sm">編輯</a>
-                            <a href="{% url 'workorder:workorder_process_detail' workorder.pk %}" class="btn btn-info btn-sm">
-                                <i class="fas fa-list"></i> 工序明細
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    {# 4. 其他狀態工單 #}
-                    {% for workorder in other_orders %}
-                    <tr>
-                        <td>{{ workorder.order_number }}</td>
-                        <td>{{ workorder.product_code }}</td>
-                        <td>{{ workorder.quantity }}</td>
-                        <td>
-                            {% if workorder.has_process_route %}
-                                <span class="badge bg-success">
-                                    <i class="fas fa-check-circle"></i> 已設定
-                                </span>
-                            {% else %}
-                                <span class="badge bg-warning">
-                                    <i class="fas fa-exclamation-triangle"></i> 未設定
-                                </span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if workorder.has_assignment %}
-                                <span class="badge bg-success">已分配</span>
-                            {% else %}
-                                <span class="badge bg-secondary">未分配</span>
-                            {% endif %}
-                        </td>
-                        <td><span class="badge bg-secondary text-white">{{ workorder.status }}</span></td>
-                        <td>{{ workorder.updated_at|date:'Y-m-d H:i' }}</td>
-                        <td>
-                            <a href="{% url 'workorder:edit' workorder.pk %}" class="btn btn-primary btn-sm">編輯</a>
-                            <a href="{% url 'workorder:workorder_process_detail' workorder.pk %}" class="btn btn-info btn-sm">
-                                <i class="fas fa-list"></i> 工序明細
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    {% if not pending_orders and not in_progress_orders and not completed_orders and not other_orders %}
-                    <tr><td colspan="8" class="text-center">目前沒有工單</td></tr>
+                    {% if not pending_orders and not in_progress_orders %}
+                    <tr><td colspan="8" class="text-center">目前沒有活躍工單</td></tr>
                     {% endif %}
                 </tbody>
             </table>

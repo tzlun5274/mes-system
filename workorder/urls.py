@@ -41,6 +41,16 @@ urlpatterns = [
         "completed_workorders/", views.completed_workorders, name="completed_workorders"
     ),
     path(
+        "import_historical_workorders/",
+        views.import_historical_workorders,
+        name="import_historical_workorders",
+    ),
+    path(
+        "download_historical_workorder_template/",
+        views.download_historical_workorder_template,
+        name="download_historical_workorder_template",
+    ),
+    path(
         "clear_completed_workorders/",
         views.clear_completed_workorders,
         name="clear_completed_workorders",

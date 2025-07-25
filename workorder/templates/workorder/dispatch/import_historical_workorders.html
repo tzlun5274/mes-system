@@ -1,0 +1,191 @@
+<!--
+匯入歷史派工單模板
+功能：允許管理員匯入歷史的派工單資料，支援 Excel 和 CSV 格式
+-->
+{% extends 'base.html' %}
+{% block title %}匯入歷史派工單{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2>匯入歷史派工單</h2>
+            
+            <!-- 導航麵包屑 -->
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'workorder:completed_workorders' %}">完工工單列表</a></li>
+                    <li class="breadcrumb-item active">匯入歷史派工單</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <!-- 說明區塊 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h5><i class="fas fa-info-circle"></i> 匯入說明</h5>
+                <ul class="mb-0">
+                    <li>支援 Excel (.xlsx) 和 CSV 格式的檔案</li>
+                    <li>檔案必須包含以下欄位：<strong>公司代號</strong>、<strong>工單號碼</strong>、<strong>產品編號</strong>、<strong>數量</strong></li>
+                    <li><strong>唯一性檢查</strong>：以公司代號和工單號碼作為唯一性檢查，會檢查所有狀態的工單（待生產、生產中、完工），重複的資料會被跳過</li>
+                    <li>匯入的工單會直接設為「完工」狀態</li>
+                    <li>建議先下載範本檔案，按照格式填寫後再匯入</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 下載範本按鈕 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-download"></i> 下載匯入範本
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">下載 Excel 範本檔案，按照格式填寫您的歷史派工單資料。</p>
+                    <a href="{% url 'workorder:download_historical_workorder_template' %}" class="btn btn-success">
+                        <i class="fas fa-file-excel"></i> 下載 Excel 範本
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 匯入表單 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-upload"></i> 匯入檔案
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="file" class="form-label">選擇檔案</label>
+                            <input type="file" class="form-control" id="file" name="file" 
+                                   accept=".xlsx,.csv" required>
+                            <div class="form-text">支援 Excel (.xlsx) 和 CSV 格式</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="confirm_import" required>
+                                <label class="form-check-label" for="confirm_import">
+                                    我確認要匯入歷史派工單資料，並了解系統會檢查所有狀態的工單（待生產、生產中、完工）是否有重複的公司代號和工單號碼
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload"></i> 開始匯入
+                            </button>
+                            <a href="{% url 'workorder:completed_workorders' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> 返回完工工單列表
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 欄位說明 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-table"></i> 欄位說明
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>欄位名稱</th>
+                                    <th>說明</th>
+                                    <th>範例</th>
+                                    <th>是否必填</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>公司代號</strong></td>
+                                    <td>公司或部門的代號</td>
+                                    <td>10, 20, 30</td>
+                                    <td><span class="badge bg-danger">必填</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>工單號碼</strong></td>
+                                    <td>工單的唯一編號</td>
+                                    <td>WO-2024-001, 331-25C31001</td>
+                                    <td><span class="badge bg-danger">必填</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>產品編號</strong></td>
+                                    <td>產品的編號或型號</td>
+                                    <td>PFP-001, PFP-CCTOTCTS17-500</td>
+                                    <td><span class="badge bg-danger">必填</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>數量</strong></td>
+                                    <td>工單的生產數量</td>
+                                    <td>100, 200, 300</td>
+                                    <td><span class="badge bg-danger">必填</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 檔案選擇驗證
+document.getElementById('file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    const fileName = file ? file.name.toLowerCase() : '';
+    
+    if (file && !fileName.endsWith('.xlsx') && !fileName.endsWith('.csv')) {
+        alert('請選擇 Excel (.xlsx) 或 CSV 格式的檔案');
+        this.value = '';
+    }
+});
+
+// 表單提交確認
+document.querySelector('form').addEventListener('submit', function(e) {
+    const file = document.getElementById('file').files[0];
+    const confirmCheckbox = document.getElementById('confirm_import');
+    
+    if (!file) {
+        e.preventDefault();
+        alert('請選擇要匯入的檔案');
+        return;
+    }
+    
+    if (!confirmCheckbox.checked) {
+        e.preventDefault();
+        alert('請確認匯入條款');
+        return;
+    }
+    
+    if (!confirm('確定要匯入歷史派工單資料嗎？此操作無法復原。')) {
+        e.preventDefault();
+        return;
+    }
+});
+</script>
+{% endblock %} 

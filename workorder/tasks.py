@@ -66,7 +66,7 @@ def auto_convert_orders():
         # 讀取自動轉換間隔設定（預設 30 分鐘）
         auto_convert_interval = 30
         try:
-            config = SystemConfig.objects.get(key="auto_convert_workorder_interval")
+            config = SystemConfig.objects.get(key="auto_convert_interval")
             auto_convert_interval = int(config.value)
             workorder_logger.info(f"讀取到自動轉換間隔設定：{auto_convert_interval} 分鐘")
         except SystemConfig.DoesNotExist:
@@ -87,27 +87,24 @@ def auto_convert_orders():
 
         for company_order in pending_orders:
             try:
-                # 檢查工單是否已存在
+                # 檢查工單是否已存在（使用公司代號和製令單號的組合）
                 existing_workorder = WorkOrder.objects.filter(
                     company_code=company_order.company_code,
-                    order_number=company_order.order_number
+                    order_number=company_order.mkordno
                 ).first()
                 
                 if existing_workorder:
                     # 如果工單已存在，跳過並標記為已轉換
                     company_order.is_converted = True
                     company_order.save()
-                    workorder_logger.warning(f"工單已存在，跳過轉換：{company_order.order_number}")
+                    workorder_logger.warning(f"工單已存在，跳過轉換：{company_order.mkordno}")
                     continue
                 
-                # 建立工單
+                # 建立工單（使用製令單號作為工單號碼）
                 workorder = WorkOrder.objects.create(
-                    order_number=WorkOrder.generate_order_number(company_order.company_code),
-                    product_code=company_order.product_code,
-                    product_name=company_order.product_name,
-                    quantity=company_order.quantity,
-                    customer_name=company_order.customer_name,
-                    delivery_date=company_order.delivery_date,
+                    order_number=company_order.mkordno,  # 直接使用製令單號
+                    product_code=company_order.product_id,  # 使用 product_id
+                    quantity=company_order.prodt_qty,  # 使用 prodt_qty
                     status="pending",
                     company_code=company_order.company_code,
                 )
@@ -159,7 +156,7 @@ def auto_convert_orders():
 
             except Exception as e:
                 workorder_logger.error(
-                    f"轉換製令單失敗 (製令單: {company_order.order_number}): {e}"
+                    f"轉換製令單失敗 (製令單: {company_order.mkordno}): {e}"
                 )
 
         # 更新 CompanyOrder 的轉換狀態

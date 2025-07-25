@@ -90,8 +90,8 @@ class Command(BaseCommand):
         task_name = "workorder.tasks.auto_convert_orders"
         display_name = "自動轉換工單"
 
-        # 從 SystemConfig 讀取自動轉換間隔設定（預設 1 分鐘）
-        auto_convert_interval = 1
+        # 從 SystemConfig 讀取自動轉換間隔設定（預設 3 分鐘）
+        auto_convert_interval = 3
         try:
             config = SystemConfig.objects.get(key="auto_convert_interval")
             auto_convert_interval = int(config.value)
@@ -99,9 +99,10 @@ class Command(BaseCommand):
                 f"讀取到自動轉換間隔設定：{auto_convert_interval} 分鐘"
             )
         except SystemConfig.DoesNotExist:
-            workorder_logger.warning("未找到自動轉換間隔設定，使用預設值 1 分鐘")
-            # 自動建立預設設定
-            SystemConfig.objects.create(key="auto_convert_interval", value="1")
+            workorder_logger.warning("未找到自動轉換間隔設定，使用預設值 3 分鐘")
+            # 只有在不存在時才建立預設設定
+            SystemConfig.objects.create(key="auto_convert_interval", value="3")
+            auto_convert_interval = 3
 
         # 建立或更新間隔排程
         interval, created = IntervalSchedule.objects.get_or_create(

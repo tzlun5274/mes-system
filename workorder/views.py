@@ -169,7 +169,7 @@ def delete(request, pk):
             return redirect(reverse("workorder:index"))
             
     return render(
-        request, "workorder/workorder_confirm_delete.html", {"workorder": workorder}
+        request, "workorder/workorder/workorder_confirm_delete.html", {"workorder": workorder}
     )
 
 
@@ -222,7 +222,7 @@ def delete_pending_workorders(request):
     )
     return render(
         request,
-        "workorder/delete_pending_confirm.html",
+        "workorder/workorder/delete_pending_confirm.html",
         {
             "pending_count": pending_count,
             "in_progress_count": in_progress_count,
@@ -268,7 +268,7 @@ def delete_in_progress_workorders(request):
     in_progress_count = WorkOrder.objects.filter(status="in_progress").count()
     return render(
         request,
-        "workorder/delete_in_progress_confirm.html",
+        "workorder/workorder/delete_in_progress_confirm.html",
         {"in_progress_count": in_progress_count},
     )
 
@@ -285,30 +285,30 @@ def dispatch_list(request):
     """
     from process.models import ProductProcessRoute
 
-    # 顯示所有狀態的工單，包括 pending、in_progress、completed 等
-    all_orders = WorkOrder.objects.all().order_by("-created_at")
+    # 只顯示待生產和生產中的工單，不顯示已完成工單
+    all_orders = WorkOrder.objects.filter(status__in=["pending", "in_progress"]).order_by("-created_at")
     
     # 按狀態分組
     pending_orders = [order for order in all_orders if order.status == "pending"]
     in_progress_orders = [order for order in all_orders if order.status == "in_progress"]
-    completed_orders = [order for order in all_orders if order.status == "completed"]
-    other_orders = [order for order in all_orders if order.status not in ["pending", "in_progress", "completed"]]
+    completed_orders = []  # 派工單管理頁面不顯示已完成工單
+    other_orders = []  # 派工單管理頁面不顯示其他狀態工單
 
-    # 計算統計數據
-    total_workorders = WorkOrder.objects.count()
+    # 計算統計數據（只計算待生產和生產中的工單）
+    total_workorders = WorkOrder.objects.filter(status__in=["pending", "in_progress"]).count()
     pending_count = len(pending_orders)
     in_progress_count = len(in_progress_orders)
-    completed_count = len(completed_orders)
-    other_count = len(other_orders)
+    completed_count = 0  # 派工單管理頁面不顯示已完成工單
+    other_count = 0  # 派工單管理頁面不顯示其他狀態工單
     
     # 計算工藝路線已設定總數
     process_route_set_count = 0
     # 計算分配資訊已分配總數
     assignment_set_count = 0
     
-    # 檢查所有工單的工藝路線和分配狀態
-    all_workorders = WorkOrder.objects.all()
-    for workorder in all_workorders:
+    # 檢查待生產和生產中工單的工藝路線和分配狀態
+    active_workorders = WorkOrder.objects.filter(status__in=["pending", "in_progress"])
+    for workorder in active_workorders:
         # 檢查工藝路線設定
         has_process_route = ProductProcessRoute.objects.filter(
             product_id=workorder.product_code
@@ -439,6 +439,9 @@ def company_orders(request):
         else:
             # 原本的自動轉換/同步間隔設定
             new_convert_interval = request.POST.get("auto_convert_interval")
+            new_sync_interval = request.POST.get("auto_sync_companyorder_interval")
+            interval_changed = False
+            
             if (
                 new_convert_interval
                 and new_convert_interval.isdigit()
@@ -453,7 +456,8 @@ def company_orders(request):
                     f"管理員 {request.user} 變更自動轉換工單間隔，原值：{old_value} 分鐘，新值：{new_convert_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
                 )
                 auto_convert_interval = int(new_convert_interval)
-            new_sync_interval = request.POST.get("auto_sync_companyorder_interval")
+                interval_changed = True
+                
             if (
                 new_sync_interval
                 and new_sync_interval.isdigit()
@@ -468,6 +472,22 @@ def company_orders(request):
                     f"管理員 {request.user} 變更自動同步製令間隔，原值：{old_value} 分鐘，新值：{new_sync_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
                 )
                 auto_sync_companyorder_interval = int(new_sync_interval)
+                interval_changed = True
+            
+            # 如果間隔設定有變更，重新設定定時任務
+            if interval_changed:
+                try:
+                    from django.core.management import call_command
+                    call_command("setup_workorder_tasks")
+                    workorder_logger.info(
+                        f"管理員 {request.user} 重新設定定時任務成功。IP: {request.META.get('REMOTE_ADDR')}"
+                    )
+                    messages.success(request, "間隔設定已更新，定時任務已重新設定！")
+                except Exception as e:
+                    workorder_logger.error(
+                        f"重新設定定時任務失敗：{str(e)}。IP: {request.META.get('REMOTE_ADDR')}"
+                    )
+                    messages.warning(request, f"間隔設定已更新，但重新設定定時任務失敗：{str(e)}")
     # POST 處理完後，重新查詢最新關鍵字設定
     try:
         config = SystemConfig.objects.get(key="no_distribute_keywords")
@@ -600,7 +620,7 @@ def manual_convert_orders(request):
         count_auto_assigned = 0
 
         for company_order in pending_orders:
-            # 檢查工單是否已存在
+            # 檢查工單是否已存在（使用公司代號和製令單號的組合）
             existing_workorder = WorkOrder.objects.filter(
                 company_code=company_order.company_code,
                 order_number=company_order.mkordno
@@ -613,9 +633,9 @@ def manual_convert_orders(request):
                 print(f"⚠️ 工單已存在，跳過轉換：{company_order.mkordno}")
                 continue
             
-            # 建立工單
+            # 建立工單（使用製令單號作為工單號碼）
             workorder = WorkOrder.objects.create(
-                order_number=WorkOrder.generate_order_number(company_order.company_code),  # 自動生成工單號碼
+                order_number=company_order.mkordno,  # 直接使用製令單號
                 product_code=company_order.product_id,  # 使用 product_id
                 quantity=company_order.prodt_qty,  # 使用 prodt_qty
                 status="pending",
@@ -1106,7 +1126,6 @@ def completed_workorders(request):
         completed_workorders = completed_workorders.filter(
             Q(order_number__icontains=search_query)
             | Q(product_code__icontains=search_query)
-            | Q(product_name__icontains=search_query)
             | Q(company_code__icontains=search_query)
         )
 
@@ -1118,12 +1137,177 @@ def completed_workorders(request):
     page_obj = paginator.get_page(page_number)
 
     context = {
-        "page_obj": page_obj,
+        "completed_orders": page_obj,
         "search_query": search_query,
         "total_count": completed_workorders.count(),
     }
 
     return render(request, "workorder/dispatch/completed_workorders.html", context)
+
+
+def import_historical_workorders(request):
+    """
+    匯入歷史派工單頁面：允許用戶匯入歷史的派工單資料
+    支援 Excel 和 CSV 格式，以公司代號和工單號碼作為唯一性檢查
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "只有管理員可以執行此操作")
+        return redirect("workorder:completed_workorders")
+
+    if request.method == "POST":
+        try:
+            # 檢查是否有上傳檔案
+            if "file" not in request.FILES:
+                messages.error(request, "請選擇要匯入的檔案")
+                return redirect("workorder:import_historical_workorders")
+
+            uploaded_file = request.FILES["file"]
+            
+            # 檢查檔案格式
+            file_name = uploaded_file.name.lower()
+            if not (file_name.endswith('.xlsx') or file_name.endswith('.csv')):
+                messages.error(request, "只支援 Excel (.xlsx) 和 CSV 格式的檔案")
+                return redirect("workorder:import_historical_workorders")
+
+            # 讀取檔案內容
+            import pandas as pd
+            import io
+            
+            if file_name.endswith('.xlsx'):
+                df = pd.read_excel(uploaded_file)
+            else:
+                df = pd.read_csv(uploaded_file)
+
+            # 檢查必要欄位
+            required_columns = ['公司代號', '工單號碼', '產品編號', '數量']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            
+            if missing_columns:
+                messages.error(request, f"檔案缺少必要欄位：{', '.join(missing_columns)}")
+                return redirect("workorder:import_historical_workorders")
+
+            # 開始匯入處理
+            success_count = 0
+            skip_count = 0
+            error_count = 0
+            error_messages = []
+            skip_details = []  # 記錄跳過的詳細資訊
+
+            for index, row in df.iterrows():
+                try:
+                    company_code = str(row['公司代號']).strip()
+                    order_number = str(row['工單號碼']).strip()
+                    product_code = str(row['產品編號']).strip()
+                    quantity = int(row['數量'])
+
+                    # 檢查公司代號和工單號碼的唯一性（包括所有狀態的工單）
+                    existing_workorder = WorkOrder.objects.filter(
+                        company_code=company_code,
+                        order_number=order_number
+                    ).first()
+
+                    if existing_workorder:
+                        skip_count += 1
+                        skip_detail = f"公司代號 {company_code}，工單號碼 {order_number}，現有狀態：{existing_workorder.status}"
+                        skip_details.append(skip_detail)
+                        workorder_logger.warning(f"跳過重複工單：{skip_detail}")
+                        continue
+
+                    # 建立新的完工工單
+                    workorder = WorkOrder.objects.create(
+                        company_code=company_code,
+                        order_number=order_number,
+                        product_code=product_code,
+                        quantity=quantity,
+                        status="completed",  # 直接設為完工狀態
+                        created_at=timezone.now(),
+                        updated_at=timezone.now(),
+                    )
+
+                    success_count += 1
+
+                except Exception as e:
+                    error_count += 1
+                    error_messages.append(f"第 {index + 1} 行：{str(e)}")
+
+            # 顯示匯入結果
+            if success_count > 0:
+                messages.success(
+                    request, 
+                    f"匯入完成！成功匯入 {success_count} 筆歷史派工單"
+                )
+            
+            if skip_count > 0:
+                messages.warning(
+                    request, 
+                    f"跳過 {skip_count} 筆重複資料（公司代號和工單號碼已存在於任何狀態的工單中）"
+                )
+            
+            if error_count > 0:
+                messages.error(
+                    request, 
+                    f"匯入失敗 {error_count} 筆資料，請檢查檔案格式"
+                )
+                # 記錄詳細錯誤訊息
+                workorder_logger.error(f"匯入歷史派工單錯誤：{error_messages}")
+            
+            # 記錄跳過的詳細資訊
+            if skip_details:
+                workorder_logger.info(f"匯入歷史派工單跳過詳情：{skip_details}")
+
+            return redirect("workorder:completed_workorders")
+
+        except Exception as e:
+            messages.error(request, f"匯入失敗：{str(e)}")
+            workorder_logger.error(f"匯入歷史派工單失敗：{str(e)}")
+            return redirect("workorder:import_historical_workorders")
+
+    # GET 請求顯示匯入頁面
+    return render(request, "workorder/dispatch/import_historical_workorders.html")
+
+
+def download_historical_workorder_template(request):
+    """
+    下載歷史派工單匯入範本
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "只有管理員可以執行此操作")
+        return redirect("workorder:completed_workorders")
+
+    try:
+        import pandas as pd
+        import io
+        from django.http import HttpResponse
+        
+        # 建立範本資料
+        template_data = {
+            '公司代號': ['10', '20', '30'],
+            '工單號碼': ['WO-2024-001', 'WO-2024-002', 'WO-2024-003'],
+            '產品編號': ['PFP-001', 'PFP-002', 'PFP-003'],
+            '數量': [100, 200, 300],
+        }
+        
+        df = pd.DataFrame(template_data)
+        
+        # 建立 Excel 檔案
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='歷史派工單範本', index=False)
+        
+        output.seek(0)
+        
+        # 回傳檔案
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="歷史派工單匯入範本.xlsx"'
+        
+        return response
+
+    except Exception as e:
+        messages.error(request, f"下載範本失敗：{str(e)}")
+        return redirect("workorder:import_historical_workorders")
 
 
 def clear_completed_workorders(request):
@@ -1194,10 +1378,15 @@ def clear_data(request):
             return redirect("workorder:clear_data")
 
     # GET 請求顯示確認頁面
+    workorder_count = WorkOrder.objects.count()
+    company_order_count = CompanyOrder.objects.count()
+    dispatch_log_count = DispatchLog.objects.count()
+    
     context = {
-        "workorder_count": WorkOrder.objects.count(),
-        "company_order_count": CompanyOrder.objects.count(),
-        "dispatch_log_count": DispatchLog.objects.count(),
+        "workorder_count": workorder_count,
+        "company_order_count": company_order_count,
+        "dispatch_log_count": dispatch_log_count,
+        "total_count": workorder_count + company_order_count + dispatch_log_count,
     }
 
     return render(request, "workorder/clear_data_confirm.html", context)

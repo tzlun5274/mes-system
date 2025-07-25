@@ -1,0 +1,83 @@
+<!--
+這個模板用來顯示清除完工工單的確認頁面。
+管理員可以在這裡確認是否要刪除所有完工工單。
+-->
+{% extends 'base.html' %}
+{% block title %}清除完工工單確認{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> 清除完工工單確認
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5><i class="fas fa-warning"></i> 警告</h5>
+                        <p class="mb-0">
+                            您即將刪除所有狀態為「已完成」的工單記錄，此操作不可逆！
+                        </p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="text-danger">{{ completed_count }}</h3>
+                                    <p class="mb-0">筆完工工單將被刪除</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="text-info">{{ completed_count }}</h3>
+                                    <p class="mb-0">筆相關工序記錄將被刪除</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h5>刪除範圍：</h5>
+                        <ul>
+                            <li>所有狀態為「已完成」的工單</li>
+                            <li>相關的工序明細記錄</li>
+                            <li>相關的工序執行日誌</li>
+                            <li>相關的分配記錄</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> 注意</h6>
+                        <ul class="mb-0">
+                            <li>此操作不會影響「待生產」和「生產中」的工單</li>
+                            <li>刪除後無法恢復，請確認已備份重要資料</li>
+                            <li>只有管理員可以執行此操作</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <form method="post">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-lg w-100">
+                                    <i class="fas fa-trash"></i> 確認刪除
+                                </button>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="{% url 'workorder:completed_workorders' %}" class="btn btn-secondary btn-lg w-100">
+                                <i class="fas fa-times"></i> 取消
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
