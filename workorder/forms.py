@@ -632,7 +632,7 @@ class SMTSupplementBatchForm(forms.Form):
     daily_quantity = forms.IntegerField(
         label="每日數量",
         widget=forms.NumberInput(
-            attrs={"class": "form-control", "min": "1", "id": "daily_quantity_input"}
+            attrs={"class": "form-control", "min": "0", "id": "daily_quantity_input"}
         ),
         required=True,
         help_text="請輸入每日的報工數量",
@@ -702,10 +702,10 @@ class SMTSupplementBatchForm(forms.Form):
                     {"end_date": "批量補登的日期範圍不能超過30天"}
                 )
 
-        # 驗證每日數量必須大於0
+        # 驗證每日數量不能為負數
         daily_quantity = cleaned_data.get("daily_quantity")
-        if daily_quantity and daily_quantity <= 0:
-            raise forms.ValidationError({"daily_quantity": "每日數量必須大於0"})
+        if daily_quantity and daily_quantity < 0:
+            raise forms.ValidationError({"daily_quantity": "每日數量不能為負數"})
 
         return cleaned_data
 
@@ -876,12 +876,12 @@ class OperatorSupplementReportForm(forms.ModelForm):
                 "class": "form-control",
                 "id": "work_quantity_input",
                 "placeholder": "請輸入該時段內實際完成的合格產品數量",
-                "min": "1",
+                "min": "0",
             }
         ),
         required=True,
-        initial=1,
-        help_text="請輸入該時段內實際完成的合格產品數量",
+        initial=0,
+        help_text="請輸入該時段內實際完成的合格產品數量（可為0）",
     )
 
     # 不良品數量
@@ -1181,8 +1181,8 @@ class OperatorSupplementReportForm(forms.ModelForm):
                 pass  # 時間格式錯誤已在上面處理
 
         # 驗證數量
-        if work_quantity is not None and work_quantity <= 0:
-            raise forms.ValidationError("工作數量必須大於0")
+        if work_quantity is not None and work_quantity < 0:
+            raise forms.ValidationError("工作數量不能為負數")
 
         # 驗證核准狀態
         approval_status = cleaned_data.get("approval_status")
@@ -1474,10 +1474,10 @@ class OperatorSupplementBatchForm(forms.Form):
                     {"end_date": "批量補登的日期範圍不能超過30天"}
                 )
 
-        # 驗證每日數量必須大於0
+        # 驗證每日數量不能為負數
         daily_quantity = cleaned_data.get("daily_quantity")
-        if daily_quantity and daily_quantity <= 0:
-            raise forms.ValidationError({"daily_quantity": "每日數量必須大於0"})
+        if daily_quantity and daily_quantity < 0:
+            raise forms.ValidationError({"daily_quantity": "每日數量不能為負數"})
 
         # 驗證時間格式
         start_time = cleaned_data.get("start_time")
@@ -1722,8 +1722,8 @@ class ManagerProductionReportForm(forms.ModelForm):
 
     def clean_work_quantity(self):
         work_quantity = self.cleaned_data.get("work_quantity")
-        if work_quantity is not None and work_quantity <= 0:
-            raise forms.ValidationError("工作數量必須大於0")
+        if work_quantity is not None and work_quantity < 0:
+            raise forms.ValidationError("工作數量不能為負數")
         return work_quantity
 
 
@@ -1879,7 +1879,7 @@ class ManagerProductionReportBatchForm(forms.Form):
         widget=forms.NumberInput(
             attrs={
                 "class": "form-control",
-                "min": "1",
+                "min": "0",
                 "placeholder": "請輸入每日工作數量",
             }
         ),
@@ -1976,8 +1976,8 @@ class ManagerProductionReportBatchForm(forms.Form):
         daily_work_quantity = cleaned_data.get("daily_work_quantity")
         daily_defect_quantity = cleaned_data.get("daily_defect_quantity", 0)
 
-        if daily_work_quantity is not None and daily_work_quantity <= 0:
-            raise forms.ValidationError("每日工作數量必須大於0")
+        if daily_work_quantity is not None and daily_work_quantity < 0:
+            raise forms.ValidationError("每日工作數量不能為負數")
 
         if daily_defect_quantity is not None and daily_defect_quantity < 0:
             raise forms.ValidationError("每日不良品數量不能為負數")
@@ -2255,8 +2255,8 @@ class RDSampleSupplementReportForm(forms.ModelForm):
                 pass  # 時間格式錯誤已在上面處理
 
         # 驗證數量
-        if work_quantity is not None and work_quantity <= 0:
-            raise forms.ValidationError("完成數量必須大於0")
+        if work_quantity is not None and work_quantity < 0:
+            raise forms.ValidationError("完成數量不能為負數")
 
         return cleaned_data
 

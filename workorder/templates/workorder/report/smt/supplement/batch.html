@@ -139,6 +139,9 @@
                 <a href="{% url 'workorder:smt_supplement_template' %}" class="btn btn-info">
                     <i class="fas fa-file-excel"></i> 下載Excel範本
                 </a>
+                <a href="{% url 'workorder:smt_supplement_template' %}?format=csv" class="btn btn-secondary">
+                    <i class="fas fa-file-csv"></i> 下載CSV範本
+                </a>
             </div>
         </div>
     </div>
@@ -156,13 +159,13 @@
                     <form id="uploadForm" enctype="multipart/form-data">
                         {% csrf_token %}
                         <div class="upload-area" id="uploadArea">
-                            <input type="file" id="fileInput" class="file-input" accept=".xlsx" required>
+                            <input type="file" id="fileInput" class="file-input" accept=".xlsx,.csv" required>
                             <div class="upload-content" id="uploadContent">
                                 <div class="upload-icon">
                                     <i class="fas fa-cloud-upload-alt"></i>
                                 </div>
                                 <h5>拖拽檔案到此處或點擊選擇檔案</h5>
-                                <p class="text-muted">支援 Excel 格式檔案 (.xlsx)，檔案大小不超過 5MB</p>
+                                <p class="text-muted">支援 Excel (.xlsx) 和 CSV 格式檔案，檔案大小不超過 5MB</p>
                                 <p class="text-muted"><small>時間格式支援：08:00:00 AM、02:15:00 PM、14:30、14:30:00 等</small></p>
                                 <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
                                     <i class="fas fa-folder-open"></i> 選擇檔案
@@ -294,13 +297,16 @@ uploadArea.addEventListener('drop', function(e) {
     const files = e.dataTransfer.files;
     if (files.length > 0) {
         const file = files[0];
-        if (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.name.endsWith('.xlsx')) {
+        if (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+            file.name.endsWith('.xlsx') || 
+            file.type === 'text/csv' || 
+            file.name.endsWith('.csv')) {
             document.getElementById('fileInput').files = files;
             selectedFile = file;
             document.getElementById('uploadBtn').disabled = false;
             updateUploadArea(file);
         } else {
-            alert('請選擇 Excel 格式的檔案 (.xlsx)');
+            alert('請選擇 Excel (.xlsx) 或 CSV 格式的檔案');
         }
     }
 });
@@ -308,9 +314,17 @@ uploadArea.addEventListener('drop', function(e) {
 // 更新上傳區域顯示
 function updateUploadArea(file) {
     const uploadContent = document.getElementById('uploadContent');
+    const isExcel = file.name.endsWith('.xlsx');
+    const isCsv = file.name.endsWith('.csv');
+    
+    let iconClass = 'fas fa-file-excel text-success';
+    if (isCsv) {
+        iconClass = 'fas fa-file-csv text-info';
+    }
+    
     uploadContent.innerHTML = `
         <div class="upload-icon">
-            <i class="fas fa-file-excel text-success"></i>
+            <i class="${iconClass}"></i>
         </div>
         <h5>已選擇檔案：${file.name}</h5>
         <p class="text-muted">檔案大小：${(file.size / 1024 / 1024).toFixed(2)} MB</p>
@@ -434,7 +448,7 @@ function resetFileInput() {
             <i class="fas fa-cloud-upload-alt"></i>
         </div>
                                         <h5>拖拽檔案到此處或點擊選擇檔案</h5>
-                                <p class="text-muted">支援 Excel 格式檔案 (.xlsx)，檔案大小不超過 5MB</p>
+                                <p class="text-muted">支援 Excel (.xlsx) 和 CSV 格式檔案，檔案大小不超過 5MB</p>
                                 <p class="text-muted"><small>時間格式支援：08:00:00 AM、02:15:00 PM、14:30、14:30:00 等</small></p>
                                 <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
             <i class="fas fa-folder-open"></i> 選擇檔案

@@ -568,7 +568,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const workQuantity = parseInt(workQuantityInput.value) || 0;
         const defectQuantity = parseInt(defectQuantityInput.value) || 0;
         
-        if (workQuantity <= 0) {
+        if (workQuantity < 0) {
             workQuantityInput.classList.add('is-invalid');
             isValid = false;
         }

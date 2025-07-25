@@ -1176,7 +1176,7 @@ def import_historical_workorders(request):
             if file_name.endswith('.xlsx'):
                 df = pd.read_excel(uploaded_file)
             else:
-                df = pd.read_csv(uploaded_file)
+                df = pd.read_csv(uploaded_file, parse_dates=False)
 
             # 檢查必要欄位
             required_columns = ['公司代號', '工單號碼', '產品編號', '數量']
@@ -3854,76 +3854,109 @@ def smt_supplement_export(request):
 
 def smt_supplement_template(request):
     """
-    SMT補登報工匯入範本下載 - Excel格式
+    SMT補登報工匯入範本下載 - 支援Excel和CSV格式
     按照圖片格式：設備、公司別、報工日期、開始時間、完成時間、製令號碼、機種名稱、工序、工作數量、不良品數量、備註
     """
-    from django.http import HttpResponse
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    from openpyxl.utils import get_column_letter
+    format_type = request.GET.get('format', 'xlsx')
     
-    # 建立工作簿
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "SMT補登報工範本"
-    
-    # 設定標題樣式
-    header_font = Font(name='微軟正黑體', size=12, bold=True, color='FFFFFF')
-    header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
-    header_alignment = Alignment(horizontal='center', vertical='center')
-    
-    # 設定資料樣式
-    data_font = Font(name='微軟正黑體', size=11)
-    data_alignment = Alignment(horizontal='center', vertical='center')
-    
-    # 設定邊框
-    thin_border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-    
-    # 標題行 - 按照圖片格式
-    headers = [
-        '設備', '公司別', '報工日期', '開始時間', '完成時間', '製令號碼', 
-        '機種名稱', '工序', '工作數量', '不良品數量', '備註'
-    ]
-    
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = thin_border
-    
-    # 寫入範例資料 - 使用12小時制格式
-    example_data = [
-        ['SMT-A_LINE', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', 'SMT貼片', '100', '0', '正常生產'],
-        ['SMT-B_LINE', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', 'RD樣品', 'RD-001', 'SMT貼片', '50', '2', 'RD樣品測試'],
-        ['SMT-P_LINE', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-002', 'SMT貼片', '200', '5', '大量生產'],
-    ]
-    
-    for row, data in enumerate(example_data, 2):
-        for col, value in enumerate(data, 1):
-            cell = ws.cell(row=row, column=col, value=value)
-            cell.font = data_font
-            cell.alignment = data_alignment
+    if format_type == 'csv':
+        # 建立CSV範本
+        from django.http import HttpResponse
+        import csv
+        
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = 'attachment; filename="smt_supplement_template.csv"'
+        
+        # 寫入CSV內容
+        writer = csv.writer(response)
+        
+        # 標題行
+        headers = [
+            '設備', '公司別', '報工日期', '開始時間', '完成時間', '製令號碼', 
+            '機種名稱', '工序', '工作數量', '不良品數量', '備註'
+        ]
+        writer.writerow(headers)
+        
+        # 範例資料行
+        example_data = [
+            ['SMT-A_LINE', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', 'SMT貼片', '100', '0', '正常生產'],
+            ['SMT-B_LINE', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', 'RD樣品', 'RD-001', 'SMT貼片', '50', '2', 'RD樣品測試'],
+            ['SMT-P_LINE', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-002', 'SMT貼片', '200', '5', '大量生產'],
+        ]
+        
+        for row in example_data:
+            writer.writerow(row)
+        
+        return response
+    else:
+        # 建立Excel範本
+        from django.http import HttpResponse
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+        
+        # 建立工作簿
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "SMT補登報工範本"
+        
+        # 設定標題樣式
+        header_font = Font(name='微軟正黑體', size=12, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center')
+        
+        # 設定資料樣式
+        data_font = Font(name='微軟正黑體', size=11)
+        data_alignment = Alignment(horizontal='center', vertical='center')
+        
+        # 設定邊框
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # 標題行 - 按照圖片格式
+        headers = [
+            '設備', '公司別', '報工日期', '開始時間', '完成時間', '製令號碼', 
+            '機種名稱', '工序', '工作數量', '不良品數量', '備註'
+        ]
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
             cell.border = thin_border
-    
-    # 自動調整欄寬
-    for col in range(1, len(headers) + 1):
-        ws.column_dimensions[get_column_letter(col)].width = 15
-    
-    # 建立回應
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = 'attachment; filename="smt_supplement_template.xlsx"'
-    
-    # 儲存檔案
-    wb.save(response)
-    return response
+        
+        # 寫入範例資料 - 使用12小時制格式
+        example_data = [
+            ['SMT-A_LINE', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', 'SMT貼片', '100', '0', '正常生產'],
+            ['SMT-B_LINE', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', 'RD樣品', 'RD-001', 'SMT貼片', '50', '2', 'RD樣品測試'],
+            ['SMT-P_LINE', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-002', 'SMT貼片', '200', '5', '大量生產'],
+        ]
+        
+        for row, data in enumerate(example_data, 2):
+            for col, value in enumerate(data, 1):
+                cell = ws.cell(row=row, column=col, value=value)
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = thin_border
+        
+        # 自動調整欄寬
+        for col in range(1, len(headers) + 1):
+            ws.column_dimensions[get_column_letter(col)].width = 15
+        
+        # 建立回應
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="smt_supplement_template.xlsx"'
+        
+        # 儲存檔案
+        wb.save(response)
+        return response
 
 
 def smt_supplement_report_create(request):
@@ -4170,6 +4203,182 @@ def smt_supplement_report_reject(request, report_id):
         })
 
 
+def process_smt_supplement_row(row_num, equipment_name, company_code, work_date_str, start_time_str, end_time_str,
+                              workorder_number, product_code, operation, work_quantity, defect_quantity, remarks, request):
+    """
+    處理SMT補登報工單行資料
+    支援多種時間格式，與作業員報工匯入保持一致
+    """
+    from .models import SMTProductionReport, WorkOrder
+    from equip.models import Equipment
+    from erp_integration.models import CompanyConfig
+    from datetime import datetime
+    
+    try:
+        # 驗證必要欄位
+        if not equipment_name or not work_date_str:
+            return {
+                'success': False,
+                'error': f'第 {row_num} 行：缺少必要欄位（設備、報工日期）'
+            }
+        
+        # 解析日期 - 支援多種格式
+        try:
+            if isinstance(work_date_str, str):
+                work_date_str = work_date_str.strip()
+                
+                # 如果包含時間部分，先提取日期部分
+                if ' ' in work_date_str:
+                    work_date_str = work_date_str.split(' ')[0]
+                
+                # 支援的日期格式列表
+                date_formats = [
+                    '%Y-%m-%d',           # 2024-01-15
+                    '%Y/%m/%d',           # 2024/01/15
+                ]
+                
+                work_date = None
+                for fmt in date_formats:
+                    try:
+                        parsed_datetime = datetime.strptime(work_date_str, fmt)
+                        work_date = parsed_datetime.date()
+                        break
+                    except ValueError:
+                        continue
+                
+                if work_date is None:
+                    return {
+                        'success': False,
+                        'error': f'第 {row_num} 行：報工日期格式錯誤 - 無法解析 {work_date_str}'
+                    }
+                    
+            elif hasattr(work_date_str, 'date'):
+                # 如果是datetime物件
+                work_date = work_date_str.date()
+            elif hasattr(work_date_str, 'strftime'):
+                # 如果是date物件
+                work_date = work_date_str
+            else:
+                return {
+                    'success': False,
+                    'error': f'第 {row_num} 行：報工日期格式錯誤 - 無法解析 {type(work_date_str)}'
+                }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'第 {row_num} 行：報工日期格式錯誤 - {str(e)}'
+            }
+        
+        # 解析時間 - 支援多種格式
+        def parse_time(time_str):
+            """解析時間字串，支援多種格式"""
+            # 如果已經是 time 物件，直接返回
+            if hasattr(time_str, 'hour') and hasattr(time_str, 'minute'):
+                return time_str
+            
+            # 如果是 datetime 物件，轉換為 time
+            if hasattr(time_str, 'time'):
+                return time_str.time()
+            
+            # 如果是字串，進行解析
+            if isinstance(time_str, str):
+                time_str = time_str.strip()
+                
+                # 支援的格式列表
+                time_formats = [
+                    '%H:%M:%S %p',      # 02:15:00 PM
+                    '%I:%M:%S %p',      # 02:15:00 PM (12小時制)
+                    '%H:%M %p',         # 14:15 PM
+                    '%I:%M %p',         # 02:15 PM
+                    '%H:%M:%S',         # 14:15:00
+                    '%H:%M',            # 14:15
+                    '%I:%M:%S',         # 02:15:00 (12小時制)
+                    '%I:%M',            # 02:15 (12小時制)
+                ]
+                
+                for fmt in time_formats:
+                    try:
+                        return datetime.strptime(time_str, fmt).time()
+                    except ValueError:
+                        continue
+                
+                raise ValueError(f"無法解析時間格式: {time_str}")
+            
+            # 其他情況，嘗試轉換
+            return time_str
+        
+        try:
+            start_time = parse_time(start_time_str)
+            end_time = parse_time(end_time_str)
+        except ValueError as e:
+            return {
+                'success': False,
+                'error': f'第 {row_num} 行：時間格式錯誤 - {str(e)}'
+            }
+        
+        # 取得設備
+        try:
+            equipment = Equipment.objects.get(name=equipment_name)
+        except Equipment.DoesNotExist:
+            return {
+                'success': False,
+                'error': f'第 {row_num} 行：找不到設備名稱 {equipment_name}'
+            }
+        
+        # 處理工單（根據製令號碼判斷是否為RD樣品）
+        workorder = None
+        report_type = 'normal'  # 預設為正式報工
+        if workorder_number == 'RD樣品':
+            report_type = 'rd_sample'
+        elif workorder_number:
+            try:
+                workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
+                if not workorder:
+                    return {
+                        'success': False,
+                        'error': f'第 {row_num} 行：找不到工單號 {workorder_number}'
+                    }
+            except Exception as e:
+                return {
+                    'success': False,
+                    'error': f'第 {row_num} 行：工單查詢錯誤 - {str(e)}'
+                }
+        
+        # 創建補登記錄
+        report = SMTProductionReport.objects.create(
+            equipment=equipment,
+            workorder=workorder,
+            rd_workorder_number=workorder_number if report_type == 'rd_sample' else None,
+            rd_product_code=product_code if report_type == 'rd_sample' else None,
+            work_date=work_date,
+            start_time=start_time,
+            end_time=end_time,
+            work_quantity=int(work_quantity),
+            defect_quantity=int(defect_quantity) if defect_quantity else 0,
+            operation=operation or 'SMT貼片',
+            remarks=remarks or '',
+            report_type=report_type,
+            created_by=request.user.username,
+            approval_status='pending'
+        )
+        
+        return {
+            'success': True,
+            'data': {
+                'id': report.id,
+                'equipment': equipment.name,
+                'workorder': workorder_number or (workorder.order_number if workorder else ''),
+                'quantity': report.work_quantity,
+            }
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'第 {row_num} 行：{str(e)}'
+        }
+
+
 @require_POST
 @csrf_exempt
 def smt_supplement_batch_create(request):
@@ -4196,143 +4405,101 @@ def smt_supplement_batch_create(request):
             logger.info(f"收到檔案：{excel_file.name}，大小：{excel_file.size} bytes")
             
             # 檢查檔案格式
-            if not excel_file.name.endswith('.xlsx'):
+            file_name = excel_file.name.lower()
+            if not (file_name.endswith('.xlsx') or file_name.endswith('.csv')):
                 logger.error(f"檔案格式錯誤：{excel_file.name}")
                 return JsonResponse({
                     'success': False,
-                    'message': '請上傳 Excel 格式檔案 (.xlsx)'
+                    'message': '請上傳 Excel (.xlsx) 或 CSV 格式檔案'
                 })
             
-            # 讀取Excel檔案
+            # 讀取檔案
             try:
-                wb = load_workbook(excel_file)
-                ws = wb.active
-                
                 created_reports = []
                 errors = []
                 
-                # 跳過標題行，從第二行開始讀取
-                for row in range(2, ws.max_row + 1):
-                    try:
-                        # 讀取各欄位資料 - 按照圖片格式
-                        equipment_name = ws.cell(row=row, column=1).value
-                        company_code = ws.cell(row=row, column=2).value
-                        work_date_str = ws.cell(row=row, column=3).value
-                        start_time_str = ws.cell(row=row, column=4).value
-                        end_time_str = ws.cell(row=row, column=5).value
-                        workorder_number = ws.cell(row=row, column=6).value
-                        product_code = ws.cell(row=row, column=7).value
-                        operation = ws.cell(row=row, column=8).value
-                        work_quantity = ws.cell(row=row, column=9).value
-                        defect_quantity = ws.cell(row=row, column=10).value
-                        remarks = ws.cell(row=row, column=11).value
-                        
-                        # 驗證必要欄位
-                        if not equipment_name or not work_date_str or not work_quantity:
-                            errors.append(f'第 {row} 行：缺少必要欄位（設備、報工日期、工作數量）')
-                            continue
-                        
-                        # 解析日期
+                if file_name.endswith('.xlsx'):
+                    # 讀取Excel檔案
+                    wb = load_workbook(excel_file)
+                    ws = wb.active
+                    
+                    # 跳過標題行，從第二行開始讀取
+                    for row in range(2, ws.max_row + 1):
                         try:
-                            if isinstance(work_date_str, str):
-                                work_date = datetime.strptime(work_date_str, '%Y-%m-%d').date()
+                            # 讀取各欄位資料 - 確保所有欄位都轉換為字串
+                            equipment_name = str(ws.cell(row=row, column=1).value) if ws.cell(row=row, column=1).value else ''
+                            company_code = str(ws.cell(row=row, column=2).value) if ws.cell(row=row, column=2).value else ''
+                            work_date_str = str(ws.cell(row=row, column=3).value) if ws.cell(row=row, column=3).value else ''
+                            start_time_str = str(ws.cell(row=row, column=4).value) if ws.cell(row=row, column=4).value else ''
+                            end_time_str = str(ws.cell(row=row, column=5).value) if ws.cell(row=row, column=5).value else ''
+                            workorder_number = str(ws.cell(row=row, column=6).value) if ws.cell(row=row, column=6).value else ''
+                            product_code = str(ws.cell(row=row, column=7).value) if ws.cell(row=row, column=7).value else ''
+                            operation = str(ws.cell(row=row, column=8).value) if ws.cell(row=row, column=8).value else ''
+                            work_quantity = ws.cell(row=row, column=9).value if ws.cell(row=row, column=9).value else 0
+                            defect_quantity = ws.cell(row=row, column=10).value if ws.cell(row=row, column=10).value else 0
+                            remarks = str(ws.cell(row=row, column=11).value) if ws.cell(row=row, column=11).value else ''
+                            
+                            # 處理單行資料
+                            result = process_smt_supplement_row(
+                                row, equipment_name, company_code, work_date_str, start_time_str, end_time_str,
+                                workorder_number, product_code, operation, work_quantity, defect_quantity, remarks, request
+                            )
+                            
+                            if result['success']:
+                                created_reports.append(result['data'])
                             else:
-                                work_date = work_date_str.date()
-                        except:
-                            errors.append(f'第 {row} 行：報工日期格式錯誤')
-                            continue
-                        
-                        # 解析時間 - 支援多種格式
-                        def parse_time(time_str):
-                            """解析時間字串，支援多種格式"""
-                            # 如果已經是 time 物件，直接返回
-                            if hasattr(time_str, 'hour') and hasattr(time_str, 'minute'):
-                                return time_str
-                            
-                            # 如果是 datetime 物件，轉換為 time
-                            if hasattr(time_str, 'time'):
-                                return time_str.time()
-                            
-                            # 如果是字串，進行解析
-                            if isinstance(time_str, str):
-                                time_str = time_str.strip()
+                                errors.append(result['error'])
                                 
-                                # 支援的格式列表
-                                time_formats = [
-                                    '%H:%M:%S %p',      # 02:15:00 PM
-                                    '%I:%M:%S %p',      # 02:15:00 PM (12小時制)
-                                    '%H:%M %p',         # 14:15 PM
-                                    '%I:%M %p',         # 02:15 PM
-                                    '%H:%M:%S',         # 14:15:00
-                                    '%H:%M',            # 14:15
-                                    '%I:%M:%S',         # 02:15:00 (12小時制)
-                                    '%I:%M',            # 02:15 (12小時制)
-                                ]
-                                
-                                for fmt in time_formats:
-                                    try:
-                                        return datetime.strptime(time_str, fmt).time()
-                                    except ValueError:
-                                        continue
-                                
-                                raise ValueError(f"無法解析時間格式: {time_str}")
+                        except Exception as e:
+                            errors.append(f'第 {row} 行：{str(e)}')
                             
-                            # 其他情況，嘗試轉換
-                            return time_str
-                        
-                        try:
-                            start_time = parse_time(start_time_str)
-                            end_time = parse_time(end_time_str)
-                        except ValueError as e:
-                            errors.append(f'第 {row} 行：時間格式錯誤 - {str(e)}')
-                            continue
-                        
-                        # 取得設備
-                        try:
-                            equipment = Equipment.objects.get(name=equipment_name)
-                        except Equipment.DoesNotExist:
-                            errors.append(f'第 {row} 行：找不到設備名稱 {equipment_name}')
-                            continue
-                        
-                        # 處理工單（根據製令號碼判斷是否為RD樣品）
-                        workorder = None
-                        report_type = 'normal'  # 預設為正式報工
-                        if workorder_number == 'RD樣品':
-                            report_type = 'rd_sample'
-                        elif workorder_number:
-                            try:
-                                workorder = WorkOrder.objects.get(order_number=workorder_number)
-                            except WorkOrder.DoesNotExist:
-                                errors.append(f'第 {row} 行：找不到工單號 {workorder_number}')
-                                continue
-                        
-                        # 創建補登記錄
-                        report = SMTProductionReport.objects.create(
-                            equipment=equipment,
-                            workorder=workorder,
-                            rd_workorder_number=workorder_number if report_type == 'rd_sample' else None,
-                            rd_product_code=product_code if report_type == 'rd_sample' else None,
-                            work_date=work_date,
-                            start_time=start_time,
-                            end_time=end_time,
-                            work_quantity=int(work_quantity),
-                            defect_quantity=int(defect_quantity) if defect_quantity else 0,
-                            operation=operation or 'SMT貼片',
-                            remarks=remarks or '',
-                            report_type=report_type,
-                            created_by=request.user.username,
-                            approval_status='pending'
-                        )
-                        
-                        created_reports.append({
-                            'id': report.id,
-                            'equipment': equipment.name,
-                            'workorder': workorder_number or (workorder.order_number if workorder else ''),
-                            'quantity': report.work_quantity,
+                else:
+                    # 讀取CSV檔案
+                    import pandas as pd
+                    import io
+                    
+                    # 讀取CSV檔案 - 禁用自動日期解析，避免 fromisoformat 錯誤
+                    df = pd.read_csv(excel_file, parse_dates=False)
+                    
+                    # 檢查必要欄位
+                    required_columns = ['設備', '公司別', '報工日期', '開始時間', '完成時間', '製令號碼', '機種名稱', '工序', '工作數量', '不良品數量', '備註']
+                    missing_columns = [col for col in required_columns if col not in df.columns]
+                    
+                    if missing_columns:
+                        return JsonResponse({
+                            'success': False,
+                            'message': f'CSV檔案缺少必要欄位：{", ".join(missing_columns)}'
                         })
-                        
-                    except Exception as e:
-                        errors.append(f'第 {row} 行：{str(e)}')
+                    
+                    # 處理每一行資料
+                    for index, row_data in df.iterrows():
+                        try:
+                            # 讀取各欄位資料 - 確保所有欄位都轉換為字串
+                            equipment_name = str(row_data['設備']) if pd.notna(row_data['設備']) else ''
+                            company_code = str(row_data['公司別']) if pd.notna(row_data['公司別']) else ''
+                            work_date_str = str(row_data['報工日期']) if pd.notna(row_data['報工日期']) else ''
+                            start_time_str = str(row_data['開始時間']) if pd.notna(row_data['開始時間']) else ''
+                            end_time_str = str(row_data['完成時間']) if pd.notna(row_data['完成時間']) else ''
+                            workorder_number = str(row_data['製令號碼']) if pd.notna(row_data['製令號碼']) else ''
+                            product_code = str(row_data['機種名稱']) if pd.notna(row_data['機種名稱']) else ''
+                            operation = str(row_data['工序']) if pd.notna(row_data['工序']) else ''
+                            work_quantity = row_data['工作數量'] if pd.notna(row_data['工作數量']) else 0
+                            defect_quantity = row_data['不良品數量'] if pd.notna(row_data['不良品數量']) else 0
+                            remarks = str(row_data['備註']) if pd.notna(row_data['備註']) else ''
+                            
+                            # 處理單行資料
+                            result = process_smt_supplement_row(
+                                index + 2, equipment_name, company_code, work_date_str, start_time_str, end_time_str,
+                                workorder_number, product_code, operation, work_quantity, defect_quantity, remarks, request
+                            )
+                            
+                            if result['success']:
+                                created_reports.append(result['data'])
+                            else:
+                                errors.append(result['error'])
+                                
+                        except Exception as e:
+                            errors.append(f'第 {index + 2} 行：{str(e)}')
                 
                 return JsonResponse({
                     'success': True,
@@ -5733,75 +5900,346 @@ def operator_supplement_export(request):
 
 def operator_supplement_template(request):
     """
-    作業員補登報工匯入範本下載 - Excel格式
+    作業員補登報工匯入範本下載 - 支援Excel和CSV格式
     """
-    from django.http import HttpResponse
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    from openpyxl.utils import get_column_letter
+    format_type = request.GET.get('format', 'xlsx')
     
-    # 建立工作簿
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "作業員補登報工範本"
-    
-    # 設定標題樣式
-    header_font = Font(name='微軟正黑體', size=12, bold=True, color='FFFFFF')
-    header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
-    header_alignment = Alignment(horizontal='center', vertical='center')
-    
-    # 設定資料樣式
-    data_font = Font(name='微軟正黑體', size=11)
-    data_alignment = Alignment(horizontal='center', vertical='center')
-    
-    # 設定邊框
-    thin_border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-    
-    # 標題行 - 增加設備欄位，使用名稱而不是ID
-    headers = [
-        '公司代號', '報工日期', '開始時間', '結束時間', '作業員名稱', '工單號', '工序名稱', 
-        '設備名稱', '報工數量', '不良品數量', '備註', '報工類型'
-    ]
-    
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_alignment
-        cell.border = thin_border
-    
-    # 寫入範例資料 - 使用12小時制格式
-    example_data = [
-        ['COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', '張小明', 'WO-2024-001', '目檢', '目檢台A', '100', '5', '正常生產', '正式報工'],
-        ['COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', '李美玲', '', '測試', '測試設備B', '50', '2', 'RD樣品測試', 'RD樣品'],
-        ['COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', '王大華', 'WO-2024-002', '包裝', '包裝機C', '150', '3', '大量生產', '正式報工'],
-    ]
-    
-    for row, data in enumerate(example_data, 2):
-        for col, value in enumerate(data, 1):
-            cell = ws.cell(row=row, column=col, value=value)
-            cell.font = data_font
-            cell.alignment = data_alignment
+    if format_type == 'csv':
+        # 建立CSV範本
+        from django.http import HttpResponse
+        import csv
+        
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = 'attachment; filename="operator_supplement_template.csv"'
+        
+        # 寫入CSV內容
+        writer = csv.writer(response)
+        
+        # 標題行
+        headers = [
+            '作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', '工單號', '產品編號', 
+            '工序名稱', '設備名稱', '報工數量', '不良品數量', '備註'
+        ]
+        writer.writerow(headers)
+        
+        # 範例資料行
+        example_data = [
+            ['張小明', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', '目檢', '目檢台A', '100', '5', '正常生產'],
+            ['李美玲', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', '', 'PROD-002', '測試', '測試設備B', '50', '2', 'RD樣品測試'],
+            ['王大華', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-003', '包裝', '包裝機C', '150', '3', '大量生產'],
+        ]
+        
+        for row in example_data:
+            writer.writerow(row)
+        
+        return response
+    else:
+        # 建立Excel範本
+        from django.http import HttpResponse
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+        
+        # 建立工作簿
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "作業員補登報工範本"
+        
+        # 設定標題樣式
+        header_font = Font(name='微軟正黑體', size=12, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center')
+        
+        # 設定資料樣式
+        data_font = Font(name='微軟正黑體', size=11)
+        data_alignment = Alignment(horizontal='center', vertical='center')
+        
+        # 設定邊框
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # 標題行 - 增加設備欄位，使用名稱而不是ID
+        headers = [
+            '作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', '工單號', '產品編號', 
+            '工序名稱', '設備名稱', '報工數量', '不良品數量', '備註'
+        ]
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
             cell.border = thin_border
+        
+        # 寫入範例資料 - 使用12小時制格式
+        example_data = [
+            ['張小明', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', '目檢', '目檢台A', '100', '5', '正常生產'],
+            ['李美玲', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', '', 'PROD-002', '測試', '測試設備B', '50', '2', 'RD樣品測試'],
+            ['王大華', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-003', '包裝', '包裝機C', '150', '3', '大量生產'],
+        ]
+        
+        for row, data in enumerate(example_data, 2):
+            for col, value in enumerate(data, 1):
+                cell = ws.cell(row=row, column=col, value=value)
+                cell.font = data_font
+                cell.alignment = data_alignment
+                cell.border = thin_border
+        
+        # 自動調整欄寬
+        for col in range(1, len(headers) + 1):
+            ws.column_dimensions[get_column_letter(col)].width = 15
+        
+        # 建立回應
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="operator_supplement_template.xlsx"'
+        
+        # 儲存檔案
+        wb.save(response)
+        return response
+
+
+def process_operator_supplement_row(row_num, operator_name, company_code, work_date_str, start_time_str, end_time_str,
+                                   workorder_number, product_code, process_name, equipment_name,
+                                   work_quantity, defect_quantity, remarks, request):
+    """
+    處理作業員補登報工單行資料
+    支援多種時間格式，與SMT報工匯入保持一致
+    """
+    from .models import OperatorSupplementReport, WorkOrder
+    from process.models import Operator, ProcessName
+    from equip.models import Equipment
+    from erp_integration.models import CompanyConfig
+    from datetime import datetime
     
-    # 自動調整欄寬
-    for col in range(1, len(headers) + 1):
-        ws.column_dimensions[get_column_letter(col)].width = 15
-    
-    # 建立回應
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = 'attachment; filename="operator_supplement_template.xlsx"'
-    
-    # 儲存檔案
-    wb.save(response)
-    return response
+    try:
+        # 驗證必要欄位
+        if not company_code or not work_date_str or not operator_name:
+            return {
+                'success': False,
+                'error': f'第 {row_num} 行：缺少必要欄位（公司代號、報工日期、作業員名稱）'
+            }
+        
+        # 解析日期 - 支援多種格式
+        try:
+            if isinstance(work_date_str, str):
+                work_date_str = work_date_str.strip()
+                
+                # 如果包含時間部分，先提取日期部分
+                if ' ' in work_date_str:
+                    work_date_str = work_date_str.split(' ')[0]
+                
+                # 支援的日期格式列表
+                date_formats = [
+                    '%Y-%m-%d',           # 2024-01-15
+                    '%Y/%m/%d',           # 2024/01/15
+                ]
+                
+                work_date = None
+                for fmt in date_formats:
+                    try:
+                        parsed_datetime = datetime.strptime(work_date_str, fmt)
+                        work_date = parsed_datetime.date()
+                        break
+                    except ValueError:
+                        continue
+                
+                if work_date is None:
+                    return {
+                        'success': False,
+                        'error': f'第 {row_num} 行：報工日期格式錯誤 - 無法解析 {work_date_str}'
+                    }
+                    
+            elif hasattr(work_date_str, 'date'):
+                # 如果是datetime物件
+                work_date = work_date_str.date()
+            elif hasattr(work_date_str, 'strftime'):
+                # 如果是date物件
+                work_date = work_date_str
+            else:
+                return {
+                    'success': False,
+                    'error': f'第 {row_num} 行：報工日期格式錯誤 - 無法解析 {type(work_date_str)}'
+                }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'第 {row_num} 行：報工日期格式錯誤 - {str(e)}'
+            }
+        
+        # 解析時間 - 支援多種格式
+        def parse_time(time_str):
+            """解析時間字串，支援多種格式"""
+            # 如果已經是 time 物件，直接返回
+            if hasattr(time_str, 'hour') and hasattr(time_str, 'minute'):
+                return time_str
+            
+            # 如果是 datetime 物件，轉換為 time
+            if hasattr(time_str, 'time'):
+                return time_str.time()
+            
+            # 如果是字串，進行解析
+            if isinstance(time_str, str):
+                time_str = time_str.strip()
+                
+                # 支援的格式列表
+                time_formats = [
+                    '%H:%M:%S %p',      # 02:15:00 PM
+                    '%I:%M:%S %p',      # 02:15:00 PM (12小時制)
+                    '%H:%M %p',         # 14:15 PM
+                    '%I:%M %p',         # 02:15 PM
+                    '%H:%M:%S',         # 14:15:00
+                    '%H:%M',            # 14:15
+                    '%I:%M:%S',         # 02:15:00 (12小時制)
+                    '%I:%M',            # 02:15 (12小時制)
+                ]
+                
+                for fmt in time_formats:
+                    try:
+                        return datetime.strptime(time_str, fmt).time()
+                    except ValueError:
+                        continue
+                
+                raise ValueError(f"無法解析時間格式: {time_str}")
+            
+            # 其他情況，嘗試轉換
+            return time_str
+        
+        try:
+            start_time = parse_time(start_time_str)
+            end_time = parse_time(end_time_str)
+        except ValueError as e:
+            return {
+                'success': False,
+                'error': f'第 {row_num} 行：時間格式錯誤 - {str(e)}'
+            }
+        
+        # 先查找公司配置
+        try:
+            company_config = CompanyConfig.objects.get(company_code=company_code)
+        except CompanyConfig.DoesNotExist:
+            return {
+                'success': False,
+                'error': f'第 {row_num} 行：找不到公司代號 {company_code}'
+            }
+        
+        # 取得作業員（根據名稱）
+        try:
+            operator = Operator.objects.get(name=operator_name)
+        except Operator.DoesNotExist:
+            return {
+                'success': False,
+                'error': f'第 {row_num} 行：找不到作業員 {operator_name}'
+            }
+        
+        # 取得工序（根據名稱）
+        process = None
+        if process_name:
+            try:
+                process = ProcessName.objects.get(name=process_name)
+            except ProcessName.DoesNotExist:
+                return {
+                    'success': False,
+                    'error': f'第 {row_num} 行：找不到工序 {process_name}'
+                }
+        
+        # 取得設備（根據名稱，可選）
+        equipment = None
+        if equipment_name:
+            try:
+                equipment = Equipment.objects.get(name=equipment_name)
+            except Equipment.DoesNotExist:
+                # 設備名稱找不到時，只記錄警告，不中斷處理
+                print(f'警告：第 {row_num} 行找不到設備 {equipment_name}，將使用空值')
+                equipment = None
+        
+        # 處理工單（根據工單號）
+        workorder = None
+        if workorder_number:
+            try:
+                workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
+                if not workorder:
+                    return {
+                        'success': False,
+                        'error': f'第 {row_num} 行：找不到工單號 {workorder_number}'
+                    }
+            except Exception as e:
+                return {
+                    'success': False,
+                    'error': f'第 {row_num} 行：工單查詢錯誤 - {str(e)}'
+                }
+        
+        # 處理報工數量
+        if work_quantity is None or work_quantity == '':
+            work_quantity = 0
+        else:
+            try:
+                work_quantity = int(work_quantity)
+                if work_quantity < 0:
+                    return {
+                        'success': False,
+                        'error': f'第 {row_num} 行：報工數量不能為負數'
+                    }
+            except (ValueError, TypeError):
+                return {
+                    'success': False,
+                    'error': f'第 {row_num} 行：報工數量格式錯誤'
+                }
+        
+        # 處理不良品數量
+        if defect_quantity is None or defect_quantity == '':
+            defect_quantity = 0
+        else:
+            try:
+                defect_quantity = int(defect_quantity)
+                if defect_quantity < 0:
+                    return {
+                        'success': False,
+                        'error': f'第 {row_num} 行：不良品數量不能為負數'
+                    }
+            except (ValueError, TypeError):
+                return {
+                    'success': False,
+                    'error': f'第 {row_num} 行：不良品數量格式錯誤'
+                }
+        
+        # 創建補登記錄
+        report = OperatorSupplementReport.objects.create(
+            operator=operator,
+            workorder=workorder,
+            process=process,
+            equipment=equipment,
+            work_date=work_date,
+            start_time=start_time,
+            end_time=end_time,
+            work_quantity=work_quantity,
+            defect_quantity=defect_quantity,
+            remarks=remarks or '',
+            report_type='normal',  # 預設為正式報工
+            created_by=request.user.username,
+            approval_status='pending'
+        )
+        
+        return {
+            'success': True,
+            'data': {
+                'id': report.id,
+                'operator': operator.name,
+                'workorder': workorder_number or (workorder.order_number if workorder else ''),
+                'quantity': report.work_quantity,
+            }
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'第 {row_num} 行：{str(e)}'
+        }
 
 
 @require_POST
@@ -5823,167 +6261,106 @@ def operator_supplement_batch_create(request):
             excel_file = request.FILES['file']
             
             # 檢查檔案格式
-            if not excel_file.name.endswith('.xlsx'):
+            file_name = excel_file.name.lower()
+            if not (file_name.endswith('.xlsx') or file_name.endswith('.csv')):
                 return JsonResponse({
                     'success': False,
-                    'message': '請上傳 Excel 格式檔案 (.xlsx)'
+                    'message': '請上傳 Excel (.xlsx) 或 CSV 格式檔案'
                 })
             
-            # 讀取Excel檔案
+            # 讀取檔案
             try:
-                wb = load_workbook(excel_file)
-                ws = wb.active
-                
                 created_reports = []
                 errors = []
                 
-                # 跳過標題行，從第二行開始讀取
-                for row in range(2, ws.max_row + 1):
-                    try:
-                        # 讀取各欄位資料
-                        company_code = ws.cell(row=row, column=1).value
-                        work_date_str = ws.cell(row=row, column=2).value
-                        start_time_str = ws.cell(row=row, column=3).value
-                        end_time_str = ws.cell(row=row, column=4).value
-                        operator_name = ws.cell(row=row, column=5).value
-                        workorder_number = ws.cell(row=row, column=6).value
-                        process_name = ws.cell(row=row, column=7).value
-                        equipment_name = ws.cell(row=row, column=8).value
-                        work_quantity = ws.cell(row=row, column=9).value
-                        defect_quantity = ws.cell(row=row, column=10).value
-                        remarks = ws.cell(row=row, column=11).value
-                        report_type = ws.cell(row=row, column=12).value
-                        
-                        # 驗證必要欄位
-                        if not company_code or not work_date_str or not operator_name or not work_quantity:
-                            errors.append(f'第 {row} 行：缺少必要欄位（公司代號、報工日期、作業員名稱、報工數量）')
-                            continue
-                        
-                        # 解析日期
+                if file_name.endswith('.xlsx'):
+                    # 讀取Excel檔案
+                    wb = load_workbook(excel_file)
+                    ws = wb.active
+                    
+                    # 跳過標題行，從第二行開始讀取
+                    for row in range(2, ws.max_row + 1):
                         try:
-                            if isinstance(work_date_str, str):
-                                work_date = datetime.strptime(work_date_str, '%Y-%m-%d').date()
+                            # 讀取各欄位資料 - 確保所有欄位都轉換為字串
+                            operator_name = str(ws.cell(row=row, column=1).value) if ws.cell(row=row, column=1).value else ''
+                            company_code = str(ws.cell(row=row, column=2).value) if ws.cell(row=row, column=2).value else ''
+                            work_date_str = str(ws.cell(row=row, column=3).value) if ws.cell(row=row, column=3).value else ''
+                            start_time_str = str(ws.cell(row=row, column=4).value) if ws.cell(row=row, column=4).value else ''
+                            end_time_str = str(ws.cell(row=row, column=5).value) if ws.cell(row=row, column=5).value else ''
+                            workorder_number = str(ws.cell(row=row, column=6).value) if ws.cell(row=row, column=6).value else ''
+                            product_code = str(ws.cell(row=row, column=7).value) if ws.cell(row=row, column=7).value else ''
+                            process_name = str(ws.cell(row=row, column=8).value) if ws.cell(row=row, column=8).value else ''
+                            equipment_name = str(ws.cell(row=row, column=9).value) if ws.cell(row=row, column=9).value else ''
+                            work_quantity = ws.cell(row=row, column=10).value if ws.cell(row=row, column=10).value else 0
+                            defect_quantity = ws.cell(row=row, column=11).value if ws.cell(row=row, column=11).value else 0
+                            remarks = str(ws.cell(row=row, column=12).value) if ws.cell(row=row, column=12).value else ''
+                            
+                            # 處理單行資料
+                            result = process_operator_supplement_row(
+                                row, operator_name, company_code, work_date_str, start_time_str, end_time_str,
+                                workorder_number, product_code, process_name, equipment_name,
+                                work_quantity, defect_quantity, remarks, request
+                            )
+                            
+                            if result['success']:
+                                created_reports.append(result['data'])
                             else:
-                                work_date = work_date_str.date()
-                        except:
-                            errors.append(f'第 {row} 行：報工日期格式錯誤')
-                            continue
-                        
-                        # 解析時間 - 支援多種格式
-                        def parse_time(time_str):
-                            """解析時間字串，支援多種格式"""
-                            # 如果已經是 time 物件，直接返回
-                            if hasattr(time_str, 'hour') and hasattr(time_str, 'minute'):
-                                return time_str
-                            
-                            # 如果是 datetime 物件，轉換為 time
-                            if hasattr(time_str, 'time'):
-                                return time_str.time()
-                            
-                            # 如果是字串，進行解析
-                            if isinstance(time_str, str):
-                                time_str = time_str.strip()
+                                errors.append(result['error'])
                                 
-                                # 支援的格式列表
-                                time_formats = [
-                                    '%H:%M:%S %p',      # 02:15:00 PM
-                                    '%I:%M:%S %p',      # 02:15:00 PM (12小時制)
-                                    '%H:%M %p',         # 14:15 PM
-                                    '%I:%M %p',         # 02:15 PM
-                                    '%H:%M:%S',         # 14:15:00
-                                    '%H:%M',            # 14:15
-                                    '%I:%M:%S',         # 02:15:00 (12小時制)
-                                    '%I:%M',            # 02:15 (12小時制)
-                                ]
-                                
-                                for fmt in time_formats:
-                                    try:
-                                        return datetime.strptime(time_str, fmt).time()
-                                    except ValueError:
-                                        continue
-                                
-                                raise ValueError(f"無法解析時間格式: {time_str}")
+                        except Exception as e:
+                            errors.append(f'第 {row} 行：{str(e)}')
                             
-                            # 其他情況，嘗試轉換
-                            return time_str
-                        
-                        try:
-                            start_time = parse_time(start_time_str)
-                            end_time = parse_time(end_time_str)
-                        except ValueError as e:
-                            errors.append(f'第 {row} 行：時間格式錯誤 - {str(e)}')
-                            continue
-                        
-                        # 先查找公司配置
-                        try:
-                            from erp_integration.models import CompanyConfig
-                            company_config = CompanyConfig.objects.get(company_code=company_code)
-                        except CompanyConfig.DoesNotExist:
-                            errors.append(f'第 {row} 行：找不到公司代號 {company_code}')
-                            continue
-                        
-                        # 取得作業員（根據名稱）
-                        try:
-                            operator = Operator.objects.get(name=operator_name)
-                        except Operator.DoesNotExist:
-                            errors.append(f'第 {row} 行：找不到作業員 {operator_name}')
-                            continue
-                        
-                        # 取得工序（根據名稱）
-                        process = None
-                        if process_name:
-                            try:
-                                process = ProcessName.objects.get(name=process_name)
-                            except ProcessName.DoesNotExist:
-                                errors.append(f'第 {row} 行：找不到工序 {process_name}')
-                                continue
-                        
-                        # 取得設備（根據名稱，可選）
-                        equipment = None
-                        if equipment_name:
-                            try:
-                                from equip.models import Equipment
-                                equipment = Equipment.objects.get(name=equipment_name)
-                            except Equipment.DoesNotExist:
-                                # 設備名稱找不到時，只記錄警告，不中斷處理
-                                print(f'警告：第 {row} 行找不到設備 {equipment_name}，將使用空值')
-                                equipment = None
-                        
-                        # 處理工單（根據報工類型）
-                        workorder = None
-                        if report_type == '正式報工' and workorder_number:
-                            try:
-                                workorder = WorkOrder.objects.get(order_number=workorder_number)
-                            except WorkOrder.DoesNotExist:
-                                errors.append(f'第 {row} 行：找不到工單號 {workorder_number}')
-                                continue
-                        
-                        # 創建補登記錄
-                        report = OperatorSupplementReport.objects.create(
-                            operator=operator,
-                            workorder=workorder,
-                            process=process,
-                            equipment=equipment,
-                            work_date=work_date,
-                            start_time=start_time,
-                            end_time=end_time,
-                            work_quantity=int(work_quantity),
-                            defect_quantity=int(defect_quantity) if defect_quantity else 0,
-                            remarks=remarks or '',
-                            report_type='rd_sample' if report_type == 'RD樣品' else 'normal',
-                            created_by=request.user.username,
-                            approval_status='pending'
-                        )
-                        
-                        created_reports.append({
-                            'id': report.id,
-                            'operator': operator.name,
-                            'workorder': workorder_number or (workorder.order_number if workorder else ''),
-                            'quantity': report.work_quantity,
+                else:
+                    # 讀取CSV檔案
+                    import pandas as pd
+                    import io
+                    
+                    # 讀取CSV檔案 - 禁用自動日期解析，避免 fromisoformat 錯誤
+                    df = pd.read_csv(excel_file, parse_dates=False)
+                    
+                    # 檢查必要欄位
+                    required_columns = ['作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', '工單號', '產品編號', '工序名稱', '設備名稱', '報工數量', '不良品數量', '備註']
+                    missing_columns = [col for col in required_columns if col not in df.columns]
+                    
+                    if missing_columns:
+                        return JsonResponse({
+                            'success': False,
+                            'message': f'CSV檔案缺少必要欄位：{", ".join(missing_columns)}'
                         })
+                    
+                    # 處理每一行資料
+                    for index, row_data in df.iterrows():
+                        try:
+                            # 讀取各欄位資料 - 確保所有欄位都轉換為字串
+                            operator_name = str(row_data['作業員名稱']) if pd.notna(row_data['作業員名稱']) else ''
+                            company_code = str(row_data['公司代號']) if pd.notna(row_data['公司代號']) else ''
+                            work_date_str = str(row_data['報工日期']) if pd.notna(row_data['報工日期']) else ''
+                            start_time_str = str(row_data['開始時間']) if pd.notna(row_data['開始時間']) else ''
+                            end_time_str = str(row_data['結束時間']) if pd.notna(row_data['結束時間']) else ''
+                            workorder_number = str(row_data['工單號']) if pd.notna(row_data['工單號']) else ''
+                            product_code = str(row_data['產品編號']) if pd.notna(row_data['產品編號']) else ''
+                            process_name = str(row_data['工序名稱']) if pd.notna(row_data['工序名稱']) else ''
+                            equipment_name = str(row_data['設備名稱']) if pd.notna(row_data['設備名稱']) else ''
+                            work_quantity = row_data['報工數量'] if pd.notna(row_data['報工數量']) else 0
+                            defect_quantity = row_data['不良品數量'] if pd.notna(row_data['不良品數量']) else 0
+                            remarks = str(row_data['備註']) if pd.notna(row_data['備註']) else ''
+                            
+                            # 處理單行資料
+                            result = process_operator_supplement_row(
+                                index + 2, operator_name, company_code, work_date_str, start_time_str, end_time_str,
+                                workorder_number, product_code, process_name, equipment_name,
+                                work_quantity, defect_quantity, remarks, request
+                            )
+                            
+                            if result['success']:
+                                created_reports.append(result['data'])
+                            else:
+                                errors.append(result['error'])
+                                
+                        except Exception as e:
+                            errors.append(f'第 {index + 2} 行：{str(e)}')
                         
-                    except Exception as e:
-                        errors.append(f'第 {row} 行：{str(e)}')
+
                 
                 return JsonResponse({
                     'success': True,

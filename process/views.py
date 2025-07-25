@@ -588,7 +588,7 @@ def standard_capacity_import(request):
 
             # 讀取 Excel 檔案
             if file.name.endswith(".csv"):
-                df = pd.read_csv(file, encoding="utf-8")
+                df = pd.read_csv(file, encoding="utf-8", parse_dates=False)
             else:
                 df = pd.read_excel(file)
 

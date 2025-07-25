@@ -390,8 +390,8 @@
             return false;
         }
         
-        if (completedQuantity <= 0) {
-            showAlert('完成數量必須大於0！', 'danger');
+        if (completedQuantity < 0) {
+            showAlert('完成數量不能為負數！', 'danger');
             return false;
         }
         

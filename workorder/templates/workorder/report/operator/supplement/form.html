@@ -939,9 +939,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             const workQuantity = document.getElementById('{{ form.work_quantity.id_for_label }}');
-            if (workQuantity && workQuantity.value && parseInt(workQuantity.value) <= 0) {
+            if (workQuantity && workQuantity.value && parseInt(workQuantity.value) < 0) {
                 e.preventDefault();
-                alert('工作數量必須大於0');
+                alert('工作數量不能為負數');
                 return false;
             }
             
