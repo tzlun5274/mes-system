@@ -6799,499 +6799,295 @@ class ManagerProductionReportDeleteView(LoginRequiredMixin, DeleteView):
         return super().delete(request, *args, **kwargs)
 
 
-class ManagerProductionReportApproveView(LoginRequiredMixin, UpdateView):
-    """
-    管理者生產報工記錄審核通過視圖
-    """
-    model = ManagerProductionReport
-    form_class = ManagerProductionReportApprovalForm
-    template_name = 'workorder/manager_production_approve.html'
-    success_url = reverse_lazy('workorder:manager_production_list')
-    
-    def dispatch(self, request, *args, **kwargs):
-        """檢查權限"""
-        obj = self.get_object()
-        if not obj.can_approve(request.user):
-            messages.error(request, '您沒有權限進行審核！')
-            return redirect('workorder:manager_production_list')
-        
-        if obj.approval_status == 'approved':
-            messages.error(request, '此記錄已經審核通過！')
-            return redirect('workorder:manager_production_list')
-        
-        return super().dispatch(request, *args, **kwargs)
-    
-    def form_valid(self, form):
-        """表單驗證成功"""
-        remarks = form.cleaned_data.get('approval_remarks', '')
-        
-        try:
-            self.object.approve(self.request.user, remarks)
-            messages.success(self.request, '管理者生產報工記錄審核通過！')
-        except PermissionError as e:
-            messages.error(self.request, str(e))
-            return self.form_invalid(form)
-        
-        return redirect(self.success_url)
+# ==================== 作業員現場報工功能 ====================
 
-
-class ManagerProductionReportRejectView(LoginRequiredMixin, UpdateView):
-    """
-    管理者生產報工記錄駁回視圖
-    """
-    model = ManagerProductionReport
-    form_class = ManagerProductionReportRejectionForm
-    template_name = 'workorder/manager_production_reject.html'
-    success_url = reverse_lazy('workorder:manager_production_list')
-    
-    def dispatch(self, request, *args, **kwargs):
-        """檢查權限"""
-        obj = self.get_object()
-        if not obj.can_approve(request.user):
-            messages.error(request, '您沒有權限進行審核！')
-            return redirect('workorder:manager_production_list')
-        
-        if obj.approval_status == 'approved':
-            messages.error(request, '此記錄已經審核通過！')
-            return redirect('workorder:manager_production_list')
-        
-        return super().dispatch(request, *args, **kwargs)
-    
-    def form_valid(self, form):
-        """表單驗證成功"""
-        reason = form.cleaned_data.get('rejection_reason', '')
-        
-        try:
-            self.object.reject(self.request.user, reason)
-            messages.success(self.request, '管理者生產報工記錄已駁回！')
-        except PermissionError as e:
-            messages.error(self.request, str(e))
-            return self.form_invalid(form)
-        
-        return redirect(self.success_url)
-
-
-class ManagerProductionReportBatchView(LoginRequiredMixin, CreateView):
-    """
-    管理者生產報工記錄批量創建視圖
-    """
-    model = ManagerProductionReport
-    form_class = ManagerProductionReportBatchForm
-    template_name = 'workorder/manager_production_batch.html'
-    success_url = reverse_lazy('workorder:manager_production_list')
-    
-    def form_valid(self, form):
-        """表單驗證成功"""
-        # 取得表單資料
-        manager = form.cleaned_data['manager']
-        workorder = form.cleaned_data['workorder']
-        process = form.cleaned_data['process']
-        equipment = form.cleaned_data.get('equipment')
-        operator = form.cleaned_data.get('operator')
-        start_date = form.cleaned_data['start_date']
-        end_date = form.cleaned_data['end_date']
-        start_time = form.cleaned_data['start_time']
-        end_time = form.cleaned_data['end_time']
-        daily_work_quantity = form.cleaned_data['daily_work_quantity']
-        daily_defect_quantity = form.cleaned_data.get('daily_defect_quantity', 0)
-        completion_method = form.cleaned_data['completion_method']
-        remarks = form.cleaned_data.get('remarks', '')
-        
-        # 批量創建記錄
-        created_count = 0
-        current_date = start_date
-        
-        while current_date <= end_date:
-            report = ManagerProductionReport(
-                manager=manager,
-                workorder=workorder,
-                planned_quantity=workorder.quantity,
-                process=process,
-                equipment=equipment,
-                operator=operator,
-                work_date=current_date,
-                start_time=start_time,
-                end_time=end_time,
-                work_quantity=daily_work_quantity,
-                defect_quantity=daily_defect_quantity,
-                completion_method=completion_method,
-                remarks=remarks,
-                created_by=self.request.user.username
-            )
-            
-            # 檢查自動完工狀態
-            report.check_auto_completion()
-            report.save()
-            
-            created_count += 1
-            current_date += timedelta(days=1)
-        
-        messages.success(self.request, f'成功批量創建 {created_count} 筆管理者生產報工記錄！')
-        return redirect(self.success_url)
-    
-    def get_context_data(self, **kwargs):
-        """取得上下文資料"""
-        context = super().get_context_data(**kwargs)
-        context['title'] = '批量創建管理者生產報工記錄'
-        context['submit_text'] = '批量創建'
-        return context
-
-
-# API 視圖
+@require_GET
 @csrf_exempt
-def manager_get_workorders_by_product(request):
+def get_workorders_by_operator(request):
     """
-    根據產品編號取得工單列表 API
+    API：根據作業員 ID 獲取該作業員可操作的工單列表
+    用於作業員現場報工系統中的工單選擇
     """
-    if request.method == 'GET':
-        product_id = request.GET.get('product_id', '')
+    try:
+        operator_id = request.GET.get('operator_id')
         
-        if not product_id:
-            return JsonResponse({'error': '請提供產品編號'}, status=400)
+        if not operator_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': '請提供作業員 ID'
+            })
         
-        workorders = WorkOrder.objects.filter(
-            product_code__icontains=product_id
-        ).values('id', 'order_number', 'product_code', 'quantity', 'status')
-        
-        return JsonResponse({
-            'workorders': list(workorders)
-        })
-    
-    return JsonResponse({'error': '不支援的請求方法'}, status=405)
-
-
-@csrf_exempt
-def manager_batch_create_api(request):
-    """
-    批量創建管理者生產報工記錄 API
-    """
-    if request.method == 'POST':
+        # 取得作業員
         try:
-            data = json.loads(request.body)
-            
-            # 驗證必要欄位
-            required_fields = ['manager', 'workorder_id', 'process_id', 'start_date', 'end_date', 
-                             'start_time', 'end_time', 'daily_work_quantity']
-            
-            for field in required_fields:
-                if field not in data:
-                    return JsonResponse({'error': f'缺少必要欄位: {field}'}, status=400)
-            
-            # 取得相關物件
-            try:
-                workorder = WorkOrder.objects.get(id=data['workorder_id'])
-                process = ProcessName.objects.get(id=data['process_id'])
-            except (WorkOrder.DoesNotExist, ProcessName.DoesNotExist):
-                return JsonResponse({'error': '工單或工序不存在'}, status=400)
-            
-            # 取得可選物件
-            equipment = None
-            operator = None
-            
-            if data.get('equipment_id'):
-                try:
-                    equipment = Equipment.objects.get(id=data['equipment_id'])
-                except Equipment.DoesNotExist:
-                    return JsonResponse({'error': '設備不存在'}, status=400)
-            
-            if data.get('operator_id'):
-                try:
-                    operator = Operator.objects.get(id=data['operator_id'])
-                except Operator.DoesNotExist:
-                    return JsonResponse({'error': '作業員不存在'}, status=400)
-            
-            # 解析日期和時間
-            start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
-            end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
-            start_time = datetime.strptime(data['start_time'], '%H:%M').time()
-            end_time = datetime.strptime(data['end_time'], '%H:%M').time()
-            
-            # 批量創建記錄
-            created_reports = []
-            current_date = start_date
-            
-            while current_date <= end_date:
-                report = ManagerProductionReport(
-                    manager=data['manager'],
-                    workorder=workorder,
-                    planned_quantity=workorder.quantity,
-                    process=process,
-                    equipment=equipment,
-                    operator=operator,
-                    work_date=current_date,
-                    start_time=start_time,
-                    end_time=end_time,
-                    work_quantity=data['daily_work_quantity'],
-                    defect_quantity=data.get('daily_defect_quantity', 0),
-                    completion_method=data.get('completion_method', 'manual'),
-                    remarks=data.get('remarks', ''),
-                    created_by=request.user.username if request.user.is_authenticated else 'system'
-                )
-                
-                # 檢查自動完工狀態
-                report.check_auto_completion()
-                report.save()
-                
-                created_reports.append({
-                    'id': report.id,
-                    'date': current_date.strftime('%Y-%m-%d'),
-                    'work_quantity': report.work_quantity
+            operator = Operator.objects.get(id=operator_id)
+        except Operator.DoesNotExist:
+            return JsonResponse({
+                'status': 'error',
+                'message': '找不到指定的作業員'
+            })
+        
+        # 查詢該作業員可操作的工單
+        # 1. 從 WorkOrderProcess 中查找分配給該作業員的工序
+        # 2. 取得這些工序對應的工單
+        workorder_processes = WorkOrderProcess.objects.filter(
+            assigned_operator=operator.name,
+            status__in=['pending', 'in_progress']
+        ).select_related('workorder')
+        
+        # 去重並整理工單資料
+        workorders = []
+        seen_workorder_ids = set()
+        
+        for process in workorder_processes:
+            workorder = process.workorder
+            if workorder.id not in seen_workorder_ids:
+                seen_workorder_ids.add(workorder.id)
+                workorders.append({
+                    'id': workorder.id,
+                    'order_number': workorder.order_number,
+                    'product_code': workorder.product_code,
+                    'quantity': workorder.quantity,
+                    'status': workorder.status,
+                    'status_display': workorder.get_status_display(),
+                    'process_name': process.process_name,
+                    'process_status': process.status,
+                    'process_status_display': process.get_status_display(),
                 })
-                
-                current_date += timedelta(days=1)
+        
+        # 如果沒有找到分配給該作業員的工單，則顯示所有狀態為 pending 或 in_progress 的工單
+        if not workorders:
+            all_workorders = WorkOrder.objects.filter(
+                status__in=['pending', 'in_progress']
+            ).order_by('-created_at')[:20]  # 限制顯示前20筆
             
-            return JsonResponse({
-                'success': True,
-                'message': f'成功創建 {len(created_reports)} 筆記錄',
-                'reports': created_reports
-            })
-            
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'JSON 格式錯誤'}, status=400)
-        except Exception as e:
-            return JsonResponse({'error': f'創建失敗: {str(e)}'}, status=500)
-    
-    return JsonResponse({'error': '不支援的請求方法'}, status=405)
+            for workorder in all_workorders:
+                workorders.append({
+                    'id': workorder.id,
+                    'order_number': workorder.order_number,
+                    'product_code': workorder.product_code,
+                    'quantity': workorder.quantity,
+                    'status': workorder.status,
+                    'status_display': workorder.get_status_display(),
+                    'process_name': '未分配',
+                    'process_status': 'pending',
+                    'process_status_display': '待生產',
+                })
+        
+        return JsonResponse({
+            'status': 'success',
+            'operator_name': operator.name,
+            'workorders': workorders,
+            'count': len(workorders)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'獲取工單列表失敗：{str(e)}'
+        })
 
+@require_GET
+@csrf_exempt
+def get_processes_by_workorder_for_operator(request):
+    """
+    API：根據工單 ID 獲取該工單的非SMT工序列表
+    用於作業員現場報工系統中的工序選擇
+    從派工單（WorkOrderProcess）讀取已派工的非SMT工序
+    """
+    try:
+        workorder_id = request.GET.get('workorder_id')
+        
+        if not workorder_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': '請提供工單 ID'
+            })
+        
+        # 取得工單
+        try:
+            workorder = WorkOrder.objects.get(id=workorder_id)
+        except WorkOrder.DoesNotExist:
+            return JsonResponse({
+                'status': 'error',
+                'message': '找不到指定的工單'
+            })
+        
+        # 從派工單讀取該工單的非SMT工序列表
+        processes = WorkOrderProcess.objects.filter(
+            workorder=workorder
+        ).filter(
+            ~models.Q(process_name__icontains='SMT') &  # 排除SMT相關工序
+            ~models.Q(process_name__icontains='貼片') &  # 排除貼片工序
+            ~models.Q(process_name__icontains='Pick') &  # 排除Pick工序
+            ~models.Q(process_name__icontains='Place')   # 排除Place工序
+        ).order_by('step_order')
+        
+        # 整理工序資料
+        process_list = []
+        for process in processes:
+            process_list.append({
+                'id': process.id,
+                'process_name': process.process_name,
+                'status': process.status,
+                'status_display': process.get_status_display(),
+                'step_order': process.step_order,
+                'assigned_equipment': process.assigned_equipment,
+                'assigned_operator': process.assigned_operator,
+            })
+        
+        return JsonResponse({
+            'status': 'success',
+            'workorder_number': workorder.order_number,
+            'product_code': workorder.product_code,
+            'processes': process_list,
+            'count': len(process_list)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'獲取工序列表失敗：{str(e)}'
+        })
 
 @require_POST
 @csrf_exempt
-def manager_production_report_approve_ajax(request, report_id):
+def submit_operator_report(request):
     """
-    AJAX：管理者生產報工記錄審核通過
+    API：提交作業員現場報工記錄
+    用於作業員現場報工系統的報工提交
     """
     try:
-        from .models import ManagerProductionReport
+        operator_id = request.POST.get('operator_id')
+        workorder_id = request.POST.get('workorder_id')
+        process_id = request.POST.get('process_id')
+        equipment_id = request.POST.get('equipment_id')  # 新增設備ID參數
+        quantity = request.POST.get('quantity')
+        production_status = request.POST.get('production_status')
+        notes = request.POST.get('notes', '')
         
-        report = ManagerProductionReport.objects.get(id=report_id)
-        
-        # 檢查權限
-        if not report.can_approve(request.user):
+        # 基本驗證
+        if not all([operator_id, workorder_id, process_id, production_status]):
             return JsonResponse({
-                'success': False,
-                'message': '您沒有權限審核此記錄'
+                'status': 'error',
+                'message': '請填寫所有必要欄位'
             })
         
-        # 審核通過
-        remarks = request.POST.get('remarks', '')
-        report.approve(request.user, remarks)
+        # 處理報工數量，允許為空
+        if quantity is None or quantity == '':
+            quantity = 0
+        else:
+            try:
+                quantity = int(quantity)
+                if quantity < 0:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': '報工數量不能為負數'
+                    })
+            except ValueError:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': '報工數量格式錯誤'
+                })
+        
+        # 取得作業員、工單和工序
+        operator = Operator.objects.get(id=operator_id)
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        
+        # 取得選擇的工序（從 WorkOrderProcess 讀取）
+        try:
+            selected_process = WorkOrderProcess.objects.get(id=process_id)
+            process_name = selected_process.process_name
+        except WorkOrderProcess.DoesNotExist:
+            return JsonResponse({
+                'status': 'error',
+                'message': '找不到指定的工序'
+            })
+        
+        # 建立作業員補登報工記錄
+        from .models import OperatorSupplementReport
+        from process.models import ProcessName
+        from django.utils import timezone
+        
+        # 取得或創建工序名稱
+        try:
+            process_obj = ProcessName.objects.get(name=process_name)
+        except ProcessName.DoesNotExist:
+            process_obj = ProcessName.objects.create(
+                name=process_name,
+                description=f'自動創建的{process_name}工序'
+            )
+        
+        # 取得設備資訊（如果提供）
+        equipment_obj = None
+        if equipment_id:
+            try:
+                from equip.models import Equipment
+                equipment_obj = Equipment.objects.get(id=equipment_id)
+            except Equipment.DoesNotExist:
+                equipment_obj = None
+        
+        # 建立報工記錄
+        report = OperatorSupplementReport.objects.create(
+            operator=operator,
+            workorder=workorder,
+            product_id=workorder.product_code,
+            planned_quantity=workorder.quantity,
+            process=process_obj,
+            operation=process_name,
+            equipment=equipment_obj,  # 使用設備物件
+            work_date=timezone.now().date(),
+            start_time=timezone.now().time(),
+            end_time=timezone.now().time(),
+            work_quantity=quantity,
+            defect_quantity=0,
+            is_completed=(production_status == 'complete'),
+            remarks=notes,
+            created_by=request.user.username if request.user.is_authenticated else 'system'
+        )
+        
+        # 更新工序狀態
+        if production_status == 'start':
+            selected_process.status = 'in_progress'
+            selected_process.actual_start_time = timezone.now()
+        elif production_status == 'complete':
+            selected_process.status = 'completed'
+            selected_process.actual_end_time = timezone.now()
+            selected_process.completed_quantity += quantity
+        
+        selected_process.save()
         
         return JsonResponse({
-            'success': True,
-            'message': '審核通過成功！'
+            'status': 'success',
+            'message': '作業員報工記錄提交成功',
+            'report_id': report.id
         })
         
-    except ManagerProductionReport.DoesNotExist:
+    except Operator.DoesNotExist:
         return JsonResponse({
-            'success': False,
-            'message': '找不到指定的管理者生產報工記錄'
+            'status': 'error',
+            'message': '找不到指定的作業員'
+        })
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': '找不到指定的工單'
+        })
+    except WorkOrderProcess.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': '找不到指定的工序'
+        })
+    except ValueError as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'資料格式錯誤：{str(e)}'
         })
     except Exception as e:
         return JsonResponse({
-            'success': False,
-            'message': f'審核失敗：{str(e)}'
+            'status': 'error',
+            'message': f'提交失敗：{str(e)}'
         })
 
-
-@require_POST
-@csrf_exempt
-def manager_production_report_reject_ajax(request, report_id):
-    """
-    AJAX：管理者生產報工記錄駁回
-    """
-    try:
-        from .models import ManagerProductionReport
-        
-        report = ManagerProductionReport.objects.get(id=report_id)
-        
-        # 檢查權限
-        if not report.can_approve(request.user):
-            return JsonResponse({
-                'success': False,
-                'message': '您沒有權限駁回此記錄'
-            })
-        
-        # 駁回
-        reason = request.POST.get('reason', '')
-        if not reason:
-            return JsonResponse({
-                'success': False,
-                'message': '請填寫駁回原因'
-            })
-        
-        report.reject(request.user, reason)
-        
-        return JsonResponse({
-            'success': True,
-            'message': '駁回成功！'
-        })
-        
-    except ManagerProductionReport.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'message': '找不到指定的管理者生產報工記錄'
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'駁回失敗：{str(e)}'
-        })
-
-def rd_sample_supplement_report_create(request):
-    """
-    RD樣品補登報工新增頁面
-    專門用於RD樣品的報工記錄
-    """
-    from datetime import date, time
-    from process.models import Operator, ProcessName
-    from .models import OperatorSupplementReport
-    from .forms import RDSampleSupplementReportForm
-    
-    if request.method == 'POST':
-        form = RDSampleSupplementReportForm(request.POST)
-        
-        if form.is_valid():
-            # 處理時間欄位
-            start_time_str = form.cleaned_data['start_time']
-            end_time_str = form.cleaned_data['end_time']
-            
-            try:
-                from datetime import datetime
-                start_time = datetime.strptime(start_time_str, '%H:%M').time()
-                end_time = datetime.strptime(end_time_str, '%H:%M').time()
-                
-                # 創建RD樣品補登記錄
-                supplement_report = form.save(commit=False)
-                supplement_report.start_time = start_time
-                supplement_report.end_time = end_time
-                supplement_report.created_by = request.user.username
-                
-                # 設定RD樣品報工相關欄位
-                supplement_report.report_type = 'rd_sample'
-                supplement_report.workorder = None
-                supplement_report.planned_quantity = 0
-                
-                supplement_report.save()
-                
-                messages.success(request, 'RD樣品補登報工記錄建立成功！')
-                return redirect('workorder:operator_supplement_report_index')
-            except ValueError:
-                form.add_error("start_time", "時間格式錯誤")
-                form.add_error("end_time", "時間格式錯誤")
-    else:
-        # 設定預設值
-        initial_data = {
-            'start_time': '08:30',
-            'end_time': '17:30',
-        }
-        form = RDSampleSupplementReportForm(initial=initial_data)
-    
-    context = {
-        "form": form,
-        "is_create": True,
-        "is_rd_sample": True,
-        "page_title": "新增RD樣品補登報工記錄",
-    }
-    
-    return render(request, 'workorder/report/operator/supplement/rd_sample_form.html', context)
-
-
-def smt_rd_sample_supplement_index(request):
-    """
-    SMTRD樣品補登管理頁面
-    顯示SMT生產線的RD樣品補登記錄列表
-    """
-    from .models import SMTProductionReport
-    
-    # 取得RD樣品補登記錄（目前為空，因為還沒有實作）
-    rd_sample_reports = []
-    
-    # 計算統計資料
-    total_count = len(rd_sample_reports)
-    pending_count = len([r for r in rd_sample_reports if r.approval_status == 'pending'])
-    approved_count = len([r for r in rd_sample_reports if r.approval_status == 'approved'])
-    rejected_count = len([r for r in rd_sample_reports if r.approval_status == 'rejected'])
-    
-    context = {
-        'rd_sample_reports': rd_sample_reports,
-        'total_count': total_count,
-        'pending_count': pending_count,
-        'approved_count': approved_count,
-        'rejected_count': rejected_count,
-        'page_title': 'SMTRD樣品補登管理',
-    }
-    
-    return render(request, 'workorder/report/smt/rd_sample_supplement/index.html', context)
-
-
-def rd_sample_supplement_report_edit(request, report_id):
-    """
-    RD樣品補登報工編輯頁面
-    專門用於編輯RD樣品的報工記錄
-    """
-    from datetime import date, time
-    from process.models import Operator, ProcessName
-    from .models import OperatorSupplementReport
-    from .forms import RDSampleSupplementReportForm
-    
-    try:
-        report = OperatorSupplementReport.objects.get(id=report_id)
-        
-        # 檢查是否為RD樣品報工記錄
-        if report.report_type != 'rd_sample':
-            messages.error(request, '此記錄不是RD樣品報工記錄，無法在此頁面編輯')
-            return redirect('workorder:operator_supplement_report_index')
-        
-    except OperatorSupplementReport.DoesNotExist:
-        messages.error(request, '找不到指定的RD樣品補登報工記錄')
-        return redirect('workorder:operator_supplement_report_index')
-    
-    if request.method == 'POST':
-        form = RDSampleSupplementReportForm(request.POST, instance=report)
-        
-        if form.is_valid():
-            # 處理時間欄位
-            start_time_str = form.cleaned_data['start_time']
-            end_time_str = form.cleaned_data['end_time']
-            
-            try:
-                from datetime import datetime
-                start_time = datetime.strptime(start_time_str, '%H:%M').time()
-                end_time = datetime.strptime(end_time_str, '%H:%M').time()
-                
-                # 更新RD樣品補登記錄
-                supplement_report = form.save(commit=False)
-                supplement_report.start_time = start_time
-                supplement_report.end_time = end_time
-                
-                # 設定RD樣品報工相關欄位
-                supplement_report.report_type = 'rd_sample'
-                supplement_report.workorder = None
-                supplement_report.planned_quantity = 0
-                
-                supplement_report.save()
-                
-                messages.success(request, 'RD樣品補登報工記錄更新成功！')
-                return redirect('workorder:operator_supplement_report_index')
-            except ValueError:
-                form.add_error("start_time", "時間格式錯誤")
-                form.add_error("end_time", "時間格式錯誤")
-    else:
-        # 初始化表單時，將時間欄位轉換為字串格式
-        initial_data = {
-            'start_time': report.start_time.strftime('%H:%M') if report.start_time else '',
-            'end_time': report.end_time.strftime('%H:%M') if report.end_time else '',
-        }
-        form = RDSampleSupplementReportForm(instance=report, initial=initial_data)
-    
-    context = {
-        "form": form,
-        'supplement_report': report,
-        "is_create": False,
-        "is_rd_sample": True,
-        "page_title": "編輯RD樣品補登報工記錄",
-    }
-    
-    return render(request, 'workorder/report/operator/supplement/rd_sample_form.html', context)
+# ==================== 作業員補登報工功能 ====================
 
 

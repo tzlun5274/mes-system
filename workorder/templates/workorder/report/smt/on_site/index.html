@@ -260,8 +260,12 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
+                                    <label for="workorder_quantity" class="form-label">工單數量</label>
+                                    <input type="number" class="form-control bg-light" id="workorder_quantity" name="workorder_quantity" readonly style="cursor: not-allowed;">
+                                </div>
+                                <div class="mb-3">
                                     <label for="report_quantity" class="form-label">報工數量</label>
-                                    <input type="number" class="form-control" id="report_quantity" name="quantity" min="0" required>
+                                    <input type="number" class="form-control" id="report_quantity" name="quantity" min="0" placeholder="請輸入報工數量（可空白）">
                                 </div>
                                 <div class="mb-3">
                                     <label for="report_production_status" class="form-label">報工狀態</label>
@@ -444,7 +448,8 @@
                 loadWorkorders(equipmentId);
             } else {
                 document.getElementById('workorder_select').innerHTML = '<option value="">請先選擇設備...</option>';
-                // 清空報工數量
+                // 清空工單數量和報工數量
+                document.getElementById('workorder_quantity').value = '';
                 document.getElementById('report_quantity').value = '';
             }
             // 檢查並啟用/禁用表單
@@ -456,15 +461,13 @@
         workorderSelect.addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
             if (selectedOption && selectedOption.value) {
-                // 從選項的 data 屬性中獲取工單數量
-                const quantity = selectedOption.getAttribute('data-quantity');
-                if (quantity) {
-                    document.getElementById('report_quantity').value = quantity;
-                }
+                // 載入工單數量
+                loadWorkorderQuantity(selectedOption.value);
                 // 載入該工單的工序列表
                 loadProcesses(selectedOption.value);
             } else {
-                // 清空報工數量和工序
+                // 清空工單數量、報工數量和工序
+                document.getElementById('workorder_quantity').value = '';
                 document.getElementById('report_quantity').value = '';
                 document.getElementById('process_select').innerHTML = '<option value="">請先選擇工單...</option>';
             }
@@ -490,13 +493,23 @@
             if (equipmentId && workorderId && processId) {
                 // 有選擇設備、工單和工序時，啟用表單
                 formElements.forEach(function(element) {
-                    element.disabled = false;
+                    // 工單數量欄位保持啟用（因為是唯讀的）
+                    if (element.id === 'workorder_quantity') {
+                        element.disabled = false;
+                    } else {
+                        element.disabled = false;
+                    }
                 });
                 document.getElementById('report_quantity').focus();
             } else {
                 // 沒有完整選擇時，禁用表單
                 formElements.forEach(function(element) {
-                    element.disabled = true;
+                    // 工單數量欄位保持啟用（因為是唯讀的）
+                    if (element.id === 'workorder_quantity') {
+                        element.disabled = false;
+                    } else {
+                        element.disabled = true;
+                    }
                 });
             }
         }
@@ -569,6 +582,14 @@
             }
         });
         
+        // 表單重置事件
+        smtReportingForm.addEventListener('reset', function(e) {
+            // 延遲執行，確保在表單重置後清空工單數量
+            setTimeout(() => {
+                document.getElementById('workorder_quantity').value = '';
+            }, 0);
+        });
+        
         // 自動刷新設備狀態（每30秒）
         setInterval(function() {
             refreshEquipmentStatus();
@@ -615,6 +636,32 @@
         .catch(error => {
             console.error('Error:', error);
             document.getElementById('workorder_select').innerHTML = '<option value="">載入失敗，請檢查網路連線</option>';
+        });
+    }
+    
+    // 載入工單數量
+    function loadWorkorderQuantity(workorderId) {
+        // 發送 AJAX 請求獲取該工單的數量
+        console.log('開始載入工單數量，工單ID:', workorderId);
+        
+        fetch('{% url "workorder:get_workorder_details" %}?workorder_id=' + workorderId, {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                document.getElementById('workorder_quantity').value = data.workorder.quantity || 0;
+            } else {
+                document.getElementById('workorder_quantity').value = '';
+                console.error('載入工單數量失敗：', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('workorder_quantity').value = '';
         });
     }
     

@@ -153,30 +153,13 @@
             </div>
         </div>
 
-        <!-- 管理者報工 -->
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-info">
-                        <i class="fas fa-user-tie mr-2"></i>管理者功能
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">管理者生產報工記錄，支援審核流程和權限管理。</p>
-                    <div class="btn-group-vertical w-100" role="group">
-                        <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-info mb-2">
-                            <i class="fas fa-list mr-2"></i>管理者報工列表
-                        </a>
-                        <a href="{% url 'workorder:manager_production_create' %}" class="btn btn-primary mb-2">
-                            <i class="fas fa-plus mr-2"></i>新增管理者報工
-                        </a>
-                        <a href="{% url 'workorder:manager_production_batch' %}" class="btn btn-warning">
-                            <i class="fas fa-upload mr-2"></i>批量創建
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- 管理者報工功能 - 暫時停用，等待實作 -->
+        <!-- 
+        管理者生產報工記錄功能已暫時停用，包含：
+        - 管理者報工列表
+        - 新增管理者報工
+        - 批量創建功能
+        -->
     </div>
 
     <!-- 最近報工記錄 -->
