@@ -6,4 +6,4 @@ from .models import WorkOrder
 from process.models import ProcessName, Operator
 from equip.models import Equipment
 
-# 管理者審核記錄測試案例 - 已刪除，準備重新設計
+# 主管審核記錄測試案例 - 已刪除，準備重新設計

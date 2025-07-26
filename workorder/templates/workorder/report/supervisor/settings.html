@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}系統設定{% endblock %}
+
+{% block extra_head %}
+<style>
+    .settings-container {
+        padding: 20px;
+    }
+    
+    .settings-section {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .section-title {
+        font-size: 1.3em;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 10px;
+    }
+    
+    .setting-item {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        transition: all 0.3s ease;
+    }
+    
+    .setting-item:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .setting-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    .setting-title {
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .setting-description {
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 10px;
+    }
+    
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+    }
+    
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+    }
+    
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+        background-color: #2196F3;
+    }
+    
+    input:checked + .slider:before {
+        transform: translateX(26px);
+    }
+    
+    .btn-save {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-cog text-primary"></i>
+                    系統設定
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor_functions' %}">主管功能</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">系統設定</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        
+        <!-- 基本設定 -->
+        <div class="settings-section">
+            <div class="section-title">
+                <i class="fas fa-sliders-h mr-2"></i>基本設定
+            </div>
+            
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">自動審核</div>
+                        <div class="setting-description">啟用後，符合條件的報工將自動審核通過</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="auto_approval" {% if system_options.auto_approval %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">通知功能</div>
+                        <div class="setting-description">啟用後，系統將發送異常和審核通知</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="notification_enabled" {% if system_options.notification_enabled %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            
+
+            
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">審計日誌</div>
+                        <div class="setting-description">啟用後，系統將記錄所有操作日誌</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="audit_log_enabled" {% if system_options.audit_log_enabled %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 進階設定 -->
+        <div class="settings-section">
+            <div class="section-title">
+                <i class="fas fa-cogs mr-2"></i>進階設定
+            </div>
+            
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">最大檔案大小</div>
+                        <div class="setting-description">設定上傳檔案的最大大小限制</div>
+                    </div>
+                    <div class="input-group" style="width: 150px;">
+                        <input type="number" class="form-control" name="max_file_size" value="{{ system_options.max_file_size }}" min="1" max="100">
+                        <div class="input-group-append">
+                            <span class="input-group-text">MB</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">會話超時</div>
+                        <div class="setting-description">設定使用者會話自動登出的時間</div>
+                    </div>
+                    <div class="input-group" style="width: 150px;">
+                        <input type="number" class="form-control" name="session_timeout" value="{{ system_options.session_timeout }}" min="5" max="480">
+                        <div class="input-group-append">
+                            <span class="input-group-text">分鐘</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 儲存按鈕 -->
+        <div class="text-center">
+            <button type="submit" class="btn btn-save">
+                <i class="fas fa-save mr-2"></i>儲存設定
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 表單提交處理
+    document.querySelector('form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // 顯示載入中
+        const submitBtn = document.querySelector('.btn-save');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>儲存中...';
+        submitBtn.disabled = true;
+        
+        // 模擬儲存過程
+        setTimeout(function() {
+            alert('設定已成功儲存！');
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }, 2000);
+    });
+    
+    // 切換開關動畫
+    const toggles = document.querySelectorAll('.toggle-switch input');
+    toggles.forEach(function(toggle) {
+        toggle.addEventListener('change', function() {
+            const slider = this.nextElementSibling;
+            if (this.checked) {
+                slider.style.transform = 'scale(1.1)';
+                setTimeout(function() {
+                    slider.style.transform = 'scale(1)';
+                }, 100);
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 

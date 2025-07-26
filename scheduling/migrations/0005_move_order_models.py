@@ -39,9 +39,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, verbose_name="創建時間"
-                    ),
+                    models.DateTimeField(auto_now_add=True, verbose_name="創建時間"),
                 ),
                 (
                     "updated_at",
@@ -98,9 +96,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, verbose_name="建立時間"
-                    ),
+                    models.DateTimeField(auto_now_add=True, verbose_name="建立時間"),
                 ),
                 (
                     "updated_at",

@@ -196,29 +196,31 @@ def adjust_time_within_work_hours(
 def get_standard_capacity_for_route(product_code, process_name):
     """
     查詢產品工序的標準產能資料
-    
+
     參數：
         product_code: 產品編號
         process_name: 工序名稱
-    
+
     回傳：
         標準每小時產能，如果找不到則回傳預設值 1000
     """
     try:
         from process.models import ProductProcessStandardCapacity
-        
+
         # 查詢最新的有效標準產能資料
-        capacity_data = ProductProcessStandardCapacity.objects.filter(
-            product_code=product_code,
-            process_name=process_name,
-            is_active=True
-        ).order_by('-version').first()
-        
+        capacity_data = (
+            ProductProcessStandardCapacity.objects.filter(
+                product_code=product_code, process_name=process_name, is_active=True
+            )
+            .order_by("-version")
+            .first()
+        )
+
         if capacity_data:
             return capacity_data.standard_capacity_per_hour
         else:
             return 1000  # 預設值
-            
+
     except Exception as e:
         logger.error(f"查詢標準產能資料失敗: {str(e)}")
         return 1000  # 預設值
@@ -259,11 +261,10 @@ def generate_semi_auto_tasks(
             if not process:
                 logger.error(f"工序 ID {process_id} 不存在")
                 return [], f"工序 ID {process_id} 不存在", "請檢查工序資料"
-            
+
             # 使用標準產能資料計算持續時間
             capacity_per_hour = get_standard_capacity_for_route(
-                product_code=order.product_id,
-                process_name=process["name"]
+                product_code=order.product_id, process_name=process["name"]
             )
             duration_minutes = calculate_task_duration(order_qty, capacity_per_hour)
 

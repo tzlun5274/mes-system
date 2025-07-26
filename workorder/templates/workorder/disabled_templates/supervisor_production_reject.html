@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}審核通過 - 管理者生產報工記錄{% endblock %}
+{% block title %}駁回 - 主管生產報工記錄{% endblock %}
 
 {% block extra_css %}
 <style>
-    .approval-section {
+    .rejection-section {
         background-color: #f8f9fa;
         border-radius: 0.375rem;
         padding: 1.5rem;
         margin-bottom: 1.5rem;
     }
-    .approval-section h5 {
+    .rejection-section h5 {
         color: #495057;
         border-bottom: 2px solid #dee2e6;
         padding-bottom: 0.5rem;
@@ -54,10 +54,10 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <h2 class="mb-0">
-                    <i class="fas fa-check-circle text-success"></i> 審核通過
+                    <i class="fas fa-times-circle text-danger"></i> 駁回報工記錄
                 </h2>
                 <div>
-                    <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-secondary">
+                    <a href="{% url 'workorder:supervisor_production_list' %}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> 返回列表
                     </a>
                 </div>
@@ -76,10 +76,10 @@
                 </div>
                 <div class="card-body">
                     <!-- 基本資訊 -->
-                    <div class="approval-section">
+                    <div class="rejection-section">
                         <h5><i class="fas fa-info-circle"></i> 基本資訊</h5>
                         <div class="info-row">
-                            <span class="info-label">管理者：</span>
+                            <span class="info-label">主管：</span>
                             <span class="info-value">{{ report.manager }}</span>
                         </div>
                         <div class="info-row">
@@ -101,7 +101,7 @@
                     </div>
 
                     <!-- 時間資訊 -->
-                    <div class="approval-section">
+                    <div class="rejection-section">
                         <h5><i class="fas fa-clock"></i> 時間資訊</h5>
                         <div class="info-row">
                             <span class="info-label">報工日期：</span>
@@ -122,7 +122,7 @@
                     </div>
 
                     <!-- 數量資訊 -->
-                    <div class="approval-section">
+                    <div class="rejection-section">
                         <h5><i class="fas fa-cubes"></i> 數量資訊</h5>
                         <div class="info-row">
                             <span class="info-label">工作數量：</span>
@@ -143,7 +143,7 @@
                     </div>
 
                     <!-- 完工狀態 -->
-                    <div class="approval-section">
+                    <div class="rejection-section">
                         <h5><i class="fas fa-flag-checkered"></i> 完工狀態</h5>
                         <div class="info-row">
                             <span class="info-label">完工狀態：</span>
@@ -170,55 +170,47 @@
                     </div>
 
                     <!-- 備註資訊 -->
-                    {% if report.remarks or report.abnormal_notes %}
-                    <div class="approval-section">
+                    {% if report.remarks %}
+                    <div class="rejection-section">
                         <h5><i class="fas fa-sticky-note"></i> 備註資訊</h5>
-                        {% if report.remarks %}
                         <div class="info-row">
                             <span class="info-label">備註：</span>
                             <span class="info-value">{{ report.remarks }}</span>
                         </div>
                         {% endif %}
-                        {% if report.abnormal_notes %}
-                        <div class="info-row">
-                            <span class="info-label">異常記錄：</span>
-                            <span class="info-value">{{ report.remarks }}</span>
-                        </div>
-                        {% endif %}
                     </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- 審核表單 -->
+        <!-- 駁回表單 -->
         <div class="col-lg-4">
             <div class="card">
-                <div class="card-header bg-success text-white">
+                <div class="card-header bg-danger text-white">
                     <h5 class="card-title mb-0">
-                        <i class="fas fa-check"></i> 審核通過
+                        <i class="fas fa-times"></i> 駁回報工記錄
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="post" id="approvalForm">
+                    <form method="post" id="rejectionForm">
                         {% csrf_token %}
                         
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i>
-                            您即將審核通過此筆報工記錄。審核通過後，此記錄將不可再修改。
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            您即將駁回此筆報工記錄。駁回後，建立者需要重新提交。
                         </div>
 
                         <div class="form-group">
-                            <label for="{{ form.approval_remarks.id_for_label }}" class="form-label">
-                                {{ form.approval_remarks.label }}
+                            <label for="{{ form.rejection_reason.id_for_label }}" class="form-label">
+                                {{ form.rejection_reason.label }} <span class="text-danger">*</span>
                             </label>
-                            {{ form.approval_remarks }}
-                            {% if form.approval_remarks.help_text %}
-                            <div class="form-text">{{ form.approval_remarks.help_text }}</div>
+                            {{ form.rejection_reason }}
+                            {% if form.rejection_reason.help_text %}
+                            <div class="form-text">{{ form.rejection_reason.help_text }}</div>
                             {% endif %}
-                            {% if form.approval_remarks.errors %}
+                            {% if form.rejection_reason.errors %}
                             <div class="invalid-feedback d-block">
-                                {% for error in form.approval_remarks.errors %}
+                                {% for error in form.rejection_reason.errors %}
                                 {{ error }}
                                 {% endfor %}
                             </div>
@@ -226,11 +218,11 @@
                         </div>
 
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-success">
-                                <i class="fas fa-check"></i> 確認審核通過
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-times"></i> 確認駁回
                             </button>
-                            <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-secondary">
-                                <i class="fas fa-times"></i> 取消
+                            <a href="{% url 'workorder:supervisor_production_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> 取消
                             </a>
                         </div>
                     </form>
@@ -245,9 +237,17 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // 表單提交確認
-        const form = document.getElementById('approvalForm');
+        const form = document.getElementById('rejectionForm');
         form.addEventListener('submit', function(e) {
-            if (!confirm('確定要審核通過此筆報工記錄嗎？審核通過後將不可修改。')) {
+            const reason = document.getElementById('{{ form.rejection_reason.id_for_label }}').value.trim();
+            
+            if (!reason) {
+                alert('請填寫駁回原因');
+                e.preventDefault();
+                return false;
+            }
+            
+            if (!confirm('確定要駁回此筆報工記錄嗎？駁回後建立者需要重新提交。')) {
                 e.preventDefault();
                 return false;
             }

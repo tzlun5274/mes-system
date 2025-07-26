@@ -66,16 +66,19 @@ def process_names(request):
         )
     # 統計數字
     total_count = len(enhanced_process_names)
-    with_equipment_count = sum(1 for p in enhanced_process_names if p["usable_equipment_names"] != "-")
+    with_equipment_count = sum(
+        1 for p in enhanced_process_names if p["usable_equipment_names"] != "-"
+    )
     with_description_count = sum(1 for p in enhanced_process_names if p["description"])
     return render(
-        request, "process/process_names.html",
+        request,
+        "process/process_names.html",
         {
             "process_names": enhanced_process_names,
             "total_count": total_count,
             "with_equipment_count": with_equipment_count,
             "with_description_count": with_description_count,
-        }
+        },
     )
 
 

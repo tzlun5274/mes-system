@@ -268,15 +268,11 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "old_values",
-                    models.JSONField(
-                        blank=True, null=True, verbose_name="舊值"
-                    ),
+                    models.JSONField(blank=True, null=True, verbose_name="舊值"),
                 ),
                 (
                     "new_values",
-                    models.JSONField(
-                        blank=True, null=True, verbose_name="新值"
-                    ),
+                    models.JSONField(blank=True, null=True, verbose_name="新值"),
                 ),
                 (
                     "change_reason",
@@ -288,9 +284,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "changed_at",
-                    models.DateTimeField(
-                        auto_now_add=True, verbose_name="變更時間"
-                    ),
+                    models.DateTimeField(auto_now_add=True, verbose_name="變更時間"),
                 ),
                 (
                     "capacity",
@@ -382,9 +376,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, verbose_name="建立時間"
-                    ),
+                    models.DateTimeField(auto_now_add=True, verbose_name="建立時間"),
                 ),
             ],
             options={

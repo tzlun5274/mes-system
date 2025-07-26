@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}主管審核首頁 - MES系統{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        transition: transform 0.2s;
+    }
+    .stats-card:hover {
+        transform: translateY(-2px);
+    }
+    .stats-number {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    .stats-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+    .recent-review-item {
+        border-left: 3px solid #007bff;
+        padding-left: 15px;
+        margin-bottom: 15px;
+    }
+    .review-time {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    .review-type {
+        font-weight: bold;
+        color: #007bff;
+    }
+    .quick-action-btn {
+        margin: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-chart-line text-primary"></i>
+                    主管審核首頁
+                </h2>
+                <div class="btn-group">
+                    <a href="{% url 'workorder:supervisor_functions' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-cogs"></i> 功能設定
+                    </a>
+                    <a href="{% url 'workorder:report_statistics' %}" class="btn btn-outline-info">
+                        <i class="fas fa-chart-bar"></i> 統計報表
+                    </a>
+                    <a href="{% url 'workorder:abnormal_management' %}" class="btn btn-outline-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 異常處理
+                    </a>
+                </div>
+            </div>
+            <hr>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <!-- 待審核統計 -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card stats-card bg-warning text-white">
+                <div class="card-body text-center">
+                    <div class="stats-number">{{ stats.total_pending|default:0 }}</div>
+                    <div class="stats-label">待審核報工</div>
+                    <small>
+                        主管: {{ stats.pending_supervisor|default:0 }} | 
+                        作業員: {{ stats.pending_operator|default:0 }} | 
+                        SMT: {{ stats.pending_smt|default:0 }}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- 今日統計 -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card stats-card bg-success text-white">
+                <div class="card-body text-center">
+                    <div class="stats-number">{{ stats.total_today|default:0 }}</div>
+                    <div class="stats-label">今日報工</div>
+                    <small>
+                        主管: {{ stats.today_supervisor|default:0 }} | 
+                        作業員: {{ stats.today_operator|default:0 }} | 
+                        SMT: {{ stats.today_smt|default:0 }}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- 本月統計 -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card stats-card bg-info text-white">
+                <div class="card-body text-center">
+                    <div class="stats-number">{{ stats.total_month|default:0 }}</div>
+                    <div class="stats-label">本月報工</div>
+                    <small>
+                        主管: {{ stats.month_supervisor|default:0 }} | 
+                        作業員: {{ stats.month_operator|default:0 }} | 
+                        SMT: {{ stats.month_smt|default:0 }}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- 異常統計 -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card stats-card bg-danger text-white">
+                <div class="card-body text-center">
+                    <div class="stats-number">{{ stats.total_abnormal|default:0 }}</div>
+                    <div class="stats-label">異常記錄</div>
+                    <small>
+                        主管: {{ stats.abnormal_supervisor|default:0 }} | 
+                        作業員: {{ stats.abnormal_operator|default:0 }} | 
+                        SMT: {{ stats.abnormal_smt|default:0 }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速操作 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt text-warning"></i>
+                        快速操作
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'workorder:pending_approval_list' %}" class="btn btn-warning btn-block quick-action-btn">
+                                <i class="fas fa-clock"></i><br>
+                                待審核清單<br>
+                                <small>({{ stats.total_pending|default:0 }})</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'workorder:supervisor_functions' %}" class="btn btn-primary btn-block quick-action-btn">
+                                <i class="fas fa-cogs"></i><br>
+                                功能設定<br>
+                                <small>系統配置</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'workorder:report_statistics' %}" class="btn btn-info btn-block quick-action-btn">
+                                <i class="fas fa-chart-bar"></i><br>
+                                統計報表<br>
+                                <small>數據分析</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'workorder:abnormal_management' %}" class="btn btn-danger btn-block quick-action-btn">
+                                <i class="fas fa-exclamation-triangle"></i><br>
+                                異常處理<br>
+                                <small>({{ stats.total_abnormal|default:0 }})</small>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近審核記錄 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history text-secondary"></i>
+                        最近審核記錄
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_reviews %}
+                        {% for review in recent_reviews %}
+                        <div class="recent-review-item">
+                            <div class="row align-items-center">
+                                <div class="col-md-2">
+                                    <span class="review-type">{{ review.type }}</span>
+                                </div>
+                                <div class="col-md-2">
+                                    <strong>工單:</strong> {{ review.workorder }}
+                                </div>
+                                <div class="col-md-2">
+                                    <strong>工序:</strong> {{ review.process }}
+                                </div>
+                                <div class="col-md-2">
+                                    <strong>數量:</strong> {{ review.quantity|default:0 }}
+                                </div>
+                                <div class="col-md-2">
+                                    <strong>審核者:</strong> {{ review.reviewer|default:'-' }}
+                                </div>
+                                <div class="col-md-2">
+                                    <span class="review-time">{{ review.time|date:"m/d H:i" }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <p>目前沒有審核記錄</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 自動刷新頁面數據（每5分鐘）
+    setInterval(function() {
+        location.reload();
+    }, 300000);
+    
+    // 統計卡片點擊事件
+    $('.stats-card').click(function() {
+        var cardType = $(this).find('.stats-label').text();
+        if (cardType.includes('待審核')) {
+            window.location.href = "{% url 'workorder:pending_approval_list' %}";
+        } else if (cardType.includes('異常')) {
+            window.location.href = "{% url 'workorder:abnormal_management' %}";
+        }
+    });
+    
+    // 統計卡片懸停效果
+    $('.stats-card').hover(
+        function() {
+            $(this).addClass('shadow-lg');
+        },
+        function() {
+            $(this).removeClass('shadow-lg');
+        }
+    );
+});
+</script>
+{% endblock %} 

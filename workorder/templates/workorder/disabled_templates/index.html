@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}管理者審核管理{% endblock %}
+{% block title %}主管審核管理{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -104,13 +104,13 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
                     <i class="fas fa-user-tie text-primary"></i>
-                    管理者審核管理
+                    主管審核管理
                 </h2>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">管理者審核</li>
+                        <li class="breadcrumb-item active" aria-current="page">主管審核</li>
                     </ol>
                 </nav>
             </div>
@@ -151,7 +151,7 @@
             <div class="card manager-card">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-clipboard-check"></i> 管理者審核
+                        <i class="fas fa-clipboard-check"></i> 主管審核
                     </h5>
                 </div>
                 <div class="card-body">
@@ -230,21 +230,21 @@
             <div class="card manager-card">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-clipboard-list"></i> 管理者生產報工
+                        <i class="fas fa-clipboard-list"></i> 主管生產報工
                     </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        管理者審核報工記錄，包含新增、編輯、審核、統計等功能。
+                        主管審核報工記錄，包含新增、編輯、審核、統計等功能。
                     </p>
                     <div class="btn-group" role="group">
-                        <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-primary">
+                        <a href="{% url 'workorder:supervisor_production_list' %}" class="btn btn-primary">
                             <i class="fas fa-list"></i> 查看列表
                         </a>
-                        <a href="{% url 'workorder:manager_production_create' %}" class="btn btn-success">
+                        <a href="{% url 'workorder:supervisor_production_create' %}" class="btn btn-success">
                             <i class="fas fa-plus"></i> 新增記錄
                         </a>
-                        <a href="{% url 'workorder:manager_production_batch' %}" class="btn btn-info">
+                        <a href="{% url 'workorder:supervisor_production_batch' %}" class="btn btn-info">
                             <i class="fas fa-layer-group"></i> 批量創建
                         </a>
                     </div>
@@ -307,7 +307,7 @@
                                     <tr>
                                         <td>{{ review.time|date:"Y-m-d H:i" }}</td>
                                         <td>
-                                            {% if review.type == '管理者審核' %}
+                                            {% if review.type == '主管審核' %}
                                                 <span class="badge badge-primary">{{ review.type }}</span>
                                             {% elif review.type == '作業員報工' %}
                                                 <span class="badge badge-success">{{ review.type }}</span>
@@ -345,7 +345,7 @@
 
 {% block extra_js %}
 <script>
-    // 管理者審核專用 JavaScript
+    // 主管審核專用 JavaScript
     document.addEventListener('DOMContentLoaded', function() {
         // 卡片懸停效果
         const cards = document.querySelectorAll('.manager-card');

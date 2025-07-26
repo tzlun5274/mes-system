@@ -39,29 +39,36 @@ def process_user_required(user):
 @user_passes_test(process_user_required, login_url="/accounts/login/")
 def index(request):
     log_user_operation(request.user.username, "process", "訪問工序管理模組首頁")
-    
+
     # 計算統計資料
-    from .models import ProcessName, Operator, ProductProcessRoute, ProductProcessStandardCapacity
-    
+    from .models import (
+        ProcessName,
+        Operator,
+        ProductProcessRoute,
+        ProductProcessStandardCapacity,
+    )
+
     # 工序總數
     process_count = ProcessName.objects.count()
-    
+
     # 作業員總數
     operator_count = Operator.objects.count()
-    
+
     # 產品路線總數（不重複的產品編號）
-    product_route_count = ProductProcessRoute.objects.values('product_id').distinct().count()
-    
+    product_route_count = (
+        ProductProcessRoute.objects.values("product_id").distinct().count()
+    )
+
     # 產能設定總數
     capacity_count = ProductProcessStandardCapacity.objects.count()
-    
+
     context = {
-        'process_count': process_count,
-        'operator_count': operator_count,
-        'product_route_count': product_route_count,
-        'capacity_count': capacity_count,
+        "process_count": process_count,
+        "operator_count": operator_count,
+        "product_route_count": product_route_count,
+        "capacity_count": capacity_count,
     }
-    
+
     return render(request, "process/index.html", context)
 
 
@@ -148,7 +155,7 @@ def standard_capacity_list(request):
     equipment_type = request.GET.get("equipment_type", "")
     operator_level = request.GET.get("operator_level", "")
     is_active = request.GET.get("is_active", "")
-    
+
     # 排序條件
     sort_by = request.GET.get("sort_by", "product_code")
     sort_order = request.GET.get("sort_order", "asc")
@@ -169,21 +176,36 @@ def standard_capacity_list(request):
     # 處理排序
     if sort_order == "desc":
         sort_by = f"-{sort_by}"
-    
+
     # 如果是按產品編號排序，需要特殊處理以支援數字排序
     if sort_by == "product_code" or sort_by == "-product_code":
         # 先按產品編號排序，再按其他欄位排序
         if sort_by == "product_code":
             capacities = capacities.order_by(
-                "product_code", "process_name", "equipment_type", "operator_level", "-version"
+                "product_code",
+                "process_name",
+                "equipment_type",
+                "operator_level",
+                "-version",
             )
         else:
             capacities = capacities.order_by(
-                "-product_code", "process_name", "equipment_type", "operator_level", "-version"
+                "-product_code",
+                "process_name",
+                "equipment_type",
+                "operator_level",
+                "-version",
             )
     else:
         # 其他欄位排序
-        capacities = capacities.order_by(sort_by, "product_code", "process_name", "equipment_type", "operator_level", "-version")
+        capacities = capacities.order_by(
+            sort_by,
+            "product_code",
+            "process_name",
+            "equipment_type",
+            "operator_level",
+            "-version",
+        )
 
     # 計算統計數據
     total_capacities = capacities.count()
@@ -469,10 +491,10 @@ def standard_capacity_delete_all(request):
             equipment_type = request.POST.get("equipment_type", "").strip()
             operator_level = request.POST.get("operator_level", "").strip()
             is_active = request.POST.get("is_active", "").strip()
-            
+
             # 建立查詢條件
             capacities = ProductProcessStandardCapacity.objects.all()
-            
+
             if product_code:
                 capacities = capacities.filter(product_code__icontains=product_code)
             if process_name:
@@ -483,13 +505,15 @@ def standard_capacity_delete_all(request):
                 capacities = capacities.filter(operator_level=operator_level)
             if is_active != "":
                 capacities = capacities.filter(is_active=is_active == "true")
-            
+
             # 計算要刪除的數量
             delete_count = capacities.count()
-            
+
             if delete_count == 0:
-                return JsonResponse({"success": False, "message": "沒有符合條件的資料可刪除"})
-            
+                return JsonResponse(
+                    {"success": False, "message": "沒有符合條件的資料可刪除"}
+                )
+
             # 記錄歷史（批次記錄）
             for obj in capacities:
                 CapacityHistory.objects.create(
@@ -498,18 +522,22 @@ def standard_capacity_delete_all(request):
                     changed_by=request.user.username,
                     change_reason="批次刪除標準產能設定",
                 )
-            
+
             # 批次刪除
             capacities.delete()
-            
-            return JsonResponse({
-                "success": True, 
-                "message": f"批次刪除成功！共刪除 {delete_count} 筆資料"
-            })
-            
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": f"批次刪除成功！共刪除 {delete_count} 筆資料",
+                }
+            )
+
         except Exception as e:
-            return JsonResponse({"success": False, "message": f"批次刪除失敗：{str(e)}"})
-    
+            return JsonResponse(
+                {"success": False, "message": f"批次刪除失敗：{str(e)}"}
+            )
+
     return JsonResponse({"success": False, "message": "不支援的請求方法"})
 
 
@@ -608,7 +636,7 @@ def standard_capacity_import(request):
             error_count = 0
             skip_count = 0
             errors = []
-            
+
             # 檢查是否為覆蓋模式
             overwrite_mode = request.POST.get("overwrite_mode", "false") == "true"
 
@@ -617,84 +645,130 @@ def standard_capacity_import(request):
                     # 基本資料
                     product_code = str(row["產品編號"]).strip()
                     process_name = str(row["工序名稱"]).strip()
-                    
+
                     # 安全處理標準產能
                     try:
-                        standard_capacity = int(row["標準產能(pcs/hr)"]) if pd.notna(row["標準產能(pcs/hr)"]) else 0
+                        standard_capacity = (
+                            int(row["標準產能(pcs/hr)"])
+                            if pd.notna(row["標準產能(pcs/hr)"])
+                            else 0
+                        )
                     except (ValueError, TypeError):
                         standard_capacity = 0
-                    
+
                     # 安全處理版本號
                     try:
-                        version = int(row["版本號"]) if pd.notna(row.get("版本號")) else 1
+                        version = (
+                            int(row["版本號"]) if pd.notna(row.get("版本號")) else 1
+                        )
                     except (ValueError, TypeError):
                         version = 1
 
                     # 可選欄位
                     equipment_type = str(row.get("設備類型", "標準設備")).strip()
                     operator_level = str(row.get("作業員等級", "標準")).strip()
-                    
+
                     # 安全地處理數值欄位，使用 pandas 的 pd.notna() 來檢查是否為空值
                     try:
-                        efficiency_factor = float(row["效率因子"]) if pd.notna(row.get("效率因子")) else 1.00
+                        efficiency_factor = (
+                            float(row["效率因子"])
+                            if pd.notna(row.get("效率因子"))
+                            else 1.00
+                        )
                     except (ValueError, TypeError):
                         efficiency_factor = 1.00
-                    
+
                     try:
-                        setup_time = int(row["換線時間(分鐘)"]) if pd.notna(row.get("換線時間(分鐘)")) else 0
+                        setup_time = (
+                            int(row["換線時間(分鐘)"])
+                            if pd.notna(row.get("換線時間(分鐘)"))
+                            else 0
+                        )
                     except (ValueError, TypeError):
                         setup_time = 0
-                    
+
                     try:
-                        cycle_time = float(row["週期時間(秒)"]) if pd.notna(row.get("週期時間(秒)")) else 0
+                        cycle_time = (
+                            float(row["週期時間(秒)"])
+                            if pd.notna(row.get("週期時間(秒)"))
+                            else 0
+                        )
                     except (ValueError, TypeError):
                         cycle_time = 0
-                    
+
                     try:
-                        optimal_batch = int(row["最佳批量"]) if pd.notna(row.get("最佳批量")) else 1
+                        optimal_batch = (
+                            int(row["最佳批量"]) if pd.notna(row.get("最佳批量")) else 1
+                        )
                     except (ValueError, TypeError):
                         optimal_batch = 1
-                    
+
                     notes = str(row.get("備註", "")).strip()
-                    
+
                     # 處理可能為空的欄位，給予預設值
                     try:
-                        min_capacity = int(row["最低產能"]) if pd.notna(row.get("最低產能")) else 0
+                        min_capacity = (
+                            int(row["最低產能"]) if pd.notna(row.get("最低產能")) else 0
+                        )
                     except (ValueError, TypeError):
                         min_capacity = 0
-                    
+
                     try:
-                        max_capacity = int(row["最高產能"]) if pd.notna(row.get("最高產能")) else 0
+                        max_capacity = (
+                            int(row["最高產能"]) if pd.notna(row.get("最高產能")) else 0
+                        )
                     except (ValueError, TypeError):
                         max_capacity = 0
-                    
+
                     try:
-                        teardown_time = int(row["收線時間(分鐘)"]) if pd.notna(row.get("收線時間(分鐘)")) else 0
+                        teardown_time = (
+                            int(row["收線時間(分鐘)"])
+                            if pd.notna(row.get("收線時間(分鐘)"))
+                            else 0
+                        )
                     except (ValueError, TypeError):
                         teardown_time = 0
-                    
+
                     try:
-                        min_batch = int(row["最小批量"]) if pd.notna(row.get("最小批量")) else 1
+                        min_batch = (
+                            int(row["最小批量"]) if pd.notna(row.get("最小批量")) else 1
+                        )
                     except (ValueError, TypeError):
                         min_batch = 1
-                    
+
                     try:
-                        max_batch = int(row["最大批量"]) if pd.notna(row.get("最大批量")) else 1000
+                        max_batch = (
+                            int(row["最大批量"])
+                            if pd.notna(row.get("最大批量"))
+                            else 1000
+                        )
                     except (ValueError, TypeError):
                         max_batch = 1000
-                    
+
                     try:
-                        learning_curve = float(row["學習曲線因子"]) if pd.notna(row.get("學習曲線因子")) else 1.00
+                        learning_curve = (
+                            float(row["學習曲線因子"])
+                            if pd.notna(row.get("學習曲線因子"))
+                            else 1.00
+                        )
                     except (ValueError, TypeError):
                         learning_curve = 1.00
-                    
+
                     try:
-                        defect_rate = float(row["預期不良率"]) if pd.notna(row.get("預期不良率")) else 0.0000
+                        defect_rate = (
+                            float(row["預期不良率"])
+                            if pd.notna(row.get("預期不良率"))
+                            else 0.0000
+                        )
                     except (ValueError, TypeError):
                         defect_rate = 0.0000
-                    
+
                     try:
-                        rework_factor = float(row["重工時間因子"]) if pd.notna(row.get("重工時間因子")) else 1.00
+                        rework_factor = (
+                            float(row["重工時間因子"])
+                            if pd.notna(row.get("重工時間因子"))
+                            else 1.00
+                        )
                     except (ValueError, TypeError):
                         rework_factor = 1.00
 
@@ -706,11 +780,13 @@ def standard_capacity_import(request):
                         operator_level=operator_level,
                         is_active=True,
                     ).first()
-                    
+
                     if existing_record:
                         if overwrite_mode:
                             # 覆蓋模式：更新現有記錄
-                            existing_record.standard_capacity_per_hour = standard_capacity
+                            existing_record.standard_capacity_per_hour = (
+                                standard_capacity
+                            )
                             existing_record.min_capacity_per_hour = min_capacity
                             existing_record.max_capacity_per_hour = max_capacity
                             existing_record.efficiency_factor = efficiency_factor
@@ -764,7 +840,9 @@ def standard_capacity_import(request):
             # 回傳結果
             message = f"匯入完成！成功：{success_count} 筆，跳過：{skip_count} 筆，失敗：{error_count} 筆"
             if skip_count > 0:
-                message += "\n💡 跳過的記錄是因為已存在相同的產品+工序+設備+作業員等級組合"
+                message += (
+                    "\n💡 跳過的記錄是因為已存在相同的產品+工序+設備+作業員等級組合"
+                )
             if errors:
                 message += f'\n❌ 錯誤詳情：{"; ".join(errors[:5])}'  # 只顯示前5個錯誤
             if success_count == 0 and skip_count > 0:

@@ -7,27 +7,33 @@ def auto_detect_rd_sample_by_workorder(apps, schema_editor):
     """
     根據工單號碼自動判斷並更新RD樣品記錄的報工類型
     """
-    SMTProductionReport = apps.get_model('workorder', 'SMTProductionReport')
-    
+    SMTProductionReport = apps.get_model("workorder", "SMTProductionReport")
+
     # 取得所有有工單的記錄
     reports = SMTProductionReport.objects.filter(workorder__isnull=False)
-    
+
     updated_count = 0
     for report in reports:
         if report.workorder and report.workorder.order_number:
             # 檢查工單號碼是否包含RD樣品相關關鍵字
             order_number = report.workorder.order_number.upper()
-            rd_keywords = ['RD', '樣品', 'SAMPLE', 'RD樣品', 'RD-樣品', 'RD樣本']
-            
+            rd_keywords = ["RD", "樣品", "SAMPLE", "RD樣品", "RD-樣品", "RD樣本"]
+
             if any(keyword in order_number for keyword in rd_keywords):
                 # 更新為RD樣品
-                report.report_type = 'rd_sample'
+                report.report_type = "rd_sample"
                 report.rd_workorder_number = report.workorder.order_number
-                report.rd_product_code = report.workorder.product_code if report.workorder.product_code else ''
+                report.rd_product_code = (
+                    report.workorder.product_code
+                    if report.workorder.product_code
+                    else ""
+                )
                 report.save()
                 updated_count += 1
-                print(f"已更新記錄 ID {report.id} 為RD樣品，工單號碼: {report.workorder.order_number}")
-    
+                print(
+                    f"已更新記錄 ID {report.id} 為RD樣品，工單號碼: {report.workorder.order_number}"
+                )
+
     print(f"總共更新了 {updated_count} 筆記錄為RD樣品")
 
 
@@ -35,17 +41,13 @@ def reverse_auto_detect_rd_sample_by_workorder(apps, schema_editor):
     """
     反向操作：將所有RD樣品記錄改回正常工單
     """
-    SMTProductionReport = apps.get_model('workorder', 'SMTProductionReport')
-    
+    SMTProductionReport = apps.get_model("workorder", "SMTProductionReport")
+
     # 將所有RD樣品記錄改回正常工單
-    updated_count = SMTProductionReport.objects.filter(
-        report_type='rd_sample'
-    ).update(
-        report_type='normal',
-        rd_workorder_number='',
-        rd_product_code=''
+    updated_count = SMTProductionReport.objects.filter(report_type="rd_sample").update(
+        report_type="normal", rd_workorder_number="", rd_product_code=""
     )
-    
+
     print(f"已將 {updated_count} 筆RD樣品記錄改回正常工單")
 
 
@@ -58,6 +60,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(
             auto_detect_rd_sample_by_workorder,
-            reverse_auto_detect_rd_sample_by_workorder
+            reverse_auto_detect_rd_sample_by_workorder,
         ),
     ]

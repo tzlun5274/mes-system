@@ -45,7 +45,7 @@ class WorkOrder(models.Model):
 
     def __str__(self):
         return f"[{self.company_code}] 工單 {self.order_number}"
-    
+
     @classmethod
     def generate_order_number(cls, company_code):
         """
@@ -55,13 +55,17 @@ class WorkOrder(models.Model):
         """
         today = datetime.now()
         year_month = today.strftime("%Y%m")
-        
+
         # 取得當月最後一個工單號碼
-        last_order = cls.objects.filter(
-            company_code=company_code,
-            order_number__startswith=f"WO-{company_code}-{year_month}"
-        ).order_by('-order_number').first()
-        
+        last_order = (
+            cls.objects.filter(
+                company_code=company_code,
+                order_number__startswith=f"WO-{company_code}-{year_month}",
+            )
+            .order_by("-order_number")
+            .first()
+        )
+
         if last_order:
             # 從最後一個號碼中提取序號
             try:
@@ -71,52 +75,56 @@ class WorkOrder(models.Model):
                 new_sequence = 1
         else:
             new_sequence = 1
-        
+
         # 格式化序號為3位數
         sequence_str = f"{new_sequence:03d}"
-        
+
         return f"WO-{company_code}-{year_month}{sequence_str}"
-    
+
     @property
     def completed_quantity(self):
         """計算工單總完成數量"""
         return sum(process.completed_quantity for process in self.processes.all())
-    
+
     @property
     def progress(self):
         """計算工單進度百分比"""
         if self.quantity > 0:
             return round((self.completed_quantity / self.quantity) * 100, 1)
         return 0.0
-    
+
     @property
     def current_operator(self):
         """取得當前負責的作業員"""
-        current_process = self.processes.filter(status='in_progress').first()
+        current_process = self.processes.filter(status="in_progress").first()
         if current_process and current_process.assigned_operator:
             return current_process.assigned_operator
         return "未分配"
-    
+
     @property
     def current_process(self):
         """取得當前進行的工序"""
-        current_process = self.processes.filter(status='in_progress').first()
+        current_process = self.processes.filter(status="in_progress").first()
         if current_process:
             return current_process.process_name
         return "無進行中工序"
-    
+
     @property
     def start_time(self):
         """取得工單開始時間（第一個工序的開始時間或工單狀態變更時間）"""
         # 優先顯示第一個工序的實際開始時間
-        first_process = self.processes.filter(actual_start_time__isnull=False).order_by('actual_start_time').first()
+        first_process = (
+            self.processes.filter(actual_start_time__isnull=False)
+            .order_by("actual_start_time")
+            .first()
+        )
         if first_process and first_process.actual_start_time:
             return first_process.actual_start_time
-        
+
         # 如果工單狀態是生產中或暫停，則顯示工單的更新時間（狀態變更時間）
-        if self.status in ['in_progress', 'paused']:
+        if self.status in ["in_progress", "paused"]:
             return self.updated_at
-        
+
         # 如果都沒有，則顯示工單建立時間
         return self.created_at
 
@@ -533,9 +541,6 @@ class WorkOrderProcessCapacity(models.Model):
 # 例如 value: "包裝,出貨包裝,PACK,PACKING"
 
 
-
-
-
 # 注意：ERP同步相關功能已移至 erp_integration 模組
 # 請使用 erp_integration.models.ERPSyncConfig 和 erp_integration.models.ERPSyncLog
 
@@ -584,191 +589,179 @@ class SMTProductionReport(models.Model):
     SMT 生產報工記錄模型
     SMT 設備為自動化運作，不需要作業員
     """
-    
+
     # 報工類型
     REPORT_TYPE_CHOICES = [
-        ('normal', '正式工單'),
-        ('rd_sample', 'RD樣品'),
+        ("normal", "正式工單"),
+        ("rd_sample", "RD樣品"),
     ]
-    
+
     report_type = models.CharField(
         max_length=20,
         choices=REPORT_TYPE_CHOICES,
-        default='normal',
+        default="normal",
         verbose_name="報工類型",
-        help_text="請選擇報工類型：正式工單或RD樣品"
+        help_text="請選擇報工類型：正式工單或RD樣品",
     )
-    
+
     # 基本資訊
     product_id = models.CharField(
         max_length=100,
         verbose_name="產品編號",
         help_text="請選擇產品編號，將自動帶出相關工單",
-        default=""
+        default="",
     )
-    
+
     workorder = models.ForeignKey(
         WorkOrder,
         on_delete=models.CASCADE,
         verbose_name="工單號碼",
         help_text="請選擇工單號碼，或透過產品編號自動帶出",
         null=True,
-        blank=True
+        blank=True,
     )
-    
+
     # RD樣品專用欄位
     rd_workorder_number = models.CharField(
         max_length=100,
         blank=True,
         null=True,
         verbose_name="RD樣品工單號碼",
-        help_text="RD樣品模式的工單號碼"
+        help_text="RD樣品模式的工單號碼",
     )
-    
 
-    
     rd_product_code = models.CharField(
         max_length=100,
         blank=True,
         null=True,
         verbose_name="RD產品編號",
-        help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊"
+        help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊",
     )
-    
+
     planned_quantity = models.IntegerField(
         verbose_name="工單預設生產數量",
         help_text="此為工單規劃的總生產數量，不可修改",
-        default=0
+        default=0,
     )
-    
+
     operation = models.CharField(
         max_length=100,
         verbose_name="工序",
         help_text="請選擇此次補登的SMT工序",
-        default=""
+        default="",
     )
-    
+
     equipment = models.ForeignKey(
-        'equip.Equipment',
+        "equip.Equipment",
         on_delete=models.CASCADE,
         verbose_name="設備",
         help_text="請選擇本次報工使用的SMT設備",
         null=True,
-        blank=True
+        blank=True,
     )
-    
+
     # 時間資訊
     work_date = models.DateField(
-        verbose_name="日期",
-        help_text="請選擇實際報工日期",
-        default=timezone.now
+        verbose_name="日期", help_text="請選擇實際報工日期", default=timezone.now
     )
-    
+
     start_time = models.TimeField(
         verbose_name="開始時間",
         help_text="請輸入實際開始時間 (24小時制)，例如 16:00",
-        default=timezone.now
+        default=timezone.now,
     )
-    
+
     end_time = models.TimeField(
         verbose_name="結束時間",
         help_text="請輸入實際結束時間 (24小時制)，例如 18:30",
-        default=timezone.now
+        default=timezone.now,
     )
-    
+
     # 數量資訊
     work_quantity = models.IntegerField(
         verbose_name="工作數量",
         help_text="請輸入該時段內實際完成的合格產品數量",
-        default=0
+        default=0,
     )
-    
+
     defect_quantity = models.IntegerField(
         default=0,
         verbose_name="不良品數量",
-        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0"
+        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0",
     )
-    
+
     # 狀態資訊
     is_completed = models.BooleanField(
         default=False,
         verbose_name="是否已完工",
-        help_text="若此工單在此工序上已全部完成，請勾選"
+        help_text="若此工單在此工序上已全部完成，請勾選",
     )
-    
+
     # 備註
     remarks = models.TextField(
         blank=True,
         verbose_name="備註",
-        help_text="請輸入任何需要補充的資訊，如異常、停機等"
+        help_text="請輸入任何需要補充的資訊，如設備標記、操作說明等",
     )
-    
+
+    # 異常記錄
+    abnormal_notes = models.TextField(
+        blank=True,
+        verbose_name="異常記錄",
+        help_text="記錄生產過程中的異常情況，如設備故障、品質問題等",
+    )
+
     # 核准相關欄位
     approval_status = models.CharField(
         max_length=20,
         choices=[
-            ('pending', '待核准'),
-            ('approved', '已核准'),
-            ('rejected', '已駁回'),
+            ("pending", "待核准"),
+            ("approved", "已核准"),
+            ("rejected", "已駁回"),
         ],
-        default='pending',
+        default="pending",
         verbose_name="核准狀態",
-        help_text="此補登記錄的核准狀態"
+        help_text="此補登記錄的核准狀態",
     )
-    
+
     approved_by = models.CharField(
         max_length=100,
         blank=True,
         null=True,
         verbose_name="核准人員",
-        help_text="此補登記錄的核准人員"
+        help_text="此補登記錄的核准人員",
     )
-    
+
     approved_at = models.DateTimeField(
-        blank=True,
-        null=True,
-        verbose_name="核准時間",
-        help_text="此補登記錄的核准時間"
+        blank=True, null=True, verbose_name="核准時間", help_text="此補登記錄的核准時間"
     )
-    
+
     approval_remarks = models.TextField(
-        blank=True,
-        verbose_name="核准備註",
-        help_text="核准時的備註說明"
+        blank=True, verbose_name="核准備註", help_text="核准時的備註說明"
     )
-    
+
     rejection_reason = models.TextField(
-        blank=True,
-        verbose_name="駁回原因",
-        help_text="駁回時的原因說明"
+        blank=True, verbose_name="駁回原因", help_text="駁回時的原因說明"
     )
-    
+
     # 系統欄位
     created_by = models.CharField(
-        max_length=100,
-        verbose_name="建立人員",
-        default="system"
+        max_length=100, verbose_name="建立人員", default="system"
     )
-    
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="建立時間"
-    )
-    
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name="更新時間"
-    )
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
 
     class Meta:
         verbose_name = "SMT生產報工記錄"
         verbose_name_plural = "SMT生產報工記錄"
-        db_table = 'workorder_smt_production_report'
-        ordering = ['-work_date', '-start_time']
+        db_table = "workorder_smt_production_report"
+        ordering = ["-work_date", "-start_time"]
 
     def __str__(self):
-        if self.report_type == 'rd_sample':
-            rd_info = self.rd_product_code or self.product_id or 'RD樣品'
+        if self.report_type == "rd_sample":
+            rd_info = self.rd_product_code or self.product_id or "RD樣品"
             return f"RD樣品 - {rd_info} - {self.work_date}"
         else:
             return f"{self.workorder.order_number if self.workorder else '無工單'} - {self.work_date}"
@@ -776,9 +769,9 @@ class SMTProductionReport(models.Model):
     @property
     def workorder_number(self):
         """取得工單號碼"""
-        if self.report_type == 'rd_sample':
+        if self.report_type == "rd_sample":
             # RD樣品工單號碼，優先使用rd_workorder_number
-            return self.rd_workorder_number or 'RD樣品'
+            return self.rd_workorder_number or "RD樣品"
         elif self.workorder:
             return self.workorder.order_number
         elif self.product_id:
@@ -792,16 +785,16 @@ class SMTProductionReport(models.Model):
         if self.workorder and self.workorder.order_number:
             # 檢查工單號碼是否包含RD樣品相關關鍵字
             order_number = self.workorder.order_number.upper()
-            rd_keywords = ['RD', '樣品', 'SAMPLE', 'RD樣品', 'RD-樣品', 'RD樣本']
+            rd_keywords = ["RD", "樣品", "SAMPLE", "RD樣品", "RD-樣品", "RD樣本"]
             return any(keyword in order_number for keyword in rd_keywords)
         return False
 
     def auto_set_report_type(self):
         """自動設定報工類型"""
         if self.is_rd_sample_by_workorder():
-            self.report_type = 'rd_sample'
+            self.report_type = "rd_sample"
         else:
-            self.report_type = 'normal'
+            self.report_type = "normal"
 
     @property
     def equipment_name(self):
@@ -818,18 +811,18 @@ class SMTProductionReport(models.Model):
         """取得工作時數（小時）"""
         if self.start_time and self.end_time:
             from datetime import datetime, timedelta
-            
+
             # 組合日期和時間
             start_dt = datetime.combine(self.work_date, self.start_time)
             end_dt = datetime.combine(self.work_date, self.end_time)
-            
+
             # 如果結束時間小於開始時間，表示跨日
             if end_dt < start_dt:
                 end_dt += timedelta(days=1)
-            
+
             duration = end_dt - start_dt
             return duration.total_seconds() / 3600  # 轉換為小時
-        
+
         return 0.0
 
     @property
@@ -846,60 +839,55 @@ class SMTProductionReport(models.Model):
         RD樣品記錄不能修改
         """
         # RD樣品記錄不能修改
-        if self.report_type == 'rd_sample':
+        if self.report_type == "rd_sample":
             return False
-        
+
         # 已核准的記錄只有超級管理員可以編輯
-        if self.approval_status == 'approved':
+        if self.approval_status == "approved":
             return user.is_superuser
         return True
 
     def can_delete(self, user):
         """
         檢查記錄是否可以刪除
-        只有建立記錄的用戶和超級管理者可以刪除待核准和已駁回的記錄
-        已核准的記錄只有超級管理者可以刪除
+        只有建立記錄的用戶和超級主管可以刪除待核准和已駁回的記錄
+        已核准的記錄只有超級主管可以刪除
         """
-        # 已核准的記錄只有超級管理者可以刪除
-        if self.approval_status == 'approved':
+        # 已核准的記錄只有超級主管可以刪除
+        if self.approval_status == "approved":
             return user.is_superuser
-        
-        # 待核准和已駁回的記錄，只有建立者或超級管理者可以刪除
+
+        # 待核准和已駁回的記錄，只有建立者或超級主管可以刪除
         return user.is_superuser or self.created_by == user.username
 
     def can_approve(self, user):
         """檢查是否可以核准"""
-        # 只有超級用戶或管理者群組可以核准
+        # 只有超級用戶或主管群組可以核准
         if user.is_superuser:
             return True
-        
-        # 檢查是否在管理者群組中
-        return user.groups.filter(name='管理者').exists()
 
-    def approve(self, user, remarks=''):
+        # 檢查是否在主管群組中
+        return user.groups.filter(name="主管").exists()
+
+    def approve(self, user, remarks=""):
         """
         核准補登記錄
         """
-        self.approval_status = 'approved'
+        self.approval_status = "approved"
         self.approved_by = user.username
         self.approved_at = timezone.now()
         self.approval_remarks = remarks
         self.save()
 
-    def reject(self, user, reason=''):
+    def reject(self, user, reason=""):
         """
         駁回補登記錄
         """
-        self.approval_status = 'rejected'
+        self.approval_status = "rejected"
         self.approved_by = user.username
         self.approved_at = timezone.now()
         self.rejection_reason = reason
         self.save()
-
-
-
-
-
 
 
 class OperatorSupplementReport(models.Model):
@@ -907,258 +895,250 @@ class OperatorSupplementReport(models.Model):
     作業員補登報工記錄模型
     專為作業員的歷史報工記錄管理而設計，支援離線數據輸入、歷史數據修正和批量數據處理
     """
-    
+
     # 基本資訊
     operator = models.ForeignKey(
-        'process.Operator',
+        "process.Operator",
         on_delete=models.CASCADE,
         verbose_name="作業員",
-        help_text="請選擇進行補登報工的作業員"
+        help_text="請選擇進行補登報工的作業員",
     )
-    
+
     # 報工類型
     REPORT_TYPE_CHOICES = [
-        ('normal', '正式工單'),
-        ('rd_sample', 'RD樣品'),
+        ("normal", "正式工單"),
+        ("rd_sample", "RD樣品"),
     ]
-    
+
     report_type = models.CharField(
         max_length=20,
         choices=REPORT_TYPE_CHOICES,
-        default='normal',
+        default="normal",
         verbose_name="報工類型",
-        help_text="請選擇報工類型：正式工單或RD樣品"
+        help_text="請選擇報工類型：正式工單或RD樣品",
     )
-    
+
     workorder = models.ForeignKey(
         WorkOrder,
         on_delete=models.CASCADE,
         verbose_name="工單號碼",
         help_text="請選擇要補登的工單號碼",
         null=True,
-        blank=True
+        blank=True,
     )
-    
+
     # RD樣品專用欄位
     rd_workorder_number = models.CharField(
         max_length=100,
         blank=True,
         null=True,
         verbose_name="RD樣品工單號碼",
-        help_text="RD樣品模式的工單號碼"
+        help_text="RD樣品模式的工單號碼",
     )
-    
+
     rd_product_code = models.CharField(
         max_length=100,
         blank=True,
         null=True,
         verbose_name="RD產品編號",
-        help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊"
+        help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊",
     )
-    
+
     # 產品編號欄位（用於資料庫相容性）
     product_id = models.CharField(
         max_length=100,
         verbose_name="產品編號",
         help_text="產品編號（自動從工單取得）",
-        default=""
+        default="",
     )
-    
+
     # 工單預設生產數量（唯讀）
     planned_quantity = models.IntegerField(
         verbose_name="工單預設生產數量",
         help_text="此為工單規劃的總生產數量，不可修改",
-        default=0
+        default=0,
     )
-    
+
     process = models.ForeignKey(
-        'process.ProcessName',
+        "process.ProcessName",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         verbose_name="工序",
-        help_text="請選擇此次補登的工序（排除SMT相關工序）"
+        help_text="請選擇此次補登的工序（排除SMT相關工序）",
     )
-    
+
     # 工序名稱欄位（用於資料庫相容性）
     operation = models.CharField(
         max_length=100,
         verbose_name="工序名稱",
         help_text="工序名稱（自動從 process 欄位取得）",
-        default=""
+        default="",
     )
-    
+
     # 設備資訊（可選）
     equipment = models.ForeignKey(
-        'equip.Equipment',
+        "equip.Equipment",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name="設備",
-        help_text="請選擇此次補登的設備（排除SMT相關設備）"
+        help_text="請選擇此次補登的設備（排除SMT相關設備）",
     )
-    
+
     # 時間資訊
     work_date = models.DateField(
-        verbose_name="日期",
-        help_text="請選擇實際報工日期",
-        default=timezone.now
+        verbose_name="日期", help_text="請選擇實際報工日期", default=timezone.now
     )
-    
+
     start_time = models.TimeField(
         verbose_name="開始時間",
         help_text="請輸入實際開始時間 (24小時制)，例如 16:00",
-        default=timezone.now
+        default=timezone.now,
     )
-    
+
     end_time = models.TimeField(
         verbose_name="結束時間",
         help_text="請輸入實際結束時間 (24小時制)，例如 18:30",
-        default=timezone.now
+        default=timezone.now,
     )
-    
+
     # 數量資訊
     work_quantity = models.IntegerField(
         verbose_name="工作數量",
         help_text="請輸入該時段內實際完成的合格產品數量",
-        default=0
+        default=0,
     )
-    
+
     defect_quantity = models.IntegerField(
         default=0,
         verbose_name="不良品數量",
-        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0"
+        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0",
     )
-    
+
     # 狀態資訊
     is_completed = models.BooleanField(
         default=False,
         verbose_name="是否已完工",
-        help_text="若此工單在此工序上已全部完成，請勾選"
+        help_text="若此工單在此工序上已全部完成，請勾選",
     )
-    
+
     # 完工判斷方式
     COMPLETION_METHOD_CHOICES = [
-        ('manual', '手動勾選'),
-        ('auto_quantity', '自動依數量判斷'),
-        ('auto_time', '自動依工時判斷'),
-        ('auto_operator', '作業員確認'),
-        ('auto_system', '系統自動判斷'),
+        ("manual", "手動勾選"),
+        ("auto_quantity", "自動依數量判斷"),
+        ("auto_time", "自動依工時判斷"),
+        ("auto_operator", "作業員確認"),
+        ("auto_system", "系統自動判斷"),
     ]
-    
+
     completion_method = models.CharField(
         max_length=20,
         choices=COMPLETION_METHOD_CHOICES,
-        default='manual',
+        default="manual",
         verbose_name="完工判斷方式",
-        help_text="選擇如何判斷此筆記錄是否代表工單完工"
+        help_text="選擇如何判斷此筆記錄是否代表工單完工",
     )
-    
+
     # 自動完工狀態（系統計算）
     auto_completed = models.BooleanField(
         default=False,
         verbose_name="自動完工狀態",
-        help_text="系統根據累積數量或工時自動判斷的完工狀態"
+        help_text="系統根據累積數量或工時自動判斷的完工狀態",
     )
-    
+
     # 完工確認時間
     completion_time = models.DateTimeField(
         blank=True,
         null=True,
         verbose_name="完工確認時間",
-        help_text="系統記錄的完工確認時間"
+        help_text="系統記錄的完工確認時間",
     )
-    
+
     # 累積完成數量（用於自動完工判斷）
     cumulative_quantity = models.IntegerField(
         default=0,
         verbose_name="累積完成數量",
-        help_text="此工單在此工序上的累積完成數量"
+        help_text="此工單在此工序上的累積完成數量",
     )
-    
+
     # 累積工時（用於自動完工判斷）
     cumulative_hours = models.DecimalField(
         max_digits=8,
         decimal_places=2,
         default=0,
         verbose_name="累積工時",
-        help_text="此工單在此工序上的累積工時"
+        help_text="此工單在此工序上的累積工時",
     )
-    
+
     # 核准狀態
     APPROVAL_STATUS_CHOICES = [
-        ('pending', '待核准'),
-        ('approved', '已核准'),
-        ('rejected', '已駁回'),
+        ("pending", "待核准"),
+        ("approved", "已核准"),
+        ("rejected", "已駁回"),
     ]
-    
+
     approval_status = models.CharField(
         max_length=20,
         choices=APPROVAL_STATUS_CHOICES,
-        default='pending',
+        default="pending",
         verbose_name="核准狀態",
-        help_text="補登記錄的核准狀態，已核准的記錄不可修改"
+        help_text="補登記錄的核准狀態，已核准的記錄不可修改",
     )
-    
+
     approved_by = models.CharField(
         max_length=100,
         blank=True,
         null=True,
         verbose_name="核准人員",
-        help_text="核准此補登記錄的人員"
+        help_text="核准此補登記錄的人員",
     )
-    
+
     approved_at = models.DateTimeField(
-        blank=True,
-        null=True,
-        verbose_name="核准時間",
-        help_text="此補登記錄的核准時間"
+        blank=True, null=True, verbose_name="核准時間", help_text="此補登記錄的核准時間"
     )
-    
+
     approval_remarks = models.TextField(
-        blank=True,
-        verbose_name="核准備註",
-        help_text="核准時的備註說明"
+        blank=True, verbose_name="核准備註", help_text="核准時的備註說明"
     )
-    
+
     rejection_reason = models.TextField(
-        blank=True,
-        verbose_name="駁回原因",
-        help_text="駁回時的原因說明"
+        blank=True, verbose_name="駁回原因", help_text="駁回時的原因說明"
     )
-    
+
     # 備註
     remarks = models.TextField(
         blank=True,
         verbose_name="備註",
-        help_text="請輸入任何需要補充的資訊，如異常、停機等"
+        help_text="請輸入任何需要補充的資訊，如設備標記、操作說明等",
     )
-    
+
+    # 異常記錄
+    abnormal_notes = models.TextField(
+        blank=True,
+        verbose_name="異常記錄",
+        help_text="記錄生產過程中的異常情況，如設備故障、品質問題等",
+    )
+
     # 系統欄位
     created_by = models.CharField(
-        max_length=100,
-        verbose_name="建立人員",
-        default="system"
+        max_length=100, verbose_name="建立人員", default="system"
     )
-    
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="建立時間"
-    )
-    
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name="更新時間"
-    )
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
 
     class Meta:
         verbose_name = "作業員補登報工記錄"
         verbose_name_plural = "作業員補登報工記錄"
-        db_table = 'workorder_operator_supplement_report'
-        ordering = ['-work_date', '-start_time']
+        db_table = "workorder_operator_supplement_report"
+        ordering = ["-work_date", "-start_time"]
 
     def __str__(self):
-        return f"{self.operator.name} - {self.workorder.order_number} - {self.work_date}"
+        return (
+            f"{self.operator.name} - {self.workorder.order_number} - {self.work_date}"
+        )
 
     @property
     def operator_name(self):
@@ -1168,9 +1148,9 @@ class OperatorSupplementReport(models.Model):
     @property
     def workorder_number(self):
         """取得工單號碼"""
-        if self.report_type == 'rd_sample':
+        if self.report_type == "rd_sample":
             # RD樣品工單號碼，優先使用rd_workorder_number
-            return self.rd_workorder_number or 'RD樣品'
+            return self.rd_workorder_number or "RD樣品"
         elif self.workorder:
             return self.workorder.order_number
         elif self.product_id:
@@ -1184,16 +1164,16 @@ class OperatorSupplementReport(models.Model):
         if self.workorder and self.workorder.order_number:
             # 檢查工單號碼是否包含RD樣品相關關鍵字
             order_number = self.workorder.order_number.upper()
-            rd_keywords = ['RD', '樣品', 'SAMPLE', 'RD樣品', 'RD-樣品', 'RD樣本']
+            rd_keywords = ["RD", "樣品", "SAMPLE", "RD樣品", "RD-樣品", "RD樣本"]
             return any(keyword in order_number for keyword in rd_keywords)
         return False
 
     def auto_set_report_type(self):
         """自動設定報工類型"""
         if self.is_rd_sample_by_workorder():
-            self.report_type = 'rd_sample'
+            self.report_type = "rd_sample"
         else:
-            self.report_type = 'normal'
+            self.report_type = "normal"
 
     @property
     def process_name(self):
@@ -1210,6 +1190,7 @@ class OperatorSupplementReport(models.Model):
         """計算工作時數"""
         if self.start_time and self.end_time:
             from datetime import datetime, timedelta
+
             start_dt = datetime.combine(self.work_date, self.start_time)
             end_dt = datetime.combine(self.work_date, self.end_time)
             if end_dt < start_dt:
@@ -1230,21 +1211,21 @@ class OperatorSupplementReport(models.Model):
         檢查記錄是否可以編輯
         已核准的記錄只有超級管理員可以編輯
         """
-        if self.approval_status == 'approved':
+        if self.approval_status == "approved":
             return user.is_superuser
         return True
 
     def can_delete(self, user):
         """
         檢查記錄是否可以刪除
-        只有建立記錄的用戶和超級管理者可以刪除待核准和已駁回的記錄
-        已核准的記錄只有超級管理者可以刪除
+        只有建立記錄的用戶和超級主管可以刪除待核准和已駁回的記錄
+        已核准的記錄只有超級主管可以刪除
         """
-        # 已核准的記錄只有超級管理者可以刪除
-        if self.approval_status == 'approved':
+        # 已核准的記錄只有超級主管可以刪除
+        if self.approval_status == "approved":
             return user.is_superuser
-        
-        # 待核准和已駁回的記錄，只有建立者或超級管理者可以刪除
+
+        # 待核准和已駁回的記錄，只有建立者或超級主管可以刪除
         return user.is_superuser or self.created_by == user.username
 
     def can_approve(self, user):
@@ -1254,21 +1235,21 @@ class OperatorSupplementReport(models.Model):
         """
         return user.is_staff or user.is_superuser
 
-    def approve(self, user, remarks=''):
+    def approve(self, user, remarks=""):
         """
         核准通過補登記錄
         """
-        self.approval_status = 'approved'
+        self.approval_status = "approved"
         self.approved_by = user.username
         self.approved_at = timezone.now()
         self.approval_remarks = remarks
         self.save()
 
-    def reject(self, user, reason=''):
+    def reject(self, user, reason=""):
         """
         駁回補登記錄
         """
-        self.approval_status = 'rejected'
+        self.approval_status = "rejected"
         self.approved_by = user.username
         self.approved_at = timezone.now()
         self.rejection_reason = reason
@@ -1276,433 +1257,425 @@ class OperatorSupplementReport(models.Model):
 
     def submit_for_approval(self):
         """提交核准"""
-        self.approval_status = 'pending'
+        self.approval_status = "pending"
         self.save()
-    
+
     def check_auto_completion(self):
         """檢查是否自動完工"""
         from django.utils import timezone
-        
+
         # 取得此工單在此工序上的所有記錄
         all_reports = OperatorSupplementReport.objects.filter(
-            workorder=self.workorder,
-            process=self.process
-        ).order_by('work_date', 'start_time')
-        
+            workorder=self.workorder, process=self.process
+        ).order_by("work_date", "start_time")
+
         # 計算累積數量
-        total_quantity = sum(report.work_quantity for report in all_reports if report.work_quantity)
-        
+        total_quantity = sum(
+            report.work_quantity for report in all_reports if report.work_quantity
+        )
+
         # 計算累積工時
         total_hours = sum(report.work_hours for report in all_reports)
-        
+
         # 更新累積數據
         self.cumulative_quantity = total_quantity
         self.cumulative_hours = total_hours
-        
+
         # 自動完工判斷邏輯
         auto_completed = False
-        completion_method = 'manual'
-        
+        completion_method = "manual"
+
         # 1. 依數量判斷：累積數量 >= 工單預設數量
         if total_quantity >= self.workorder.quantity:
             auto_completed = True
-            completion_method = 'auto_quantity'
-        
+            completion_method = "auto_quantity"
+
         # 2. 依工時判斷：累積工時 >= 預估工時（假設每小時產出 50 件）
         estimated_hours = self.workorder.quantity / 50  # 可調整的預估標準
         if total_hours >= estimated_hours:
             auto_completed = True
-            completion_method = 'auto_time'
-        
+            completion_method = "auto_time"
+
         # 3. 作業員確認：在備註中提及完工
-        if '完工' in (self.remarks or '') or '完成' in (self.remarks or ''):
+        if "完工" in (self.remarks or "") or "完成" in (self.remarks or ""):
             auto_completed = True
-            completion_method = 'auto_operator'
-        
+            completion_method = "auto_operator"
+
         # 更新自動完工狀態
         self.auto_completed = auto_completed
         self.completion_method = completion_method
-        
+
         # 如果自動完工，設定完工時間
         if auto_completed and not self.completion_time:
             self.completion_time = timezone.now()
-        
+
         self.save()
-        
+
         return auto_completed
-    
+
     def get_completion_status_display(self):
         """取得完工狀態顯示文字"""
         if self.is_completed:
             return "手動完工"
         elif self.auto_completed:
-            method_display = dict(self.COMPLETION_METHOD_CHOICES).get(self.completion_method, '')
+            method_display = dict(self.COMPLETION_METHOD_CHOICES).get(
+                self.completion_method, ""
+            )
             return f"自動完工({method_display})"
         else:
             return "未完工"
-    
+
     def get_completion_summary(self):
         """取得完工摘要資訊"""
         return {
-            'is_completed': self.is_completed,
-            'auto_completed': self.auto_completed,
-            'completion_method': self.completion_method,
-            'completion_time': self.completion_time,
-            'cumulative_quantity': self.cumulative_quantity,
-            'cumulative_hours': self.cumulative_hours,
-            'planned_quantity': self.workorder.quantity,
-            'completion_rate': (self.cumulative_quantity / self.workorder.quantity * 100) if self.workorder.quantity > 0 else 0
+            "is_completed": self.is_completed,
+            "auto_completed": self.auto_completed,
+            "completion_method": self.completion_method,
+            "completion_time": self.completion_time,
+            "cumulative_quantity": self.cumulative_quantity,
+            "cumulative_hours": self.cumulative_hours,
+            "planned_quantity": self.workorder.quantity,
+            "completion_rate": (
+                (self.cumulative_quantity / self.workorder.quantity * 100)
+                if self.workorder.quantity > 0
+                else 0
+            ),
         }
 
 
-
-
-
-
-
-class ManagerProductionReport(models.Model):
+class SupervisorProductionReport(models.Model):
     """
-    管理者生產報工記錄模型
-    專為管理者設計的報工記錄核准模組，結合了 SMT 補登報工和作業員補登報工的功能特點
+    主管生產報工記錄模型
+    專為主設計的報工記錄核准模組，結合了 SMT 補登報工和作業員補登報工的功能特點
     """
-    
+
     # 基本資訊
-    manager = models.CharField(
-        max_length=100,
-        verbose_name="管理者",
-        help_text="請輸入管理者姓名"
+    supervisor = models.CharField(
+        max_length=100, verbose_name="主管", help_text="請輸入主管姓名"
     )
-    
+
     workorder = models.ForeignKey(
         WorkOrder,
         on_delete=models.CASCADE,
         verbose_name="工單號碼",
-        help_text="請選擇要報工的工單號碼"
+        help_text="請選擇要報工的工單號碼",
     )
-    
+
     # 工單預設生產數量（唯讀）
     planned_quantity = models.IntegerField(
         verbose_name="工單預設生產數量",
         help_text="此為工單規劃的總生產數量，不可修改",
-        default=0
+        default=0,
     )
-    
+
     process = models.ForeignKey(
-        'process.ProcessName',
+        "process.ProcessName",
         on_delete=models.CASCADE,
         verbose_name="工序",
-        help_text="請選擇此次報工的工序"
+        help_text="請選擇此次報工的工序",
     )
-    
+
     # 設備資訊（可選）
     equipment = models.ForeignKey(
-        'equip.Equipment',
+        "equip.Equipment",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name="設備",
-        help_text="請選擇此次報工的設備（可選）"
+        help_text="請選擇此次報工的設備（可選）",
     )
-    
+
     # 作業員資訊（可選）
     operator = models.ForeignKey(
-        'process.Operator',
+        "process.Operator",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name="作業員",
-        help_text="請選擇此次報工的作業員（可選）"
+        help_text="請選擇此次報工的作業員（可選）",
     )
-    
+
     # 時間資訊
     work_date = models.DateField(
-        verbose_name="日期",
-        help_text="請選擇實際報工日期",
-        default=timezone.now
+        verbose_name="日期", help_text="請選擇實際報工日期", default=timezone.now
     )
-    
+
     start_time = models.TimeField(
         verbose_name="開始時間",
         help_text="請輸入實際開始時間 (24小時制)，例如 16:00",
-        default=timezone.now
+        default=timezone.now,
     )
-    
+
     end_time = models.TimeField(
         verbose_name="結束時間",
         help_text="請輸入實際結束時間 (24小時制)，例如 18:30",
-        default=timezone.now
+        default=timezone.now,
     )
-    
+
     # 數量資訊
     work_quantity = models.IntegerField(
         verbose_name="工作數量",
         help_text="請輸入該時段內實際完成的合格產品數量",
-        default=0
+        default=0,
     )
-    
+
     defect_quantity = models.IntegerField(
         default=0,
         verbose_name="不良品數量",
-        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0"
+        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0",
     )
-    
+
     # 完工判斷
     is_completed = models.BooleanField(
         default=False,
         verbose_name="是否已完工",
-        help_text="若此工單在此工序上已全部完成，請勾選"
+        help_text="若此工單在此工序上已全部完成，請勾選",
     )
-    
+
     # 完工判斷方式
     COMPLETION_METHOD_CHOICES = [
-        ('manual', '手動勾選'),
-        ('auto_quantity', '自動依數量判斷'),
-        ('auto_time', '自動依工時判斷'),
-        ('manager_confirm', '管理者確認'),
-        ('auto_system', '系統自動判斷'),
+        ("manual", "手動勾選"),
+        ("auto_quantity", "自動依數量判斷"),
+        ("auto_time", "自動依工時判斷"),
+        ("supervisor_confirm", "主管確認"),
+        ("auto_system", "系統自動判斷"),
     ]
-    
+
     completion_method = models.CharField(
         max_length=20,
         choices=COMPLETION_METHOD_CHOICES,
-        default='manual',
+        default="manual",
         verbose_name="完工判斷方式",
-        help_text="選擇如何判斷此筆記錄是否代表工單完工"
+        help_text="選擇如何判斷此筆記錄是否代表工單完工",
     )
-    
+
     # 自動完工狀態（系統計算）
     auto_completed = models.BooleanField(
         default=False,
         verbose_name="自動完工狀態",
-        help_text="系統根據累積數量或工時自動判斷的完工狀態"
+        help_text="系統根據累積數量或工時自動判斷的完工狀態",
     )
-    
+
     # 完工確認時間
     completion_time = models.DateTimeField(
         blank=True,
         null=True,
         verbose_name="完工確認時間",
-        help_text="系統記錄的完工確認時間"
+        help_text="系統記錄的完工確認時間",
     )
-    
+
     # 累積完成數量（用於自動完工判斷）
     cumulative_quantity = models.IntegerField(
         default=0,
         verbose_name="累積完成數量",
-        help_text="此工單在此工序上的累積完成數量"
+        help_text="此工單在此工序上的累積完成數量",
     )
-    
+
     # 累積工時（用於自動完工判斷）
     cumulative_hours = models.DecimalField(
         max_digits=8,
         decimal_places=2,
         default=0,
         verbose_name="累積工時",
-        help_text="此工單在此工序上的累積工時"
+        help_text="此工單在此工序上的累積工時",
     )
-    
+
     # 核准狀態
     APPROVAL_STATUS_CHOICES = [
-        ('pending', '待核准'),
-        ('approved', '已核准'),
-        ('rejected', '已駁回'),
+        ("pending", "待核准"),
+        ("approved", "已核准"),
+        ("rejected", "已駁回"),
     ]
-    
+
     approval_status = models.CharField(
         max_length=20,
         choices=APPROVAL_STATUS_CHOICES,
-        default='pending',
+        default="pending",
         verbose_name="核准狀態",
-        help_text="報工記錄的核准狀態，已核准的記錄不可修改"
+        help_text="報工記錄的核准狀態，已核准的記錄不可修改",
     )
-    
+
     approved_by = models.CharField(
         max_length=100,
         blank=True,
         null=True,
         verbose_name="核准人員",
-        help_text="核准此報工記錄的人員"
+        help_text="核准此報工記錄的人員",
     )
-    
+
     approved_at = models.DateTimeField(
-        blank=True,
-        null=True,
-        verbose_name="核准時間",
-        help_text="此報工記錄的核准時間"
+        blank=True, null=True, verbose_name="核准時間", help_text="此報工記錄的核准時間"
     )
-    
+
     approval_remarks = models.TextField(
-        blank=True,
-        verbose_name="核准備註",
-        help_text="核准時的備註說明"
+        blank=True, verbose_name="核准備註", help_text="核准時的備註說明"
     )
-    
+
     rejection_reason = models.TextField(
-        blank=True,
-        verbose_name="駁回原因",
-        help_text="駁回時的原因說明"
+        blank=True, verbose_name="駁回原因", help_text="駁回時的原因說明"
     )
-    
+
     # 備註
     remarks = models.TextField(
         blank=True,
         verbose_name="備註",
-        help_text="請輸入任何需要補充的資訊，如異常、停機等"
+        help_text="請輸入任何需要補充的資訊，如設備標記、操作說明等",
     )
-    
+
+    # 異常記錄
+    abnormal_notes = models.TextField(
+        blank=True,
+        verbose_name="異常記錄",
+        help_text="記錄生產過程中的異常情況，如設備故障、品質問題等",
+    )
+
     # 系統欄位
     created_by = models.CharField(
-        max_length=100,
-        verbose_name="建立人員",
-        default="system"
+        max_length=100, verbose_name="建立人員", default="system"
     )
-    
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="建立時間"
-    )
-    
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name="更新時間"
-    )
-    
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+
     class Meta:
-        verbose_name = "管理者生產報工記錄"
-        verbose_name_plural = "管理者生產報工記錄"
-        db_table = 'workorder_manager_production_report'
-        ordering = ['-work_date', '-start_time']
-    
+        verbose_name = "主管生產報工記錄"
+        verbose_name_plural = "主管生產報工記錄"
+        db_table = "workorder_supervisor_production_report"
+        ordering = ["-work_date", "-start_time"]
+
     def __str__(self):
-        return f"{self.manager} - {self.workorder.order_number} - {self.process.name} - {self.work_date}"
-    
+        return f"{self.supervisor} - {self.workorder.order_number} - {self.process.name} - {self.work_date}"
+
     @property
     def workorder_number(self):
         """取得工單號碼"""
         return self.workorder.order_number if self.workorder else ""
-    
+
     @property
     def process_name(self):
         """取得工序名稱"""
         return self.process.name if self.process else ""
-    
+
     @property
     def equipment_name(self):
         """取得設備名稱"""
         return self.equipment.name if self.equipment else "未指定"
-    
+
     @property
     def operator_name(self):
         """取得作業員姓名"""
         return self.operator.name if self.operator else "未指定"
-    
+
     @property
     def total_quantity(self):
         """計算總數量（工作數量 + 不良品數量）"""
         return self.work_quantity + self.defect_quantity
-    
+
     @property
     def work_hours(self):
         """計算工作時數"""
         if self.start_time and self.end_time:
             start_dt = timezone.datetime.combine(self.work_date, self.start_time)
             end_dt = timezone.datetime.combine(self.work_date, self.end_time)
-            
+
             # 如果結束時間小於開始時間，表示跨日
             if end_dt < start_dt:
                 end_dt += timezone.timedelta(days=1)
-            
+
             duration = end_dt - start_dt
             hours = duration.total_seconds() / 3600
             return round(hours, 2)
         return 0.0
-    
+
     @property
     def yield_rate(self):
         """計算良率"""
         if self.total_quantity > 0:
             return round((self.work_quantity / self.total_quantity) * 100, 2)
         return 0.0
-    
+
     def can_edit(self, user):
         """檢查是否可以編輯"""
         # 已審核的記錄不可編輯
-        if self.approval_status == 'approved':
+        if self.approval_status == "approved":
             return False
-        
+
         # 建立者或超級用戶可以編輯
         return user.is_superuser or self.created_by == user.username
-    
+
     def can_delete(self, user):
         """
         檢查是否可以刪除
-        只有建立記錄的用戶和超級管理者可以刪除待核准和已駁回的記錄
-        已核准的記錄只有超級管理者可以刪除
+        只有建立記錄的用戶和超級主管可以刪除待核准和已駁回的記錄
+        已核准的記錄只有超級主管可以刪除
         """
-        # 已核准的記錄只有超級管理者可以刪除
-        if self.approval_status == 'approved':
+        # 已核准的記錄只有超級主管可以刪除
+        if self.approval_status == "approved":
             return user.is_superuser
-        
-        # 待核准和已駁回的記錄，只有建立者或超級管理者可以刪除
+
+        # 待核准和已駁回的記錄，只有建立者或超級主管可以刪除
         return user.is_superuser or self.created_by == user.username
-    
+
     def can_approve(self, user):
         """檢查是否可以核准"""
-        # 只有超級用戶或管理者群組可以核准
+        # 只有超級用戶或主管群組可以核准
         if user.is_superuser:
             return True
-        
-        # 檢查是否在管理者群組中
-        return user.groups.filter(name='管理者').exists()
-    
-    def approve(self, user, remarks=''):
+
+        # 檢查是否在主管群組中
+        return user.groups.filter(name="主管").exists()
+
+    def approve(self, user, remarks=""):
         """核准通過"""
         if not self.can_approve(user):
             raise PermissionError("您沒有權限進行核准")
-        
-        self.approval_status = 'approved'
+
+        self.approval_status = "approved"
         self.approved_by = user.username
         self.approved_at = timezone.now()
         self.approval_remarks = remarks
         self.save()
-    
-    def reject(self, user, reason=''):
+
+    def reject(self, user, reason=""):
         """駁回"""
         if not self.can_approve(user):
             raise PermissionError("您沒有權限進行核准")
-        
-        self.approval_status = 'rejected'
+
+        self.approval_status = "rejected"
         self.approved_by = user.username
         self.approved_at = timezone.now()
         self.rejection_reason = reason
         self.save()
-    
+
     def submit_for_approval(self):
         """提交核准"""
-        self.approval_status = 'pending'
+        self.approval_status = "pending"
         self.save()
-    
+
     def check_auto_completion(self):
         """檢查自動完工狀態"""
-        if self.completion_method == 'auto_quantity':
+        if self.completion_method == "auto_quantity":
             # 根據累積數量判斷
             if self.cumulative_quantity >= self.planned_quantity:
                 self.auto_completed = True
                 self.completion_time = timezone.now()
-        elif self.completion_method == 'auto_time':
+        elif self.completion_method == "auto_time":
             # 根據累積工時判斷（假設標準工時為8小時）
             if self.cumulative_hours >= 8.0:
                 self.auto_completed = True
                 self.completion_time = timezone.now()
-        elif self.completion_method == 'auto_system':
+        elif self.completion_method == "auto_system":
             # 系統自動判斷（綜合考量）
-            if (self.cumulative_quantity >= self.planned_quantity * 0.95 and 
-                self.cumulative_hours >= 6.0):
+            if (
+                self.cumulative_quantity >= self.planned_quantity * 0.95
+                and self.cumulative_hours >= 6.0
+            ):
                 self.auto_completed = True
                 self.completion_time = timezone.now()
-        
+
         self.save()
-    
+
     def get_completion_status_display(self):
         """取得完工狀態顯示"""
         if self.is_completed:
@@ -1711,24 +1684,20 @@ class ManagerProductionReport(models.Model):
             return "自動完工"
         else:
             return "未完工"
-    
+
     def get_completion_summary(self):
         """取得完工摘要"""
         summary = []
-        
+
         if self.is_completed:
             summary.append("手動完工")
-        
+
         if self.auto_completed:
             summary.append("自動完工")
-        
+
         if self.completion_time:
-            summary.append(f"完工時間: {self.completion_time.strftime('%Y-%m-%d %H:%M')}")
-        
+            summary.append(
+                f"完工時間: {self.completion_time.strftime('%Y-%m-%d %H:%M')}"
+            )
+
         return " | ".join(summary) if summary else "未完工"
-
-
-
-
-
-

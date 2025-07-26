@@ -68,7 +68,9 @@ def auto_convert_orders():
         try:
             config = SystemConfig.objects.get(key="auto_convert_interval")
             auto_convert_interval = int(config.value)
-            workorder_logger.info(f"讀取到自動轉換間隔設定：{auto_convert_interval} 分鐘")
+            workorder_logger.info(
+                f"讀取到自動轉換間隔設定：{auto_convert_interval} 分鐘"
+            )
         except SystemConfig.DoesNotExist:
             workorder_logger.warning("未找到自動轉換間隔設定，使用預設值 30 分鐘")
 
@@ -90,16 +92,18 @@ def auto_convert_orders():
                 # 檢查工單是否已存在（使用公司代號和製令單號的組合）
                 existing_workorder = WorkOrder.objects.filter(
                     company_code=company_order.company_code,
-                    order_number=company_order.mkordno
+                    order_number=company_order.mkordno,
                 ).first()
-                
+
                 if existing_workorder:
                     # 如果工單已存在，跳過並標記為已轉換
                     company_order.is_converted = True
                     company_order.save()
-                    workorder_logger.warning(f"工單已存在，跳過轉換：{company_order.mkordno}")
+                    workorder_logger.warning(
+                        f"工單已存在，跳過轉換：{company_order.mkordno}"
+                    )
                     continue
-                
+
                 # 建立工單（使用製令單號作為工單號碼）
                 workorder = WorkOrder.objects.create(
                     order_number=company_order.mkordno,  # 直接使用製令單號
@@ -121,18 +125,23 @@ def auto_convert_orders():
                         # 使用產品工藝路線建立工序明細
                         for route in routes:
                             # 查詢標準產能資料
-                            capacity_data = ProductProcessStandardCapacity.objects.filter(
-                                product_code=workorder.product_code,
-                                process_name=route.process_name.name,
-                                is_active=True
-                            ).order_by('-version').first()
-                            
+                            capacity_data = (
+                                ProductProcessStandardCapacity.objects.filter(
+                                    product_code=workorder.product_code,
+                                    process_name=route.process_name.name,
+                                    is_active=True,
+                                )
+                                .order_by("-version")
+                                .first()
+                            )
+
                             # 使用標準產能或預設值
                             target_hourly_output = (
-                                capacity_data.standard_capacity_per_hour 
-                                if capacity_data else 1000
+                                capacity_data.standard_capacity_per_hour
+                                if capacity_data
+                                else 1000
                             )
-                            
+
                             WorkOrderProcess.objects.create(
                                 workorder=workorder,
                                 process_name=route.process_name.name,

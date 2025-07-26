@@ -124,8 +124,8 @@ USE_I18N = True
 USE_TZ = True
 
 # 編碼設定
-DEFAULT_CHARSET = 'utf-8'
-FILE_CHARSET = 'utf-8'
+DEFAULT_CHARSET = "utf-8"
+FILE_CHARSET = "utf-8"
 
 # 靜態檔案設定（開發模式下自動處理）
 STATIC_URL = "/static/"

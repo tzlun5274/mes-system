@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+
 class CompanyView(models.Model):
     company_name = models.CharField(max_length=100, verbose_name=_("公司名稱"))
     mes_database = models.CharField(max_length=100, verbose_name=_("MES資料庫名稱"))
@@ -11,7 +12,7 @@ class CompanyView(models.Model):
     class Meta:
         verbose_name = _("公司檢視")
         verbose_name_plural = _("公司檢視")
-        ordering = ['company_name']
+        ordering = ["company_name"]
 
     def __str__(self):
         return self.company_name

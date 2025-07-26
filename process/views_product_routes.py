@@ -33,28 +33,28 @@ def standardize_product_id(product_id):
     """
     if not product_id:
         return ""
-    
+
     # 轉為字串
     product_id = str(product_id)
-    
+
     # 去除前後空白
     product_id = product_id.strip()
-    
+
     # 全形轉半形
-    product_id = unicodedata.normalize('NFKC', product_id)
-    
+    product_id = unicodedata.normalize("NFKC", product_id)
+
     # 去除不可見字元（保留空格、數字、字母、連字號、底線）
-    product_id = re.sub(r'[^\w\s\-]', '', product_id)
-    
+    product_id = re.sub(r"[^\w\s\-]", "", product_id)
+
     # 統一為大寫
     product_id = product_id.upper()
-    
+
     # 去除多餘空格（將多個空格替換為單個空格）
-    product_id = re.sub(r'\s+', ' ', product_id)
-    
+    product_id = re.sub(r"\s+", " ", product_id)
+
     # 再次去除前後空白
     product_id = product_id.strip()
-    
+
     return product_id
 
 
@@ -67,17 +67,17 @@ def check_product_id_variations(dataset):
     for row in dataset:
         original_id = row["產品編號"]
         standardized_id = standardize_product_id(original_id)
-        
+
         if standardized_id not in variations:
             variations[standardized_id] = []
         variations[standardized_id].append(original_id)
-    
+
     # 找出有變體的產品編號
     problematic_variations = {}
     for std_id, original_ids in variations.items():
         if len(set(original_ids)) > 1:  # 有多個不同的原始編號
             problematic_variations[std_id] = list(set(original_ids))
-    
+
     return problematic_variations
 
 
@@ -896,7 +896,9 @@ def import_product_routes(request):
                             success_count += 1
                             # 記錄標準化過程
                             if original_product_id != product_id:
-                                logger.info(f"產品編號標準化: '{original_product_id}' -> '{product_id}'")
+                                logger.info(
+                                    f"產品編號標準化: '{original_product_id}' -> '{product_id}'"
+                                )
                         except Exception as e:
                             errors.append(
                                 f"儲存記錄失敗（產品編號：{product_id}，工序：{process_name}，順序：{step_order}）：{str(e)}"
@@ -979,15 +981,17 @@ def import_product_routes(request):
                     "依賴半成品": dependent_semi_product,
                 }
             )
-        
+
         # 檢查產品編號變體
         problematic_variations = check_product_id_variations(dataset)
         if problematic_variations:
             # 顯示產品編號變體警告
             variation_messages = []
             for std_id, original_ids in problematic_variations.items():
-                variation_messages.append(f"產品編號 '{std_id}' 發現多種寫法：{', '.join(original_ids)}")
-            
+                variation_messages.append(
+                    f"產品編號 '{std_id}' 發現多種寫法：{', '.join(original_ids)}"
+                )
+
             # 將原始資料轉為 JSON 供後續處理
             dataset_json = json.dumps(dataset)
             return render(
@@ -1000,7 +1004,7 @@ def import_product_routes(request):
                     "show_variation_warning": True,
                 },
             )
-        
+
         duplicate_routes = []
         for row in dataset:
             product_id = row["產品編號"]
@@ -1098,7 +1102,9 @@ def import_product_routes(request):
                     success_count += 1
                     # 記錄標準化過程
                     if original_product_id != product_id:
-                        logger.info(f"產品編號標準化: '{original_product_id}' -> '{product_id}'")
+                        logger.info(
+                            f"產品編號標準化: '{original_product_id}' -> '{product_id}'"
+                        )
                 except Exception as e:
                     errors.append(
                         f"儲存記錄失敗（產品編號：{product_id}，工序：{process_name}，順序：{step_order}）：{str(e)}"
@@ -1149,24 +1155,31 @@ def api_calculate_capacity(request):
     for route in routes:
         step_order = route.step_order
         parallel = int(parallel_steps.get(str(step_order), 1))
-        
+
         # 查詢標準產能資料
-        capacity_data = ProductProcessStandardCapacity.objects.filter(
-            product_code=product_id,
-            process_name=route.process_name.name,
-            is_active=True
-        ).order_by('-version').first()
-        
+        capacity_data = (
+            ProductProcessStandardCapacity.objects.filter(
+                product_code=product_id,
+                process_name=route.process_name.name,
+                is_active=True,
+            )
+            .order_by("-version")
+            .first()
+        )
+
         # 使用標準產能或預設值
         capacity_per_hour = (
-            capacity_data.standard_capacity_per_hour 
-            if capacity_data else 1000
+            capacity_data.standard_capacity_per_hour if capacity_data else 1000
         )
-        
+
         # 假設每道工序需生產 1 批（可依需求調整）
         batch_qty = 1
         # 工時 = 批量 / (併行數 * 每小時產能)
-        hours = batch_qty / (parallel * capacity_per_hour) if parallel > 0 and capacity_per_hour > 0 else 0
+        hours = (
+            batch_qty / (parallel * capacity_per_hour)
+            if parallel > 0 and capacity_per_hour > 0
+            else 0
+        )
         # 天數 = 工時 / 11（每日8+3小時）
         days = hours / 11 if hours > 0 else 0
         total_hours += hours

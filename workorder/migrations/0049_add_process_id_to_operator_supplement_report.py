@@ -7,19 +7,19 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('workorder', '0048_fix_process_id_field'),
+        ("workorder", "0048_fix_process_id_field"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='operatorsupplementreport',
-            name='process',
+            model_name="operatorsupplementreport",
+            name="process",
             field=models.ForeignKey(
                 blank=True,
                 null=True,
                 on_delete=django.db.models.deletion.CASCADE,
-                to='process.processname',
-                verbose_name='工序'
+                to="process.processname",
+                verbose_name="工序",
             ),
         ),
-    ] 
+    ]

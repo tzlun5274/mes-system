@@ -7,19 +7,19 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('workorder', '0046_remove_managerproductionreport_abnormal_notes_and_more'),
+        ("workorder", "0046_remove_managerproductionreport_abnormal_notes_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='operatorsupplementreport',
-            name='process_id',
+            model_name="operatorsupplementreport",
+            name="process_id",
             field=models.ForeignKey(
                 blank=True,
                 null=True,
                 on_delete=django.db.models.deletion.CASCADE,
-                to='process.processname',
-                verbose_name='工序'
+                to="process.processname",
+                verbose_name="工序",
             ),
         ),
-    ] 
+    ]

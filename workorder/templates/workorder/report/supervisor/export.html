@@ -1,0 +1,396 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}報表匯出{% endblock %}
+
+{% block extra_head %}
+<style>
+    .export-container {
+        padding: 20px;
+    }
+    
+    .export-section {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .section-title {
+        font-size: 1.3em;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 10px;
+    }
+    
+    .report-type-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .report-type-card {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 15px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .report-type-card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    .report-type-card.selected {
+        border-color: #007bff;
+        background-color: #f8f9ff;
+    }
+    
+    .report-type-icon {
+        font-size: 2em;
+        color: #007bff;
+        margin-bottom: 10px;
+    }
+    
+    .report-type-title {
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .report-type-description {
+        color: #666;
+        font-size: 0.9em;
+    }
+    
+    .format-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .format-card {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .format-card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .format-card.selected {
+        border-color: #28a745;
+        background-color: #f8fff9;
+    }
+    
+    .format-icon {
+        font-size: 2em;
+        margin-bottom: 10px;
+    }
+    
+    .format-card[data-format="excel"] .format-icon {
+        color: #217346;
+    }
+    
+    .format-card[data-format="csv"] .format-icon {
+        color: #ff6b35;
+    }
+    
+    .format-card[data-format="pdf"] .format-icon {
+        color: #dc3545;
+    }
+    
+    .date-range-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .date-range-card {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .date-range-card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .date-range-card.selected {
+        border-color: #ffc107;
+        background-color: #fffbf0;
+    }
+    
+    .btn-export {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        padding: 15px 30px;
+        border-radius: 5px;
+        font-weight: bold;
+        font-size: 1.1em;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-export:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .btn-export:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-file-export text-success"></i>
+                    報表匯出
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor_functions' %}">主管功能</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">報表匯出</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <form id="exportForm">
+        <!-- 報表類型選擇 -->
+        <div class="export-section">
+            <div class="section-title">
+                <i class="fas fa-chart-bar mr-2"></i>選擇報表類型
+            </div>
+            <div class="report-type-grid">
+                {% for report_type in report_types %}
+                <div class="report-type-card" data-type="{{ report_type.id }}">
+                    <div class="report-type-icon">
+                        {% if report_type.id == 'daily' %}
+                            <i class="fas fa-calendar-day"></i>
+                        {% elif report_type.id == 'weekly' %}
+                            <i class="fas fa-calendar-week"></i>
+                        {% elif report_type.id == 'monthly' %}
+                            <i class="fas fa-calendar-alt"></i>
+                        {% elif report_type.id == 'operator' %}
+                            <i class="fas fa-user"></i>
+                        {% elif report_type.id == 'smt' %}
+                            <i class="fas fa-microchip"></i>
+                        {% elif report_type.id == 'abnormal' %}
+                            <i class="fas fa-exclamation-triangle"></i>
+                        {% elif report_type.id == 'efficiency' %}
+                            <i class="fas fa-tachometer-alt"></i>
+                        {% endif %}
+                    </div>
+                    <div class="report-type-title">{{ report_type.name }}</div>
+                    <div class="report-type-description">{{ report_type.description }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 匯出格式選擇 -->
+        <div class="export-section">
+            <div class="section-title">
+                <i class="fas fa-file mr-2"></i>選擇匯出格式
+            </div>
+            <div class="format-grid">
+                {% for format in export_formats %}
+                <div class="format-card" data-format="{{ format.id }}">
+                    <div class="format-icon">
+                        <i class="{{ format.icon }}"></i>
+                    </div>
+                    <div class="format-title">{{ format.name }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 日期範圍選擇 -->
+        <div class="export-section">
+            <div class="section-title">
+                <i class="fas fa-calendar mr-2"></i>選擇日期範圍
+            </div>
+            <div class="date-range-grid">
+                {% for date_range in date_ranges %}
+                <div class="date-range-card" data-range="{{ date_range.id }}">
+                    <div class="date-range-title">{{ date_range.name }}</div>
+                    {% if date_range.start and date_range.end %}
+                    <div class="date-range-dates">
+                        <small class="text-muted">
+                            {{ date_range.start|date:"Y-m-d" }} 至 {{ date_range.end|date:"Y-m-d" }}
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- 自訂日期範圍 -->
+            <div id="customDateRange" style="display: none;">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label>開始日期</label>
+                        <input type="date" class="form-control" id="startDate">
+                    </div>
+                    <div class="col-md-6">
+                        <label>結束日期</label>
+                        <input type="date" class="form-control" id="endDate">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 匯出按鈕 -->
+        <div class="text-center">
+            <button type="submit" class="btn btn-export" id="exportBtn" disabled>
+                <i class="fas fa-download mr-2"></i>匯出報表
+            </button>
+        </div>
+    </form>
+
+    <!-- 匯出進度 -->
+    <div class="export-section" id="exportProgress" style="display: none;">
+        <div class="section-title">
+            <i class="fas fa-spinner fa-spin mr-2"></i>匯出進度
+        </div>
+        <div class="progress">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                 role="progressbar" style="width: 0%"></div>
+        </div>
+        <div class="text-center mt-3">
+            <span id="progressText">準備匯出...</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let selectedType = null;
+    let selectedFormat = null;
+    let selectedRange = null;
+    
+    // 報表類型選擇
+    document.querySelectorAll('.report-type-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            document.querySelectorAll('.report-type-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            selectedType = this.dataset.type;
+            checkFormComplete();
+        });
+    });
+    
+    // 格式選擇
+    document.querySelectorAll('.format-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            document.querySelectorAll('.format-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            selectedFormat = this.dataset.format;
+            checkFormComplete();
+        });
+    });
+    
+    // 日期範圍選擇
+    document.querySelectorAll('.date-range-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            document.querySelectorAll('.date-range-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            selectedRange = this.dataset.range;
+            
+            // 顯示/隱藏自訂日期範圍
+            const customRange = document.getElementById('customDateRange');
+            if (selectedRange === 'custom') {
+                customRange.style.display = 'block';
+            } else {
+                customRange.style.display = 'none';
+            }
+            
+            checkFormComplete();
+        });
+    });
+    
+    // 檢查表單是否完整
+    function checkFormComplete() {
+        const exportBtn = document.getElementById('exportBtn');
+        if (selectedType && selectedFormat && selectedRange) {
+            exportBtn.disabled = false;
+        } else {
+            exportBtn.disabled = true;
+        }
+    }
+    
+    // 表單提交
+    document.getElementById('exportForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (!selectedType || !selectedFormat || !selectedRange) {
+            alert('請選擇完整的匯出選項');
+            return;
+        }
+        
+        // 顯示進度條
+        const progressSection = document.getElementById('exportProgress');
+        const progressBar = progressSection.querySelector('.progress-bar');
+        const progressText = document.getElementById('progressText');
+        
+        progressSection.style.display = 'block';
+        exportBtn.disabled = true;
+        
+        // 模擬匯出過程
+        let progress = 0;
+        const interval = setInterval(function() {
+            progress += Math.random() * 20;
+            if (progress > 100) progress = 100;
+            
+            progressBar.style.width = progress + '%';
+            
+            if (progress < 30) {
+                progressText.textContent = '準備資料...';
+            } else if (progress < 60) {
+                progressText.textContent = '生成報表...';
+            } else if (progress < 90) {
+                progressText.textContent = '格式化資料...';
+            } else {
+                progressText.textContent = '完成匯出！';
+            }
+            
+            if (progress >= 100) {
+                clearInterval(interval);
+                setTimeout(function() {
+                    alert('報表匯出完成！');
+                    progressSection.style.display = 'none';
+                    exportBtn.disabled = false;
+                    progressBar.style.width = '0%';
+                }, 1000);
+            }
+        }, 200);
+    });
+});
+</script>
+{% endblock %} 

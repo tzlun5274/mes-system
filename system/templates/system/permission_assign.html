@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+權限分配 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="bi bi-shield-plus"></i> 權限分配管理
+                    </h3>
+                    <div class="card-tools">
+                        <a href="{% url 'system:permission_list' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> 返回權限列表
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info" role="alert">
+                        <i class="bi bi-info-circle"></i> 
+                        在這裡您可以將權限分配給群組或用戶，也可以移除已分配的權限。選擇權限、目標（群組或用戶）和操作類型。
+                    </div>
+
+                    <form method="post" id="permissionForm">
+                        {% csrf_token %}
+                        <div class="row">
+                            <!-- 權限選擇 -->
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0"><i class="bi bi-shield-check"></i> 選擇權限</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label for="permission_id" class="form-label">權限：</label>
+                                            <select class="form-select" id="permission_id" name="permission_id" required>
+                                                <option value="">請選擇權限</option>
+                                                {% for permission in permissions %}
+                                                <option value="{{ permission.id }}">
+                                                    {{ permission.translated_name }} ({{ permission.content_type.app_label }})
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 目標選擇 -->
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-header bg-success text-white">
+                                        <h5 class="mb-0"><i class="bi bi-target"></i> 選擇目標</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">目標類型：</label>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="target_type" id="target_group" value="group" checked>
+                                                <label class="form-check-label" for="target_group">
+                                                    群組
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="target_type" id="target_user" value="user">
+                                                <label class="form-check-label" for="target_user">
+                                                    用戶
+                                                </label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3" id="group_select">
+                                            <label for="group_id" class="form-label">群組：</label>
+                                            <select class="form-select" id="group_id" name="group_id">
+                                                <option value="">請選擇群組</option>
+                                                {% for group in groups %}
+                                                <option value="{{ group.id }}">{{ group.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="mb-3" id="user_select" style="display: none;">
+                                            <label for="user_id" class="form-label">用戶：</label>
+                                            <select class="form-select" id="user_id" name="user_id">
+                                                <option value="">請選擇用戶</option>
+                                                {% for user in users %}
+                                                <option value="{{ user.id }}">{{ user.username }} ({{ user.first_name }} {{ user.last_name }})</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 操作選擇 -->
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-header bg-warning text-dark">
+                                        <h5 class="mb-0"><i class="bi bi-gear"></i> 選擇操作</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">操作類型：</label>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="action" id="action_assign" value="assign" checked>
+                                                <label class="form-check-label" for="action_assign">
+                                                    <i class="bi bi-plus-circle text-success"></i> 分配權限
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="action" id="action_remove" value="remove">
+                                                <label class="form-check-label" for="action_remove">
+                                                    <i class="bi bi-dash-circle text-danger"></i> 移除權限
+                                                </label>
+                                            </div>
+                                        </div>
+                                        
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="bi bi-check-circle"></i> 執行操作
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- 操作說明 -->
+                    <div class="card mt-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="bi bi-question-circle"></i> 操作說明</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="bi bi-plus-circle text-success"></i> 分配權限</h6>
+                                    <ul>
+                                        <li>將選定的權限分配給指定的群組或用戶</li>
+                                        <li>群組成員會自動繼承群組的權限</li>
+                                        <li>用戶可以直接擁有個人權限</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="bi bi-dash-circle text-danger"></i> 移除權限</h6>
+                                    <ul>
+                                        <li>從指定的群組或用戶移除選定的權限</li>
+                                        <li>移除群組權限會影響所有群組成員</li>
+                                        <li>移除用戶權限只影響該用戶</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 切換目標類型
+    const targetGroup = document.getElementById('target_group');
+    const targetUser = document.getElementById('target_user');
+    const groupSelect = document.getElementById('group_select');
+    const userSelect = document.getElementById('user_select');
+    const groupId = document.getElementById('group_id');
+    const userId = document.getElementById('user_id');
+
+    targetGroup.addEventListener('change', function() {
+        if (this.checked) {
+            groupSelect.style.display = 'block';
+            userSelect.style.display = 'none';
+            userId.value = '';
+            groupId.required = true;
+            userId.required = false;
+        }
+    });
+
+    targetUser.addEventListener('change', function() {
+        if (this.checked) {
+            groupSelect.style.display = 'none';
+            userSelect.style.display = 'block';
+            groupId.value = '';
+            groupId.required = false;
+            userId.required = true;
+        }
+    });
+
+    // 表單驗證
+    document.getElementById('permissionForm').addEventListener('submit', function(e) {
+        const permissionId = document.getElementById('permission_id').value;
+        const targetType = document.querySelector('input[name="target_type"]:checked').value;
+        
+        if (!permissionId) {
+            e.preventDefault();
+            alert('請選擇權限！');
+            return;
+        }
+
+        if (targetType === 'group' && !groupId.value) {
+            e.preventDefault();
+            alert('請選擇群組！');
+            return;
+        }
+
+        if (targetType === 'user' && !userId.value) {
+            e.preventDefault();
+            alert('請選擇用戶！');
+            return;
+        }
+    });
+});
+</script>
+
+<style>
+.card-tools {
+    float: right;
+}
+.card-tools .btn {
+    margin-left: 5px;
+}
+</style>
+{% endblock %} 

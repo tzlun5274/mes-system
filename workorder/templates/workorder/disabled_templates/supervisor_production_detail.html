@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}管理者生產報工記錄詳情{% endblock %}
+{% block title %}主管生產報工記錄詳情{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -92,31 +92,31 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <h2 class="mb-0">
-                    <i class="fas fa-eye"></i> 管理者生產報工記錄詳情
+                    <i class="fas fa-eye"></i> 主管生產報工記錄詳情
                 </h2>
                 <div>
                     {% if can_edit %}
-                    <a href="{% url 'workorder:manager_production_edit' report.pk %}" class="btn btn-warning">
+                    <a href="{% url 'workorder:supervisor_production_edit' report.pk %}" class="btn btn-warning">
                         <i class="fas fa-edit"></i> 編輯
                     </a>
                     {% endif %}
                     
                     {% if can_approve and report.approval_status == 'pending' %}
-                    <a href="{% url 'workorder:manager_production_approve' report.pk %}" class="btn btn-success">
+                    <a href="{% url 'workorder:supervisor_production_approve' report.pk %}" class="btn btn-success">
                         <i class="fas fa-check"></i> 審核通過
                     </a>
-                    <a href="{% url 'workorder:manager_production_reject' report.pk %}" class="btn btn-danger">
+                    <a href="{% url 'workorder:supervisor_production_reject' report.pk %}" class="btn btn-danger">
                         <i class="fas fa-times"></i> 駁回
                     </a>
                     {% endif %}
                     
                     {% if can_delete %}
-                    <a href="{% url 'workorder:manager_production_delete' report.pk %}" class="btn btn-danger">
+                    <a href="{% url 'workorder:supervisor_production_delete' report.pk %}" class="btn btn-danger">
                         <i class="fas fa-trash"></i> 刪除
                     </a>
                     {% endif %}
                     
-                    <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-secondary">
+                    <a href="{% url 'workorder:supervisor_production_list' %}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> 返回列表
                     </a>
                 </div>
@@ -131,7 +131,7 @@
             <div class="detail-section">
                 <h5><i class="fas fa-info-circle"></i> 基本資訊</h5>
                 <div class="info-row">
-                    <span class="info-label">管理者：</span>
+                                            <span class="info-label">主管：</span>
                     <span class="info-value">{{ report.manager }}</span>
                 </div>
                 <div class="info-row">
@@ -410,27 +410,27 @@
                 <div class="card-body">
                     <div class="d-grid gap-2">
                         {% if can_edit %}
-                        <a href="{% url 'workorder:manager_production_edit' report.pk %}" class="btn btn-warning btn-sm">
+                        <a href="{% url 'workorder:supervisor_production_edit' report.pk %}" class="btn btn-warning btn-sm">
                             <i class="fas fa-edit"></i> 編輯記錄
                         </a>
                         {% endif %}
                         
                         {% if can_approve and report.approval_status == 'pending' %}
-                        <a href="{% url 'workorder:manager_production_approve' report.pk %}" class="btn btn-success btn-sm">
+                        <a href="{% url 'workorder:supervisor_production_approve' report.pk %}" class="btn btn-success btn-sm">
                             <i class="fas fa-check"></i> 審核通過
                         </a>
-                        <a href="{% url 'workorder:manager_production_reject' report.pk %}" class="btn btn-danger btn-sm">
+                        <a href="{% url 'workorder:supervisor_production_reject' report.pk %}" class="btn btn-danger btn-sm">
                             <i class="fas fa-times"></i> 駁回記錄
                         </a>
                         {% endif %}
                         
                         {% if can_delete %}
-                        <a href="{% url 'workorder:manager_production_delete' report.pk %}" class="btn btn-danger btn-sm">
+                        <a href="{% url 'workorder:supervisor_production_delete' report.pk %}" class="btn btn-danger btn-sm">
                             <i class="fas fa-trash"></i> 刪除記錄
                         </a>
                         {% endif %}
                         
-                        <a href="{% url 'workorder:manager_production_list' %}" class="btn btn-secondary btn-sm">
+                        <a href="{% url 'workorder:supervisor_production_list' %}" class="btn btn-secondary btn-sm">
                             <i class="fas fa-list"></i> 返回列表
                         </a>
                     </div>

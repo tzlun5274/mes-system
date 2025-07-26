@@ -8,7 +8,7 @@
 {% block content %}
 <div class="container mt-4">
     <h2 class="mb-4 text-primary"><i class="bi bi-gear"></i> 系統管理首頁</h2>
-    <p class="text-secondary mb-4">這裡可以設定系統基本功能，管理用戶、群組、備份與操作紀錄。每個功能都有清楚的中文說明，操作簡單，適合不懂程式的人。</p>
+    <p class="text-secondary mb-4">這裡可以設定系統基本功能，管理用戶、群組、權限、備份與操作紀錄。每個功能都有清楚的中文說明，操作簡單，適合不懂程式的人。</p>
     <div class="row row-cols-1 row-cols-md-2 g-4">
         <!-- 環境管理 -->
         <div class="col">
@@ -81,6 +81,19 @@
                     <p class="card-text">設定用戶群組與權限，方便管理不同角色。</p>
                     <a href="{% url 'system:group_list' %}" class="btn btn-secondary"><i class="bi bi-collection"></i> 群組管理</a>
                     <a href="{% url 'system:group_add' %}" class="btn btn-outline-secondary ms-2"><i class="bi bi-collection-plus"></i> 新增群組</a>
+                </div>
+            </div>
+        </div>
+        <!-- 權限管理 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-shield-check"></i> 權限管理</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">查看所有系統權限，管理權限分配給用戶或群組。</p>
+                    <a href="{% url 'system:permission_list' %}" class="btn btn-dark"><i class="bi bi-shield-check"></i> 權限列表</a>
+                    <a href="{% url 'system:permission_assign' %}" class="btn btn-outline-dark ms-2"><i class="bi bi-shield-plus"></i> 權限分配</a>
                 </div>
             </div>
         </div>

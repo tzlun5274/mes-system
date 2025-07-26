@@ -14,7 +14,11 @@ from .edit_event import edit_event
 from .delete_event import delete_event
 from .import_events import import_events
 from .update_order_schedule import update_order_schedule
-from .view_schedule import view_schedule, delete_all_production_events, delete_order_production_events
+from .view_schedule import (
+    view_schedule,
+    delete_all_production_events,
+    delete_order_production_events,
+)
 from .add_unit import add_unit
 from .delete_unit import delete_unit
 from .update_safety_settings import update_safety_settings
@@ -22,8 +26,14 @@ from .schedule_management import schedule_management
 from .schedule_manual import product_capacity_setting
 from .schedule_semi_auto import schedule_semi_auto, recalc_log_api
 from .schedule_auto import schedule_auto
-from .api_schedule import api_schedule, api_schedule_manual, api_schedule_links, calculate_task_duration
+from .api_schedule import (
+    api_schedule,
+    api_schedule_manual,
+    api_schedule_links,
+    calculate_task_duration,
+)
 from django.shortcuts import render
 
+
 def gantt_view(request):
-    return render(request, 'scheduling/gantt.html')
+    return render(request, "scheduling/gantt.html")

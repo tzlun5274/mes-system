@@ -7,45 +7,80 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='BackupSchedule',
+            name="BackupSchedule",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('backup_time', models.TimeField(default='00:00')),
-                ('retain_count', models.IntegerField(default=5)),
-                ('is_active', models.BooleanField(default=False)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("backup_time", models.TimeField(default="00:00")),
+                ("retain_count", models.IntegerField(default=5)),
+                ("is_active", models.BooleanField(default=False)),
             ],
             options={
-                'default_permissions': (),
+                "default_permissions": (),
             },
         ),
         migrations.CreateModel(
-            name='EmailConfig',
+            name="EmailConfig",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('email_host', models.CharField(blank=True, default='', max_length=100)),
-                ('email_port', models.IntegerField(default=25)),
-                ('email_use_tls', models.BooleanField(default=True)),
-                ('email_host_user', models.CharField(blank=True, default='', max_length=100)),
-                ('email_host_password', models.CharField(blank=True, default='', max_length=100)),
-                ('default_from_email', models.EmailField(blank=True, default='', max_length=254)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "email_host",
+                    models.CharField(blank=True, default="", max_length=100),
+                ),
+                ("email_port", models.IntegerField(default=25)),
+                ("email_use_tls", models.BooleanField(default=True)),
+                (
+                    "email_host_user",
+                    models.CharField(blank=True, default="", max_length=100),
+                ),
+                (
+                    "email_host_password",
+                    models.CharField(blank=True, default="", max_length=100),
+                ),
+                (
+                    "default_from_email",
+                    models.EmailField(blank=True, default="", max_length=254),
+                ),
             ],
             options={
-                'default_permissions': (),
+                "default_permissions": (),
             },
         ),
         migrations.CreateModel(
-            name='OperationLogConfig',
+            name="OperationLogConfig",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('retain_days', models.IntegerField(default=30)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("retain_days", models.IntegerField(default=30)),
             ],
             options={
-                'default_permissions': (),
+                "default_permissions": (),
             },
         ),
     ]

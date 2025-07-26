@@ -9,14 +9,14 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('workorder', '0001_initial'),
+        ("workorder", "0001_initial"),
     ]
 
     operations = [
         # 修改 additional_operators 欄位允許 NULL
         migrations.AlterField(
-            model_name='workorderprocess',
-            name='additional_operators',
+            model_name="workorderprocess",
+            name="additional_operators",
             field=models.TextField(
                 blank=True,
                 null=True,
@@ -26,8 +26,8 @@ class Migration(migrations.Migration):
         ),
         # 修改 additional_equipments 欄位允許 NULL
         migrations.AlterField(
-            model_name='workorderprocess',
-            name='additional_equipments',
+            model_name="workorderprocess",
+            name="additional_equipments",
             field=models.TextField(
                 blank=True,
                 null=True,
@@ -35,4 +35,4 @@ class Migration(migrations.Migration):
                 help_text="JSON格式儲存額外設備清單",
             ),
         ),
-    ] 
+    ]

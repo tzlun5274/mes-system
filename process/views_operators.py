@@ -27,11 +27,14 @@ def operators(request):
     log_user_operation(request.user.username, "process", "查看作業員與技能設定")
     operators = Operator.objects.all()
     # 統計：有技能的作業員數量
-    skilled_operators_count = Operator.objects.filter(skills__isnull=False).distinct().count()
+    skilled_operators_count = (
+        Operator.objects.filter(skills__isnull=False).distinct().count()
+    )
     # 統計：高優先級技能（priority=1）數量
     high_priority_skills_count = OperatorSkill.objects.filter(priority=1).count()
     # 統計：今日新增作業員數量
     from django.utils import timezone
+
     today = timezone.now().date()
     today_new_operators_count = Operator.objects.filter(created_at__date=today).count()
     return render(
@@ -277,12 +280,18 @@ def export_operators(request):
     headers = ["作業員名稱", "所屬單位", "工序名稱", "技能優先順序"]
     for col_num, header in enumerate(headers, 1):
         worksheet[f"{get_column_letter(col_num)}1"] = header
-    operator_skills = OperatorSkill.objects.select_related('operator', 'operator__production_line', 'process_name').all()
+    operator_skills = OperatorSkill.objects.select_related(
+        "operator", "operator__production_line", "process_name"
+    ).all()
     row_num = 2
     for skill in operator_skills:
         worksheet[f"A{row_num}"] = skill.operator.name
         # 顯示產線名稱，如果沒有產線則顯示空字串
-        production_line_name = skill.operator.production_line.line_name if skill.operator.production_line else ""
+        production_line_name = (
+            skill.operator.production_line.line_name
+            if skill.operator.production_line
+            else ""
+        )
         worksheet[f"B{row_num}"] = production_line_name
         worksheet[f"C{row_num}"] = skill.process_name.name
         worksheet[f"D{row_num}"] = skill.priority
@@ -323,25 +332,30 @@ def import_operators(request):
                         priority = int(priority) if priority else 1
                     except (ValueError, TypeError):
                         priority = 1
-                    
+
                     # 根據產線名稱找到對應的 ProductionLine
                     production_line = None
                     if production_line_name:
                         try:
-                            production_line = ProductionLine.objects.get(line_name=production_line_name)
+                            production_line = ProductionLine.objects.get(
+                                line_name=production_line_name
+                            )
                         except ProductionLine.DoesNotExist:
                             # 如果找不到產線，記錄警告但繼續處理
-                            messages.warning(request, f"找不到產線：{production_line_name}，作業員 {operator_name} 將不設定產線")
-                    
+                            messages.warning(
+                                request,
+                                f"找不到產線：{production_line_name}，作業員 {operator_name} 將不設定產線",
+                            )
+
                     operator, created = Operator.objects.get_or_create(
                         name=operator_name
                     )
-                    
+
                     # 更新作業員的產線資訊
                     if production_line:
                         operator.production_line = production_line
                         operator.save()
-                    
+
                     existing_skill = OperatorSkill.objects.filter(
                         operator=operator, process_name=process
                     ).first()
@@ -382,10 +396,10 @@ def import_operators(request):
                 request, f"Excel 文件缺少必要欄位，必須包含：{required_headers}"
             )
             return redirect("process:operators")
-        
+
         # 檢查是否有「所屬單位」欄位
         has_production_line = "所屬單位" in actual_headers
-        
+
         dataset = []
         for row in worksheet.iter_rows(min_row=2, values_only=True):
             if not any(row):
@@ -393,12 +407,12 @@ def import_operators(request):
             operator_name = row[actual_headers.index("作業員名稱")]
             process_name = row[actual_headers.index("工序名稱")]
             priority = row[actual_headers.index("技能優先順序")]
-            
+
             # 取得所屬單位（產線名稱）
             production_line_name = ""
             if has_production_line:
                 production_line_name = row[actual_headers.index("所屬單位")] or ""
-            
+
             dataset.append(
                 {
                     "作業員名稱": operator_name,
@@ -440,23 +454,28 @@ def import_operators(request):
                 priority = int(priority) if priority else 1
             except (ValueError, TypeError):
                 priority = 1
-            
+
             # 根據產線名稱找到對應的 ProductionLine
             production_line = None
             if production_line_name:
                 try:
-                    production_line = ProductionLine.objects.get(line_name=production_line_name)
+                    production_line = ProductionLine.objects.get(
+                        line_name=production_line_name
+                    )
                 except ProductionLine.DoesNotExist:
                     # 如果找不到產線，記錄警告但繼續處理
-                    messages.warning(request, f"找不到產線：{production_line_name}，作業員 {operator_name} 將不設定產線")
-            
+                    messages.warning(
+                        request,
+                        f"找不到產線：{production_line_name}，作業員 {operator_name} 將不設定產線",
+                    )
+
             operator, created = Operator.objects.get_or_create(name=operator_name)
-            
+
             # 更新作業員的產線資訊
             if production_line:
                 operator.production_line = production_line
                 operator.save()
-            
+
             existing_skill = OperatorSkill.objects.filter(
                 operator=operator, process_name=process
             ).first()

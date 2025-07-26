@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 
+
 class InspectionItem(models.Model):
     name = models.CharField(max_length=100, verbose_name="檢驗項目名稱")
     standard = models.TextField(verbose_name="檢驗標準")
@@ -15,14 +16,21 @@ class InspectionItem(models.Model):
     def __str__(self):
         return self.name
 
+
 class InspectionRecord(models.Model):
-    inspection_item = models.ForeignKey(InspectionItem, on_delete=models.CASCADE, verbose_name="檢驗項目")
+    inspection_item = models.ForeignKey(
+        InspectionItem, on_delete=models.CASCADE, verbose_name="檢驗項目"
+    )
     product_name = models.CharField(max_length=100, verbose_name="產品名稱")
     inspection_date = models.DateField(verbose_name="檢驗日期")
-    result = models.CharField(max_length=20, verbose_name="檢驗結果", choices=[
-        ('pass', '通過'),
-        ('fail', '不通過'),
-    ])
+    result = models.CharField(
+        max_length=20,
+        verbose_name="檢驗結果",
+        choices=[
+            ("pass", "通過"),
+            ("fail", "不通過"),
+        ],
+    )
     remarks = models.TextField(verbose_name="備註", blank=True)
     created_at = models.DateTimeField(default=timezone.now, verbose_name="創建時間")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
@@ -33,6 +41,7 @@ class InspectionRecord(models.Model):
 
     def __str__(self):
         return f"{self.product_name} - {self.inspection_date}"
+
 
 class DefectiveProduct(models.Model):
     product_name = models.CharField(max_length=100, verbose_name="產品名稱")
@@ -49,6 +58,7 @@ class DefectiveProduct(models.Model):
     def __str__(self):
         return f"{self.product_name} - {self.defect_date}"
 
+
 class FinalInspectionReport(models.Model):
     product_name = models.CharField(max_length=100, verbose_name="產品名稱")
     inspection_date = models.DateField(verbose_name="檢驗日期")
@@ -64,6 +74,7 @@ class FinalInspectionReport(models.Model):
     def __str__(self):
         return f"{self.product_name} - {self.inspection_date}"
 
+
 class AOITestReport(models.Model):
     product_name = models.CharField(max_length=100, verbose_name="產品名稱")
     test_date = models.DateField(verbose_name="測試日期")
@@ -78,6 +89,7 @@ class AOITestReport(models.Model):
 
     def __str__(self):
         return f"{self.product_name} - {self.test_date}"
+
 
 class QualityOperationLog(models.Model):
     user = models.CharField(max_length=100, verbose_name="用戶")

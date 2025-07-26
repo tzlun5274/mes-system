@@ -5,4 +5,4 @@ from zoneinfo import ZoneInfo
 import logging
 
 TAIWAN_TZ = ZoneInfo("Asia/Taipei")
-logger = logging.getLogger('scheduling.views')
+logger = logging.getLogger("scheduling.views")

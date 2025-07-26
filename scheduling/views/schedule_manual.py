@@ -18,29 +18,31 @@ def scheduling_user_required(user):
 def get_standard_capacity_for_route(product_code, process_name):
     """
     查詢產品工序的標準產能資料
-    
+
     參數：
         product_code: 產品編號
         process_name: 工序名稱
-    
+
     回傳：
         標準每小時產能，如果找不到則回傳預設值 1000
     """
     try:
         from process.models import ProductProcessStandardCapacity
-        
+
         # 查詢最新的有效標準產能資料
-        capacity_data = ProductProcessStandardCapacity.objects.filter(
-            product_code=product_code,
-            process_name=process_name,
-            is_active=True
-        ).order_by('-version').first()
-        
+        capacity_data = (
+            ProductProcessStandardCapacity.objects.filter(
+                product_code=product_code, process_name=process_name, is_active=True
+            )
+            .order_by("-version")
+            .first()
+        )
+
         if capacity_data:
             return capacity_data.standard_capacity_per_hour
         else:
             return 1000  # 預設值
-            
+
     except Exception as e:
         logger.error(f"查詢標準產能資料失敗: {str(e)}")
         return 1000  # 預設值
@@ -74,13 +76,13 @@ def product_capacity_setting(request):
                         request.POST.get(f"tasks[{route_id}][overtime]", "0") == "1"
                     )
                 hours = 0
-                
+
                 # 使用標準產能資料計算工時
                 capacity_per_hour = get_standard_capacity_for_route(
                     product_code=selected_order.product_id,
-                    process_name=route.process_name.name
+                    process_name=route.process_name.name,
                 )
-                
+
                 if capacity_per_hour > 0 and qty_remain > 0 and parallel > 0:
                     hours = qty_remain / (capacity_per_hour * parallel)
                 daily_hours = 8 + (overtime_hours if overtime else 0)

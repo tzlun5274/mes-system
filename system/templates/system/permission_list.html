@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+權限管理 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="bi bi-shield-check"></i> 權限管理
+                    </h3>
+                    <div class="card-tools">
+                        <a href="{% url 'system:permission_assign' %}" class="btn btn-primary">
+                            <i class="bi bi-shield-plus"></i> 權限分配
+                        </a>
+                        <a href="{% url 'system:index' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> 返回系統管理
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info" role="alert">
+                        <i class="bi bi-info-circle"></i> 
+                        這裡顯示系統中所有模組的權限，您可以查看每個權限的詳細資訊，並進行權限分配管理。
+                    </div>
+                    
+                    {% if permissions_by_module %}
+                        {% for module_name, permissions in permissions_by_module.items %}
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-folder"></i> {{ module_name }} 模組權限
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>權限名稱</th>
+                                                <th>權限代碼</th>
+                                                <th>資料表</th>
+                                                <th>操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for permission in permissions %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ permission.name }}</strong>
+                                                </td>
+                                                <td>
+                                                    <code>{{ permission.codename }}</code>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-info">{{ permission.content_type }}</span>
+                                                </td>
+                                                <td>
+                                                    <a href="{% url 'system:permission_detail' permission.id %}" 
+                                                       class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-eye"></i> 查看詳情
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-warning" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i> 
+                            目前沒有找到任何權限資料。
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card-tools {
+    float: right;
+}
+.card-tools .btn {
+    margin-left: 5px;
+}
+</style>
+{% endblock %} 

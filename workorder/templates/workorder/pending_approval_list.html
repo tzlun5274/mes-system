@@ -44,7 +44,7 @@
         border-radius: 12px;
     }
     
-    .type-manager {
+    .type-supervisor {
         background-color: #d1ecf1;
         color: #0c5460;
     }
@@ -94,7 +94,7 @@
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:manager_report_index' %}">管理者審核</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor_report_index' %}">主管審核</a></li>
                         <li class="breadcrumb-item active" aria-current="page">待審核列表</li>
                     </ol>
                 </nav>
@@ -112,8 +112,8 @@
         </div>
         <div class="col-md-3">
             <div class="stats-card">
-                <div class="stats-number text-info">{{ manager_count }}</div>
-                <div class="stats-label">管理者審核</div>
+                <div class="stats-number text-info">{{ supervisor_count }}</div>
+                                    <div class="stats-label">主管審核</div>
             </div>
         </div>
         <div class="col-md-3">
@@ -135,9 +135,16 @@
         <div class="col-12">
             <div class="card pending-approval-card">
                 <div class="card-header bg-warning text-white">
-                    <h5 class="mb-0">
-                        <i class="fas fa-list"></i> 待審核報工記錄
-                    </h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list"></i> 待審核報工記錄
+                        </h5>
+                        {% if user.is_superuser %}
+                        <button type="button" class="btn btn-success btn-sm" onclick="batchApprove()">
+                            <i class="fas fa-check-double"></i> 批次審核
+                        </button>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="card-body">
                     {% if all_pending %}
@@ -321,8 +328,8 @@ function rejectReport(reportType, reportId) {
 function viewDetail(reportType, reportId) {
     let url = '';
     switch(reportType) {
-        case 'manager':
-            url = `/workorder/report/manager/production/detail/${reportId}/`;
+        case 'supervisor':
+            url = `/workorder/report/supervisor/production/detail/${reportId}/`;
             break;
         case 'operator':
             url = `/workorder/report/operator/supplement/detail/${reportId}/`;
@@ -336,14 +343,58 @@ function viewDetail(reportType, reportId) {
     }
 }
 
+function batchApprove() {
+    // 批次審核功能
+    if (!confirm('確定要批次審核所有待審核的報工記錄嗎？\n\n此操作將一次性審核所有待審核記錄，無法撤銷。')) {
+        return;
+    }
+    
+    // 顯示載入中提示
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
+    button.disabled = true;
+    
+    // 發送批次審核請求
+    fetch('/workorder/batch_approve_pending/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: new URLSearchParams({
+            'csrfmiddlewaretoken': getCSRFToken()
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`批次審核完成！\n成功審核 ${data.approved_count} 筆記錄`);
+            location.reload();
+        } else {
+            console.error('批次審核失敗：' + data.message);
+            alert('批次審核失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('批次審核失敗：', error);
+        alert('批次審核失敗，請稍後再試');
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
 function confirmApprove() {
             // 確認審核
     const remarks = document.getElementById('approval_remarks').value;
     let url = '';
     
     switch(currentReportType) {
-        case 'manager':
-            url = `/workorder/report/manager/production/approve-ajax/${currentReportId}/`;
+        case 'supervisor':
+            url = `/workorder/report/supervisor/production/approve-ajax/${currentReportId}/`;
             break;
         case 'operator':
             url = `/workorder/report/operator/supplement/approve/${currentReportId}/`;
@@ -401,8 +452,8 @@ function confirmReject() {
     
     let url = '';
     switch(currentReportType) {
-        case 'manager':
-            url = `/workorder/report/manager/production/reject-ajax/${currentReportId}/`;
+        case 'supervisor':
+            url = `/workorder/report/supervisor/production/reject-ajax/${currentReportId}/`;
             break;
         case 'operator':
             url = `/workorder/report/operator/supplement/reject/${currentReportId}/`;

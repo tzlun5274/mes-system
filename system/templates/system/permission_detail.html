@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+權限詳情 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="bi bi-shield-check"></i> 權限詳情
+                    </h3>
+                    <div class="card-tools">
+                        <a href="{% url 'system:permission_assign' %}" class="btn btn-primary">
+                            <i class="bi bi-shield-plus"></i> 權限分配
+                        </a>
+                        <a href="{% url 'system:permission_list' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> 返回權限列表
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- 權限基本資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> 權限基本資訊</h5>
+                                </div>
+                                <div class="card-body">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <td><strong>權限名稱：</strong></td>
+                                            <td>{{ translated_name }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>權限代碼：</strong></td>
+                                            <td><code>{{ permission.codename }}</code></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>模組名稱：</strong></td>
+                                            <td><span class="badge bg-info">{{ permission.content_type.app_label }}</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>資料表：</strong></td>
+                                            <td><span class="badge bg-secondary">{{ permission.content_type.model }}</span></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0"><i class="bi bi-people"></i> 權限統計</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-6">
+                                            <div class="border-end">
+                                                <h3 class="text-primary">{{ groups_with_permission.count }}</h3>
+                                                <p class="text-muted">擁有此權限的群組</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <h3 class="text-success">{{ users_with_permission.count }}</h3>
+                                            <p class="text-muted">擁有此權限的用戶</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 擁有此權限的群組 -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">
+                                <i class="bi bi-collection"></i> 擁有此權限的群組 ({{ groups_with_permission.count }})
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if groups_with_permission %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>群組名稱</th>
+                                                <th>群組ID</th>
+                                                <th>操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for group in groups_with_permission %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ group.name }}</strong>
+                                                </td>
+                                                <td>
+                                                    <code>{{ group.id }}</code>
+                                                </td>
+                                                <td>
+                                                    <a href="{% url 'system:group_edit' group.id %}" 
+                                                       class="btn btn-sm btn-outline-warning">
+                                                        <i class="bi bi-pencil"></i> 編輯群組
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info" role="alert">
+                                    <i class="bi bi-info-circle"></i> 
+                                    目前沒有任何群組擁有此權限。
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 擁有此權限的用戶 -->
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <i class="bi bi-person"></i> 擁有此權限的用戶 ({{ users_with_permission.count }})
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if users_with_permission %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>用戶名稱</th>
+                                                <th>姓名</th>
+                                                <th>電子郵件</th>
+                                                <th>狀態</th>
+                                                <th>操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for user in users_with_permission %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ user.username }}</strong>
+                                                </td>
+                                                <td>
+                                                    {{ user.first_name }} {{ user.last_name }}
+                                                </td>
+                                                <td>
+                                                    {{ user.email|default:"未設定" }}
+                                                </td>
+                                                <td>
+                                                    {% if user.is_active %}
+                                                        <span class="badge bg-success">啟用</span>
+                                                    {% else %}
+                                                        <span class="badge bg-danger">停用</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <a href="{% url 'system:user_edit' user.id %}" 
+                                                       class="btn btn-sm btn-outline-info">
+                                                        <i class="bi bi-pencil"></i> 編輯用戶
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info" role="alert">
+                                    <i class="bi bi-info-circle"></i> 
+                                    目前沒有任何用戶擁有此權限。
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card-tools {
+    float: right;
+}
+.card-tools .btn {
+    margin-left: 5px;
+}
+</style>
+{% endblock %} 
