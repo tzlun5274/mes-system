@@ -55,6 +55,7 @@ urlpatterns = [
         name="clear_completed_workorders",
     ),
     path("clear_data/", views.clear_data, name="clear_data"),
+    path("clear_production_reports/", views.clear_all_production_reports, name="clear_all_production_reports"),
     path("get_processes_only/", views.get_processes_only, name="get_processes_only"),
     path(
         "get_operators_and_equipments/",

@@ -2135,6 +2135,75 @@ def mobile_quick_supplement_form(request, workorder_id):
     )
 
 
+def clear_all_production_reports(request):
+    """
+    清除所有報工紀錄的視圖函數
+    包括：作業員補登報工、SMT補登報工、SMT現場報工
+    只有管理員可以執行此操作
+    """
+    from .models import OperatorSupplementReport, SMTProductionReport
+    
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "只有管理員可以執行此操作")
+        return redirect("workorder:index")
+
+    if request.method == "POST":
+        try:
+            # 統計要清除的資料數量
+            operator_reports_count = OperatorSupplementReport.objects.count()
+            smt_supplement_count = SMTProductionReport.objects.filter(report_type__in=['normal', 'rd_sample']).count()
+            smt_on_site_count = SMTProductionReport.objects.filter(report_type='on_site').count()
+            
+            total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
+            
+            if total_count == 0:
+                messages.info(request, "目前沒有任何報工紀錄需要清除")
+                return redirect("workorder:index")
+            
+            # 清除所有報工紀錄
+            OperatorSupplementReport.objects.all().delete()
+            SMTProductionReport.objects.all().delete()
+            
+            # 記錄操作日誌
+            from system.models import OperationLog
+            OperationLog.objects.create(
+                user=request.user.username,
+                module="workorder",
+                action=f"清除所有報工紀錄（作業員：{operator_reports_count}，SMT補登：{smt_supplement_count}，SMT現場：{smt_on_site_count}）",
+                timestamp=timezone.now(),
+                ip_address=request.META.get('REMOTE_ADDR', ''),
+            )
+            
+            messages.success(
+                request, 
+                f"成功清除所有報工紀錄！共清除 {total_count} 筆記錄：\n"
+                f"• 作業員補登報工：{operator_reports_count} 筆\n"
+                f"• SMT補登報工：{smt_supplement_count} 筆\n"
+                f"• SMT現場報工：{smt_on_site_count} 筆"
+            )
+            return redirect("workorder:index")
+            
+        except Exception as e:
+            messages.error(request, f"清除報工紀錄失敗：{str(e)}")
+            return redirect("workorder:clear_all_production_reports")
+
+    # GET 請求顯示確認頁面
+    operator_reports_count = OperatorSupplementReport.objects.count()
+    smt_supplement_count = SMTProductionReport.objects.filter(report_type__in=['normal', 'rd_sample']).count()
+    smt_on_site_count = SMTProductionReport.objects.filter(report_type='on_site').count()
+    
+    total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
+    
+    context = {
+        "operator_reports_count": operator_reports_count,
+        "smt_supplement_count": smt_supplement_count,
+        "smt_on_site_count": smt_on_site_count,
+        "total_count": total_count,
+    }
+    
+    return render(request, "workorder/clear_production_reports_confirm.html", context)
+
+
 @require_GET
 @csrf_exempt
 def mobile_get_workorder_info(request):
