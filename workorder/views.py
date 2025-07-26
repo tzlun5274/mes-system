@@ -3799,24 +3799,7 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
         messages.error(request, f'載入異常詳情時發生錯誤：{str(e)}')
         return redirect('workorder:abnormal_management')
 
-def system_settings(request):
-    """
-    系統設定頁面
-    管理報工系統相關設定，包含審核流程等
-    """
-    # 系統設定選項
-    system_options = {
-        'auto_approval': False,  # 自動審核
-        'notification_enabled': True,  # 通知功能
-        'audit_log_enabled': True,  # 審計日誌
-        'max_file_size': 10,  # 最大檔案大小 (MB)
-        'session_timeout': 30,  # 會話超時 (分鐘)
-    }
-    
-    context = {
-        'system_options': system_options,
-    }
-    return render(request, 'workorder/report/supervisor/settings.html', context)
+# 系統設定功能已移至系統管理模組，請使用 system:workorder_settings
 
 def report_export(request):
     """
@@ -3889,27 +3872,73 @@ def data_maintenance(request):
         ).count() + SMTProductionReport.objects.filter(
             created_at__lt=today - timedelta(days=90)
         ).count(),
-        'duplicate_reports': 0,  # 需要實作重複檢查邏輯
-        'orphaned_reports': 0,   # 需要實作孤立資料檢查邏輯
+        'duplicate_reports': 0,  # 將在下面實作重複檢查邏輯
+        'orphaned_reports': 0,   # 將在下面實作孤立資料檢查邏輯
     }
+    
+    # 計算重複資料數量
+    # 作業員報工重複：相同的作業員、工單、工序、日期、時間範圍
+    operator_duplicates = OperatorSupplementReport.objects.values(
+        'operator', 'workorder', 'process', 'work_date', 'start_time', 'end_time'
+    ).annotate(
+        count=Count('id')
+    ).filter(count__gt=1)
+    
+    operator_duplicate_count = sum(duplicate['count'] - 1 for duplicate in operator_duplicates)
+    
+    # SMT報工重複：相同的設備、工單、產品、報工時間
+    smt_duplicates = SMTProductionReport.objects.values(
+        'equipment', 'workorder', 'rd_product_code', 'work_date', 'start_time', 'end_time'
+    ).annotate(
+        count=Count('id')
+    ).filter(count__gt=1)
+    
+    smt_duplicate_count = sum(duplicate['count'] - 1 for duplicate in smt_duplicates)
+    
+    data_stats['duplicate_reports'] = operator_duplicate_count + smt_duplicate_count
     
     # 維護選項
     maintenance_options = [
         {'id': 'cleanup_old', 'name': '清理舊資料', 'description': '清理30天前的報工記錄'},
         {'id': 'cleanup_duplicates', 'name': '清理重複資料', 'description': '清理重複的報工記錄'},
-        {'id': 'backup_data', 'name': '備份資料', 'description': '建立資料庫備份'},
-        {'id': 'restore_data', 'name': '還原資料', 'description': '從備份還原資料'},
         {'id': 'optimize_database', 'name': '資料庫優化', 'description': '優化資料庫效能'},
         {'id': 'export_archive', 'name': '匯出歸檔', 'description': '匯出舊資料進行歸檔'},
     ]
     
     # 系統狀態
+    from django.db import connection
+    import os
+    
+    # 計算資料庫大小
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT pg_size_pretty(pg_database_size(current_database())) as db_size
+        """)
+        db_size = cursor.fetchone()[0]
+    
+    # 檢查歸檔目錄
+    archive_dir = os.path.join(settings.MEDIA_ROOT, 'archives')
+    if os.path.exists(archive_dir):
+        archive_files = [f for f in os.listdir(archive_dir) if f.endswith('.json')]
+        last_archive = max(archive_files, key=lambda x: os.path.getctime(os.path.join(archive_dir, x))) if archive_files else None
+        last_archive_time = os.path.getctime(os.path.join(archive_dir, last_archive)) if last_archive else None
+    else:
+        last_archive_time = None
+    
+    # 計算磁碟使用率
+    try:
+        statvfs = os.statvfs(settings.MEDIA_ROOT)
+        disk_usage = (1 - statvfs.f_bavail / statvfs.f_blocks) * 100
+        disk_usage_str = f"{disk_usage:.1f}%"
+    except:
+        disk_usage_str = "未知"
+    
     system_status = {
-        'database_size': '2.5 GB',
-        'last_backup': '2025-07-25 23:00:00',
-        'backup_status': 'success',
+        'database_size': db_size,
+        'last_backup': '已移至系統管理模組' if last_archive_time else '無',
+        'backup_status': 'success' if last_archive_time else 'none',
         'optimization_status': 'good',
-        'disk_usage': '45%',
+        'disk_usage': disk_usage_str,
     }
     
     context = {
@@ -3918,6 +3947,196 @@ def data_maintenance(request):
         'system_status': system_status,
     }
     return render(request, 'workorder/report/supervisor/maintenance.html', context)
+
+@require_POST
+@csrf_exempt
+def execute_maintenance(request):
+    """
+    執行維護操作的API端點
+    處理各種資料維護功能
+    """
+    from datetime import date, timedelta
+    from django.db.models import Q, Count
+    from django.db import connection
+    from django.http import JsonResponse
+    import json
+    import os
+    from django.conf import settings
+    
+    action = request.POST.get('action')
+    
+    if not action:
+        return JsonResponse({'success': False, 'message': '缺少操作類型'})
+    
+    try:
+        if action == 'cleanup_old':
+            # 清理30天前的舊資料
+            cutoff_date = date.today() - timedelta(days=30)
+            
+            # 清理作業員報工記錄
+            old_operator_reports = OperatorSupplementReport.objects.filter(
+                created_at__lt=cutoff_date
+            )
+            operator_count = old_operator_reports.count()
+            old_operator_reports.delete()
+            
+            # 清理SMT報工記錄
+            old_smt_reports = SMTProductionReport.objects.filter(
+                created_at__lt=cutoff_date
+            )
+            smt_count = old_smt_reports.count()
+            old_smt_reports.delete()
+            
+            total_deleted = operator_count + smt_count
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'成功清理 {total_deleted} 筆舊資料（作業員報工：{operator_count}，SMT報工：{smt_count}）'
+            })
+            
+        elif action == 'cleanup_duplicates':
+            # 清理重複資料
+            deleted_count = 0
+            
+            # 清理作業員報工重複記錄
+            # 定義重複：相同的作業員、工單、工序、日期、時間範圍
+            operator_duplicates = OperatorSupplementReport.objects.values(
+                'operator', 'workorder', 'process', 'work_date', 'start_time', 'end_time'
+            ).annotate(
+                count=Count('id')
+            ).filter(count__gt=1)
+            
+            for duplicate in operator_duplicates:
+                # 保留最新的記錄，刪除其他重複記錄
+                reports = OperatorSupplementReport.objects.filter(
+                    operator=duplicate['operator'],
+                    workorder=duplicate['workorder'],
+                    process=duplicate['process'],
+                    work_date=duplicate['work_date'],
+                    start_time=duplicate['start_time'],
+                    end_time=duplicate['end_time']
+                ).order_by('-created_at')
+                
+                # 刪除除最新記錄外的所有重複記錄
+                reports_to_delete = reports[1:]
+                deleted_count += reports_to_delete.count()
+                reports_to_delete.delete()
+            
+            # 清理SMT報工重複記錄
+            # 定義重複：相同的設備、工單、產品、報工時間
+            smt_duplicates = SMTProductionReport.objects.values(
+                'equipment', 'workorder', 'rd_product_code', 'work_date', 'start_time', 'end_time'
+            ).annotate(
+                count=Count('id')
+            ).filter(count__gt=1)
+            
+            for duplicate in smt_duplicates:
+                # 保留最新的記錄，刪除其他重複記錄
+                reports = SMTProductionReport.objects.filter(
+                    equipment=duplicate['equipment'],
+                    workorder=duplicate['workorder'],
+                    rd_product_code=duplicate['rd_product_code'],
+                    work_date=duplicate['work_date'],
+                    start_time=duplicate['start_time'],
+                    end_time=duplicate['end_time']
+                ).order_by('-created_at')
+                
+                # 刪除除最新記錄外的所有重複記錄
+                reports_to_delete = reports[1:]
+                deleted_count += reports_to_delete.count()
+                reports_to_delete.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'成功清理 {deleted_count} 筆重複資料'
+            })
+            
+        elif action == 'optimize_database':
+            # 資料庫優化
+            with connection.cursor() as cursor:
+                # 分析資料表
+                cursor.execute("ANALYZE workorder_operatorsupplementreport;")
+                cursor.execute("ANALYZE workorder_smtproductionreport;")
+                cursor.execute("ANALYZE workorder_workorder;")
+                cursor.execute("ANALYZE workorder_workorderprocess;")
+                
+                # 重新整理資料表
+                cursor.execute("REINDEX TABLE workorder_operatorsupplementreport;")
+                cursor.execute("REINDEX TABLE workorder_smtproductionreport;")
+                cursor.execute("REINDEX TABLE workorder_workorder;")
+                cursor.execute("REINDEX TABLE workorder_workorderprocess;")
+                
+                # 清理過期的統計資訊
+                cursor.execute("VACUUM ANALYZE workorder_operatorsupplementreport;")
+                cursor.execute("VACUUM ANALYZE workorder_smtproductionreport;")
+                cursor.execute("VACUUM ANALYZE workorder_workorder;")
+                cursor.execute("VACUUM ANALYZE workorder_workorderprocess;")
+            
+            return JsonResponse({
+                'success': True,
+                'message': '資料庫優化完成，已重新整理索引並更新統計資訊'
+            })
+            
+        elif action == 'export_archive':
+            # 匯出歸檔資料
+            from django.core import serializers
+            
+            # 取得90天前的資料進行歸檔
+            cutoff_date = date.today() - timedelta(days=90)
+            
+            # 收集要歸檔的資料
+            archive_data = {
+                'operator_reports': OperatorSupplementReport.objects.filter(
+                    created_at__lt=cutoff_date
+                ),
+                'smt_reports': SMTProductionReport.objects.filter(
+                    created_at__lt=cutoff_date
+                ),
+                'completed_workorders': WorkOrder.objects.filter(
+                    status='completed',
+                    created_at__lt=cutoff_date
+                )
+            }
+            
+            # 建立歸檔目錄
+            archive_dir = os.path.join(settings.MEDIA_ROOT, 'archives')
+            os.makedirs(archive_dir, exist_ok=True)
+            
+            # 建立歸檔檔案
+            archive_filename = f'workorder_archive_{date.today().strftime("%Y%m%d")}.json'
+            archive_path = os.path.join(archive_dir, archive_filename)
+            
+            # 序列化資料
+            all_data = []
+            for model_name, queryset in archive_data.items():
+                for obj in queryset:
+                    all_data.append({
+                        'model': f'workorder.{obj._meta.model_name}',
+                        'pk': obj.pk,
+                        'fields': serializers.serialize('json', [obj])[1:-1]  # 移除外層的方括號
+                    })
+            
+            # 寫入檔案
+            with open(archive_path, 'w', encoding='utf-8') as f:
+                json.dump(all_data, f, ensure_ascii=False, indent=2)
+            
+            total_records = (
+                archive_data['operator_reports'].count() +
+                archive_data['smt_reports'].count() +
+                archive_data['completed_workorders'].count()
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'成功匯出 {total_records} 筆歸檔資料到 {archive_filename}',
+                'download_url': f'/media/archives/{archive_filename}'
+            })
+            
+        else:
+            return JsonResponse({'success': False, 'message': '不支援的操作類型'})
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'執行失敗：{str(e)}'})
 
 def operator_report_index(request):
     """

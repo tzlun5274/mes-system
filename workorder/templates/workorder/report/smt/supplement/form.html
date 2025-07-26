@@ -480,11 +480,13 @@
 
                         
 
-                        <!-- 備註區塊 -->
+                        <!-- 備註與異常記錄區塊 -->
                 <div class="form-block">
-                            <h6><i class="fas fa-comment"></i> 備註</h6>
+                            <h6><i class="fas fa-comment"></i> 備註與異常記錄</h6>
                     
-                    <div class="form-field">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <!-- 備註 -->
+                        <div class="form-field">
                                         <label for="{{ form.remarks.id_for_label }}" class="form-label">
                                             備註
                                         </label>
@@ -496,6 +498,21 @@
                                             <div class="error-text">{{ form.remarks.errors.0 }}</div>
                                         {% endif %}
                             </div>
+
+                        <!-- 異常記錄 -->
+                        <div class="form-field">
+                                        <label for="{{ form.abnormal_notes.id_for_label }}" class="form-label">
+                                            異常記錄
+                                        </label>
+                                        {{ form.abnormal_notes }}
+                                        {% if form.abnormal_notes.help_text %}
+                                            <div class="help-text">{{ form.abnormal_notes.help_text }}</div>
+                                        {% endif %}
+                                        {% if form.abnormal_notes.errors %}
+                                            <div class="error-text">{{ form.abnormal_notes.errors.0 }}</div>
+                                        {% endif %}
+                            </div>
+                    </div>
                         </div>
 
                         <!-- 按鈕區域 -->

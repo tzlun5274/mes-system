@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}系統設定{% endblock %}
+{% block title %}工單管理設定{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -40,7 +40,7 @@
     
     .setting-header {
         display: flex;
-        justify-content: between;
+        justify-content: space-between;
         align-items: center;
         margin-bottom: 10px;
     }
@@ -125,19 +125,26 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
                     <i class="fas fa-cog text-primary"></i>
-                    系統設定
+                    工單管理設定
                 </h2>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor_functions' %}">主管功能</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">系統設定</li>
+                        <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">工單管理設定</li>
                     </ol>
                 </nav>
             </div>
         </div>
     </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
 
     <form method="post">
         {% csrf_token %}
@@ -173,8 +180,6 @@
                     </label>
                 </div>
             </div>
-            
-
             
             <div class="setting-item">
                 <div class="setting-header">
@@ -242,20 +247,13 @@
 document.addEventListener('DOMContentLoaded', function() {
     // 表單提交處理
     document.querySelector('form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
         // 顯示載入中
         const submitBtn = document.querySelector('.btn-save');
         const originalText = submitBtn.innerHTML;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>儲存中...';
         submitBtn.disabled = true;
         
-        // 模擬儲存過程
-        setTimeout(function() {
-            alert('設定已成功儲存！');
-            submitBtn.innerHTML = originalText;
-            submitBtn.disabled = false;
-        }, 2000);
+        // 表單會正常提交，不需要阻止預設行為
     });
     
     // 切換開關動畫

@@ -1170,6 +1170,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "is_completed": "是否已完工",
             "completion_method": "完工判斷方式",
             "remarks": "備註",
+            "abnormal_notes": "異常記錄",
             "approval_status": "核准狀態",
         }
         help_texts = {
@@ -1187,6 +1188,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "is_completed": "若此工單在此工序上已全部完成，請勾選",
             "completion_method": "請選擇完工判斷方式",
             "remarks": "請輸入備註說明（可選）",
+            "abnormal_notes": "記錄生產過程中的異常情況，如設備故障、品質問題等",
             "approval_status": "請選擇核准狀態",
         }
 

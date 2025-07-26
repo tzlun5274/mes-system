@@ -100,13 +100,26 @@
         <!-- 操作紀錄管理 -->
         <div class="col">
             <div class="card h-100 shadow-sm">
-                <div class="card-header bg-dark text-white">
+                <div class="card-header bg-info text-white">
                     <h5 class="mb-0"><i class="bi bi-journal-text"></i> 操作紀錄管理</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">查詢、管理系統操作紀錄，並可清理過期資料。</p>
-                    <a href="{% url 'system:operation_log_manage' %}" class="btn btn-dark"><i class="bi bi-journal-text"></i> 操作紀錄管理</a>
-                    <a href="{% url 'system:clean_operation_logs' %}" class="btn btn-outline-danger ms-2"><i class="bi bi-trash"></i> 清理過期紀錄</a>
+                    <p class="card-text">查看和管理系統操作紀錄，包含登入、資料變更等活動。</p>
+                    <a href="{% url 'system:operation_log_manage' %}" class="btn btn-info"><i class="bi bi-journal-text"></i> 操作紀錄</a>
+                    <a href="{% url 'system:clean_operation_logs' %}" class="btn btn-outline-info ms-2"><i class="bi bi-trash"></i> 清理紀錄</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 工單管理設定 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> 工單管理設定</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">管理工單系統相關設定，包含審核流程、通知功能、檔案大小限制等。</p>
+                    <a href="{% url 'system:workorder_settings' %}" class="btn btn-warning text-dark"><i class="bi bi-gear"></i> 工單管理設定</a>
                 </div>
             </div>
         </div>

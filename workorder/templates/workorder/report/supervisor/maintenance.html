@@ -167,6 +167,7 @@
 
 {% block content %}
 <div class="container mt-4">
+    {% csrf_token %}
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -343,14 +344,6 @@ function executeMaintenance(operation) {
             confirmMessage = '確定要清理重複的報工記錄嗎？此操作無法復原！';
             operationName = '清理重複資料';
             break;
-        case 'backup_data':
-            confirmMessage = '確定要建立資料庫備份嗎？';
-            operationName = '備份資料';
-            break;
-        case 'restore_data':
-            confirmMessage = '確定要從備份還原資料嗎？此操作會覆蓋現有資料！';
-            operationName = '還原資料';
-            break;
         case 'optimize_database':
             confirmMessage = '確定要優化資料庫嗎？此操作可能需要一些時間。';
             operationName = '資料庫優化';
@@ -359,6 +352,9 @@ function executeMaintenance(operation) {
             confirmMessage = '確定要匯出舊資料進行歸檔嗎？';
             operationName = '匯出歸檔';
             break;
+        default:
+            alert('不支援的操作類型');
+            return;
     }
     
     if (confirm(confirmMessage)) {
@@ -368,17 +364,43 @@ function executeMaintenance(operation) {
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 執行中...';
         btn.disabled = true;
         
-        // 模擬執行過程
-        setTimeout(function() {
-            alert(`${operationName}執行完成！`);
+        // 發送API請求
+        fetch('{% url "workorder:execute_maintenance" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: `action=${operation}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`${operationName}執行成功！\n${data.message}`);
+                
+                // 如果是匯出歸檔且有下載連結，提供下載
+                if (operation === 'export_archive' && data.download_url) {
+                    if (confirm('是否要下載歸檔檔案？')) {
+                        window.open(data.download_url, '_blank');
+                    }
+                }
+                
+                // 重新載入頁面以更新統計資料
+                if (operation.includes('cleanup') || operation.includes('optimize')) {
+                    location.reload();
+                }
+            } else {
+                alert(`${operationName}執行失敗！\n${data.message}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert(`${operationName}執行失敗！請檢查網路連線或聯繫系統管理員。`);
+        })
+        .finally(() => {
             btn.innerHTML = originalText;
             btn.disabled = false;
-            
-            // 重新載入頁面以更新統計資料
-            if (operation.includes('cleanup') || operation.includes('optimize')) {
-                location.reload();
-            }
-        }, 3000);
+        });
     }
 }
 

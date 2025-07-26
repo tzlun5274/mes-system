@@ -43,8 +43,11 @@ urlpatterns = [
         "clean_operation_logs/", views.clean_operation_logs, name="clean_operation_logs"
     ),
     path(
-        "change-password/", views.change_password, name="change_password"
-    ),  # 新增路由：一般使用者變更密碼
+        "change-password/",
+        views.change_password,
+        name="change_password"
+    ),
+    path("workorder_settings/", views.workorder_settings, name="workorder_settings"),
     # 環境管理相關路由
     path("environment/", views.environment_management, name="environment_management"),
     path("environment/log/<str:filename>/", views.view_log_file, name="view_log_file"),

@@ -1424,3 +1424,86 @@ def permission_assign(request):
         "system/permission_assign.html",
         {"permissions": all_permissions, "groups": groups, "users": users},
     )
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def workorder_settings(request):
+    """
+    工單管理設定頁面
+    管理工單系統相關設定，包含審核流程等
+    """
+    from workorder.models import SystemConfig
+    
+    if request.method == "POST":
+        # 處理表單提交
+        auto_approval = request.POST.get('auto_approval') == 'on'
+        notification_enabled = request.POST.get('notification_enabled') == 'on'
+        audit_log_enabled = request.POST.get('audit_log_enabled') == 'on'
+        max_file_size = request.POST.get('max_file_size', 10)
+        session_timeout = request.POST.get('session_timeout', 30)
+        
+        # 更新系統設定
+        SystemConfig.objects.update_or_create(
+            key="auto_approval",
+            defaults={"value": str(auto_approval)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="notification_enabled",
+            defaults={"value": str(notification_enabled)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="audit_log_enabled",
+            defaults={"value": str(audit_log_enabled)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="max_file_size",
+            defaults={"value": str(max_file_size)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="session_timeout",
+            defaults={"value": str(session_timeout)}
+        )
+        
+        messages.success(request, "工單管理設定已成功更新！")
+        return redirect('system:workorder_settings')
+    
+    # 取得現有設定
+    try:
+        auto_approval = SystemConfig.objects.get(key="auto_approval").value == "True"
+    except SystemConfig.DoesNotExist:
+        auto_approval = False
+        
+    try:
+        notification_enabled = SystemConfig.objects.get(key="notification_enabled").value == "True"
+    except SystemConfig.DoesNotExist:
+        notification_enabled = True
+        
+    try:
+        audit_log_enabled = SystemConfig.objects.get(key="audit_log_enabled").value == "True"
+    except SystemConfig.DoesNotExist:
+        audit_log_enabled = True
+        
+    try:
+        max_file_size = int(SystemConfig.objects.get(key="max_file_size").value)
+    except (SystemConfig.DoesNotExist, ValueError):
+        max_file_size = 10
+        
+    try:
+        session_timeout = int(SystemConfig.objects.get(key="session_timeout").value)
+    except (SystemConfig.DoesNotExist, ValueError):
+        session_timeout = 30
+    
+    # 系統設定選項
+    system_options = {
+        'auto_approval': auto_approval,  # 自動審核
+        'notification_enabled': notification_enabled,  # 通知功能
+        'audit_log_enabled': audit_log_enabled,  # 審計日誌
+        'max_file_size': max_file_size,  # 最大檔案大小 (MB)
+        'session_timeout': session_timeout,  # 會話超時 (分鐘)
+    }
+    
+    context = {
+        'system_options': system_options,
+    }
+    return render(request, 'system/workorder_settings.html', context)
