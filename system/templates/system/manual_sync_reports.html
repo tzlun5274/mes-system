@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}手動執行報表同步 - {{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .sync-form {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .sync-options {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .sync-type-card {
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .sync-type-card:hover {
+        border-color: #007bff;
+        background-color: #f8f9fa;
+    }
+    
+    .sync-type-card.selected {
+        border-color: #007bff;
+        background-color: #e3f2fd;
+    }
+    
+    .sync-type-card input[type="radio"] {
+        margin-right: 0.5rem;
+    }
+    
+    .date-range-section {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .warning-box {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .warning-box .alert-icon {
+        color: #856404;
+        font-size: 1.2rem;
+        margin-right: 0.5rem;
+    }
+    
+    .action-buttons {
+        text-align: center;
+        margin-top: 2rem;
+    }
+    
+    .btn-sync {
+        padding: 0.75rem 2rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+    
+    .sync-info {
+        background: #e3f2fd;
+        border-left: 4px solid #2196f3;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .sync-info h5 {
+        color: #1976d2;
+        margin-bottom: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-sync-alt text-primary"></i>
+                {{ title }}
+            </h1>
+            <p class="text-muted mb-0">手動執行報表資料同步，可選擇特定類型或全部報表</p>
+        </div>
+        <div>
+            <a href="{% url 'system:report_settings' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回報表設定
+            </a>
+        </div>
+    </div>
+
+    <!-- 訊息顯示 -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- 同步說明 -->
+    <div class="sync-info">
+        <h5><i class="fas fa-info-circle"></i> 同步說明</h5>
+        <p class="mb-0">
+            手動同步功能可以立即執行報表資料的同步作業，支援選擇特定報表類型或同步所有報表。
+            同步過程會將最新的資料更新到報表系統中，確保報表的準確性和即時性。
+        </p>
+    </div>
+
+    <!-- 警告訊息 -->
+    <div class="warning-box">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-exclamation-triangle alert-icon"></i>
+            <div>
+                <strong>注意事項：</strong>
+                <ul class="mb-0 mt-2">
+                    <li>同步過程可能需要一些時間，請耐心等待</li>
+                    <li>建議在系統使用量較少的時段執行同步</li>
+                    <li>同步期間請勿關閉瀏覽器或重新整理頁面</li>
+                    <li>大量資料同步可能會影響系統效能</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 同步表單 -->
+    <form method="post" class="sync-form">
+        {% csrf_token %}
+        
+        <!-- 同步類型選擇 -->
+        <div class="sync-options">
+            <h5 class="mb-3">
+                <i class="fas fa-list-check text-primary"></i>
+                選擇同步類型
+            </h5>
+            
+            <div class="row">
+                {% for value, label in sync_types %}
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="sync-type-card" onclick="selectSyncType('{{ value }}')">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="sync_type" 
+                                   id="sync_{{ value }}" value="{{ value }}" 
+                                   {% if value == 'all' %}checked{% endif %}>
+                            <label class="form-check-label" for="sync_{{ value }}">
+                                <strong>{{ label }}</strong>
+                                {% if value == 'all' %}
+                                    <br><small class="text-muted">同步所有報表類型</small>
+                                {% elif value == 'work_time' %}
+                                    <br><small class="text-muted">工作時間相關報表</small>
+                                {% elif value == 'work_order' %}
+                                    <br><small class="text-muted">工單機種相關報表</small>
+                                {% elif value == 'personnel' %}
+                                    <br><small class="text-muted">人員績效相關報表</small>
+                                {% elif value == 'equipment' %}
+                                    <br><small class="text-muted">設備效率相關報表</small>
+                                {% elif value == 'quality' %}
+                                    <br><small class="text-muted">品質分析相關報表</small>
+                                {% elif value == 'comprehensive' %}
+                                    <br><small class="text-muted">綜合分析報表</small>
+                                {% endif %}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 日期範圍設定 -->
+        <div class="date-range-section">
+            <h5 class="mb-3">
+                <i class="fas fa-calendar-alt text-primary"></i>
+                同步日期範圍
+            </h5>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="date_from" class="form-label">開始日期</label>
+                        <input type="date" class="form-control" id="date_from" name="date_from" 
+                               value="{{ today|date:'Y-m-d' }}" required>
+                        <div class="form-text">選擇同步資料的開始日期</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="date_to" class="form-label">結束日期</label>
+                        <input type="date" class="form-control" id="date_to" name="date_to" 
+                               value="{{ today|date:'Y-m-d' }}" required>
+                        <div class="form-text">選擇同步資料的結束日期</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <strong>提示：</strong>
+                如果不指定日期範圍，系統將同步最近 7 天的資料。建議選擇較小的日期範圍以確保同步效率。
+            </div>
+        </div>
+
+        <!-- 操作按鈕 -->
+        <div class="action-buttons">
+            <button type="submit" class="btn btn-primary btn-sync" onclick="return confirmSync()">
+                <i class="fas fa-sync-alt"></i>
+                開始同步
+            </button>
+            <a href="{% url 'system:report_settings' %}" class="btn btn-secondary btn-sync ms-2">
+                <i class="fas fa-times"></i>
+                取消
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function selectSyncType(value) {
+    // 取消所有選中狀態
+    document.querySelectorAll('.sync-type-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // 選中對應的選項
+    const radio = document.getElementById('sync_' + value);
+    radio.checked = true;
+    
+    // 添加選中樣式
+    radio.closest('.sync-type-card').classList.add('selected');
+}
+
+function confirmSync() {
+    const syncType = document.querySelector('input[name="sync_type"]:checked').value;
+    const dateFrom = document.getElementById('date_from').value;
+    const dateTo = document.getElementById('date_to').value;
+    
+    let message = `確定要執行以下同步作業嗎？\n\n`;
+    message += `同步類型：${document.querySelector('input[name="sync_type"]:checked').nextElementSibling.textContent.trim()}\n`;
+    message += `日期範圍：${dateFrom} 至 ${dateTo}\n\n`;
+    message += `此操作可能需要一些時間，請確認後繼續。`;
+    
+    return confirm(message);
+}
+
+// 頁面載入時初始化選中狀態
+document.addEventListener('DOMContentLoaded', function() {
+    const checkedRadio = document.querySelector('input[name="sync_type"]:checked');
+    if (checkedRadio) {
+        checkedRadio.closest('.sync-type-card').classList.add('selected');
+    }
+    
+    // 設定預設日期範圍（最近7天）
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    
+    document.getElementById('date_from').value = sevenDaysAgo.toISOString().split('T')[0];
+    document.getElementById('date_to').value = today.toISOString().split('T')[0];
+});
+</script>
+{% endblock %} 

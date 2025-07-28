@@ -1848,6 +1848,87 @@ def pending_approval_list(request):
     )
 
 
+def approved_reports_list(request):
+    """
+    已核准報工列表頁面
+    顯示所有類型的已核准報工記錄（主管、作業員、SMT）
+    """
+    from .models import OperatorSupplementReport, SMTProductionReport
+    
+    # 取得所有類型的已核准記錄
+    supervisor_approved = []  # 主管審核功能已刪除
+    
+    operator_approved = OperatorSupplementReport.objects.select_related(
+        'operator', 'workorder', 'process'
+    ).filter(approval_status='approved').order_by('-approved_at')
+    
+    smt_approved = SMTProductionReport.objects.select_related(
+        'workorder', 'equipment'
+    ).filter(approval_status='approved').order_by('-approved_at')
+    
+    # 合併所有已核准記錄
+    all_approved = []
+    
+    # 主管審核功能已刪除，跳過處理
+    
+    for report in operator_approved:
+        all_approved.append({
+            'type': '作業員報工',
+            'id': report.id,
+            'report_type': 'operator',
+            'operator': report.operator.name if report.operator else '-',
+            'workorder': report.workorder.order_number if report.workorder else '-',
+            'process': report.process.name if report.process else '-',
+            'quantity': report.work_quantity,
+            'defect_quantity': report.defect_quantity,
+            'work_date': report.work_date,
+            'start_time': report.start_time,
+            'end_time': report.end_time,
+            'approved_at': report.approved_at,
+            'approved_by': report.approved_by,
+            'remarks': report.remarks,
+        })
+    
+    for report in smt_approved:
+        all_approved.append({
+            'type': 'SMT報工',
+            'id': report.id,
+            'report_type': 'smt',
+            'operator': 'SMT設備',
+            'workorder': report.workorder.order_number if report.workorder else '-',
+            'process': report.operation,
+            'quantity': report.work_quantity,
+            'defect_quantity': getattr(report, 'defect_quantity', 0),
+            'work_date': report.work_date,
+            'start_time': report.start_time,
+            'end_time': report.end_time,
+            'approved_at': report.approved_at,
+            'approved_by': report.approved_by,
+            'remarks': getattr(report, 'remarks', ''),
+        })
+    
+    # 按核准時間排序
+    all_approved.sort(key=lambda x: x['approved_at'], reverse=True)
+    
+    # 統計資料
+    total_approved = len(all_approved)
+    supervisor_count = 0  # 主管審核功能已刪除
+    operator_count = len(operator_approved)
+    smt_count = len(smt_approved)
+
+    return render(
+        request,
+        "workorder/approved_reports_list.html",
+        {
+            "all_approved": all_approved,
+            "total_approved": total_approved,
+            "supervisor_count": supervisor_count,
+            "operator_count": operator_count,
+            "smt_count": smt_count,
+        },
+    )
+
+
 @csrf_exempt
 def get_operators_and_equipments(request):
     """
@@ -3289,31 +3370,58 @@ def report_index(request):
     from django.contrib.auth.decorators import login_required
     from django.shortcuts import redirect
     from datetime import date
+    from django.db.models import Q
+    from .models import OperatorSupplementReport, SMTProductionReport
     
     # 檢查用戶權限
     if not request.user.is_authenticated:
         return redirect('login')
     
-    # 簡化的統計資料（暫時使用固定值，避免資料庫錯誤）
+    today = date.today()
+    month_start = today.replace(day=1)
+    
+    # 從補登報工記錄中取得真實統計資料
+    # 作業員補登報工統計
+    operator_today = OperatorSupplementReport.objects.filter(created_at__date=today).count()
+    operator_month = OperatorSupplementReport.objects.filter(created_at__date__gte=month_start).count()
+    operator_pending = OperatorSupplementReport.objects.filter(approval_status='pending').count()
+    operator_abnormal = OperatorSupplementReport.objects.filter(
+        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
+    ).count()
+    
+    # SMT補登報工統計
+    smt_today = SMTProductionReport.objects.filter(created_at__date=today).count()
+    smt_month = SMTProductionReport.objects.filter(created_at__date__gte=month_start).count()
+    smt_pending = SMTProductionReport.objects.filter(approval_status='pending').count()
+    smt_abnormal = SMTProductionReport.objects.filter(
+        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
+    ).count()
+    
+    # 計算總計
+    total_today = operator_today + smt_today
+    total_month = operator_month + smt_month
+    total_pending = operator_pending + smt_pending
+    total_abnormal = operator_abnormal + smt_abnormal
+    
     context = {
-        'today_reports': 0,
-        'month_reports': 0,
-        'pending_reports': 0,
-        'abnormal_reports': 0,
+        'today_reports': total_today,
+        'month_reports': total_month,
+        'pending_reports': total_pending,
+        'abnormal_reports': total_abnormal,
         'recent_reports': [],
         'stats': {
-            'total_pending': 0,
-            'total_today': 0,
-            'total_month': 0,
-            'total_abnormal': 0,
-            'pending_operator': 0,
-            'pending_smt': 0,
-            'today_operator': 0,
-            'today_smt': 0,
-            'month_operator': 0,
-            'month_smt': 0,
-            'abnormal_operator': 0,
-            'abnormal_smt': 0,
+            'total_pending': total_pending,
+            'total_today': total_today,
+            'total_month': total_month,
+            'total_abnormal': total_abnormal,
+            'pending_operator': operator_pending,
+            'pending_smt': smt_pending,
+            'today_operator': operator_today,
+            'today_smt': smt_today,
+            'month_operator': operator_month,
+            'month_smt': smt_month,
+            'abnormal_operator': operator_abnormal,
+            'abnormal_smt': smt_abnormal,
         }
     }
     
@@ -3339,24 +3447,24 @@ def supervisor_report_index(request):
         'pending_smt': SMTProductionReport.objects.filter(approval_status='pending').count(),
         
         # 今日統計
-        'today_supervisor': SupervisorProductionReport.objects.filter(work_date=today).count(),
-        'today_operator': OperatorSupplementReport.objects.filter(work_date=today).count(),
-        'today_smt': SMTProductionReport.objects.filter(work_date=today).count(),
+        'today_supervisor': SupervisorProductionReport.objects.filter(created_at__date=today).count(),
+        'today_operator': OperatorSupplementReport.objects.filter(created_at__date=today).count(),
+        'today_smt': SMTProductionReport.objects.filter(created_at__date=today).count(),
         
         # 本月統計
-        'month_supervisor': SupervisorProductionReport.objects.filter(work_date__gte=month_start).count(),
-        'month_operator': OperatorSupplementReport.objects.filter(work_date__gte=month_start).count(),
-        'month_smt': SMTProductionReport.objects.filter(work_date__gte=month_start).count(),
+        'month_supervisor': SupervisorProductionReport.objects.filter(created_at__date__gte=month_start).count(),
+        'month_operator': OperatorSupplementReport.objects.filter(created_at__date__gte=month_start).count(),
+        'month_smt': SMTProductionReport.objects.filter(created_at__date__gte=month_start).count(),
         
         # 異常統計
         'abnormal_supervisor': SupervisorProductionReport.objects.filter(
-            Q(remarks__isnull=False) & ~Q(remarks='')
+            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
         ).count(),
         'abnormal_operator': OperatorSupplementReport.objects.filter(
-            Q(remarks__isnull=False) & ~Q(remarks='')
+            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
         ).count(),
         'abnormal_smt': SMTProductionReport.objects.filter(
-            Q(remarks__icontains='異常') | Q(remarks__icontains='異常')
+            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
         ).count(),
     }
     
@@ -3365,6 +3473,12 @@ def supervisor_report_index(request):
     stats['total_today'] = stats['today_supervisor'] + stats['today_operator'] + stats['today_smt']
     stats['total_month'] = stats['month_supervisor'] + stats['month_operator'] + stats['month_smt']
     stats['total_abnormal'] = stats['abnormal_supervisor'] + stats['abnormal_operator'] + stats['abnormal_smt']
+    
+    # 計算已核准統計
+    stats['approved_supervisor'] = SupervisorProductionReport.objects.filter(approval_status='approved').count()
+    stats['approved_operator'] = OperatorSupplementReport.objects.filter(approval_status='approved').count()
+    stats['approved_smt'] = SMTProductionReport.objects.filter(approval_status='approved').count()
+    stats['total_approved'] = stats['approved_supervisor'] + stats['approved_operator'] + stats['approved_smt']
     
     # 取得最近審核記錄
     recent_reviews = []
@@ -3449,13 +3563,13 @@ def supervisor_functions(request):
         'abnormal_reports': 0,
         
         # 各類型統計
-        'operator_reports_today': OperatorSupplementReport.objects.filter(work_date=today).count(),
-        'smt_reports_today': SMTProductionReport.objects.filter(work_date=today).count(),
-        'supervisor_reports_today': SupervisorProductionReport.objects.filter(work_date=today).count(),
+        'operator_reports_today': OperatorSupplementReport.objects.filter(created_at__date=today).count(),
+        'smt_reports_today': SMTProductionReport.objects.filter(created_at__date=today).count(),
+        'supervisor_reports_today': SupervisorProductionReport.objects.filter(created_at__date=today).count(),
         
-        'operator_reports_month': OperatorSupplementReport.objects.filter(work_date__gte=month_start).count(),
-        'smt_reports_month': SMTProductionReport.objects.filter(work_date__gte=month_start).count(),
-        'supervisor_reports_month': SupervisorProductionReport.objects.filter(work_date__gte=month_start).count(),
+        'operator_reports_month': OperatorSupplementReport.objects.filter(created_at__date__gte=month_start).count(),
+        'smt_reports_month': SMTProductionReport.objects.filter(created_at__date__gte=month_start).count(),
+        'supervisor_reports_month': SupervisorProductionReport.objects.filter(created_at__date__gte=month_start).count(),
         
         # 待審核統計
         'pending_operator': OperatorSupplementReport.objects.filter(approval_status='pending').count(),
@@ -3464,13 +3578,13 @@ def supervisor_functions(request):
         
         # 異常統計
         'abnormal_operator': OperatorSupplementReport.objects.filter(
-            Q(remarks__isnull=False) & ~Q(remarks='')
+            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
         ).count(),
         'abnormal_smt': SMTProductionReport.objects.filter(
-            Q(remarks__icontains='異常') | Q(remarks__icontains='異常')
+            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
         ).count(),
         'abnormal_supervisor': SupervisorProductionReport.objects.filter(
-            Q(remarks__isnull=False) & ~Q(remarks='')
+            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
         ).count(),
     }
     
@@ -3487,7 +3601,7 @@ def supervisor_functions(request):
     operator_abnormal = OperatorSupplementReport.objects.select_related(
         'operator', 'workorder', 'process'
     ).filter(
-        Q(remarks__isnull=False) & ~Q(remarks='')
+        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
     ).order_by('-created_at')[:5]
     
     for report in operator_abnormal:
@@ -3497,7 +3611,7 @@ def supervisor_functions(request):
             'operator': report.operator.name if report.operator else '-',
             'workorder': report.workorder.order_number if report.workorder else '-',
             'process': report.process.name if report.process else '-',
-            'remarks': report.remarks,
+            'remarks': report.abnormal_notes,
             'status': report.approval_status,
         })
     
@@ -3505,7 +3619,7 @@ def supervisor_functions(request):
     smt_abnormal = SMTProductionReport.objects.select_related(
         'workorder'
     ).filter(
-        Q(remarks__icontains='異常') | Q(remarks__icontains='異常')
+        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
     ).order_by('-created_at')[:5]
     
     for report in smt_abnormal:
@@ -3515,7 +3629,7 @@ def supervisor_functions(request):
             'operator': report.equipment_name,
             'workorder': report.workorder.order_number if report.workorder else '-',
             'process': report.operation,
-            'remarks': report.remarks,
+            'remarks': report.abnormal_notes,
             'status': report.approval_status,
         })
     
@@ -3523,7 +3637,7 @@ def supervisor_functions(request):
     supervisor_abnormal = SupervisorProductionReport.objects.select_related(
         'workorder', 'process'
     ).filter(
-        Q(remarks__isnull=False) & ~Q(remarks='')
+        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
     ).order_by('-created_at')[:5]
     
     for report in supervisor_abnormal:
@@ -3533,7 +3647,7 @@ def supervisor_functions(request):
             'operator': report.supervisor,
             'workorder': report.workorder.order_number if report.workorder else '-',
             'process': report.process.name if report.process else '-',
-            'remarks': report.remarks,
+            'remarks': report.abnormal_notes,
             'status': report.approval_status,
         })
     
@@ -3574,20 +3688,20 @@ def report_statistics(request):
     
     # 各類型統計
     operator_stats = {
-        'today': OperatorSupplementReport.objects.filter(work_date=today).count(),
-        'week': OperatorSupplementReport.objects.filter(work_date__gte=week_start).count(),
-        'month': OperatorSupplementReport.objects.filter(work_date__gte=month_start).count(),
-        'year': OperatorSupplementReport.objects.filter(work_date__year=today.year).count(),
+        'today': OperatorSupplementReport.objects.filter(created_at__date=today).count(),
+        'week': OperatorSupplementReport.objects.filter(created_at__date__gte=week_start).count(),
+        'month': OperatorSupplementReport.objects.filter(created_at__date__gte=month_start).count(),
+        'year': OperatorSupplementReport.objects.filter(created_at__year=today.year).count(),
         'pending': OperatorSupplementReport.objects.filter(approval_status='pending').count(),
         'approved': OperatorSupplementReport.objects.filter(approval_status='approved').count(),
         'rejected': OperatorSupplementReport.objects.filter(approval_status='rejected').count(),
     }
     
     smt_stats = {
-        'today': SMTProductionReport.objects.filter(work_date=today).count(),
-        'week': SMTProductionReport.objects.filter(work_date__gte=week_start).count(),
-        'month': SMTProductionReport.objects.filter(work_date__gte=month_start).count(),
-        'year': SMTProductionReport.objects.filter(work_date__year=today.year).count(),
+        'today': SMTProductionReport.objects.filter(created_at__date=today).count(),
+        'week': SMTProductionReport.objects.filter(created_at__date__gte=week_start).count(),
+        'month': SMTProductionReport.objects.filter(created_at__date__gte=month_start).count(),
+        'year': SMTProductionReport.objects.filter(created_at__year=today.year).count(),
         'pending': SMTProductionReport.objects.filter(approval_status='pending').count(),
         'approved': SMTProductionReport.objects.filter(approval_status='approved').count(),
         'rejected': SMTProductionReport.objects.filter(approval_status='rejected').count(),
@@ -3619,7 +3733,7 @@ def report_statistics(request):
     
     # 作業員報工統計
     operator_reports_30d = OperatorSupplementReport.objects.filter(
-        work_date__gte=thirty_days_ago
+        created_at__date__gte=thirty_days_ago
     ).aggregate(
         total_quantity=Sum('work_quantity'),
         avg_quantity=Avg('work_quantity')
@@ -3627,14 +3741,14 @@ def report_statistics(request):
     
     # 計算作業員總工作時數（使用Python計算）
     operator_reports_list = OperatorSupplementReport.objects.filter(
-        work_date__gte=thirty_days_ago
+        created_at__date__gte=thirty_days_ago
     )
     operator_total_hours = sum(report.work_hours for report in operator_reports_list)
     operator_avg_hours = operator_total_hours / len(operator_reports_list) if operator_reports_list else 0
     
     # SMT報工統計
     smt_reports_30d = SMTProductionReport.objects.filter(
-        work_date__gte=thirty_days_ago
+        created_at__date__gte=thirty_days_ago
     ).aggregate(
         total_quantity=Sum('work_quantity'),
         avg_quantity=Avg('work_quantity')
@@ -3642,7 +3756,7 @@ def report_statistics(request):
     
     # 計算SMT總工作時數（使用Python計算）
     smt_reports_list = SMTProductionReport.objects.filter(
-        work_date__gte=thirty_days_ago
+        created_at__date__gte=thirty_days_ago
     )
     smt_total_hours = sum(report.work_duration for report in smt_reports_list if report.work_duration)
     smt_avg_hours = smt_total_hours / len(smt_reports_list) if smt_reports_list else 0
@@ -3872,49 +3986,11 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
 
 def report_export(request):
     """
-    報表匯出頁面
-    匯出各種報工報表，支援Excel、PDF等多種格式
+    報表匯出頁面 - 已移至報表管理模組統一管理
+    請使用 reporting:report_export
     """
-    from datetime import date, timedelta
-    from django.db.models import Q
-    from .models import OperatorSupplementReport, SMTProductionReport
-    
-    today = date.today()
-    month_start = today.replace(day=1)
-    
-    # 可匯出的報表類型
-    report_types = [
-        {'id': 'daily', 'name': '日報表', 'description': '每日報工統計報表'},
-        {'id': 'weekly', 'name': '週報表', 'description': '每週報工統計報表'},
-        {'id': 'monthly', 'name': '月報表', 'description': '每月報工統計報表'},
-        {'id': 'operator', 'name': '作業員報工報表', 'description': '作業員報工詳細記錄'},
-        {'id': 'smt', 'name': 'SMT報工報表', 'description': 'SMT設備報工詳細記錄'},
-        {'id': 'abnormal', 'name': '異常報工報表', 'description': '異常報工記錄分析'},
-        {'id': 'efficiency', 'name': '效率分析報表', 'description': '產能效率分析報表'},
-    ]
-    
-    # 匯出格式
-    export_formats = [
-        {'id': 'excel', 'name': 'Excel (.xlsx)', 'icon': 'fas fa-file-excel'},
-        {'id': 'csv', 'name': 'CSV (.csv)', 'icon': 'fas fa-file-csv'},
-        {'id': 'pdf', 'name': 'PDF (.pdf)', 'icon': 'fas fa-file-pdf'},
-    ]
-    
-    # 日期範圍選項
-    date_ranges = [
-        {'id': 'today', 'name': '今日', 'start': today, 'end': today},
-        {'id': 'yesterday', 'name': '昨日', 'start': today - timedelta(days=1), 'end': today - timedelta(days=1)},
-        {'id': 'week', 'name': '本週', 'start': today - timedelta(days=today.weekday()), 'end': today},
-        {'id': 'month', 'name': '本月', 'start': month_start, 'end': today},
-        {'id': 'custom', 'name': '自訂日期範圍', 'start': None, 'end': None},
-    ]
-    
-    context = {
-        'report_types': report_types,
-        'export_formats': export_formats,
-        'date_ranges': date_ranges,
-    }
-    return render(request, 'workorder/report/supervisor/export.html', context)
+    from django.shortcuts import redirect
+    return redirect('reporting:report_export')
 
 def data_maintenance(request):
     """
@@ -4776,10 +4852,10 @@ def smt_supplement_export(request):
         bottom=Side(style='thin')
     )
     
-    # 標題行 - 按照圖片格式
+    # 標題行 - 按照圖片格式，增加異常紀錄欄位
     headers = [
         '設備', '公司別', '報工日期', '開始時間', '完成時間', '製令號碼', 
-        '機種名稱', '工序', '工作數量', '不良品數量', '備註'
+        '機種名稱', '工序', '工作數量', '不良品數量', '備註', '異常紀錄'
     ]
     
     for col, header in enumerate(headers, 1):
@@ -4838,9 +4914,10 @@ def smt_supplement_export(request):
         ws.cell(row=row, column=9, value=report.work_quantity)
         ws.cell(row=row, column=10, value=defect_quantity)
         ws.cell(row=row, column=11, value=report.remarks or '')
+        ws.cell(row=row, column=12, value=report.abnormal_notes or '')  # 異常紀錄欄位
         
         # 套用樣式
-        for col in range(1, 12):
+        for col in range(1, 13):
             cell = ws.cell(row=row, column=col)
             cell.font = data_font
             cell.alignment = data_alignment
@@ -4879,18 +4956,18 @@ def smt_supplement_template(request):
         # 寫入CSV內容
         writer = csv.writer(response)
         
-        # 標題行
+        # 標題行 - 增加異常紀錄欄位
         headers = [
             '設備', '公司別', '報工日期', '開始時間', '完成時間', '製令號碼', 
-            '機種名稱', '工序', '工作數量', '不良品數量', '備註'
+            '機種名稱', '工序', '工作數量', '不良品數量', '備註', '異常紀錄'
         ]
         writer.writerow(headers)
         
-        # 範例資料行
+        # 範例資料行 - 增加異常紀錄欄位
         example_data = [
-            ['SMT-A_LINE', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', 'SMT貼片', '100', '0', '正常生產'],
-            ['SMT-B_LINE', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', 'RD樣品', 'RD-001', 'SMT貼片', '50', '2', 'RD樣品測試'],
-            ['SMT-P_LINE', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-002', 'SMT貼片', '200', '5', '大量生產'],
+            ['SMT-A_LINE', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', 'SMT貼片', '100', '0', '正常生產', ''],
+            ['SMT-B_LINE', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', 'RD樣品', 'RD-001', 'SMT貼片', '50', '2', 'RD樣品測試', '設備故障'],
+            ['SMT-P_LINE', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-002', 'SMT貼片', '200', '5', '大量生產', ''],
         ]
         
         for row in example_data:
@@ -4926,10 +5003,10 @@ def smt_supplement_template(request):
             bottom=Side(style='thin')
         )
         
-        # 標題行 - 按照圖片格式
+        # 標題行 - 按照圖片格式，增加異常紀錄欄位
         headers = [
             '設備', '公司別', '報工日期', '開始時間', '完成時間', '製令號碼', 
-            '機種名稱', '工序', '工作數量', '不良品數量', '備註'
+            '機種名稱', '工序', '工作數量', '不良品數量', '備註', '異常紀錄'
         ]
         
         for col, header in enumerate(headers, 1):
@@ -4939,11 +5016,11 @@ def smt_supplement_template(request):
             cell.alignment = header_alignment
             cell.border = thin_border
         
-        # 寫入範例資料 - 使用12小時制格式
+        # 寫入範例資料 - 使用12小時制格式，增加異常紀錄欄位
         example_data = [
-            ['SMT-A_LINE', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', 'SMT貼片', '100', '0', '正常生產'],
-            ['SMT-B_LINE', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', 'RD樣品', 'RD-001', 'SMT貼片', '50', '2', 'RD樣品測試'],
-            ['SMT-P_LINE', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-002', 'SMT貼片', '200', '5', '大量生產'],
+            ['SMT-A_LINE', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', 'SMT貼片', '100', '0', '正常生產', ''],
+            ['SMT-B_LINE', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', 'RD樣品', 'RD-001', 'SMT貼片', '50', '2', 'RD樣品測試', '設備故障'],
+            ['SMT-P_LINE', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-002', 'SMT貼片', '200', '5', '大量生產', ''],
         ]
         
         for row, data in enumerate(example_data, 2):
@@ -5213,7 +5290,7 @@ def smt_supplement_report_reject(request, report_id):
 
 
 def process_smt_supplement_row(row_num, equipment_name, company_code, work_date_str, start_time_str, end_time_str,
-                              workorder_number, product_code, operation, work_quantity, defect_quantity, remarks, request):
+                              workorder_number, product_code, operation, work_quantity, defect_quantity, remarks, abnormal_record, request):
     """
     處理SMT補登報工單行資料
     支援多種時間格式，與作業員報工匯入保持一致
@@ -5341,11 +5418,15 @@ def process_smt_supplement_row(row_num, equipment_name, company_code, work_date_
             report_type = 'rd_sample'
         elif workorder_number:
             try:
-                workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
+                workorder = WorkOrder.objects.filter(
+                    order_number=workorder_number
+                ).exclude(
+                    status="completed"  # 排除已完工的工單
+                ).first()
                 if not workorder:
                     return {
                         'success': False,
-                        'error': f'第 {row_num} 行：找不到工單號 {workorder_number}'
+                        'error': f'第 {row_num} 行：找不到未完工的工單號 {workorder_number}'
                     }
             except Exception as e:
                 return {
@@ -5366,6 +5447,7 @@ def process_smt_supplement_row(row_num, equipment_name, company_code, work_date_
             defect_quantity=int(defect_quantity) if defect_quantity else 0,
             operation=operation or 'SMT貼片',
             remarks=remarks or '',
+            abnormal_notes=abnormal_record or '',  # 新增異常紀錄欄位
             report_type=report_type,
             created_by=request.user.username,
             approval_status='pending'
@@ -5447,11 +5529,12 @@ def smt_supplement_batch_create(request):
                             work_quantity = ws.cell(row=row, column=9).value if ws.cell(row=row, column=9).value else 0
                             defect_quantity = ws.cell(row=row, column=10).value if ws.cell(row=row, column=10).value else 0
                             remarks = str(ws.cell(row=row, column=11).value) if ws.cell(row=row, column=11).value else ''
+                            abnormal_record = str(ws.cell(row=row, column=12).value) if ws.cell(row=row, column=12).value else ''
                             
                             # 處理單行資料
                             result = process_smt_supplement_row(
                                 row, equipment_name, company_code, work_date_str, start_time_str, end_time_str,
-                                workorder_number, product_code, operation, work_quantity, defect_quantity, remarks, request
+                                workorder_number, product_code, operation, work_quantity, defect_quantity, remarks, abnormal_record, request
                             )
                             
                             if result['success']:
@@ -5471,7 +5554,7 @@ def smt_supplement_batch_create(request):
                     df = pd.read_csv(excel_file, parse_dates=False)
                     
                     # 檢查必要欄位
-                    required_columns = ['設備', '公司別', '報工日期', '開始時間', '完成時間', '製令號碼', '機種名稱', '工序', '工作數量', '不良品數量', '備註']
+                    required_columns = ['設備', '公司別', '報工日期', '開始時間', '完成時間', '製令號碼', '機種名稱', '工序', '工作數量', '不良品數量', '備註', '異常紀錄']
                     missing_columns = [col for col in required_columns if col not in df.columns]
                     
                     if missing_columns:
@@ -5495,11 +5578,12 @@ def smt_supplement_batch_create(request):
                             work_quantity = row_data['工作數量'] if pd.notna(row_data['工作數量']) else 0
                             defect_quantity = row_data['不良品數量'] if pd.notna(row_data['不良品數量']) else 0
                             remarks = str(row_data['備註']) if pd.notna(row_data['備註']) else ''
+                            abnormal_record = str(row_data['異常紀錄']) if pd.notna(row_data['異常紀錄']) else ''
                             
                             # 處理單行資料
                             result = process_smt_supplement_row(
                                 index + 2, equipment_name, company_code, work_date_str, start_time_str, end_time_str,
-                                workorder_number, product_code, operation, work_quantity, defect_quantity, remarks, request
+                                workorder_number, product_code, operation, work_quantity, defect_quantity, remarks, abnormal_record, request
                             )
                             
                             if result['success']:
@@ -5617,9 +5701,11 @@ def get_workorders_by_product(request):
     try:
         from .models import WorkOrder
         
-        # 查詢該產品編號的所有工單（補登報工應該能選擇所有派工單，不限狀態）
+        # 查詢該產品編號的未完工工單（補登報工只能選擇現存派工單上的工單）
         workorders = WorkOrder.objects.filter(
             product_code=product_id
+        ).exclude(
+            status="completed"  # 排除已完工的工單
         ).order_by('-created_at')
         
         workorder_list = []
@@ -5718,9 +5804,11 @@ def get_smt_workorders_by_equipment(request):
         from equip.models import Equipment
         equipment = Equipment.objects.get(id=equipment_id)
         
-        # 取得該設備的工單（這裡可以根據實際業務邏輯調整）
+        # 取得該設備的未完工工單（補登報工只能選擇現存派工單上的工單）
         workorders = WorkOrder.objects.filter(
-            status__in=['in_progress', 'completed']
+            status__in=['pending', 'in_progress', 'paused']
+        ).exclude(
+            status="completed"  # 排除已完工的工單
         ).order_by('-created_at')[:50]  # 限制數量避免過載
         
         workorder_list = []
@@ -6846,10 +6934,10 @@ def operator_supplement_export(request):
         bottom=Side(style='thin')
     )
     
-    # 標題行
+    # 標題行 - 增加異常紀錄欄位
     headers = [
         '報工日期', '開始時間', '結束時間', '作業員', '工單號', '工序', 
-        '報工數量', '不良品數量', '工時', '審核狀態', '備註', '建立時間'
+        '報工數量', '不良品數量', '工時', '審核狀態', '備註', '異常紀錄', '建立時間'
     ]
     
     for col, header in enumerate(headers, 1):
@@ -6883,10 +6971,11 @@ def operator_supplement_export(request):
         ws.cell(row=row, column=9, value=f"{report.work_hours:.2f}" if report.work_hours else '')
         ws.cell(row=row, column=10, value=report.get_approval_status_display())
         ws.cell(row=row, column=11, value=report.remarks or '')
-        ws.cell(row=row, column=12, value=report.created_at.strftime('%Y-%m-%d %H:%M') if report.created_at else '')
+        ws.cell(row=row, column=12, value=report.abnormal_notes or '')  # 異常紀錄欄位
+        ws.cell(row=row, column=13, value=report.created_at.strftime('%Y-%m-%d %H:%M') if report.created_at else '')
         
         # 套用樣式
-        for col in range(1, 13):
+        for col in range(1, 14):
             cell = ws.cell(row=row, column=col)
             cell.font = data_font
             cell.alignment = data_alignment
@@ -6924,18 +7013,18 @@ def operator_supplement_template(request):
         # 寫入CSV內容
         writer = csv.writer(response)
         
-        # 標題行
+        # 標題行 - 增加異常紀錄欄位
         headers = [
             '作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', '工單號', '產品編號', 
-            '工序名稱', '設備名稱', '報工數量', '不良品數量', '備註'
+            '工序名稱', '設備名稱', '報工數量', '不良品數量', '備註', '異常紀錄'
         ]
         writer.writerow(headers)
         
-        # 範例資料行
+        # 範例資料行 - 增加異常紀錄欄位
         example_data = [
-            ['張小明', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', '目檢', '目檢台A', '100', '5', '正常生產'],
-            ['李美玲', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', '', 'PROD-002', '測試', '測試設備B', '50', '2', 'RD樣品測試'],
-            ['王大華', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-003', '包裝', '包裝機C', '150', '3', '大量生產'],
+            ['張小明', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', '目檢', '目檢台A', '100', '5', '正常生產', ''],
+            ['李美玲', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', '', 'PROD-002', '測試', '測試設備B', '50', '2', 'RD樣品測試', '設備故障'],
+            ['王大華', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-003', '包裝', '包裝機C', '150', '3', '大量生產', ''],
         ]
         
         for row in example_data:
@@ -6971,10 +7060,10 @@ def operator_supplement_template(request):
             bottom=Side(style='thin')
         )
         
-        # 標題行 - 增加設備欄位，使用名稱而不是ID
+        # 標題行 - 增加設備欄位和異常紀錄欄位，使用名稱而不是ID
         headers = [
             '作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', '工單號', '產品編號', 
-            '工序名稱', '設備名稱', '報工數量', '不良品數量', '備註'
+            '工序名稱', '設備名稱', '報工數量', '不良品數量', '備註', '異常紀錄'
         ]
         
         for col, header in enumerate(headers, 1):
@@ -6984,11 +7073,11 @@ def operator_supplement_template(request):
             cell.alignment = header_alignment
             cell.border = thin_border
         
-        # 寫入範例資料 - 使用12小時制格式
+        # 寫入範例資料 - 使用12小時制格式，增加異常紀錄欄位
         example_data = [
-            ['張小明', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', '目檢', '目檢台A', '100', '5', '正常生產'],
-            ['李美玲', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', '', 'PROD-002', '測試', '測試設備B', '50', '2', 'RD樣品測試'],
-            ['王大華', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-003', '包裝', '包裝機C', '150', '3', '大量生產'],
+            ['張小明', 'COMP001', '2024-01-15', '08:00:00 AM', '12:00:00 PM', 'WO-2024-001', 'PROD-001', '目檢', '目檢台A', '100', '5', '正常生產', ''],
+            ['李美玲', 'COMP001', '2024-01-15', '01:00:00 PM', '05:00:00 PM', '', 'PROD-002', '測試', '測試設備B', '50', '2', 'RD樣品測試', '設備故障'],
+            ['王大華', 'COMP002', '2024-01-16', '09:00:00 AM', '05:00:00 PM', 'WO-2024-002', 'PROD-003', '包裝', '包裝機C', '150', '3', '大量生產', ''],
         ]
         
         for row, data in enumerate(example_data, 2):
@@ -7015,7 +7104,7 @@ def operator_supplement_template(request):
 
 def process_operator_supplement_row(row_num, operator_name, company_code, work_date_str, start_time_str, end_time_str,
                                    workorder_number, product_code, process_name, equipment_name,
-                                   work_quantity, defect_quantity, remarks, request):
+                                   work_quantity, defect_quantity, remarks, abnormal_record, request):
     """
     處理作業員補登報工單行資料
     支援多種時間格式，與SMT報工匯入保持一致
@@ -7229,6 +7318,7 @@ def process_operator_supplement_row(row_num, operator_name, company_code, work_d
             work_quantity=work_quantity,
             defect_quantity=defect_quantity,
             remarks=remarks or '',
+            abnormal_notes=abnormal_record or '',  # 新增異常紀錄欄位
             report_type='normal',  # 預設為正式報工
             created_by=request.user.username,
             approval_status='pending'
@@ -7303,12 +7393,13 @@ def operator_supplement_batch_create(request):
                             work_quantity = ws.cell(row=row, column=10).value if ws.cell(row=row, column=10).value else 0
                             defect_quantity = ws.cell(row=row, column=11).value if ws.cell(row=row, column=11).value else 0
                             remarks = str(ws.cell(row=row, column=12).value) if ws.cell(row=row, column=12).value else ''
+                            abnormal_record = str(ws.cell(row=row, column=13).value) if ws.cell(row=row, column=13).value else ''
                             
                             # 處理單行資料
                             result = process_operator_supplement_row(
                                 row, operator_name, company_code, work_date_str, start_time_str, end_time_str,
                                 workorder_number, product_code, process_name, equipment_name,
-                                work_quantity, defect_quantity, remarks, request
+                                work_quantity, defect_quantity, remarks, abnormal_record, request
                             )
                             
                             if result['success']:
@@ -7328,7 +7419,7 @@ def operator_supplement_batch_create(request):
                     df = pd.read_csv(excel_file, parse_dates=False)
                     
                     # 檢查必要欄位
-                    required_columns = ['作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', '工單號', '產品編號', '工序名稱', '設備名稱', '報工數量', '不良品數量', '備註']
+                    required_columns = ['作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', '工單號', '產品編號', '工序名稱', '設備名稱', '報工數量', '不良品數量', '備註', '異常紀錄']
                     missing_columns = [col for col in required_columns if col not in df.columns]
                     
                     if missing_columns:
@@ -7353,12 +7444,13 @@ def operator_supplement_batch_create(request):
                             work_quantity = row_data['報工數量'] if pd.notna(row_data['報工數量']) else 0
                             defect_quantity = row_data['不良品數量'] if pd.notna(row_data['不良品數量']) else 0
                             remarks = str(row_data['備註']) if pd.notna(row_data['備註']) else ''
+                            abnormal_record = str(row_data['異常紀錄']) if pd.notna(row_data['異常紀錄']) else ''
                             
                             # 處理單行資料
                             result = process_operator_supplement_row(
                                 index + 2, operator_name, company_code, work_date_str, start_time_str, end_time_str,
                                 workorder_number, product_code, process_name, equipment_name,
-                                work_quantity, defect_quantity, remarks, request
+                                work_quantity, defect_quantity, remarks, abnormal_record, request
                             )
                             
                             if result['success']:

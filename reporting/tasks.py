@@ -1,4 +1,4 @@
-# 這個檔案是報表模組的Celery任務，負責自動同步SMT生產報表與作業員生產報表
+# 這個檔案是報表管理模組的Celery任務，負責自動同步SMT生產報表與作業員生產報表
 from celery import shared_task
 from django.core.management import call_command
 from django.core.mail import get_connection, send_mail
@@ -162,7 +162,7 @@ def generate_excel_report(report_type, data):
             worksheet.cell(
                 row=row_num, column=1, value=report.date.strftime("%Y-%m-%d")
             )
-            worksheet.cell(row=row_num, column=2, value=report.operator_name)
+            worksheet.cell(row=row_num, column=2, value=report.operator_or_line)
             worksheet.cell(row=row_num, column=3, value=report.equipment_name)
             worksheet.cell(row=row_num, column=4, value=report.get_line_display())
             worksheet.cell(row=row_num, column=5, value=report.completed_quantity)

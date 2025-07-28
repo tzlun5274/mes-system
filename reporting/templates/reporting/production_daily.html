@@ -3,12 +3,12 @@
 {% load i18n %}
 
 {% block title %}
-{% trans "生產日報表 - MES 系統" %}
+{% trans "工作時間報表 - MES" %}
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <h2>{% trans "生產日報表（作業員單位）" %}</h2>
+    <h2>{% trans "工作時間報表（作業員單位）" %}</h2>
     <hr>
 
     <div class="card mb-4">
@@ -32,7 +32,7 @@
                     {% for report in production_reports %}
                     <tr>
                         <td>{{ report.date }}</td>
-                        <td>{{ report.operator_name }}</td>
+                        <td>{{ report.operator_or_line }}</td>
                         <td>{{ report.equipment_name }}</td>
                         <td>{{ report.get_line_display }}</td>
                         <td>{{ report.process_name }}</td>
@@ -43,12 +43,12 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9">{% trans "無生產日報表數據" %}</td>
+                        <td colspan="9">{% trans "無工作時間報表數據" %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
-            <a href="{% url 'reporting:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
+                            <a href="{% url 'reporting:index' %}" class="btn btn-secondary">{% trans "返回" %}</a>
         </div>
     </div>
 </div>

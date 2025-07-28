@@ -43,6 +43,6 @@ def log_user_operation(username, module, action):
         log_model = getattr(model_module, class_name)
 
         # 創建操作日誌記錄
-        log_model.objects.create(user=username, action=log_message, timestamp=timestamp)
+        log_model.objects.create(user=username, action=log_message)
     except Exception as e:
         logger.error(f"記錄操作日誌失敗，模組: {module}, 錯誤: {str(e)}")

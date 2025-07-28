@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}
-{{ title }} - MES 系統
+{{ title }} - MES
 {% endblock %}
 
 {% block content %}
@@ -25,7 +25,7 @@
                                         <option value="">請選擇報表類型</option>
                                         <option value="smt" {% if schedule.report_type == 'smt' %}selected{% endif %}>SMT生產報表</option>
                                         <option value="operator" {% if schedule.report_type == 'operator' %}selected{% endif %}>作業員生產報表</option>
-                                        <option value="production_daily" {% if schedule.report_type == 'production_daily' %}selected{% endif %}>生產日報表</option>
+                                        <option value="production_daily" {% if schedule.report_type == 'production_daily' %}selected{% endif %}>工作時間報表</option>
                                         <option value="all" {% if schedule.report_type == 'all' %}selected{% endif %}>所有報表</option>
                                     </select>
                                     <div class="form-text">選擇要自動發送的報表類型</div>
@@ -87,8 +87,8 @@
                         <div class="mb-3">
                             <label for="subject_template" class="form-label">郵件主旨模板</label>
                             <input type="text" class="form-control" id="subject_template" name="subject_template" 
-                                   value="{% if schedule.subject_template %}{{ schedule.subject_template }}{% else %}MES 系統 - {report_type} - {date}{% endif %}" 
-                                   placeholder="MES 系統 - {report_type} - {date}">
+                                   value="{% if schedule.subject_template %}{{ schedule.subject_template }}{% else %}MES - {report_type} - {date}{% endif %}" 
+                                   placeholder="MES - {report_type} - {date}">
                             <div class="form-text">
                                 可使用變數：{report_type}（報表類型）、{date}（報表日期）
                             </div>

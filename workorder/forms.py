@@ -542,13 +542,14 @@ class SMTSupplementReportForm(forms.ModelForm):
         from .models import WorkOrder
         from django.db import models
 
-        # 從工單中取得所有產品編號（排除RD樣品相關的工單）
+        # 從未完工的工單中取得所有產品編號（排除RD樣品相關的工單）
         products = (
             WorkOrder.objects.exclude(product_code__isnull=True)
             .exclude(product_code="")
             .exclude(order_number__icontains="RD樣品")  # 排除RD樣品工單
             .exclude(order_number__icontains="RD-樣品")  # 排除RD-樣品工單
             .exclude(order_number__icontains="RD樣本")  # 排除RD樣本工單
+            .exclude(status="completed")  # 排除已完工的工單
             .values_list("product_code", flat=True)
             .distinct()
             .order_by("product_code")
@@ -566,14 +567,15 @@ class SMTSupplementReportForm(forms.ModelForm):
         """取得工單查詢集"""
         from .models import WorkOrder
 
-        # 補登報工應該能選擇所有派工單，不限狀態，但排除RD樣品相關工單
-        # 移除200筆限制，避免遺漏工單
+        # 補登報工只能選擇現存派工單上的工單（未完工的工單）
+        # 排除已完工的工單和RD樣品相關工單
         return (
             WorkOrder.objects.exclude(
                 order_number__icontains="RD樣品"  # 排除RD樣品工單
             )
             .exclude(order_number__icontains="RD-樣品")  # 排除RD-樣品工單
             .exclude(order_number__icontains="RD樣本")  # 排除RD樣本工單
+            .exclude(status="completed")  # 排除已完工的工單
             .order_by("-created_at")
         )
 
@@ -704,7 +706,9 @@ class SMTSupplementBatchForm(forms.Form):
         from .models import WorkOrder
 
         workorders = WorkOrder.objects.filter(
-            status__in=["in_progress", "completed"]
+            status__in=["pending", "in_progress", "paused"]
+        ).exclude(
+            status="completed"  # 排除已完工的工單
         ).order_by("-created_at")[:100]
         self.fields["workorder"].queryset = workorders
 
@@ -1074,6 +1078,7 @@ class OperatorSupplementReportForm(forms.ModelForm):
             )  # 排除RD樣品工單
             .exclude(order_number__icontains="RD-樣品")  # 排除RD-樣品工單
             .exclude(order_number__icontains="RD樣本")  # 排除RD樣本工單
+            .exclude(status="completed")  # 排除已完工的工單
             .values_list("product_code", "product_code")
             .distinct()
             .order_by("product_code")
@@ -1088,13 +1093,14 @@ class OperatorSupplementReportForm(forms.ModelForm):
         from .models import WorkOrder
 
         # 載入所有有效工單（新增和編輯模式都使用相同的邏輯）
-        # 補登報工應該能選擇所有派工單，不限狀態，但排除RD樣品相關工單
+        # 補登報工只能選擇現存派工單上的工單（未完工的工單）
         related_workorders = (
             WorkOrder.objects.exclude(
                 order_number__icontains="RD樣品"  # 排除RD樣品工單
             )
             .exclude(order_number__icontains="RD-樣品")  # 排除RD-樣品工單
             .exclude(order_number__icontains="RD樣本")  # 排除RD樣本工單
+            .exclude(status="completed")  # 排除已完工的工單
             .order_by("-created_at")
         )
 
@@ -1499,7 +1505,9 @@ class OperatorSupplementBatchForm(forms.Form):
         from .models import WorkOrder
 
         workorders = WorkOrder.objects.filter(
-            status__in=["in_progress", "completed"]
+            status__in=["pending", "in_progress", "paused"]
+        ).exclude(
+            status="completed"  # 排除已完工的工單
         ).order_by("-created_at")[:100]
         self.fields["workorder"].queryset = workorders
 
@@ -1726,10 +1734,10 @@ class SupervisorProductionReportForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # 設定工單選項
-        self.fields["workorder"].queryset = WorkOrder.objects.all().order_by(
-            "-created_at"
-        )
+        # 設定工單選項（僅顯示未完工的工單）
+        self.fields["workorder"].queryset = WorkOrder.objects.exclude(
+            status="completed"
+        ).order_by("-created_at")
         self.fields["workorder"].empty_label = "請選擇工單號碼"
 
         # 設定工序選項
@@ -1865,9 +1873,9 @@ class SupervisorProductionReportBatchForm(forms.Form):
     )
 
     workorder = forms.ModelChoiceField(
-        queryset=WorkOrder.objects.all().order_by("-created_at"),
+        queryset=WorkOrder.objects.exclude(status="completed").order_by("-created_at"),
         label="工單號碼",
-        help_text="請選擇要批量報工的工單",
+        help_text="請選擇要批量報工的工單（僅顯示未完工的工單）",
         widget=forms.Select(
             attrs={"class": "form-control", "placeholder": "請選擇工單號碼"}
         ),

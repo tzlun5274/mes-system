@@ -2,26 +2,29 @@ from django.contrib import admin
 from .models import (
     ProductionDailyReport,
     OperatorPerformance,
-    ReportSyncSettings,
     ReportEmailSchedule,
     ReportEmailLog,
+    ReportingOperationLog,
+    WorkTimeReport,
+    WorkOrderProductReport,
+    PersonnelPerformanceReport,
+    EquipmentEfficiencyReport,
+    QualityAnalysisReport,
+    ComprehensiveAnalysisReport,
+    ManufacturingWorkHour,
+    ReportSyncSettings,
 )
 
-
+# 報表管理模組管理介面
 @admin.register(ProductionDailyReport)
 class ProductionDailyReportAdmin(admin.ModelAdmin):
-    list_display = [
-        "date",
-        "operator_name",
-        "equipment_name",
-        "line",
-        "completed_quantity",
-        "work_hours",
-        "efficiency_rate",
-    ]
-    list_filter = ["date", "line", "operator_name"]
-    search_fields = ["operator_name", "equipment_name"]
-    date_hierarchy = "date"
+    """生產日報表管理"""
+    list_display = ['date', 'operator_or_line', 'equipment_name', 'line', 'completed_quantity', 'created_at']
+    list_filter = ['date', 'operator_or_line', 'equipment_name', 'line']
+    search_fields = ['operator_or_line', 'equipment_name', 'process_name']
+    date_hierarchy = 'date'
+    verbose_name = "生產日報表"
+    verbose_name_plural = "生產日報表"
 
 
 @admin.register(OperatorPerformance)

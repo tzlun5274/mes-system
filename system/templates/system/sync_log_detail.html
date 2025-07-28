@@ -1,0 +1,264 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}同步日誌詳情 - {{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .detail-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
+    }
+    
+    .detail-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 8px 8px 0 0;
+    }
+    
+    .detail-body {
+        padding: 1.5rem;
+    }
+    
+    .status-badge {
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+    }
+    
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f1f3f4;
+    }
+    
+    .info-row:last-child {
+        border-bottom: none;
+    }
+    
+    .info-label {
+        font-weight: 600;
+        color: #495057;
+    }
+    
+    .info-value {
+        color: #212529;
+    }
+    
+    .error-message {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .stat-item {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #007bff;
+        margin-bottom: 0.25rem;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-eye text-primary"></i>
+                {{ title }}
+            </h1>
+            <p class="text-muted mb-0">查看同步作業的詳細執行資訊</p>
+        </div>
+        <div>
+            <a href="{% url 'system:sync_logs' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回日誌列表
+            </a>
+        </div>
+    </div>
+
+    <!-- 同步狀態概覽 -->
+    <div class="detail-card">
+        <div class="detail-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-1">{{ sync_log.get_sync_type_display }}</h4>
+                    <p class="mb-0 opacity-75">同步作業詳情</p>
+                </div>
+                <div>
+                    {% if sync_log.status == 'success' %}
+                        <span class="badge bg-success status-badge">
+                            <i class="fas fa-check"></i> 成功
+                        </span>
+                    {% elif sync_log.status == 'failed' %}
+                        <span class="badge bg-danger status-badge">
+                            <i class="fas fa-times"></i> 失敗
+                        </span>
+                    {% elif sync_log.status == 'partial' %}
+                        <span class="badge bg-warning status-badge">
+                            <i class="fas fa-exclamation-triangle"></i> 部分成功
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="detail-body">
+            <!-- 統計資訊 -->
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">{{ sync_log.records_processed }}</div>
+                    <div class="stat-label">處理記錄數</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">{{ sync_log.records_updated }}</div>
+                    <div class="stat-label">更新記錄數</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">{{ sync_log.records_created }}</div>
+                    <div class="stat-label">新增記錄數</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">{{ sync_log.duration_seconds|default:0 }}</div>
+                    <div class="stat-label">執行時間(秒)</div>
+                </div>
+            </div>
+
+            <!-- 詳細資訊 -->
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="mb-3">
+                        <i class="fas fa-info-circle text-primary"></i>
+                        基本資訊
+                    </h5>
+                    
+                    <div class="info-row">
+                        <span class="info-label">同步類型</span>
+                        <span class="info-value">{{ sync_log.get_sync_type_display }}</span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">同步期間</span>
+                        <span class="info-value">
+                            {{ sync_log.period_start|date:"Y-m-d" }} 至 {{ sync_log.period_end|date:"Y-m-d" }}
+                        </span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">同步狀態</span>
+                        <span class="info-value">
+                            {% if sync_log.status == 'success' %}
+                                <span class="badge bg-success">成功</span>
+                            {% elif sync_log.status == 'failed' %}
+                                <span class="badge bg-danger">失敗</span>
+                            {% elif sync_log.status == 'partial' %}
+                                <span class="badge bg-warning">部分成功</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">建立時間</span>
+                        <span class="info-value">{{ sync_log.created_at|date:"Y-m-d H:i:s" }}</span>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <h5 class="mb-3">
+                        <i class="fas fa-clock text-primary"></i>
+                        執行資訊
+                    </h5>
+                    
+                    <div class="info-row">
+                        <span class="info-label">開始時間</span>
+                        <span class="info-value">{{ sync_log.started_at|date:"Y-m-d H:i:s" }}</span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">完成時間</span>
+                        <span class="info-value">
+                            {% if sync_log.completed_at %}
+                                {{ sync_log.completed_at|date:"Y-m-d H:i:s" }}
+                            {% else %}
+                                <span class="text-muted">尚未完成</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">執行時間</span>
+                        <span class="info-value">
+                            {% if sync_log.duration_seconds %}
+                                {{ sync_log.duration_seconds }} 秒
+                                {% if sync_log.duration_seconds > 60 %}
+                                    ({{ sync_log.duration_seconds|floatformat:0|div:60|floatformat:1 }} 分鐘)
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <span class="info-label">處理效率</span>
+                        <span class="info-value">
+                            {% if sync_log.duration_seconds and sync_log.records_processed %}
+                                {{ sync_log.records_processed|div:sync_log.duration_seconds|floatformat:1 }} 記錄/秒
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 錯誤訊息 -->
+            {% if sync_log.error_message %}
+            <div class="error-message">
+                <h6 class="text-danger mb-2">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    錯誤訊息
+                </h6>
+                <pre class="mb-0 text-danger">{{ sync_log.error_message }}</pre>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="text-center">
+        <a href="{% url 'system:sync_logs' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 返回日誌列表
+        </a>
+        <a href="{% url 'system:manual_sync_reports' %}" class="btn btn-primary ms-2">
+            <i class="fas fa-sync-alt"></i> 重新同步
+        </a>
+    </div>
+</div>
+{% endblock %} 

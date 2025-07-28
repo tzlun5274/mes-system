@@ -1,67 +1,48 @@
 from django.urls import path
 from . import views
 
-app_name = "reporting"
-module_display_name = "報表模組"
+app_name = "reporting"  # 報表管理
 
 urlpatterns = [
-    path("", views.index, name="index"),
-    path("production_daily/", views.production_daily, name="production_daily"),
-    path(
-        "operator_performance/", views.operator_performance, name="operator_performance"
-    ),
-    path(
-        "api/production_daily/", views.get_production_daily, name="get_production_daily"
-    ),
-    path(
-        "api/operator_performance/",
-        views.get_operator_performance,
-        name="get_operator_performance",
-    ),
-    path(
-        "api/manual_sync_smt_report/",
-        views.manual_sync_smt_report,
-        name="manual_sync_smt_report",
-    ),
-    path(
-        "api/manual_sync_operator_performance/",
-        views.manual_sync_operator_performance,
-        name="manual_sync_operator_performance",
-    ),
-    path(
-        "api/update_sync_interval/",
-        views.update_sync_interval,
-        name="update_sync_interval",
-    ),
-    path("api/get_sync_settings/", views.get_sync_settings, name="get_sync_settings"),
-    # 報表郵件發送設定
-    path("email_schedule/", views.email_schedule_list, name="email_schedule_list"),
-    path(
-        "email_schedule/create/",
-        views.email_schedule_create,
-        name="email_schedule_create",
-    ),
-    path(
-        "email_schedule/<int:schedule_id>/edit/",
-        views.email_schedule_edit,
-        name="email_schedule_edit",
-    ),
-    path(
-        "email_schedule/<int:schedule_id>/delete/",
-        views.email_schedule_delete,
-        name="email_schedule_delete",
-    ),
-    path("email_log/", views.email_log_list, name="email_log_list"),
-    path(
-        "api/test_send_report_email/",
-        views.test_send_report_email,
-        name="test_send_report_email",
-    ),
-    # 清除報表資料
-    path("clear_data/", views.clear_report_data, name="clear_report_data"),
-    path(
-        "manufacturing_workhour_list/",
-        views.manufacturing_workhour_list,
-        name="manufacturing_workhour_list",
-    ),
+    # 首頁
+    path("", views.reporting_index, name="index"),
+    
+    # 生產日報表
+    path("production-daily/", views.production_daily, name="production_daily"),
+    path("production-daily/export/", views.execute_report_export, name="export_production_daily"),
+    
+    # 統一工作時間報表
+    path("work-time-report/", views.work_time_report, name="work_time_report"),
+    path("work-time-report/api/", views.api_work_time_report, name="api_work_time_report"),
+    path("work-time-report/export/", views.export_work_time_report, name="export_work_time_report"),
+    
+    # 測試頁面
+    path("test-work-time/", views.test_work_time, name="test_work_time"),
+    
+    # 作業員績效報表
+    path("operator-performance/", views.operator_performance, name="operator_performance"),
+    
+    # API 端點
+    path("api/production-daily/", views.get_production_daily, name="api_production_daily"),
+    path("api/operator-performance/", views.get_operator_performance, name="api_operator_performance"),
+    
+    # 報表匯出
+    path("export/", views.report_export, name="report_export"),
+    path("export/<str:report_type>/", views.report_export, name="report_export"),
+    
+    # 郵件發送設定
+    path("email-schedule/", views.email_schedule_list, name="email_schedule_list"),
+    path("email-schedule/create/", views.email_schedule_create, name="email_schedule_add"),
+    path("email-schedule/edit/<int:schedule_id>/", views.email_schedule_edit, name="email_schedule_edit"),
+    path("email-schedule/delete/<int:schedule_id>/", views.email_schedule_delete, name="email_schedule_delete"),
+    path("email-schedule/test/<int:schedule_id>/", views.test_send_report_email, name="email_schedule_test"),
+    path("email-log/", views.email_log_list, name="email_log_list"),
+    
+
+    
+    # 數量分配相關路由
+    path('quantity-allocation/', views.quantity_allocation_dashboard, name='quantity_allocation_dashboard'),
+    path('quantity-allocation/allocate/', views.allocate_workorder_quantities, name='allocate_workorder_quantities'),
+    path('quantity-allocation/allocate-multiple/', views.allocate_multiple_workorders, name='allocate_multiple_workorders'),
+    path('quantity-allocation/detail/<str:workorder_id>/', views.allocation_detail, name='allocation_detail'),
 ]

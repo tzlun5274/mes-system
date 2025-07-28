@@ -170,66 +170,10 @@
                         <a href="{% url 'workorder:supervisor_report_index' %}" class="btn btn-primary mb-2">
                             <i class="fas fa-users-cog mr-2"></i>審核管理
                         </a>
-                        <a href="#" class="btn btn-info">
+                        <a href="{% url 'workorder:report_statistics' %}" class="btn btn-info">
                             <i class="fas fa-chart-bar mr-2"></i>統計分析
                         </a>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 最近報工記錄 -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">
-                        <i class="fas fa-history mr-2"></i>最近報工記錄
-                    </h6>
-                </div>
-                <div class="card-body">
-                    {% if recent_reports %}
-                        <div class="table-responsive">
-                            <table class="table table-bordered" width="100%" cellspacing="0">
-                                <thead>
-                                    <tr>
-                                        <th>報工時間</th>
-                                        <th>作業員/設備</th>
-                                        <th>工單號碼</th>
-                                        <th>工序</th>
-                                        <th>數量</th>
-                                        <th>工時</th>
-                                        <th>狀態</th>
-                                        <th>類型</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for report in recent_reports %}
-                                    <tr>
-                                        <td>{{ report.report_time|date:"Y-m-d H:i" }}</td>
-                                        <td>{{ report.operator }}</td>
-                                        <td>{{ report.workorder }}</td>
-                                        <td>{{ report.process }}</td>
-                                        <td>{{ report.quantity }}</td>
-                                        <td>{{ report.work_hours }}</td>
-                                        <td>
-                                            <span class="badge badge-{% if report.status == '已核准' %}success{% elif report.status == '待審核' %}warning{% else %}danger{% endif %}">
-                                                {{ report.status }}
-                                            </span>
-                                        </td>
-                                        <td>{{ report.type }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-4">
-                            <i class="fas fa-inbox fa-3x text-gray-300 mb-3"></i>
-                            <p class="text-gray-500">目前沒有報工記錄</p>
-                        </div>
-                    {% endif %}
                 </div>
             </div>
         </div>

@@ -14,7 +14,7 @@ urlpatterns = [
     path("scheduling/", include("scheduling.urls")),
     path("production/", include("production.urls", namespace="production")),
     path("quality/", include("quality.urls")),
-    path("reporting/", include("reporting.urls")),
+    path("reporting/", include("reporting.urls")),  # 報表管理
     path("kanban/", include("kanban.urls")),
     path("erp_integration/", include("erp_integration.urls")),
     path("ai/", include("ai.urls")),

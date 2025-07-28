@@ -75,11 +75,11 @@
 		</div>
 		#}
 
-        <!-- 報表模組 -->
+        <!-- 報表管理 -->
         <div class="col-md-4 col-lg-3 mb-3">
             <div class="card h-100 text-center">
                 <div class="card-body">
-                    <h5 class="card-title">{% trans "報表模組" %}</h5>
+                    <h5 class="card-title">{% trans "報表管理" %}</h5>
                     <p class="card-text">{% trans "生成和查看各種報表數據" %}</p>
                     <a href="{% url 'reporting:index' %}" class="btn btn-primary">{% trans "進入" %}</a>
                 </div>
@@ -91,7 +91,7 @@
                 <div class="card-body">
                     <h5 class="card-title">{% trans "工時單查詢" %}</h5>
                     <p class="card-text">{% trans "查詢和分析製造工時單數據" %}</p>
-                    <a href="{% url 'reporting:manufacturing_workhour_list' %}" class="btn btn-info">{% trans "查詢" %}</a>
+                    <a href="{% url 'reporting:production_daily' %}" class="btn btn-info">{% trans "查詢" %}</a>
                 </div>
             </div>
         </div>

@@ -1,0 +1,458 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ report_title }} - MES系統{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'reporting/css/report.css' %}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css">
+<style>
+.report-container {
+    background: #f8f9fa;
+    min-height: 100vh;
+}
+.query-section {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+.statistics-section {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+.report-content-section {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.export-options {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255,255,255,0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="report-container">
+    <!-- 報表標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2>
+                        <i class="fas fa-chart-bar text-primary"></i>
+                        {{ report_title }}
+                    </h2>
+                    <p class="text-muted mb-0">{{ report_description|default:"報表數據分析與統計" }}</p>
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-primary" onclick="refreshReport()">
+                        <i class="fas fa-sync-alt"></i> 重新整理
+                    </button>
+                    <button type="button" class="btn btn-outline-success" onclick="showExportModal()">
+                        <i class="fas fa-download"></i> 匯出
+                    </button>
+                    <a href="{% url 'reporting:index' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 查詢條件 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="query-section">
+                <div class="card-header py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-search"></i> 查詢條件
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% block query_form %}
+                    <!-- 預設查詢表單 -->
+                    <form method="get" id="queryForm">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label for="date_from" class="form-label">開始日期</label>
+                                <input type="date" class="form-control" id="date_from" name="date_from" 
+                                       value="{{ date_from|default:'' }}" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="date_to" class="form-label">結束日期</label>
+                                <input type="date" class="form-control" id="date_to" name="date_to" 
+                                       value="{{ date_to|default:'' }}" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="operator_name" class="form-label">作業員姓名</label>
+                                <input type="text" class="form-control" id="operator_name" name="operator_name" 
+                                       value="{{ operator_name|default:'' }}" placeholder="輸入作業員姓名">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="workorder_number" class="form-label">工單號碼</label>
+                                <input type="text" class="form-control" id="workorder_number" name="workorder_number" 
+                                       value="{{ workorder_number|default:'' }}" placeholder="輸入工單號碼">
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> 查詢
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="resetForm()">
+                                    <i class="fas fa-undo"></i> 重置
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    {% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計摘要 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="statistics-section">
+                <div class="card-header py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie"></i> 統計摘要
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% block statistics %}
+                    <!-- 預設統計摘要 -->
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h4 class="card-title">總記錄數</h4>
+                                    <h2 class="mb-0">{{ total_records|default:"0" }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h4 class="card-title">完成數量</h4>
+                                    <h2 class="mb-0">{{ total_quantity|default:"0" }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h4 class="card-title">平均效率</h4>
+                                    <h2 class="mb-0">{{ avg_efficiency|default:"0" }}%</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h4 class="card-title">工作時數</h4>
+                                    <h2 class="mb-0">{{ total_hours|default:"0" }}h</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表內容 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="report-content-section">
+                <div class="card-header py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-table"></i> 報表內容
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% block report_content %}
+                    <!-- 預設報表內容 -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>日期</th>
+                                    <th>作業員</th>
+                                    <th>工單號</th>
+                                    <th>數量</th>
+                                    <th>效率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in report_data %}
+                                <tr>
+                                    <td>{{ item.date|date:"Y-m-d" }}</td>
+                                    <td>{{ item.operator }}</td>
+                                    <td>{{ item.workorder_number }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.efficiency }}%</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">暫無資料</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 匯出選項模態框 -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exportModalLabel">
+                    <i class="fas fa-download"></i> 匯出報表
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="exportForm">
+                    <div class="mb-3">
+                        <label for="exportFormat" class="form-label">匯出格式</label>
+                        <select class="form-select" id="exportFormat" name="format" required>
+                            <option value="excel">Excel (.xlsx)</option>
+                            <option value="csv">CSV (.csv)</option>
+                            <option value="pdf">PDF (.pdf)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="exportDateRange" class="form-label">日期範圍</label>
+                        <select class="form-select" id="exportDateRange" name="date_range">
+                            <option value="current">當前查詢範圍</option>
+                            <option value="today">今日</option>
+                            <option value="yesterday">昨日</option>
+                            <option value="this_week">本週</option>
+                            <option value="this_month">本月</option>
+                            <option value="custom">自訂範圍</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="customDateRange" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="customDateFrom" class="form-label">開始日期</label>
+                                <input type="date" class="form-control" id="customDateFrom" name="custom_date_from">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="customDateTo" class="form-label">結束日期</label>
+                                <input type="date" class="form-control" id="customDateTo" name="custom_date_to">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includeCharts" name="include_charts" checked>
+                            <label class="form-check-label" for="includeCharts">
+                                包含圖表
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="exportReport()">
+                    <i class="fas fa-download"></i> 匯出
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 載入中遮罩 -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">載入中...</span>
+        </div>
+        <p class="mt-2">正在處理中，請稍候...</p>
+    </div>
+</div>
+
+<!-- 匯出選項浮動按鈕 -->
+<div class="export-options">
+    <div class="btn-group-vertical">
+        <button type="button" class="btn btn-success btn-sm" onclick="quickExport('excel')" title="匯出Excel">
+            <i class="fas fa-file-excel"></i>
+        </button>
+        <button type="button" class="btn btn-info btn-sm" onclick="quickExport('csv')" title="匯出CSV">
+            <i class="fas fa-file-csv"></i>
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="quickExport('pdf')" title="匯出PDF">
+            <i class="fas fa-file-pdf"></i>
+        </button>
+    </div>
+</div>
+
+<script>
+// 顯示載入遮罩
+function showLoading() {
+    document.getElementById('loadingOverlay').style.display = 'flex';
+}
+
+// 隱藏載入遮罩
+function hideLoading() {
+    document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+// 重新整理報表
+function refreshReport() {
+    showLoading();
+    location.reload();
+}
+
+// 重置表單
+function resetForm() {
+    document.getElementById('queryForm').reset();
+}
+
+// 顯示匯出模態框
+function showExportModal() {
+    var modal = new bootstrap.Modal(document.getElementById('exportModal'));
+    modal.show();
+}
+
+// 匯出報表
+function exportReport() {
+    showLoading();
+    
+    var formData = new FormData(document.getElementById('exportForm'));
+    var queryString = new URLSearchParams(window.location.search);
+    
+    // 合併查詢參數
+    for (var pair of queryString.entries()) {
+        formData.append(pair[0], pair[1]);
+    }
+    
+    fetch('{% url "reporting:report_export" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = '{{ report_title }}_' + new Date().toISOString().split('T')[0] + '.' + formData.get('format');
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        hideLoading();
+        
+        // 關閉模態框
+        var modal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+        modal.hide();
+    })
+    .catch(error => {
+        console.error('匯出失敗:', error);
+        hideLoading();
+        alert('匯出失敗，請稍後再試');
+    });
+}
+
+// 快速匯出
+function quickExport(format) {
+    showLoading();
+    
+    var formData = new FormData();
+    formData.append('format', format);
+    formData.append('report_type', '{{ report_type|default:"daily" }}');
+    
+    // 添加當前查詢參數
+    var queryString = new URLSearchParams(window.location.search);
+    for (var pair of queryString.entries()) {
+        formData.append(pair[0], pair[1]);
+    }
+    
+    fetch('{% url "reporting:report_export" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = '{{ report_title }}_' + new Date().toISOString().split('T')[0] + '.' + format;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        hideLoading();
+    })
+    .catch(error => {
+        console.error('匯出失敗:', error);
+        hideLoading();
+        alert('匯出失敗，請稍後再試');
+    });
+}
+
+// 日期範圍選擇處理
+document.getElementById('exportDateRange').addEventListener('change', function() {
+    var customRange = document.getElementById('customDateRange');
+    if (this.value === 'custom') {
+        customRange.style.display = 'block';
+    } else {
+        customRange.style.display = 'none';
+    }
+});
+
+// 頁面載入完成後初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 添加CSRF token到表單
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        var token = document.createElement('input');
+        token.type = 'hidden';
+        token.name = 'csrfmiddlewaretoken';
+        token.value = '{{ csrf_token }}';
+        document.getElementById('queryForm').appendChild(token);
+    }
+    
+    // 初始化工具提示
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %} 

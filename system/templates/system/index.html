@@ -75,12 +75,12 @@
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-header bg-secondary text-white">
-                    <h5 class="mb-0"><i class="bi bi-collection"></i> 群組管理</h5>
+                    <h5 class="mb-0"><i class="bi bi-people-fill"></i> 群組管理</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">設定用戶群組與權限，方便管理不同角色。</p>
+                    <p class="card-text">管理用戶群組，設定群組權限，方便批量管理。</p>
                     <a href="{% url 'system:group_list' %}" class="btn btn-secondary"><i class="bi bi-collection"></i> 群組管理</a>
-                    <a href="{% url 'system:group_add' %}" class="btn btn-outline-secondary ms-2"><i class="bi bi-collection-plus"></i> 新增群組</a>
+                    <a href="{% url 'system:group_add' %}" class="btn btn-outline-secondary ms-2"><i class="bi bi-plus-circle"></i> 新增群組</a>
                 </div>
             </div>
         </div>
@@ -91,9 +91,9 @@
                     <h5 class="mb-0"><i class="bi bi-shield-check"></i> 權限管理</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">查看所有系統權限，管理權限分配給用戶或群組。</p>
-                    <a href="{% url 'system:permission_list' %}" class="btn btn-dark"><i class="bi bi-shield-check"></i> 權限列表</a>
-                    <a href="{% url 'system:permission_assign' %}" class="btn btn-outline-dark ms-2"><i class="bi bi-shield-plus"></i> 權限分配</a>
+                    <p class="card-text">查看和管理系統權限，分配權限給群組或用戶。</p>
+                    <a href="{% url 'system:permission_list' %}" class="btn btn-dark"><i class="bi bi-shield"></i> 權限管理</a>
+                    <a href="{% url 'system:permission_assign' %}" class="btn btn-outline-dark ms-2"><i class="bi bi-person-check"></i> 權限分配</a>
                 </div>
             </div>
         </div>
@@ -123,9 +123,48 @@
                 </div>
             </div>
         </div>
+        
+        <!-- 報表設定 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-purple text-white">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> 報表設定</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">管理報表資料同步設定、郵件通知設定，包含自動同步和手動同步功能。</p>
+                    <a href="{% url 'system:report_settings' %}" class="btn btn-purple"><i class="bi bi-gear"></i> 報表設定</a>
+                    <a href="{% url 'system:manual_sync_reports' %}" class="btn btn-outline-purple ms-2"><i class="bi bi-arrow-repeat"></i> 手動同步</a>
+                </div>
+            </div>
+        </div>
     </div>
     <div class="alert alert-info mt-4" role="alert">
         <i class="bi bi-info-circle"></i> 所有操作都有中文說明，遇到問題可隨時詢問管理員。
     </div>
 </div>
+
+<style>
+.bg-purple {
+    background-color: #6f42c1 !important;
+}
+.btn-purple {
+    background-color: #6f42c1;
+    border-color: #6f42c1;
+    color: white;
+}
+.btn-purple:hover {
+    background-color: #5a32a3;
+    border-color: #5a32a3;
+    color: white;
+}
+.btn-outline-purple {
+    color: #6f42c1;
+    border-color: #6f42c1;
+}
+.btn-outline-purple:hover {
+    background-color: #6f42c1;
+    border-color: #6f42c1;
+    color: white;
+}
+</style>
 {% endblock %}

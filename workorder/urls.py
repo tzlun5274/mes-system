@@ -157,6 +157,11 @@ urlpatterns = [
         name="pending_approval_list",
     ),
     path(
+        "approved_reports_list/",
+        views.approved_reports_list,
+        name="approved_reports_list",
+    ),
+    path(
         "batch_approve_pending/",
         views.batch_approve_pending,
         name="batch_approve_pending",

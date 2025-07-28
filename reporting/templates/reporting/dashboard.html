@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}報表儀表板 - MES 系統{% endblock %}
+{% block title %}報表儀表板 - MES{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -14,7 +14,7 @@
                     <h1 class="h3 mb-0">
                         <i class="fas fa-tachometer-alt text-primary"></i> 報表儀表板
                     </h1>
-                    <p class="text-muted mb-0">MES 系統報表管理中心 - 即時監控與分析</p>
+                    <p class="text-muted mb-0">MES 報表管理中心 - 即時監控與分析</p>
                 </div>
                 <div>
                     <span class="badge badge-success">
@@ -34,7 +34,7 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                生產日報表
+                                工作時間報表
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_production }}</div>
                             <div class="text-xs text-muted">今日新增: {{ today_production }}</div>
@@ -118,7 +118,7 @@
                     <div class="row">
                         <div class="col-lg-3 col-md-6 mb-3">
                             <div class="text-center">
-                                <a href="{% url 'reporting:operator_daily_report' %}" class="btn btn-primary btn-lg btn-block mb-2">
+                                <a href="{% url 'reporting:operator_performance' %}" class="btn btn-primary btn-lg btn-block mb-2">
                                     <i class="fas fa-user-clock fa-2x mb-2"></i><br>
                                     作業員日報表
                                 </a>
@@ -130,17 +130,14 @@
                             <div class="text-center">
                                 <a href="{% url 'reporting:production_daily' %}" class="btn btn-info btn-lg btn-block mb-2">
                                     <i class="fas fa-industry fa-2x mb-2"></i><br>
-                                    生產日報表
+                                    工作時間報表
                                 </a>
                                 <small class="text-muted">整體生產線數據</small>
                             </div>
                         </div>
                         <div class="col-lg-3 col-md-6 mb-3">
                             <div class="text-center">
-                                <a href="{% url 'reporting:operator_score_report' %}" class="btn btn-warning btn-lg btn-block mb-2">
-                                    <i class="fas fa-star fa-2x mb-2"></i><br>
-                                    評分報表
-                                </a>
+
                                 <small class="text-muted">作業員績效評分</small>
                             </div>
                         </div>
@@ -178,9 +175,7 @@
                             </a>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:operator_performance' %}" class="btn btn-outline-info btn-block">
-                                <i class="fas fa-chart-line"></i> 績效報表
-                            </a>
+
                         </div>
                     </div>
                     <small class="text-muted">包含作業員的日產量、月統計、評分分析等完整報表</small>
@@ -251,9 +246,7 @@
                             </a>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:manufacturing_workhour_list' %}" class="btn btn-outline-dark btn-block">
-                                <i class="fas fa-clock"></i> 工時單查詢
-                            </a>
+
                         </div>
                     </div>
                     <small class="text-muted">生產線數據、工單追蹤、產能分析等管理報表</small>
@@ -311,7 +304,7 @@
                     <ul class="nav nav-tabs" id="reportTabs" role="tablist">
                         <li class="nav-item">
                             <a class="nav-link active" id="production-tab" data-toggle="tab" href="#production" role="tab">
-                                生產日報表
+                                工作時間報表
                             </a>
                         </li>
                         <li class="nav-item">
@@ -356,7 +349,7 @@
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="6" class="text-center text-muted">無生產日報表數據</td>
+                                            <td colspan="6" class="text-center text-muted">無工作時間報表數據</td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>

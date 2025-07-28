@@ -147,6 +147,13 @@
                                 <small>({{ stats.total_pending|default:0 }})</small>
                             </a>
                         </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'workorder:approved_reports_list' %}" class="btn btn-success btn-block quick-action-btn">
+                                <i class="fas fa-check-circle"></i><br>
+                                已核准清單<br>
+                                <small>({{ stats.total_approved|default:0 }})</small>
+                            </a>
+                        </div>
 
                         <div class="col-md-3 mb-2">
                             <a href="{% url 'workorder:report_statistics' %}" class="btn btn-info btn-block quick-action-btn">

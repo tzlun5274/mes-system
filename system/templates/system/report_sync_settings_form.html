@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-sync text-primary"></i>
+                    {{ title }}
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'system:report_settings' %}">報表設定</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <!-- 基本設定 -->
+                    <div class="col-md-6">
+                        <h5 class="mb-3"><i class="fas fa-cog"></i> 基本設定</h5>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.sync_type.id_for_label }}" class="form-label">
+                                {{ form.sync_type.label }}
+                            </label>
+                            {{ form.sync_type }}
+                            {% if form.sync_type.help_text %}
+                                <div class="form-text">{{ form.sync_type.help_text }}</div>
+                            {% endif %}
+                            {% if form.sync_type.errors %}
+                                <div class="text-danger">{{ form.sync_type.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.sync_frequency.id_for_label }}" class="form-label">
+                                {{ form.sync_frequency.label }}
+                            </label>
+                            {{ form.sync_frequency }}
+                            {% if form.sync_frequency.help_text %}
+                                <div class="form-text">{{ form.sync_frequency.help_text }}</div>
+                            {% endif %}
+                            {% if form.sync_frequency.errors %}
+                                <div class="text-danger">{{ form.sync_frequency.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.sync_time.id_for_label }}" class="form-label">
+                                {{ form.sync_time.label }}
+                            </label>
+                            {{ form.sync_time }}
+                            {% if form.sync_time.help_text %}
+                                <div class="form-text">{{ form.sync_time.help_text }}</div>
+                            {% endif %}
+                            {% if form.sync_time.errors %}
+                                <div class="text-danger">{{ form.sync_time.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- 資料來源設定 -->
+                    <div class="col-md-6">
+                        <h5 class="mb-3"><i class="fas fa-database"></i> 資料來源設定</h5>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.data_source_modules.id_for_label }}" class="form-label">
+                                {{ form.data_source_modules.label }}
+                            </label>
+                            {{ form.data_source_modules }}
+                            {% if form.data_source_modules.help_text %}
+                                <div class="form-text">{{ form.data_source_modules.help_text }}</div>
+                            {% endif %}
+                            {% if form.data_source_modules.errors %}
+                                <div class="text-danger">{{ form.data_source_modules.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.include_pending_reports }}
+                                <label class="form-check-label" for="{{ form.include_pending_reports.id_for_label }}">
+                                    {{ form.include_pending_reports.label }}
+                                </label>
+                                {% if form.include_pending_reports.help_text %}
+                                    <div class="form-text">{{ form.include_pending_reports.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.include_approved_reports }}
+                                <label class="form-check-label" for="{{ form.include_approved_reports.id_for_label }}">
+                                    {{ form.include_approved_reports.label }}
+                                </label>
+                                {% if form.include_approved_reports.help_text %}
+                                    <div class="form-text">{{ form.include_approved_reports.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="row">
+                    <!-- 同步設定 -->
+                    <div class="col-md-6">
+                        <h5 class="mb-3"><i class="fas fa-sliders-h"></i> 同步設定</h5>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.auto_sync }}
+                                <label class="form-check-label" for="{{ form.auto_sync.id_for_label }}">
+                                    {{ form.auto_sync.label }}
+                                </label>
+                                {% if form.auto_sync.help_text %}
+                                    <div class="form-text">{{ form.auto_sync.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.sync_retention_days.id_for_label }}" class="form-label">
+                                {{ form.sync_retention_days.label }}
+                            </label>
+                            {{ form.sync_retention_days }}
+                            {% if form.sync_retention_days.help_text %}
+                                <div class="form-text">{{ form.sync_retention_days.help_text }}</div>
+                            {% endif %}
+                            {% if form.sync_retention_days.errors %}
+                                <div class="text-danger">{{ form.sync_retention_days.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- 錯誤處理 -->
+                    <div class="col-md-6">
+                        <h5 class="mb-3"><i class="fas fa-exclamation-triangle"></i> 錯誤處理</h5>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.retry_on_failure }}
+                                <label class="form-check-label" for="{{ form.retry_on_failure.id_for_label }}">
+                                    {{ form.retry_on_failure.label }}
+                                </label>
+                                {% if form.retry_on_failure.help_text %}
+                                    <div class="form-text">{{ form.retry_on_failure.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.max_retry_attempts.id_for_label }}" class="form-label">
+                                {{ form.max_retry_attempts.label }}
+                            </label>
+                            {{ form.max_retry_attempts }}
+                            {% if form.max_retry_attempts.help_text %}
+                                <div class="form-text">{{ form.max_retry_attempts.help_text }}</div>
+                            {% endif %}
+                            {% if form.max_retry_attempts.errors %}
+                                <div class="text-danger">{{ form.max_retry_attempts.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.is_active }}
+                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                    {{ form.is_active.label }}
+                                </label>
+                                {% if form.is_active.help_text %}
+                                    <div class="form-text">{{ form.is_active.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'system:report_settings' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> 儲存設定
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1010,6 +1010,31 @@ class OperatorSupplementReport(models.Model):
         default=0,
     )
 
+    # 分配數量相關欄位
+    allocated_quantity = models.IntegerField(
+        default=0,
+        verbose_name="分配數量",
+        help_text="系統智能分配的數量"
+    )
+    
+    quantity_source = models.CharField(
+        max_length=20,
+        choices=[
+            ('original', '原始數量'),
+            ('allocated', '智能分配'),
+            ('packaging', '包裝工序'),
+        ],
+        default='original',
+        verbose_name="數量來源",
+        help_text="數量的來源類型"
+    )
+    
+    allocation_notes = models.TextField(
+        blank=True,
+        verbose_name="分配說明",
+        help_text="記錄分配計算過程和依據"
+    )
+
     defect_quantity = models.IntegerField(
         default=0,
         verbose_name="不良品數量",

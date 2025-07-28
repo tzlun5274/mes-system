@@ -17,7 +17,7 @@ from workorder.models import SystemConfig
 
 
 class Command(BaseCommand):
-    help = "清除報表模組的所有資料"
+    help = "清除報表管理模組的所有資料"
 
     def add_arguments(self, parser):
         parser.add_argument(
