@@ -1,0 +1,385 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}工單機種報表詳情 - MES系統{% endblock %}
+
+{% block extra_css %}
+<style>
+.detail-card {
+    border-left: 4px solid #28a745;
+    transition: all 0.3s ease;
+}
+.detail-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.info-row {
+    border-bottom: 1px solid #e9ecef;
+    padding: 12px 0;
+}
+.info-row:last-child {
+    border-bottom: none;
+}
+.info-label {
+    font-weight: 600;
+    color: #495057;
+}
+.info-value {
+    color: #212529;
+}
+.status-badge {
+    font-size: 0.9em;
+    padding: 0.4em 0.8em;
+}
+.completion-gauge {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2em;
+    margin: 0 auto;
+}
+.completion-high {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+}
+.completion-medium {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+    color: white;
+}
+.completion-low {
+    background: linear-gradient(135deg, #dc3545, #e83e8c);
+    color: white;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-clipboard-list text-success"></i> 工單機種報表詳情
+                    </h1>
+                    <p class="text-muted mb-0">查看工單機種報表的詳細資訊</p>
+                </div>
+                <div class="btn-group">
+                    <a href="{% url 'reporting:work_order_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回列表
+                    </a>
+                    <a href="{% url 'reporting:work_order_export' %}?id={{ work_order_report.id }}" 
+                       class="btn btn-success">
+                        <i class="fas fa-download"></i> 匯出此報表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表基本資訊 -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card detail-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle"></i> 基本資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-row">
+                                <div class="info-label">報表日期</div>
+                                <div class="info-value">
+                                    <span class="badge bg-secondary">{{ work_order_report.report_date|date:"Y-m-d" }}</span>
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">作業員</div>
+                                <div class="info-value">
+                                    <strong>{{ work_order_report.worker_name|default:"未指定" }}</strong>
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">工單號</div>
+                                <div class="info-value">
+                                    <code>{{ work_order_report.work_order_no }}</code>
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">產品編號</div>
+                                <div class="info-value">
+                                    <strong>{{ work_order_report.product_name }}</strong>
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">工序</div>
+                                <div class="info-value">{{ work_order_report.process_name|default:"未指定" }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-row">
+                                <div class="info-label">開始日期</div>
+                                <div class="info-value">
+                                    {% if work_order_report.start_date %}
+                                        {{ work_order_report.start_date|date:"Y-m-d" }}
+                                    {% else %}
+                                        <span class="text-muted">未設定</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">完成日期</div>
+                                <div class="info-value">
+                                    {% if work_order_report.completion_date %}
+                                        {{ work_order_report.completion_date|date:"Y-m-d" }}
+                                    {% else %}
+                                        <span class="text-muted">未完成</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">交期</div>
+                                <div class="info-value">
+                                    {% if work_order_report.due_date %}
+                                        {{ work_order_report.due_date|date:"Y-m-d" }}
+                                    {% else %}
+                                        <span class="text-muted">未設定</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">狀態</div>
+                                <div class="info-value">
+                                    {% if work_order_report.status == 'completed' %}
+                                        <span class="badge bg-success status-badge">已完成</span>
+                                    {% elif work_order_report.status == 'in_progress' %}
+                                        <span class="badge bg-warning status-badge">進行中</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary status-badge">待開始</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 完成率指標 -->
+        <div class="col-lg-4">
+            <div class="card detail-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> 完成率指標
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    {% if work_order_report.completion_rate %}
+                        {% if work_order_report.completion_rate >= 100 %}
+                            <div class="completion-gauge completion-high">
+                                100%
+                            </div>
+                            <p class="mt-2 text-success">已完成</p>
+                        {% elif work_order_report.completion_rate >= 80 %}
+                            <div class="completion-gauge completion-high">
+                                {{ work_order_report.completion_rate|floatformat:1 }}%
+                            </div>
+                            <p class="mt-2 text-success">進度良好</p>
+                        {% elif work_order_report.completion_rate >= 50 %}
+                            <div class="completion-gauge completion-medium">
+                                {{ work_order_report.completion_rate|floatformat:1 }}%
+                            </div>
+                            <p class="mt-2 text-warning">進行中</p>
+                        {% else %}
+                            <div class="completion-gauge completion-low">
+                                {{ work_order_report.completion_rate|floatformat:1 }}%
+                            </div>
+                            <p class="mt-2 text-danger">進度落後</p>
+                        {% endif %}
+                    {% else %}
+                        <div class="completion-gauge bg-light text-muted">
+                            N/A
+                        </div>
+                        <p class="mt-2 text-muted">無資料</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 數量統計 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-calculator"></i> 數量統計
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="text-info">{{ work_order_report.work_hours|floatformat:1|default:"0.0" }}</h3>
+                                <p class="text-muted mb-0">工作時數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="text-success">{{ work_order_report.actual_quantity|intcomma }}</h3>
+                                <p class="text-muted mb-0">完成數量</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="text-warning">{{ work_order_report.defect_quantity|intcomma }}</h3>
+                                <p class="text-muted mb-0">不良品數量</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                {% if work_order_report.efficiency %}
+                                    <h3 class="text-primary">{{ work_order_report.efficiency|floatformat:1 }}%</h3>
+                                {% else %}
+                                    <h3 class="text-muted">-</h3>
+                                {% endif %}
+                                <p class="text-muted mb-0">效率</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細資訊 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list-alt"></i> 詳細資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-row">
+                                <div class="info-label">建立時間</div>
+                                <div class="info-value">{{ work_order_report.created_at|date:"Y-m-d H:i:s" }}</div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">更新時間</div>
+                                <div class="info-value">{{ work_order_report.updated_at|date:"Y-m-d H:i:s" }}</div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">建立者</div>
+                                <div class="info-value">{{ work_order_report.created_by|default:"系統" }}</div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">客戶</div>
+                                <div class="info-value">{{ work_order_report.customer_name|default:"未指定" }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-row">
+                                <div class="info-label">備註</div>
+                                <div class="info-value">
+                                    {% if work_order_report.notes %}
+                                        {{ work_order_report.notes }}
+                                    {% else %}
+                                        <span class="text-muted">無備註</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">異常記錄</div>
+                                <div class="info-value">
+                                    {% if work_order_report.abnormal_notes %}
+                                        <span class="text-danger">{{ work_order_report.abnormal_notes }}</span>
+                                    {% else %}
+                                        <span class="text-success">正常</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">資料來源</div>
+                                <div class="info-value">{{ work_order_report.data_source|default:"手動輸入" }}</div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-label">優先級</div>
+                                <div class="info-value">
+                                    {% if work_order_report.priority == 'high' %}
+                                        <span class="badge bg-danger">高</span>
+                                    {% elif work_order_report.priority == 'medium' %}
+                                        <span class="badge bg-warning">中</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">低</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'reporting:work_order_list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-list"></i> 返回列表
+                        </a>
+                        <a href="{% url 'reporting:work_order_export' %}?id={{ work_order_report.id }}&format=excel" 
+                           class="btn btn-outline-success">
+                            <i class="fas fa-file-excel"></i> 匯出 Excel
+                        </a>
+                        <a href="{% url 'reporting:work_order_export' %}?id={{ work_order_report.id }}&format=csv" 
+                           class="btn btn-outline-info">
+                            <i class="fas fa-file-csv"></i> 匯出 CSV
+                        </a>
+                        <a href="{% url 'reporting:work_order_export' %}?id={{ work_order_report.id }}&format=pdf" 
+                           class="btn btn-outline-danger">
+                            <i class="fas fa-file-pdf"></i> 匯出 PDF
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 匯出按鈕點擊事件
+    $('.btn-group .btn').click(function(e) {
+        if ($(this).attr('href').includes('export')) {
+            var $btn = $(this);
+            var originalText = $btn.html();
+            
+            $btn.html('<i class="fas fa-spinner fa-spin"></i> 處理中...');
+            $btn.prop('disabled', true);
+            
+            // 3秒後恢復按鈕狀態
+            setTimeout(function() {
+                $btn.html(originalText);
+                $btn.prop('disabled', false);
+            }, 3000);
+        }
+    });
+});
+</script>
+{% endblock %} 

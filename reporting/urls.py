@@ -1,48 +1,52 @@
+# -*- coding: utf-8 -*-
+"""
+報表模組 URL 路由設定
+包含報表查看、同步管理等功能的路由
+"""
+
 from django.urls import path
 from . import views
+from .views import sync_views
+# 直接從主 views.py 文件導入函數
+from .views.report_views import report_export, execute_report_export
 
-app_name = "reporting"  # 報表管理
+app_name = 'reporting'
 
 urlpatterns = [
-    # 首頁
-    path("", views.reporting_index, name="index"),
+    # 報表首頁
+    path('', views.ReportDashboardView.as_view(), name='dashboard'),
+    path('', views.ReportDashboardView.as_view(), name='index'),  # 為了與其他模組保持一致
     
-    # 生產日報表
-    path("production-daily/", views.production_daily, name="production_daily"),
-    path("production-daily/export/", views.execute_report_export, name="export_production_daily"),
+    # 工作時間報表
+    path('work-time/', views.WorkTimeReportListView.as_view(), name='work_time_list'),
+    path('work-time/detail/<int:pk>/', views.WorkTimeReportDetailView.as_view(), name='work_time_detail'),
+    path('work-time/export/', views.WorkTimeReportExportView.as_view(), name='work_time_export'),
     
-    # 統一工作時間報表
-    path("work-time-report/", views.work_time_report, name="work_time_report"),
-    path("work-time-report/api/", views.api_work_time_report, name="api_work_time_report"),
-    path("work-time-report/export/", views.export_work_time_report, name="export_work_time_report"),
+    # 工時單查詢（生產日報）
+    path('production-daily/', views.WorkTimeReportListView.as_view(), name='production_daily'),
     
-    # 測試頁面
-    path("test-work-time/", views.test_work_time, name="test_work_time"),
-    
-    # 作業員績效報表
-    path("operator-performance/", views.operator_performance, name="operator_performance"),
-    
-    # API 端點
-    path("api/production-daily/", views.get_production_daily, name="api_production_daily"),
-    path("api/operator-performance/", views.get_operator_performance, name="api_operator_performance"),
+    # 工單機種報表
+    path('work-order/', views.WorkOrderProductReportListView.as_view(), name='work_order_list'),
+    path('work-order/detail/<int:pk>/', views.WorkOrderProductReportDetailView.as_view(), name='work_order_detail'),
+    path('work-order/export/', views.WorkOrderProductReportExportView.as_view(), name='work_order_export'),
     
     # 報表匯出
-    path("export/", views.report_export, name="report_export"),
-    path("export/<str:report_type>/", views.report_export, name="report_export"),
+    path('export/', views.ReportExportView.as_view(), name='export'),
+    path('report-export/', report_export, name='report_export'),
+    path('execute-report-export/', execute_report_export, name='execute_report_export'),
     
-    # 郵件發送設定
-    path("email-schedule/", views.email_schedule_list, name="email_schedule_list"),
-    path("email-schedule/create/", views.email_schedule_create, name="email_schedule_add"),
-    path("email-schedule/edit/<int:schedule_id>/", views.email_schedule_edit, name="email_schedule_edit"),
-    path("email-schedule/delete/<int:schedule_id>/", views.email_schedule_delete, name="email_schedule_delete"),
-    path("email-schedule/test/<int:schedule_id>/", views.test_send_report_email, name="email_schedule_test"),
-    path("email-log/", views.email_log_list, name="email_log_list"),
+    # 同步管理相關路由
+    path('sync/', sync_views.SyncStatusListView.as_view(), name='sync_status_list'),
+    path('sync/detail/<int:pk>/', sync_views.SyncDetailView.as_view(), name='sync_detail'),
+    path('sync/dashboard/', sync_views.SyncDashboardView.as_view(), name='sync_dashboard'),
+    path('sync/settings/', sync_views.SyncSettingsView.as_view(), name='sync_settings'),
+    path('sync/manual/', sync_views.ManualSyncView.as_view(), name='manual_sync'),
+    path('sync/api/', sync_views.SyncAPIView.as_view(), name='sync_api'),
+    path('sync/allocation/', sync_views.WorkOrderAllocationView.as_view(), name='workorder_allocation'),
     
-
-    
-    # 數量分配相關路由
-    path('quantity-allocation/', views.quantity_allocation_dashboard, name='quantity_allocation_dashboard'),
-    path('quantity-allocation/allocate/', views.allocate_workorder_quantities, name='allocate_workorder_quantities'),
-    path('quantity-allocation/allocate-multiple/', views.allocate_multiple_workorders, name='allocate_multiple_workorders'),
-    path('quantity-allocation/detail/<str:workorder_id>/', views.allocation_detail, name='allocation_detail'),
+    # 同步設定管理
+    path('sync/settings/add/', views.AddSyncSettingView.as_view(), name='add_sync_setting'),
+    path('sync/settings/edit/', views.EditSyncSettingView.as_view(), name='edit_sync_setting'),
+    path('sync/settings/delete/<int:pk>/', views.DeleteSyncSettingView.as_view(), name='delete_sync_setting'),
+    path('sync/settings/toggle/<int:pk>/', views.ToggleSyncSettingView.as_view(), name='toggle_sync_setting'),
 ]

@@ -117,13 +117,13 @@
                                     <td>
                                         <div class="btn-group" role="group">
                                             <a href="{% url 'process:edit_operator' operator.id %}" class="btn btn-sm btn-outline-warning" title="編輯">
-                                                <i class="bi bi-pencil"></i>
+                                                <i class="bi bi-pencil"></i> 編輯
                                             </a>
                                             <a href="{% url 'process:delete_operator' operator.id %}" 
                                                class="btn btn-sm btn-outline-danger" 
                                                onclick="return confirm('確定要刪除作業員「{{ operator.name }}」嗎？此操作無法復原。');"
                                                title="刪除">
-                                                <i class="bi bi-trash"></i>
+                                                <i class="bi bi-trash"></i> 刪除
                                             </a>
                                         </div>
                                     </td>

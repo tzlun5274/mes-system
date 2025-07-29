@@ -1,0 +1,613 @@
+{% extends 'reporting/base/report_base_v2.html' %}
+{% load static %}
+
+{% block title %}{{ report_title|default:"儀表板報表" }} - MES系統{% endblock %}
+
+{% block statistics %}
+<!-- 儀表板統計卡片 -->
+<div class="row">
+    {% for metric in dashboard_metrics %}
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="stat-card text-center">
+            <div class="stat-icon">
+                <i class="fas fa-{{ metric.icon }}"></i>
+            </div>
+            <div class="stat-value">{{ metric.value }}</div>
+            <div class="stat-label">{{ metric.label }}</div>
+            {% if metric.trend %}
+            <div class="stat-trend mt-2">
+                <small class="text-{{ metric.trend_color }}">
+                    <i class="fas fa-arrow-{{ metric.trend_direction }}"></i>
+                    {{ metric.trend }}
+                </small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- 進度指標 -->
+{% if progress_indicators %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-tasks me-2"></i>進度指標
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for indicator in progress_indicators %}
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold">{{ indicator.label }}</span>
+                            <span class="text-muted">{{ indicator.value }}%</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-{{ indicator.color }}" 
+                                 role="progressbar" 
+                                 style="width: {{ indicator.value }}%"
+                                 aria-valuenow="{{ indicator.value }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                        <small class="text-muted">{{ indicator.description }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block report_content %}
+<!-- 儀表板內容 -->
+<div class="row">
+    <!-- 主要圖表區域 -->
+    {% if main_charts %}
+    <div class="col-12 mb-4">
+        <div class="row">
+            {% for chart in main_charts %}
+            <div class="col-md-{{ chart.size|default:6 }} mb-4">
+                <div class="chart-container">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-{{ chart.type|default:'bar' }} me-2"></i>
+                            {{ chart.title }}
+                        </h6>
+                        {% if chart.actions %}
+                        <div class="btn-group btn-group-sm">
+                            {% for action in chart.actions %}
+                            <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                    onclick="{{ action.function }}">
+                                <i class="fas fa-{{ action.icon }}"></i>
+                                {{ action.label }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="chart-wrapper" style="position: relative; height: {{ chart.height|default:300 }}px;">
+                        <canvas id="mainChart{{ forloop.counter }}" 
+                                data-chart="{{ chart.type|default:'bar' }}"
+                                data-chart-title="{{ chart.title }}"
+                                data-chart-data="{{ chart.data|safe }}"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 次要圖表區域 -->
+    {% if secondary_charts %}
+    <div class="col-12 mb-4">
+        <div class="row">
+            {% for chart in secondary_charts %}
+            <div class="col-lg-{{ chart.size|default:4 }} col-md-6 mb-4">
+                <div class="chart-container">
+                    <h6 class="mb-3">
+                        <i class="fas fa-chart-{{ chart.type|default:'line' }} me-2"></i>
+                        {{ chart.title }}
+                    </h6>
+                    <div class="chart-wrapper" style="position: relative; height: {{ chart.height|default:250 }}px;">
+                        <canvas id="secondaryChart{{ forloop.counter }}" 
+                                data-chart="{{ chart.type|default:'line' }}"
+                                data-chart-title="{{ chart.title }}"
+                                data-chart-data="{{ chart.data|safe }}"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 數據表格區域 -->
+    {% if data_tables %}
+    <div class="col-12">
+        <div class="row">
+            {% for table in data_tables %}
+            <div class="col-lg-{{ table.size|default:6 }} mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-table me-2"></i>{{ table.title }}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        {% for column in table.columns %}
+                                        <th>{{ column }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in table.data %}
+                                    <tr>
+                                        {% for cell in row %}
+                                        <td>{{ cell }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 警報和通知區域 -->
+    {% if alerts %}
+    <div class="col-12 mt-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>系統警報
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for alert in alerts %}
+                    <div class="col-md-6 mb-3">
+                        <div class="alert alert-{{ alert.level }} alert-dismissible fade show">
+                            <i class="fas fa-{{ alert.icon }} me-2"></i>
+                            <strong>{{ alert.title }}</strong>
+                            <br>
+                            {{ alert.message }}
+                            {% if alert.action %}
+                            <br>
+                            <a href="{{ alert.action.url }}" class="btn btn-sm btn-{{ alert.level }} mt-2">
+                                {{ alert.action.label }}
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 快速操作區域 -->
+    {% if quick_actions %}
+    <div class="col-12 mt-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-bolt me-2"></i>快速操作
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for action in quick_actions %}
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ action.url }}" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-{{ action.icon }} fa-2x mb-2"></i>
+                            <br>
+                            {{ action.label }}
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// 儀表板報表專用 JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化儀表板功能
+    initializeDashboard();
+});
+
+function initializeDashboard() {
+    // 初始化所有圖表
+    initializeDashboardCharts();
+    
+    // 設定自動更新
+    setupAutoRefresh();
+    
+    // 設定互動功能
+    setupDashboardInteractions();
+    
+    // 初始化進度條動畫
+    initializeProgressBars();
+}
+
+function initializeDashboardCharts() {
+    // 初始化主要圖表
+    const mainChartElements = document.querySelectorAll('[id^="mainChart"]');
+    mainChartElements.forEach((canvas, index) => {
+        initializeChart(canvas, `mainChart${index + 1}`);
+    });
+    
+    // 初始化次要圖表
+    const secondaryChartElements = document.querySelectorAll('[id^="secondaryChart"]');
+    secondaryChartElements.forEach((canvas, index) => {
+        initializeChart(canvas, `secondaryChart${index + 1}`);
+    });
+}
+
+function initializeChart(canvas, chartId) {
+    const chartType = canvas.dataset.chart;
+    const chartTitle = canvas.dataset.chartTitle;
+    const chartData = JSON.parse(canvas.dataset.chartData || '{}');
+    
+    const ctx = canvas.getContext('2d');
+    const chart = new Chart(ctx, {
+        type: chartType,
+        data: chartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 11
+                        }
+                    }
+                },
+                title: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                x: {
+                    display: true,
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    display: true,
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)'
+                    },
+                    beginAtZero: true
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            }
+        }
+    });
+    
+    // 儲存圖表實例
+    currentCharts.push(chart);
+}
+
+function setupAutoRefresh() {
+    // 設定自動更新間隔（預設5分鐘）
+    const refreshInterval = {{ auto_refresh_interval|default:300000 }};
+    
+    if (refreshInterval > 0) {
+        setInterval(() => {
+            refreshDashboard();
+        }, refreshInterval);
+    }
+}
+
+function refreshDashboard() {
+    showLoading();
+    
+    // 重新載入儀表板數據
+    fetch(window.location.pathname + '?refresh=true')
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // 更新統計卡片
+            updateStatistics(doc);
+            
+            // 更新圖表
+            updateCharts(doc);
+            
+            // 更新表格
+            updateTables(doc);
+            
+            hideLoading();
+        })
+        .catch(error => {
+            console.error('儀表板更新失敗:', error);
+            hideLoading();
+        });
+}
+
+function updateStatistics(doc) {
+    const newStats = doc.querySelector('.statistics-section .card-body');
+    if (newStats) {
+        document.querySelector('.statistics-section .card-body').innerHTML = newStats.innerHTML;
+    }
+}
+
+function updateCharts(doc) {
+    // 更新圖表數據
+    const chartElements = doc.querySelectorAll('canvas[data-chart-data]');
+    chartElements.forEach((canvas, index) => {
+        if (currentCharts[index]) {
+            const newData = JSON.parse(canvas.dataset.chartData || '{}');
+            currentCharts[index].data = newData;
+            currentCharts[index].update('none');
+        }
+    });
+}
+
+function updateTables(doc) {
+    // 更新表格數據
+    const tableElements = doc.querySelectorAll('.table-responsive');
+    tableElements.forEach((table, index) => {
+        const currentTable = document.querySelectorAll('.table-responsive')[index];
+        if (currentTable) {
+            currentTable.innerHTML = table.innerHTML;
+        }
+    });
+}
+
+function setupDashboardInteractions() {
+    // 統計卡片點擊事件
+    document.querySelectorAll('.stat-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const metricName = this.querySelector('.stat-label').textContent;
+            showMetricDetail(metricName);
+        });
+    });
+    
+    // 進度條點擊事件
+    document.querySelectorAll('.progress').forEach(progress => {
+        progress.addEventListener('click', function() {
+            const indicatorName = this.closest('.col-md-6').querySelector('.fw-bold').textContent;
+            showProgressDetail(indicatorName);
+        });
+    });
+}
+
+function showMetricDetail(metricName) {
+    // 顯示指標詳細資訊
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'metricDetailModal';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-chart-line me-2"></i>${metricName} 詳細資訊
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="metricDetailChart" style="height: 400px;">
+                        <canvas id="detailChart"></canvas>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+    
+    // 載入詳細圖表數據
+    loadMetricDetailData(metricName);
+    
+    // 模態框關閉後移除元素
+    modal.addEventListener('hidden.bs.modal', function() {
+        document.body.removeChild(modal);
+    });
+}
+
+function loadMetricDetailData(metricName) {
+    // 載入指標詳細數據
+    fetch(`/reporting/api/metric-detail/${encodeURIComponent(metricName)}/`)
+        .then(response => response.json())
+        .then(data => {
+            const canvas = document.getElementById('detailChart');
+            const ctx = canvas.getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        },
+                        title: {
+                            display: true,
+                            text: `${metricName} 趨勢圖`
+                        }
+                    }
+                }
+            });
+        })
+        .catch(error => {
+            console.error('載入指標詳細數據失敗:', error);
+        });
+}
+
+function showProgressDetail(indicatorName) {
+    // 顯示進度詳細資訊
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'progressDetailModal';
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-tasks me-2"></i>${indicatorName} 進度詳情
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="progressDetailContent">
+                        載入中...
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+    
+    // 載入進度詳細數據
+    loadProgressDetailData(indicatorName);
+    
+    // 模態框關閉後移除元素
+    modal.addEventListener('hidden.bs.modal', function() {
+        document.body.removeChild(modal);
+    });
+}
+
+function loadProgressDetailData(indicatorName) {
+    // 載入進度詳細數據
+    fetch(`/reporting/api/progress-detail/${encodeURIComponent(indicatorName)}/`)
+        .then(response => response.json())
+        .then(data => {
+            const content = document.getElementById('progressDetailContent');
+            content.innerHTML = `
+                <div class="row">
+                    <div class="col-6">
+                        <strong>當前進度:</strong> ${data.current}%
+                    </div>
+                    <div class="col-6">
+                        <strong>目標進度:</strong> ${data.target}%
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <strong>詳細說明:</strong>
+                        <p class="mt-2">${data.description}</p>
+                    </div>
+                </div>
+            `;
+        })
+        .catch(error => {
+            console.error('載入進度詳細數據失敗:', error);
+            document.getElementById('progressDetailContent').innerHTML = '載入失敗';
+        });
+}
+
+function initializeProgressBars() {
+    // 初始化進度條動畫
+    const progressBars = document.querySelectorAll('.progress-bar');
+    progressBars.forEach(bar => {
+        const width = bar.style.width;
+        bar.style.width = '0%';
+        
+        setTimeout(() => {
+            bar.style.width = width;
+        }, 500);
+    });
+}
+
+// 儀表板數據驗證
+function validateDashboardData(data) {
+    if (!data.metrics || !Array.isArray(data.metrics)) {
+        console.error('儀表板指標數據格式錯誤');
+        return false;
+    }
+    return true;
+}
+
+// 更新指標數據
+function updateMetric(metricName, newValue, newTrend = null) {
+    const metricElement = document.querySelector(`[data-metric="${metricName}"]`);
+    if (metricElement) {
+        const valueElement = metricElement.querySelector('.stat-value');
+        const trendElement = metricElement.querySelector('.stat-trend');
+        
+        if (valueElement) {
+            valueElement.textContent = newValue;
+        }
+        
+        if (trendElement && newTrend) {
+            trendElement.innerHTML = `
+                <small class="text-${newTrend.color}">
+                    <i class="fas fa-arrow-${newTrend.direction}"></i>
+                    ${newTrend.value}
+                </small>
+            `;
+        }
+    }
+}
+
+// 更新進度指標
+function updateProgressIndicator(indicatorName, newValue) {
+    const indicatorElement = document.querySelector(`[data-indicator="${indicatorName}"]`);
+    if (indicatorElement) {
+        const valueElement = indicatorElement.querySelector('.text-muted');
+        const progressBar = indicatorElement.querySelector('.progress-bar');
+        
+        if (valueElement) {
+            valueElement.textContent = `${newValue}%`;
+        }
+        
+        if (progressBar) {
+            progressBar.style.width = `${newValue}%`;
+            progressBar.setAttribute('aria-valuenow', newValue);
+        }
+    }
+}
+</script>
+{% endblock %} 

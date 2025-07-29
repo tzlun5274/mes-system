@@ -740,40 +740,8 @@ class ReportingOperationLog(models.Model):
         return f"{self.timestamp} - {self.user} - {self.action}"
 
 
-class ReportSyncSettings(models.Model):
-    """報表同步間隔設定模型"""
-    REPORT_TYPE_CHOICES = [
-        ("smt", "SMT生產報表"),
-        ("operator", "作業員生產報表"),
-    ]
-
-    report_type = models.CharField(
-        max_length=20, choices=REPORT_TYPE_CHOICES, verbose_name="報表類型", unique=True
-    )
-    sync_interval_hours = models.IntegerField(
-        default=24,
-        verbose_name="同步間隔（小時）",
-        help_text="設定自動同步的間隔時間，單位為小時",
-    )
-    is_active = models.BooleanField(default=True, verbose_name="啟用自動同步")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="創建時間")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
-
-    class Meta:
-        verbose_name = "報表同步設定"
-        verbose_name_plural = "報表同步設定"
-
-    def __str__(self):
-        return f"{self.get_report_type_display()} - {self.sync_interval_hours}小時"
-
-    @classmethod
-    def get_sync_interval(cls, report_type):
-        """取得指定報表類型的同步間隔設定"""
-        try:
-            setting = cls.objects.get(report_type=report_type, is_active=True)
-            return setting.sync_interval_hours
-        except cls.DoesNotExist:
-            return 24
+# 移除重複的 ReportSyncSettings 模型定義
+# 使用 system.models.ReportSyncSettings 替代
 
 
 class ReportEmailSchedule(models.Model):
@@ -1046,59 +1014,5 @@ class WorkOrderSummaryCache(models.Model):
         return f"{self.workorder_number} - {self.period_start} ~ {self.period_end}"
 
 
-class ReportDataSyncLog(models.Model):
-    """
-    報表數據同步日誌
-    記錄報表數據的同步狀態和時間
-    """
-    
-    # 同步資訊
-    sync_type = models.CharField(max_length=50, verbose_name="同步類型")
-    period_start = models.DateField(verbose_name="期間開始")
-    period_end = models.DateField(verbose_name="期間結束")
-    
-    # 同步結果
-    status = models.CharField(max_length=20, choices=[
-        ('success', '成功'),
-        ('failed', '失敗'),
-        ('partial', '部分成功'),
-    ], verbose_name="同步狀態")
-    
-    # 統計資訊
-    records_processed = models.IntegerField(default=0, verbose_name="處理記錄數")
-    records_updated = models.IntegerField(default=0, verbose_name="更新記錄數")
-    records_created = models.IntegerField(default=0, verbose_name="新增記錄數")
-    
-    # 錯誤資訊
-    error_message = models.TextField(blank=True, verbose_name="錯誤訊息")
-    
-    # 執行資訊
-    started_at = models.DateTimeField(verbose_name="開始時間")
-    completed_at = models.DateTimeField(blank=True, null=True, verbose_name="完成時間")
-    duration_seconds = models.IntegerField(default=0, verbose_name="執行時間(秒)")
-    
-    # 系統欄位
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
-    
-    class Meta:
-        verbose_name = "報表數據同步日誌"
-        verbose_name_plural = "報表數據同步日誌"
-        db_table = 'reporting_data_sync_log'
-        ordering = ['-started_at']
-    
-    def __str__(self):
-        return f"{self.sync_type} - {self.period_start} ~ {self.period_end} - {self.status}"
-    
-    @property
-    def duration_formatted(self):
-        """格式化執行時間"""
-        if self.duration_seconds < 60:
-            return f"{self.duration_seconds}秒"
-        elif self.duration_seconds < 3600:
-            minutes = self.duration_seconds // 60
-            seconds = self.duration_seconds % 60
-            return f"{minutes}分{seconds}秒"
-        else:
-            hours = self.duration_seconds // 3600
-            minutes = (self.duration_seconds % 3600) // 60
-            return f"{hours}小時{minutes}分"
+# 移除重複的 ReportDataSyncLog 模型定義
+# 使用 system.models.ReportDataSyncLog 替代

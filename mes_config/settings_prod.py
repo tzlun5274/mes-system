@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     "scheduling",
     "quality",
     "work_order",
-    "reporting",
+
     "kanban",
     "erp_integration.apps.ErpIntegrationConfig",
     "ai",

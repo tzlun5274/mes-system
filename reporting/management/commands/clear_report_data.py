@@ -12,7 +12,8 @@ from reporting.models import (
     ReportingOperationLog,
     ReportEmailLog,
 )
-from reporting.models import ReportSyncSettings, ReportEmailSchedule
+from reporting.models import ReportEmailSchedule
+from system.models import ReportSyncSettings
 from workorder.models import SystemConfig
 
 

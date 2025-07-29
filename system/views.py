@@ -10,16 +10,11 @@ from .forms import (
     CustomUserCreationForm,
     BackupScheduleForm,
     OperationLogConfigForm,
-    ReportSyncSettingsForm,
-    ReportEmailSettingsForm,
 )
 from .models import (
     EmailConfig, 
     BackupSchedule, 
-    OperationLogConfig,
-    ReportSyncSettings,
-    ReportEmailSettings,
-    ReportDataSyncLog
+    OperationLogConfig
 )
 from django.core.mail import get_connection, send_mail
 from django.http import HttpResponse, FileResponse
@@ -63,7 +58,6 @@ MODULE_LOG_MODELS = {
     "process": "process.models.ProcessOperationLog",
     "quality": "quality.models.QualityOperationLog",
     "work_order": "workorder.models.WorkOrderOperationLog",
-    "reporting": "reporting.models.ReportingOperationLog",
     "kanban": "kanban.models.KanbanOperationLog",
     "erp_integration": "erp_integration.models.ERPIntegrationOperationLog",
     "ai": "ai.models.AIOperationLog",
@@ -90,7 +84,6 @@ def get_all_permissions():
         "process",
         "quality",
         "workorder",
-        "reporting",
         "kanban",
         "erp_integration",
         "ai",
@@ -116,7 +109,7 @@ GROUP_TO_MODULE_MAP = {
     "製程使用者": "process",
     "品質使用者": "quality",
     "工單使用者": "workorder",
-    "報表使用者": "reporting",
+    
     "看板使用者": "kanban",
 }
 
@@ -1294,7 +1287,7 @@ def permission_list(request):
         "process",
         "quality",
         "workorder",
-        "reporting",
+
         "kanban",
         "erp_integration",
         "ai",
@@ -1518,253 +1511,4 @@ def workorder_settings(request):
     return render(request, 'system/workorder_settings.html', context)
 
 
-@login_required
-@user_passes_test(superuser_required, login_url="/accounts/login/")
-def report_settings(request):
-    """
-    報表設定管理頁面
-    管理報表同步設定和郵件通知設定
-    """
-    # 取得現有的設定
-    sync_settings = ReportSyncSettings.objects.all().order_by('sync_type', 'sync_frequency')
-    email_settings = ReportEmailSettings.objects.all().order_by('report_type', 'send_frequency')
-    
-    # 取得同步日誌統計
-    sync_logs = ReportDataSyncLog.objects.all().order_by('-started_at')[:10]
-    
-    # 計算統計數量
-    sync_settings_count = sync_settings.count()
-    email_settings_count = email_settings.count()
-    sync_logs_count = ReportDataSyncLog.objects.count()
-    
-    context = {
-        'sync_settings': sync_settings,
-        'email_settings': email_settings,
-        'sync_logs': sync_logs,
-        'sync_settings_count': sync_settings_count,
-        'email_settings_count': email_settings_count,
-        'sync_logs_count': sync_logs_count,
-        'title': '報表設定管理'
-    }
-    
-    return render(request, 'system/report_settings.html', context)
 
-
-@login_required
-@user_passes_test(superuser_required, login_url="/accounts/login/")
-def report_sync_settings(request, setting_id=None):
-    """
-    報表同步設定編輯頁面
-    """
-    if setting_id:
-        sync_setting = get_object_or_404(ReportSyncSettings, id=setting_id)
-        title = f"編輯報表同步設定 - {sync_setting.get_sync_type_display()}"
-    else:
-        sync_setting = None
-        title = "新增報表同步設定"
-    
-    if request.method == "POST":
-        form = ReportSyncSettingsForm(request.POST, instance=sync_setting)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "報表同步設定已成功儲存！")
-            return redirect('system:report_settings')
-    else:
-        form = ReportSyncSettingsForm(instance=sync_setting)
-    
-    context = {
-        'form': form,
-        'title': title,
-        'sync_setting': sync_setting
-    }
-    
-    return render(request, 'system/report_sync_settings_form.html', context)
-
-
-@login_required
-@user_passes_test(superuser_required, login_url="/accounts/login/")
-def report_email_settings(request, setting_id=None):
-    """
-    報表郵件設定編輯頁面
-    """
-    if setting_id:
-        email_setting = get_object_or_404(ReportEmailSettings, id=setting_id)
-        title = f"編輯報表郵件設定 - {email_setting.get_report_type_display()}"
-    else:
-        email_setting = None
-        title = "新增報表郵件設定"
-    
-    if request.method == "POST":
-        form = ReportEmailSettingsForm(request.POST, instance=email_setting)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "報表郵件設定已成功儲存！")
-            return redirect('system:report_settings')
-    else:
-        form = ReportEmailSettingsForm(instance=email_setting)
-    
-    context = {
-        'form': form,
-        'title': title,
-        'email_setting': email_setting
-    }
-    
-    return render(request, 'system/report_email_settings_form.html', context)
-
-
-@login_required
-@user_passes_test(superuser_required, login_url="/accounts/login/")
-def delete_report_sync_setting(request, setting_id):
-    """
-    刪除報表同步設定
-    """
-    sync_setting = get_object_or_404(ReportSyncSettings, id=setting_id)
-    
-    if request.method == "POST":
-        sync_setting.delete()
-        messages.success(request, "報表同步設定已成功刪除！")
-        return redirect('system:report_settings')
-    
-    context = {
-        'sync_setting': sync_setting,
-        'title': '刪除報表同步設定'
-    }
-    
-    return render(request, 'system/delete_report_sync_setting.html', context)
-
-
-@login_required
-@user_passes_test(superuser_required, login_url="/accounts/login/")
-def delete_report_email_setting(request, setting_id):
-    """
-    刪除報表郵件設定
-    """
-    email_setting = get_object_or_404(ReportEmailSettings, id=setting_id)
-    
-    if request.method == "POST":
-        email_setting.delete()
-        messages.success(request, "報表郵件設定已成功刪除！")
-        return redirect('system:report_settings')
-    
-    context = {
-        'email_setting': email_setting,
-        'title': '刪除報表郵件設定'
-    }
-    
-    return render(request, 'system/delete_report_email_setting.html', context)
-
-
-@login_required
-@user_passes_test(superuser_required, login_url="/accounts/login/")
-def manual_sync_reports(request):
-    """
-    手動執行報表資料同步
-    """
-    if request.method == "POST":
-        sync_type = request.POST.get('sync_type', 'all')
-        date_from = request.POST.get('date_from')
-        date_to = request.POST.get('date_to')
-        
-        try:
-            # 執行同步
-            from reporting.services.sync_service import ReportDataSyncService
-            
-            sync_service = ReportDataSyncService()
-            result = sync_service.sync_data(
-                sync_type=sync_type,
-                date_from=date_from,
-                date_to=date_to
-            )
-            
-            if result['success']:
-                messages.success(request, f"報表資料同步成功！處理了 {result['records_processed']} 筆記錄。")
-            else:
-                messages.error(request, f"報表資料同步失敗：{result['error']}")
-                
-        except Exception as e:
-            messages.error(request, f"執行同步時發生錯誤：{str(e)}")
-        
-        return redirect('system:report_settings')
-    
-    # 取得可用的同步類型
-    sync_types = ReportSyncSettings.SYNC_TYPE_CHOICES
-    
-    # 取得今天的日期
-    from django.utils import timezone
-    today = timezone.now().date()
-    
-    context = {
-        'sync_types': sync_types,
-        'today': today,
-        'title': '手動執行報表同步'
-    }
-    
-    return render(request, 'system/manual_sync_reports.html', context)
-
-
-@login_required
-@user_passes_test(superuser_required, login_url="/accounts/login/")
-def sync_logs(request):
-    """
-    報表同步日誌查看頁面
-    """
-    # 取得篩選參數
-    sync_type = request.GET.get('sync_type', '')
-    status = request.GET.get('status', '')
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
-    
-    # 查詢日誌
-    logs = ReportDataSyncLog.objects.all()
-    
-    if sync_type:
-        logs = logs.filter(sync_type=sync_type)
-    if status:
-        logs = logs.filter(status=status)
-    if date_from:
-        logs = logs.filter(started_at__date__gte=date_from)
-    if date_to:
-        logs = logs.filter(started_at__date__lte=date_to)
-    
-    logs = logs.order_by('-started_at')
-    
-    # 計算統計資訊
-    success_count = logs.filter(status='success').count()
-    failed_count = logs.filter(status='failed').count()
-    partial_count = logs.filter(status='partial').count()
-    
-    # 分頁
-    from django.core.paginator import Paginator
-    paginator = Paginator(logs, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    context = {
-        'page_obj': page_obj,
-        'sync_type': sync_type,
-        'status': status,
-        'date_from': date_from,
-        'date_to': date_to,
-        'success_count': success_count,
-        'failed_count': failed_count,
-        'partial_count': partial_count,
-        'title': '報表同步日誌'
-    }
-    
-    return render(request, 'system/sync_logs.html', context)
-
-
-@login_required
-@user_passes_test(superuser_required, login_url="/accounts/login/")
-def sync_log_detail(request, log_id):
-    """
-    報表同步日誌詳情頁面
-    """
-    sync_log = get_object_or_404(ReportDataSyncLog, id=log_id)
-    
-    context = {
-        'sync_log': sync_log,
-        'title': '同步日誌詳情'
-    }
-    
-    return render(request, 'system/sync_log_detail.html', context)

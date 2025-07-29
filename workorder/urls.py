@@ -137,8 +137,7 @@ urlpatterns = [
         views.abnormal_detail,
         name="abnormal_detail",
     ),
-    # 系統設定功能已移至系統管理模組，請使用 system:workorder_settings
-    path("report/supervisor/export/", views.report_export, name="report_export"),
+
     path(
         "report/supervisor/maintenance/",
         views.data_maintenance,

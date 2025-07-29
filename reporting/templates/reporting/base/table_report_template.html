@@ -1,0 +1,192 @@
+{% extends 'reporting/base/report_base_v2.html' %}
+{% load static %}
+
+{% block title %}{{ report_title|default:"表格報表" }} - MES系統{% endblock %}
+
+{% block report_content %}
+<!-- 表格報表內容 -->
+<div class="table-responsive">
+    <table id="reportTable" class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                {% for column in table_columns %}
+                <th>{{ column.label }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in table_data %}
+            <tr>
+                {% for column in table_columns %}
+                <td>
+                    {% if column.type == 'date' %}
+                        {{ row|get_item:column.field|date:"Y-m-d" }}
+                    {% elif column.type == 'datetime' %}
+                        {{ row|get_item:column.field|date:"Y-m-d H:i" }}
+                    {% elif column.type == 'number' %}
+                        {{ row|get_item:column.field|floatformat:2 }}
+                    {% elif column.type == 'percentage' %}
+                        {{ row|get_item:column.field|floatformat:1 }}%
+                    {% elif column.type == 'status' %}
+                        <span class="badge bg-{{ row|get_item:column.field|status_color }}">
+                            {{ row|get_item:column.field|status_text }}
+                        </span>
+                    {% else %}
+                        {{ row|get_item:column.field }}
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="{{ table_columns|length }}" class="text-center text-muted">
+                    <i class="fas fa-inbox fa-2x mb-2"></i>
+                    <br>暫無數據
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 表格摘要 -->
+{% if table_summary %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>表格摘要
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for summary in table_summary %}
+                    <div class="col-md-3 mb-3">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-{{ summary.icon }} fa-2x text-{{ summary.color }}"></i>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h6 class="mb-0">{{ summary.label }}</h6>
+                                <p class="mb-0 text-muted">{{ summary.value }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// 表格報表專用 JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化表格功能
+    initializeTableReport();
+});
+
+function initializeTableReport() {
+    // 設定表格排序和搜尋
+    if (typeof $.fn.DataTable !== 'undefined') {
+        $('#reportTable').DataTable({
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/zh-HANT.json'
+            },
+            pageLength: 25,
+            responsive: true,
+            dom: 'Bfrtip',
+            buttons: [
+                {
+                    extend: 'copy',
+                    text: '<i class="fas fa-copy"></i> 複製',
+                    className: 'btn btn-outline-secondary btn-sm'
+                },
+                {
+                    extend: 'csv',
+                    text: '<i class="fas fa-file-csv"></i> CSV',
+                    className: 'btn btn-outline-secondary btn-sm'
+                },
+                {
+                    extend: 'excel',
+                    text: '<i class="fas fa-file-excel"></i> Excel',
+                    className: 'btn btn-outline-secondary btn-sm'
+                },
+                {
+                    extend: 'print',
+                    text: '<i class="fas fa-print"></i> 列印',
+                    className: 'btn btn-outline-secondary btn-sm'
+                }
+            ],
+            order: [[0, 'desc']],
+            columnDefs: [
+                {
+                    targets: '_all',
+                    className: 'text-center'
+                }
+            ]
+        });
+    }
+}
+
+// 表格數據驗證
+function validateTableData(data) {
+    if (!Array.isArray(data)) {
+        console.error('表格數據必須是陣列格式');
+        return false;
+    }
+    return true;
+}
+
+// 表格數據格式化
+function formatTableData(data, columns) {
+    return data.map(row => {
+        const formattedRow = {};
+        columns.forEach(column => {
+            const value = row[column.field];
+            switch (column.type) {
+                case 'date':
+                    formattedRow[column.field] = formatDate(value);
+                    break;
+                case 'datetime':
+                    formattedRow[column.field] = formatDateTime(value);
+                    break;
+                case 'number':
+                    formattedRow[column.field] = formatNumber(value);
+                    break;
+                case 'percentage':
+                    formattedRow[column.field] = formatPercentage(value);
+                    break;
+                default:
+                    formattedRow[column.field] = value;
+            }
+        });
+        return formattedRow;
+    });
+}
+
+// 格式化日期時間
+function formatDateTime(dateTime) {
+    if (!dateTime) return '';
+    return new Intl.DateTimeFormat('zh-TW', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).format(new Date(dateTime));
+}
+
+// 格式化百分比
+function formatPercentage(value) {
+    if (value === null || value === undefined) return '0%';
+    return parseFloat(value).toFixed(1) + '%';
+}
+</script>
+{% endblock %} 

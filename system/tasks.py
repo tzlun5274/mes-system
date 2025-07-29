@@ -16,7 +16,7 @@ MODULE_LOG_MODELS = {
     "process": "process.models.ProcessOperationLog",
     "quality": "quality.models.QualityOperationLog",
     "work_order": "workorder.models.WorkOrderOperationLog",
-    "reporting": "reporting.models.ReportingOperationLog",
+
     "kanban": "kanban.models.KanbanOperationLog",
     "erp_integration": "erp_integration.models.ERPIntegrationOperationLog",
     "ai": "ai.models.AIOperationLog",

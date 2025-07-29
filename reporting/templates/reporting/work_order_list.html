@@ -1,0 +1,414 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}工單機種報表列表 - MES系統{% endblock %}
+
+{% block extra_css %}
+<style>
+.report-card {
+    border-left: 4px solid #28a745;
+    transition: all 0.3s ease;
+}
+.report-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.status-badge {
+    font-size: 0.8em;
+    padding: 0.25em 0.6em;
+}
+.search-form {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.export-buttons {
+    margin-bottom: 20px;
+}
+.table-responsive {
+    border-radius: 8px;
+    overflow: hidden;
+}
+.pagination-info {
+    font-size: 0.9em;
+    color: #6c757d;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-clipboard-list text-success"></i> 工單機種報表列表
+                    </h1>
+                    <p class="text-muted mb-0">查看和管理所有工單機種報表記錄</p>
+                </div>
+                <div class="btn-group">
+                    <a href="{% url 'reporting:dashboard' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回儀表板
+                    </a>
+                    <a href="{% url 'reporting:work_order_export' %}" class="btn btn-success">
+                        <i class="fas fa-download"></i> 匯出報表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 搜尋和篩選表單 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card search-form">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="search" class="form-label">關鍵字搜尋</label>
+                            <input type="text" class="form-control" id="search" name="search" 
+                                   value="{{ request.GET.search }}" placeholder="工單號、機種名稱...">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="date_from" class="form-label">開始日期</label>
+                            <input type="date" class="form-control" id="date_from" name="date_from" 
+                                   value="{{ request.GET.date_from }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="date_to" class="form-label">結束日期</label>
+                            <input type="date" class="form-control" id="date_to" name="date_to" 
+                                   value="{{ request.GET.date_to }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="product" class="form-label">機種</label>
+                            <select class="form-select" id="product" name="product">
+                                <option value="">全部機種</option>
+                                {% for product in products %}
+                                <option value="{{ product }}" {% if request.GET.product == product %}selected{% endif %}>
+                                    {{ product }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="status" class="form-label">狀態</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="">全部狀態</option>
+                                <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>已完成</option>
+                                <option value="in_progress" {% if request.GET.status == 'in_progress' %}selected{% endif %}>進行中</option>
+                                <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>待開始</option>
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label">&nbsp;</label>
+                            <div>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-search"></i> 搜尋
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">總工單數</h6>
+                            <h3 class="mb-0">{{ page_obj.paginator.count|intcomma }}</h3>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clipboard-list fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">總產量</h6>
+                            <h3 class="mb-0">{{ total_production|intcomma }}</h3>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-industry fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">完成率</h6>
+                            <h3 class="mb-0">{{ completion_rate|floatformat:1 }}%</h3>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-chart-pie fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title">平均效率</h6>
+                            <h3 class="mb-0">{{ avg_efficiency|floatformat:1 }}%</h3>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-chart-line fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 匯出按鈕 -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="export-buttons">
+                <div class="btn-group" role="group">
+                    <a href="{% url 'reporting:work_order_export' %}?{{ request.GET.urlencode }}" 
+                       class="btn btn-outline-success">
+                        <i class="fas fa-file-excel"></i> 匯出 Excel
+                    </a>
+                    <a href="{% url 'reporting:work_order_export' %}?format=csv&{{ request.GET.urlencode }}" 
+                       class="btn btn-outline-info">
+                        <i class="fas fa-file-csv"></i> 匯出 CSV
+                    </a>
+                    <a href="{% url 'reporting:work_order_export' %}?format=pdf&{{ request.GET.urlencode }}" 
+                       class="btn btn-outline-danger">
+                        <i class="fas fa-file-pdf"></i> 匯出 PDF
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表列表 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-table"></i> 工單機種報表記錄
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>報表日期</th>
+                                    <th>作業員</th>
+                                    <th>工單號</th>
+                                    <th>產品編號</th>
+                                    <th>工序</th>
+                                    <th>開始時間</th>
+                                    <th>結束時間</th>
+                                    <th>工作時數</th>
+                                    <th>完成數量</th>
+                                    <th>不良品</th>
+                                    <th>狀態</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for report in work_order_reports %}
+                                <tr class="report-card">
+                                    <td>
+                                        <span class="badge bg-secondary">{{ report.report_date|date:"Y-m-d" }}</span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ report.worker_name|default:"-" }}</strong>
+                                    </td>
+                                    <td>
+                                        <code>{{ report.work_order_no }}</code>
+                                    </td>
+                                    <td>
+                                        <span class="text-info">{{ report.product_name }}</span>
+                                    </td>
+                                    <td>{{ report.process_name|default:"-" }}</td>
+                                    <td>
+                                        {% if report.start_date %}
+                                            {{ report.start_date|date:"Y-m-d" }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if report.completion_date %}
+                                            {{ report.completion_date|date:"Y-m-d" }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if report.work_hours %}
+                                            <span class="badge bg-info">{{ report.work_hours|floatformat:1 }}h</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">{{ report.actual_quantity|intcomma }}</span>
+                                    </td>
+                                    <td>
+                                        {% if report.defect_quantity > 0 %}
+                                            <span class="badge bg-warning">{{ report.defect_quantity|intcomma }}</span>
+                                        {% else %}
+                                            <span class="text-muted">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if report.status == 'completed' %}
+                                            <span class="badge bg-success status-badge">已完成</span>
+                                        {% elif report.status == 'in_progress' %}
+                                            <span class="badge bg-warning status-badge">進行中</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary status-badge">待開始</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'reporting:work_order_detail' report.id %}" 
+                                               class="btn btn-outline-primary" title="查看詳情">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'reporting:work_order_export' %}?id={{ report.id }}" 
+                                               class="btn btn-outline-success" title="匯出">
+                                                <i class="fas fa-download"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="12" class="text-center py-4">
+                                        <div class="text-muted">
+                                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                                            <h5>暫無工單機種報表記錄</h5>
+                                            <p>目前沒有符合搜尋條件的報表記錄</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分頁 -->
+    {% if is_paginated %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <nav aria-label="報表分頁">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="pagination-info">
+                        顯示第 {{ page_obj.start_index }} 到 {{ page_obj.end_index }} 筆，
+                        共 {{ page_obj.paginator.count }} 筆記錄
+                    </div>
+                    <ul class="pagination mb-0">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1&{{ request.GET.urlencode }}">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}&{{ request.GET.urlencode }}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&{{ request.GET.urlencode }}">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 自動提交搜尋表單
+    $('.search-form select').change(function() {
+        $(this).closest('form').submit();
+    });
+
+    // 日期範圍驗證
+    $('#date_from, #date_to').change(function() {
+        var dateFrom = $('#date_from').val();
+        var dateTo = $('#date_to').val();
+        
+        if (dateFrom && dateTo && dateFrom > dateTo) {
+            alert('開始日期不能晚於結束日期');
+            $(this).val('');
+        }
+    });
+
+    // 匯出按鈕點擊事件
+    $('.export-buttons .btn').click(function(e) {
+        var $btn = $(this);
+        var originalText = $btn.html();
+        
+        $btn.html('<i class="fas fa-spinner fa-spin"></i> 處理中...');
+        $btn.prop('disabled', true);
+        
+        // 3秒後恢復按鈕狀態
+        setTimeout(function() {
+            $btn.html(originalText);
+            $btn.prop('disabled', false);
+        }, 3000);
+    });
+});
+</script>
+{% endblock %} 

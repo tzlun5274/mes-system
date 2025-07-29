@@ -1,0 +1,636 @@
+---
+description: 這是一套為「MES 製造執行系統-報表模組」量身打造的開發規則。
+globs: ["**/*"]
+alwaysApply: true
+---
+
+┌─────────────────────────────────────────────────────────────┐
+│                       報表系統架構                          │
+├─────────────────────────────────────────────────────────────┤
+│   表現層 (Presentation Layer)                               │
+│   ├── 報表查詢介面 (reporting/templates/)                   │
+│   ├── 報表匯出介面 (Excel, CSV, PDF)                      │
+│   └── 報表儀表板 (Dashboard)                                │
+├─────────────────────────────────────────────────────────────┤
+│   業務邏輯層 (Business Logic Layer)                         │
+│   ├── 報表生成服務 (reporting/services/)                    │
+│   ├── 數據計算引擎 (reporting/calculators/)                 │
+│   ├── 智能分配算法 (reporting/allocators/)                  │
+│   └── 報表驗證服務 (reporting/validators/)                  │
+├─────────────────────────────────────────────────────────────┤
+│   數據存取層 (Data Access Layer)                            │
+│   ├── 報表模型 (reporting/models.py)                        │
+│   ├── 數據查詢器 (reporting/queries/)                       │
+│   ├── 數據轉換器 (reporting/transformers/)                  │
+│   └── 快取管理 (reporting/cache/)                           │
+├─────────────────────────────────────────────────────────────┤
+│   數據來源層 (Data Source Layer)                            │
+│   ├── 工單管理模組 (workorder/)                             │
+│   ├── 設備管理模組 (equip/)                                 │
+│   ├── 製程管理模組 (process/)                               │
+│   └── ERP整合模組 (erp_integration/)                        │
+└─────────────────────────────────────────────────────────────┘
+1.2 模組職責分工 (MES 報表系統開發設計架構與結構規範 - 一、1.2)
+所有報表相關邏輯和文件都將歸屬於 reporting/ 模組。
+
+reporting/models.py: 報表數據模型定義 (如 ProcessedOperatorReport)
+
+reporting/services/: 報表業務邏輯服務 (如生成報表數據)
+
+reporting/calculators/: 數據計算引擎 (如工時計算 TimeCalculator)
+
+reporting/allocators/: 智能分配算法 (如 HybridAllocator)
+
+reporting/validators/: 數據驗證服務
+
+reporting/queries/: 數據查詢器 (統一資料獲取邏輯)
+
+reporting/transformers/: 數據轉換器
+
+reporting/cache/: 快取管理
+
+reporting/templates/: 報表模板
+
+reporting/static/: 靜態資源
+
+1.3 功能整合概述 (報表功能整合說明 - 整合概述)
+將原主管功能（workorder/views.py 第3873行）中的報表匯出功能完全遷移並整合到 reporting/ 模組中，實現所有報表匯出功能在 reporting/views.py 中統一管理，避免功能重複和衝突。
+
+2. 整合後的統一報表功能設計
+2.1 新的報表匯出功能範圍 (報表功能整合說明 - 整合後的統一功能)
+所有報表匯出功能將在 reporting/views.py 中實現，涵蓋以下類型：
+
+日報表、週報表、月報表 (工作時間報表、工單機種報表等時間維度分類)
+
+作業員報工報表 (屬於人員績效報表類別)
+
+SMT報工報表 (屬於設備效率報表類別)
+
+異常報工報表 (屬於品質分析報表類別)
+
+效率分析報表 (屬於綜合分析報表類別)
+
+作業員績效報表 (屬於人員績效報表類別)
+
+2.2 格式與日期範圍支援 (報表功能整合說明 - 整合後的統一功能)
+格式支援：Excel、CSV、PDF (PDF 將初步使用 Excel 格式，待後續實作真正的 PDF 匯出)
+
+日期範圍：今日、昨日、本週、本月、自訂範圍
+
+3. 技術實作方案
+3.1 新增與修改檔案 (報表功能整合說明 - 技術實作)
+新增檔案：
+
+reporting/views.py: 實現所有報表匯出相關視圖函數。
+
+reporting/templates/reporting/report_export.html: 報表匯出功能的前端頁面模板。
+
+reporting/urls.py: 定義報表模組的 URL 路由。
+
+修改檔案：
+
+workorder/views.py: 移除原有的報表匯出功能代碼，替換為重定向到 reporting/ 模組中的統一匯出介面。
+
+workorder/templates/workorder/report/supervisor/functions.html: 更新相關連結，指向新的 reporting/ 模組頁面。
+
+reporting/templates/reporting/index.html: 新增統一的「報表匯出」連結。
+
+3.2 新增功能函數 (報表功能整合說明 - 新增功能函數)
+為實現上述功能，將在 reporting/views.py 中新增以下主要函數：
+
+report_export(request): 負責渲染報表匯出頁面 (report_export.html)，提供報表類型、格式、日期範圍選擇。
+
+execute_report_export(request): 根據前端提交的選擇，呼叫對應的數據獲取函數和匯出函數。
+
+get_operator_report_data(workorder_no, date_range): 負責從 workorder.models.OperatorSupplementReport 獲取作業員報工資料，並呼叫 HybridAllocator 進行智能分配。
+
+get_smt_report_data(date_range): 負責從 workorder.models.SMTProductionReport 獲取 SMT 報工資料。
+
+get_abnormal_report_data(date_range): 負責篩選 OperatorSupplementReport 和 SMTProductionReport 中 abnormal_notes 欄位有內容的異常報工資料。
+
+get_operator_performance_report_data(date_range): 負責從 reporting.models.OperatorPerformance 獲取作業員績效資料。
+
+export_to_excel(data, report_type, date_range): 通用 Excel 匯出函數，使用 openpyxl 庫。
+
+export_to_csv(data, report_type, date_range): 通用 CSV 匯出函數，使用 csv 模組，確保 UTF-8 編碼。
+
+export_to_pdf(data, report_type, date_range): 通用 PDF 匯出函數，初期將重定向到 Excel 匯出或提示「PDF 匯出正在開發中」，待未來使用 reportlab 等庫實現。
+
+3.3 數據來源 (報表功能整合說明 - 資料來源)
+所有報表數據的原始來源將明確定義：
+
+作業員報工資料：workorder.models.OperatorSupplementReport
+
+欄位：報工日期、作業員、工單號、工序、數量、異常紀錄、開始時間、結束時間等。
+
+特別處理：需經過 HybridAllocator 處理未填寫數量的記錄。
+
+SMT報工資料：workorder.models.SMTProductionReport
+
+欄位：設備、報工日期、製令號碼、機種名稱、異常紀錄等。
+
+異常報工資料：OperatorSupplementReport 和 SMTProductionReport
+
+篩選條件：abnormal_notes 欄位有內容。
+
+作業員績效資料：reporting.models.OperatorPerformance
+
+欄位：作業員、工單、產品、數量、時間等。
+
+4. 權限與安全規範實作
+4.1 統一權限控制 (報表功能整合說明 - 權限管理 & MES 報表系統開發設計架構與結構規範 - 九、9.1)
+所有報表功能將統一由 Django 的權限系統控制：
+
+報表使用者群組：所有報表查看和匯出功能。
+
+超級用戶：自動擁有所有權限。
+
+一般用戶：默認無法訪問報表功能，除非被明確賦予權限。
+
+4.2 權限檢查函數 (報表功能整合說明 - 權限檢查函數)
+將使用此輔助函數進行權限檢查，並應用於 reporting/views.py 中所有報表相關的視圖函數：
+
+Python
+
+from django.contrib.auth.decorators import user_passes_test
+
+def reporting_user_required(user):
+    """
+    檢查用戶是否為超級用戶或屬於「報表使用者」群組。
+    """
+    return user.is_superuser or user.groups.filter(name="報表使用者").exists()
+
+# 示例應用：
+# @user_passes_test(reporting_user_required, login_url='/login/')
+# def report_export(request):
+#     # ... 視圖邏輯
+4.3 數據安全規範 (MES 報表系統開發設計架構與結構規範 - 九、9.2)
+數據備份：依據系統級策略定期備份報表數據。
+
+操作日誌：使用 Django 的日誌系統，記錄所有報表查詢、匯出等操作。
+
+數據加密：敏感數據（如用戶憑證）加密儲存，報表數據本身則依據業務需求考慮加密，但默認不對報表內容進行額外加密。
+
+存取控制：基於角色的存取控制已通過上述權限群組實現。
+
+5. 數據模型設計規範
+5.1 基礎報表模型 (MES 報表系統開發設計架構與結構規範 - 三、3.1)
+所有 reporting/models.py 中的報表模型將繼承 BaseReportModel。
+
+Python
+
+# reporting/models.py
+
+from django.db import models
+import logging # 引入日誌模組
+
+# 報表類型選擇 (可擴展)
+REPORT_TYPE_CHOICES = [
+    ('DAILY_WORK_TIME', '工作時間日報表'),
+    ('WEEKLY_WORK_TIME', '工作時間週報表'),
+    ('MONTHLY_WORK_TIME', '工作時間月報表'),
+    ('DAILY_WORK_ORDER', '工單機種日報表'),
+    ('WEEKLY_WORK_ORDER', '工單機種週報表'),
+    ('MONTHLY_WORK_ORDER', '工單機種月報表'),
+    ('OPERATOR_PERFORMANCE', '作業員績效報表'),
+    ('SMT_EQUIPMENT', 'SMT設備效率報表'),
+    ('ABNORMAL_REPORT', '異常報工報表'),
+    # ... 其他報表類型
+]
+
+class BaseReportModel(models.Model):
+    """報表基礎模型"""
+    
+    # 報表基本資訊
+    report_type = models.CharField(max_length=50, choices=REPORT_TYPE_CHOICES, verbose_name="報表類型") # 增加 max_length 兼容新報表類型名稱
+    report_date = models.DateField(verbose_name="報表日期")
+    report_period_start = models.DateField(verbose_name="報表期間開始", null=True, blank=True) # 允許空值以適應日報表
+    report_period_end = models.DateField(verbose_name="報表期間結束", null=True, blank=True) # 允許空值以適應日報表
+    
+    # 數據來源標示
+    data_source = models.CharField(max_length=100, verbose_name="數據來源", default="原始報工數據") # 增加 max_length
+    calculation_method = models.CharField(max_length=100, verbose_name="計算方法", default="無或按工時分配") # 增加 max_length
+    
+    # 系統資訊
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    created_by = models.CharField(max_length=100, verbose_name="建立者", default="系統") # 設定預設值
+
+    class Meta:
+        abstract = True
+        ordering = ['-report_date']
+        verbose_name = "報表基礎模型"
+        verbose_name_plural = "報表基礎模型"
+
+# ProcessedOperatorReport 的定義將會是獨立於 BaseReportModel 的，
+# 但其數據將由 reporting 模組負責處理和生成。
+# 這裡重申 ProcessedOperatorReport 的核心字段以符合分配邏輯。
+class ProcessedOperatorReport(models.Model):
+    """
+    用於報表顯示和分配邏輯的加工後作業員報工數據。
+    這是數據存取層中的報表模型範例。
+    """
+    original_report_id = models.UUIDField(unique=True, null=True, blank=True,
+                                        help_text="原始 OperatorSupplementReport 的 UUID") # 關聯原始報工
+    report_date = models.DateField(verbose_name="報工日期")
+    operator = models.ForeignKey('auth.User', on_delete=models.CASCADE, verbose_name="作業員")
+    work_order_no = models.CharField(max_length=100, verbose_name="工單號")
+    process = models.CharField(max_length=100, verbose_name="工序")
+    
+    # 原始報工數量 (良品與不良品)
+    original_quantity = models.IntegerField(null=True, blank=True, verbose_name="原始良品數量")
+    defect_quantity = models.IntegerField(null=True, blank=True, default=0, verbose_name="原始不良品數量") 
+
+    # 智能分配的數量 (良品與不良品)
+    allocated_quantity = models.IntegerField(null=True, blank=True, verbose_name="系統分配良品數量",
+                                             help_text="若原始良品數量為空，此為系統智能分配的良品數量")
+    allocated_defect_quantity = models.IntegerField(null=True, blank=True, verbose_name="系統分配不良品數量",
+                                                    help_text="若原始不良品數量為空，此為系統智能分配的不良品數量") 
+
+    # 用於報表顯示的最終數量
+    final_quantity_for_report = models.IntegerField(null=True, blank=True, verbose_name="報表最終良品數量",
+                                                    help_text="用於報表顯示的最終良品數量 (原始或分配)")
+    final_total_output_for_report = models.IntegerField(null=True, blank=True, verbose_name="報表最終總產量(良品+不良品)",
+                                                        help_text="用於報表顯示的最終總產量，包含良品與不良品") 
+
+    # 工時資訊 (用於分配計算)
+    start_time = models.DateTimeField(null=True, blank=True, verbose_name="報工開始時間")
+    end_time = models.DateTimeField(null=True, blank=True, verbose_name="報工結束時間")
+    
+    # 分配相關標示與說明
+    is_manual_modified = models.BooleanField(default=False, verbose_name="是否手動修改",
+                                             help_text="此記錄的數量是否被人工修改過，若為True則不參與自動分配")
+    allocation_explanation = models.TextField(null=True, blank=True, verbose_name="分配說明")
+    
+    # 其他可能從原始報工帶入的欄位
+    abnormal_notes = models.TextField(null=True, blank=True, verbose_name="異常紀錄")
+
+    # 系統處理時間
+    synced_at = models.DateTimeField(auto_now_add=True, verbose_name="同步時間") # 首次進入 ProcessedOperatorReport 的時間
+    last_processed_at = models.DateTimeField(auto_now=True, verbose_name="最後處理時間") # 最後一次被分配器處理的時間
+
+    class Meta:
+        verbose_name = "加工後作業員報工"
+        verbose_name_plural = "加工後作業員報工"
+        indexes = [
+            models.Index(fields=['report_date']),
+            models.Index(fields=['operator']),
+            models.Index(fields=['work_order_no']),
+            models.Index(fields=['process']),
+        ]
+
+    def save(self, *args, **kwargs):
+        # 決定最終良品數量：優先使用原始數量，其次是分配數量
+        if self.original_quantity is not None and self.original_quantity >= 0:
+            self.final_quantity_for_report = self.original_quantity
+        elif self.allocated_quantity is not None and self.allocated_quantity >= 0:
+            self.final_quantity_for_report = self.allocated_quantity
+        else:
+            self.final_quantity_for_report = 0
+
+        # 決定最終不良品數量：優先使用原始不良品數量，如果原始為空且有分配不良品，則使用分配的
+        current_final_defect_qty = self.defect_quantity if self.defect_quantity is not None else 0
+        if (self.defect_quantity is None or self.defect_quantity == 0) and \
+           self.allocated_defect_quantity is not None and self.allocated_defect_quantity >= 0:
+             current_final_defect_qty = self.allocated_defect_quantity 
+        
+        # 計算最終總產量 (良品 + 不良品)
+        self.final_total_output_for_report = self.final_quantity_for_report + current_final_defect_qty
+        
+        super().save(*args, **kwargs)
+
+5.2 數據模型命名與完整性規範 (MES 報表系統開發設計架構與結構規範 - 三、3.2 & 3.3)
+模型名稱：使用 PascalCase，以 Report 結尾（如 ProductionDailyReport），ProcessedOperatorReport 為加工數據層模型。
+
+欄位名稱：使用 snake_case。
+
+數據完整性：
+
+關鍵統計欄位（如數量、時間）為必填或有合理的預設值/ null=True, blank=True 處理。
+
+數值欄位（如數量）將通過代碼邏輯確保非負。
+
+時間欄位將符合標準格式。
+
+6. 業務邏輯設計規範
+6.1 服務層架構 (MES 報表系統開發設計架構與結構規範 - 四、4.1)
+報表業務邏輯將集中在 reporting/services/ 目錄下。
+
+reporting/services/
+├── __init__.py
+├── base_report_service.py     # 基礎報表服務類別
+├── operator_report_service.py # 作業員報工相關服務
+├── smt_report_service.py      # SMT報工相關服務
+├── abnormal_report_service.py # 異常報工相關服務
+└── # ... 其他報表類型對應的服務
+6.2 服務類別設計規範 (MES 報表系統開發設計架構與結構規範 - 四、4.2)
+每個服務類別將繼承 BaseReportService，並實現 generate_report 方法。
+
+Python
+
+# reporting/services/base_report_service.py
+import logging
+
+class BaseReportService:
+    """報表服務基礎類別"""
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+    
+    def generate_report(self, date_range, **kwargs):
+        """
+        生成報表數據（抽象方法）。
+        返回用於報表的加工數據。
+        """
+        raise NotImplementedError
+    
+    def validate_params(self, params):
+        """驗證輸入參數"""
+        # 實現參數驗證邏輯
+        return True
+    
+    def calculate_statistics(self, data):
+        """計算統計數據（可選）"""
+        # 實現數據匯總和統計邏輯
+        return data
+    
+    def format_output(self, data):
+        """格式化輸出（可選）"""
+        # 實現數據格式化邏輯，例如為匯出準備列名和數據結構
+        return data
+
+# reporting/services/operator_report_service.py (示例)
+from .base_report_service import BaseReportService
+from reporting.queries.operator_query import OperatorReportQuery
+from reporting.allocators.hybrid_allocator import HybridAllocator # 引入分配器
+
+class OperatorReportService(BaseReportService):
+    def __init__(self):
+        super().__init__()
+        self.query_handler = OperatorReportQuery()
+        self.allocator = HybridAllocator()
+
+    def generate_report(self, date_range, work_order_no=None, **kwargs):
+        """
+        生成作業員報工報表數據。
+        此處會觸發智能分配。
+        """
+        self.logger.info(f"生成作業員報工報表，工單: {work_order_no}, 日期範圍: {date_range}")
+        
+        # 1. 獲取原始數據（或加工數據，取決於設計）
+        # 假設 OperatorReportQuery 能獲取 ProcessedOperatorReport 數據，其可能需要定期從原始數據同步
+        raw_reports = self.query_handler.get_operator_supplement_reports(
+            date_range=date_range, 
+            work_order_no=work_order_no
+        )
+        
+        # 2. 執行智能分配
+        # allocate 方法會直接修改並保存 ProcessedOperatorReport 實例
+        processed_reports = self.allocator.allocate(work_order_no, date_range)
+        
+        # 3. 進一步處理或計算統計數據 (如果需要)
+        # 例如，根據 final_quantity_for_report 進行匯總等
+        
+        return processed_reports # 返回用於報表的加工後數據
+
+6.3 計算引擎設計規範 (MES 報表系統開發設計架構與結構規範 - 四、4.3)
+計算邏輯將在 reporting/calculators/ 下實現，例如 time_calculator.py。
+
+Python
+
+# reporting/calculators/time_calculator.py
+
+class TimeCalculator:
+    """
+    用於計算作業員工時的計算器。
+    """
+    def calculate_operator_work_time(self, reports):
+        """
+        根據報工記錄計算每個作業員的總工時 (以小時為單位)。
+        :param reports: ProcessedOperatorReport 對象列表
+        :return: 字典 {operator_id: total_work_hours}
+        """
+        operator_work_time = {}
+        for report in reports:
+            if report.start_time and report.end_time:
+                duration_seconds = (report.end_time - report.start_time).total_seconds()
+                work_hours = duration_seconds / 3600.0 # 轉換為小時
+                
+                # 累加每個作業員的工時
+                if report.operator.id not in operator_work_time:
+                    operator_work_time[report.operator.id] = 0
+                operator_work_time[report.operator.id] += work_hours
+        return operator_work_time
+
+7. 智能分配算法規範 (MES 報表系統開發設計架構與結構規範 - 五、5.1 & 5.2 & 5.3)
+智能分配算法是報表系統的核心業務邏輯之一。
+
+7.1 分配算法架構
+智能分配邏輯將集中在 reporting/allocators/ 目錄下，包含 HybridAllocator。
+
+reporting/allocators/
+├── __init__.py
+├── base_allocator.py         # 基礎分配器
+├── hybrid_allocator.py       # 混合分配器
+# ... 其他可能需要的分配器
+7.2 HybridAllocator 核心邏輯 (詳細說明)
+HybridAllocator 的核心目標是為那些在報工時未填寫數量（或填寫為零）的作業員，智能地分配其應有的產出數量。這個分配過程會基於已知的工單總數量作為每個工序的目標量，並參考作業員的實際工時投入。
+
+前置假設：
+
+workorder.models.WorkOrder 包含 total_order_quantity 欄位，代表工單的總數量，此數量被視為每個工序的目標產量。
+
+ProcessedOperatorReport 模型中應包含 start_time 和 end_time 欄位以計算工時，以及 defect_quantity (不良品數量) 和 is_packaging_personnel (作業員是否為包裝專員的標識，通常在 User 模型或其 Profile 中定義)。
+
+包裝工序的名稱已被配置為 self.packaging_process_name = '出貨包裝'。
+
+HybridAllocator.allocate() 方法的詳細邏輯步驟：
+
+獲取工單總數量：
+
+從 workorder.models.WorkOrder 獲取指定 work_order_no 的 total_order_quantity。
+
+如果工單不存在或無總數量，則記錄錯誤並停止分配，返回原始數據。
+
+分組報工記錄：
+
+從 _get_processed_reports(work_order_no, date_range) 獲取所有加工後的報工記錄。
+
+將這些記錄按 process 欄位進行分組。
+
+遍歷每個工序進行獨立分配：
+
+對於 reports_by_process 中的每一個 (process_name, reports_in_process) 組：
+
+區分已填寫與未填寫報工：
+
+filled_reports_in_process：當前工序中 original_quantity > 0 的報工。
+
+unfilled_reports_in_process_for_allocation：當前工序中 original_quantity 為 None 或 0，且 is_manual_modified 為 False 的報工。
+
+manual_modified_reports_in_process：當前工序中 original_quantity 為 None 或 0，但 is_manual_modified 為 True 的報工，這些將不參與自動分配。
+
+處理包裝工序的特殊情況：
+
+如果 process_name 等於 self.packaging_process_name 且報工屬於 is_packaging_personnel：
+
+如果其 original_quantity 已填寫且大於 0，則視為該工單的最終實際產量（用於驗證，但不再作為前序分配的唯一基準）。
+
+如果其 original_quantity 未填寫，則和其他前序工序一樣，參與該工序內的工時分配，其目標量為 order_target_quantity。
+
+注意： 如果包裝工序只有一個專員，且未填寫數量，則直接將 order_target_quantity 分配給他（或者，如果有多個包裝專員都未填寫，則按工時分配）。
+
+計算當前工序的「已填寫總量 (良品 + 不良品)」：
+
+current_process_total_filled_quantity = sum(r.original_quantity for r in filled_reports_in_process) + sum(r.defect_quantity for r in filled_reports_in_process)
+
+計算該工序需要分配的「剩餘總量」：
+
+remaining_quantity_to_allocate_for_process = order_target_quantity - current_process_total_filled_quantity
+
+防錯： 如果計算結果為負數，將其設為 0。
+
+計算該工序內未填寫數量作業員的總工時：
+
+使用 self.time_calculator.calculate_operator_work_time(unfilled_reports_in_process_for_allocation) 獲取這些作業員的個別工時。
+
+計算這些工時的總和 total_unfilled_work_time_in_process。
+
+執行工序內部的工時比例分配：
+
+對於 unfilled_reports_in_process_for_allocation 中的每筆報工：
+
+如果 total_unfilled_work_time_in_process > 0 且作業員有工時：
+
+allocation_ratio = 當前作業員工時 / total_unfilled_work_time_in_process
+
+allocated_qty = round(remaining_quantity_to_allocate_for_process * allocation_ratio)
+
+將 allocated_qty 賦值給 report.allocated_quantity。
+
+report.allocated_defect_quantity 暫時設為 0 (如果不良品也需要分配，此處需擴展邏輯，例如根據歷史良率比例分配)。
+
+更新 report.allocation_explanation。
+
+否則， allocated_quantity 和 allocated_defect_quantity 設為 0。
+
+保存 ( report.save() ) 並將更新後的 report 加入最終列表。
+
+將已填寫和手動修改的報工也加入最終列表。
+
+返回最終更新的報表列表： 包含所有經過分配或無需分配的 ProcessedOperatorReport 實例。
+
+7.3 分配標示規範 (MES 報表系統開發設計架構與結構規範 - 五、5.3)
+ProcessedOperatorReport 模型中的欄位將明確區分：
+
+original_quantity: 原始報工時填寫的良品數量。
+
+defect_quantity: 原始報工時填寫的不良品數量。
+
+allocated_quantity: 系統智能分配的良品數量。
+
+allocated_defect_quantity: 系統智能分配的不良品數量。
+
+final_quantity_for_report: 用於報表顯示的最終良品數量 (優先 original_quantity，其次 allocated_quantity)。
+
+final_total_output_for_report: 用於報表顯示的最終總產量 ( final_quantity_for_report + 最終不良品數量)。
+
+allocation_explanation: 記錄分配計算過程、依據和結果。
+
+is_manual_modified: 標識是否被人工修改過，以避免自動分配覆蓋。
+
+8. 前端介面設計與使用方式
+8.1 模板結構與介面設計 (MES 報表系統開發設計架構與結構規範 - 六、6.1 & 6.2)
+reporting/templates/reporting/report_export.html 將作為統一的報表匯出介面。
+
+介面將採用響應式設計，使用 Bootstrap 5 框架，確保統一風格。
+
+操作步驟將清晰引導用戶：選擇報表類型 → 選擇匯出格式 → 選擇日期範圍 → 點擊匯出。
+
+8.2 用戶體驗規範 (MES 報表系統開發設計架構與結構規範 - 六、6.3)
+載入提示：長時間操作顯示載入動畫。
+
+錯誤處理：友善的錯誤訊息提示。
+
+數據驗證：前端進行日期格式、範圍等即時表單驗證。
+
+操作確認：重要操作（如重新生成報表數據）需要確認。
+
+結果反饋：操作完成後顯示成功或失敗提示。
+
+8.3 訪問路徑與操作步驟 (報表功能整合說明 - 使用方式)
+訪問路徑：
+
+報表模組首頁 (reporting/index.html) → 點擊「報表匯出」按鈕。
+
+原主管功能頁面 (workorder/templates/workorder/report/supervisor/functions.html) → 點擊「報表匯出」按鈕（將被修改為重定向到 reporting/report_export.html）。
+
+操作步驟：
+
+用戶導航到報表匯出頁面。
+
+選擇所需的報表類型（下拉菜單）。
+
+選擇匯出格式（單選按鈕或下拉菜單）。
+
+選擇日期範圍（預設選項或自訂日期選擇器）。
+
+點擊「匯出報表」按鈕。
+
+系統在後台處理並自動下載報表檔案。
+
+9. 數據查詢與快取規範
+9.1 查詢器設計 (MES 報表系統開發設計架構與結構規範 - 七、7.1)
+所有數據查詢邏輯將抽象到 reporting/queries/ 目錄下。
+
+reporting/queries/
+├── __init__.py
+├── base_query.py            # 基礎查詢器
+├── operator_query.py        # 作業員報工查詢器
+├── smt_query.py             # SMT報工查詢器
+# ... 其他報表類型對應的查詢器
+operator_query.py 中的 get_operator_supplement_reports 應直接從 workorder.models.OperatorSupplementReport 獲取原始數據，或者從 ProcessedOperatorReport 中獲取經過初步處理的數據，具體取決於 ProcessedOperatorReport 的生成時機。在當前設計中，HybridAllocator 負責處理並保存到 ProcessedOperatorReport，因此查詢器可能會主要從 ProcessedOperatorReport 獲取最終報表數據。
+
+9.2 快取策略 (MES 報表系統開發設計架構與結構規範 - 七、7.2)
+報表快取：已生成的複雜報表結果，考慮快取 24 小時。
+
+統計快取：頻繁訪問的統計數據，快取 1 小時。
+
+查詢快取：常用基礎數據查詢結果，快取 30 分鐘。
+
+快取清理：每日凌晨運行定時任務清理過期快取。
+
+10. 報表匯出規範 (MES 報表系統開發設計架構與結構規範 - 八、8.1 & 8.2)
+10.1 匯出格式與內容
+Excel 格式：使用 openpyxl 庫，支持多工作表，確保完整樣式。包含表頭資訊、數據內容、統計摘要（如果適用）、圖表附件（未來擴展）。
+
+CSV 格式：使用 Python 內置 csv 模組，確保 UTF-8 編碼以支持中文。內容為純文本數據。
+
+PDF 格式：暫時使用 Excel 格式導出或提示功能正在開發中。未來將實作真正的 PDF 匯出，使用 reportlab 等庫，支持圖表嵌入。
+
+11. 未來擴展與注意事項
+11.1 可能的功能擴展 (報表功能整合說明 - 未來擴展)
+新增更多報表類型（如設備維護報表、產能利用率報表等）。
+
+支持更多匯出格式（如 JSON）。
+
+新增報表預覽功能。
+
+支持報表排程發送（定期郵件發送）。
+
+11.2 技術改進 (報表功能整合說明 - 技術改進)
+實作真正的 PDF 匯出功能。
+
+新增報表模板功能，允許用戶自定義報表樣式。
+
+實現報表資料快取機制，提升性能。
+
+新增報表統計分析模組，提供更深度的數據洞察。
+
+11.3 注意事項 (報表功能整合說明 - 注意事項)
+權限設定：確保用戶被正確添加到「報表使用者」群組或具有超級用戶權限。
+
+資料範圍：異常報工只包含有異常紀錄的資料。日期範圍自訂時，後台需進行嚴格的日期格式和邏輯驗證。
+
+檔案格式：提醒用戶 PDF 格式的限制。
+
+ 當我提出修改方案，如果脫離上面的架構跟結構的時候，須提出警告並說明跟哪一條規範有衝突，並提出解決方案。

@@ -15,7 +15,7 @@ from .models import (
 from .tasks import get_standard_processes
 from .forms import WorkOrderForm
 from django.contrib import messages
-from reporting.models import ProductionDailyReport
+
 from datetime import datetime, timedelta, date
 from django.db import models
 import psycopg2
@@ -3984,13 +3984,7 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
 
 # 系統設定功能已移至系統管理模組，請使用 system:workorder_settings
 
-def report_export(request):
-    """
-    報表匯出頁面 - 已移至報表管理模組統一管理
-    請使用 reporting:report_export
-    """
-    from django.shortcuts import redirect
-    return redirect('reporting:report_export')
+
 
 def data_maintenance(request):
     """

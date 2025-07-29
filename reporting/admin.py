@@ -12,8 +12,8 @@ from .models import (
     QualityAnalysisReport,
     ComprehensiveAnalysisReport,
     ManufacturingWorkHour,
-    ReportSyncSettings,
 )
+from system.models import ReportSyncSettings
 
 # 報表管理模組管理介面
 @admin.register(ProductionDailyReport)
@@ -43,8 +43,8 @@ class OperatorPerformanceAdmin(admin.ModelAdmin):
 
 @admin.register(ReportSyncSettings)
 class ReportSyncSettingsAdmin(admin.ModelAdmin):
-    list_display = ["report_type", "sync_interval_hours", "is_active", "updated_at"]
-    list_filter = ["report_type", "is_active"]
+    list_display = ["sync_type", "sync_frequency", "is_active", "updated_at"]
+    list_filter = ["sync_type", "is_active"]
     readonly_fields = ["created_at", "updated_at"]
 
     def has_add_permission(self, request):

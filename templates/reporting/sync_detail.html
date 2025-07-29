@@ -1,0 +1,391 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}同步詳情 - {{ sync_log.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-info-circle"></i> 同步詳情
+                </h2>
+                <div>
+                    <a href="{% url 'reporting:sync_status_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 基本資訊 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info"></i> 基本資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td width="150"><strong>同步ID：</strong></td>
+                                    <td>{{ sync_log.id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>同步類型：</strong></td>
+                                    <td>
+                                        <span class="badge badge-info">
+                                            {% if sync_log.sync_type == 'work_time' %}
+                                                工作時間報表
+                                            {% elif sync_log.sync_type == 'work_order' %}
+                                                工單機種報表
+                                            {% else %}
+                                                全部同步
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>狀態：</strong></td>
+                                    <td>
+                                        {% if sync_log.status == 'success' %}
+                                            <span class="badge badge-success">
+                                                <i class="fas fa-check"></i> 成功
+                                            </span>
+                                        {% elif sync_log.status == 'error' %}
+                                            <span class="badge badge-danger">
+                                                <i class="fas fa-times"></i> 失敗
+                                            </span>
+                                        {% else %}
+                                            <span class="badge badge-warning">
+                                                <i class="fas fa-clock"></i> 等待中
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>執行用戶：</strong></td>
+                                    <td>{{ sync_log.created_by|default:"系統自動" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td width="150"><strong>建立時間：</strong></td>
+                                    <td>{{ sync_log.created_at|date:"Y-m-d H:i:s" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>執行時間：</strong></td>
+                                    <td>{{ sync_log.duration_seconds }} 秒</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>處理記錄：</strong></td>
+                                    <td>{{ sync_log.processed }} 筆</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>新增記錄：</strong></td>
+                                    <td>{{ sync_log.created }} 筆</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>更新記錄：</strong></td>
+                                    <td>{{ sync_log.updated }} 筆</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細結果 -->
+    {% if sync_details %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar"></i> 詳細結果
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if sync_details.error %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            {{ sync_details.error }}
+                        </div>
+                    {% else %}
+                        <!-- 工作時間報表同步結果 -->
+                        {% if sync_details.work_time %}
+                        <div class="mb-4">
+                            <h6 class="text-primary">
+                                <i class="fas fa-clock"></i> 工作時間報表同步結果
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h4 class="text-primary">{{ sync_details.work_time.processed }}</h4>
+                                            <p class="mb-0">處理記錄</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h4 class="text-success">{{ sync_details.work_time.created }}</h4>
+                                            <p class="mb-0">新增記錄</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h4 class="text-info">{{ sync_details.work_time.updated }}</h4>
+                                            <p class="mb-0">更新記錄</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h4 class="text-warning">{{ sync_details.work_time.skipped }}</h4>
+                                            <p class="mb-0">跳過記錄</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- 工單機種報表同步結果 -->
+                        {% if sync_details.work_order %}
+                        <div class="mb-4">
+                            <h6 class="text-primary">
+                                <i class="fas fa-clipboard-list"></i> 工單機種報表同步結果
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h4 class="text-primary">{{ sync_details.work_order.processed }}</h4>
+                                            <p class="mb-0">處理記錄</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h4 class="text-success">{{ sync_details.work_order.created }}</h4>
+                                            <p class="mb-0">新增記錄</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h4 class="text-info">{{ sync_details.work_order.updated }}</h4>
+                                            <p class="mb-0">更新記錄</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-light">
+                                        <div class="card-body text-center">
+                                            <h4 class="text-warning">{{ sync_details.work_order.skipped }}</h4>
+                                            <p class="mb-0">跳過記錄</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- 錯誤訊息 -->
+                        {% if sync_details.errors %}
+                        <div class="mt-4">
+                            <h6 class="text-danger">
+                                <i class="fas fa-exclamation-triangle"></i> 錯誤訊息
+                            </h6>
+                            <div class="alert alert-danger">
+                                <ul class="mb-0">
+                                    {% for error in sync_details.errors %}
+                                    <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- 警告訊息 -->
+                        {% if sync_details.warnings %}
+                        <div class="mt-4">
+                            <h6 class="text-warning">
+                                <i class="fas fa-exclamation-circle"></i> 警告訊息
+                            </h6>
+                            <div class="alert alert-warning">
+                                <ul class="mb-0">
+                                    {% for warning in sync_details.warnings %}
+                                    <li>{{ warning }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- 處理的工單列表 -->
+                        {% if sync_details.processed_workorders %}
+                        <div class="mt-4">
+                            <h6 class="text-info">
+                                <i class="fas fa-list"></i> 處理的工單列表
+                            </h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>工單編號</th>
+                                            <th>產品代號</th>
+                                            <th>完成數量</th>
+                                            <th>不良數量</th>
+                                            <th>完成率</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for workorder in sync_details.processed_workorders %}
+                                        <tr>
+                                            <td>{{ workorder.workorder_number }}</td>
+                                            <td>{{ workorder.product_code }}</td>
+                                            <td>{{ workorder.completed_quantity }}</td>
+                                            <td>{{ workorder.defect_quantity }}</td>
+                                            <td>{{ workorder.completion_rate }}%</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- 處理的作業員列表 -->
+                        {% if sync_details.processed_workers %}
+                        <div class="mt-4">
+                            <h6 class="text-info">
+                                <i class="fas fa-users"></i> 處理的作業員列表
+                            </h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>作業員</th>
+                                            <th>工單編號</th>
+                                            <th>工序</th>
+                                            <th>工作時數</th>
+                                            <th>完成數量</th>
+                                            <th>效率</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for worker in sync_details.processed_workers %}
+                                        <tr>
+                                            <td>{{ worker.worker_name }}</td>
+                                            <td>{{ worker.workorder_number }}</td>
+                                            <td>{{ worker.process_name }}</td>
+                                            <td>{{ worker.total_work_hours }}小時</td>
+                                            <td>{{ worker.completed_quantity }}</td>
+                                            <td>{{ worker.efficiency_rate }}件/小時</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 錯誤日誌 -->
+    {% if sync_log.error_message %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bug"></i> 錯誤日誌
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <pre class="mb-0">{{ sync_log.error_message }}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 操作按鈕 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center">
+                    <a href="{% url 'reporting:sync_status_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回列表
+                    </a>
+                    {% if sync_log.status == 'error' %}
+                    <button type="button" class="btn btn-warning" onclick="retrySync()">
+                        <i class="fas fa-redo"></i> 重試同步
+                    </button>
+                    {% endif %}
+                    <button type="button" class="btn btn-info" onclick="exportDetails()">
+                        <i class="fas fa-download"></i> 匯出詳情
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function retrySync() {
+    if (confirm('確定要重試此同步嗎？')) {
+        // 這裡可以發送 AJAX 請求重試同步
+        alert('重試功能開發中...');
+    }
+}
+
+function exportDetails() {
+    // 匯出同步詳情為 JSON 檔案
+    var data = {
+        sync_id: {{ sync_log.id }},
+        sync_type: '{{ sync_log.sync_type }}',
+        status: '{{ sync_log.status }}',
+        created_at: '{{ sync_log.created_at|date:"Y-m-d H:i:s" }}',
+        duration_seconds: {{ sync_log.duration_seconds }},
+        processed: {{ sync_log.processed }},
+        created: {{ sync_log.created }},
+        updated: {{ sync_log.updated }},
+        details: {{ sync_details|safe }}
+    };
+    
+    var dataStr = JSON.stringify(data, null, 2);
+    var dataBlob = new Blob([dataStr], {type: 'application/json'});
+    
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = 'sync_details_{{ sync_log.id }}.json';
+    link.click();
+}
+</script>
+{% endblock %} 

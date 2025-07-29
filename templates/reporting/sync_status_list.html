@@ -1,0 +1,441 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}報表資料同步狀態{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-sync-alt"></i> 報表資料同步狀態
+                </h2>
+                <div>
+                    <a href="{% url 'reporting:sync_dashboard' %}" class="btn btn-info">
+                        <i class="fas fa-chart-line"></i> 同步儀表板
+                    </a>
+                    <a href="{% url 'reporting:sync_settings' %}" class="btn btn-secondary">
+                        <i class="fas fa-cog"></i> 同步設定
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ total_syncs }}</h4>
+                            <p class="mb-0">總同步次數</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-sync fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ success_syncs }}</h4>
+                            <p class="mb-0">成功同步</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-check-circle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ error_syncs }}</h4>
+                            <p class="mb-0">失敗同步</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ pending_syncs }}</h4>
+                            <p class="mb-0">等待中</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 手動同步表單 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-play"></i> 手動同步執行
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'reporting:manual_sync' %}">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="sync_type">同步類型</label>
+                                    <select name="sync_type" id="sync_type" class="form-control">
+                                        <option value="all">全部同步</option>
+                                        <option value="work_time">工作時間報表</option>
+                                        <option value="work_order">工單機種報表</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="date_from">開始日期</label>
+                                    <input type="date" name="date_from" id="date_from" class="form-control">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label for="date_to">結束日期</label>
+                                    <input type="date" name="date_to" id="date_to" class="form-control">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label>&nbsp;</label>
+                                    <button type="submit" class="btn btn-primary btn-block">
+                                        <i class="fas fa-play"></i> 執行同步
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 篩選條件 -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="get" class="row">
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label for="sync_type_filter">同步類型</label>
+                                <select name="sync_type" id="sync_type_filter" class="form-control">
+                                    <option value="">全部</option>
+                                    <option value="work_time" {% if request.GET.sync_type == 'work_time' %}selected{% endif %}>工作時間報表</option>
+                                    <option value="work_order" {% if request.GET.sync_type == 'work_order' %}selected{% endif %}>工單機種報表</option>
+                                    <option value="all" {% if request.GET.sync_type == 'all' %}selected{% endif %}>全部同步</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label for="status_filter">狀態</label>
+                                <select name="status" id="status_filter" class="form-control">
+                                    <option value="">全部</option>
+                                    <option value="success" {% if request.GET.status == 'success' %}selected{% endif %}>成功</option>
+                                    <option value="error" {% if request.GET.status == 'error' %}selected{% endif %}>失敗</option>
+                                    <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>等待中</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label for="date_from_filter">開始日期</label>
+                                <input type="date" name="date_from" id="date_from_filter" class="form-control" value="{{ request.GET.date_from }}">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label for="date_to_filter">結束日期</label>
+                                <input type="date" name="date_to" id="date_to_filter" class="form-control" value="{{ request.GET.date_to }}">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label>&nbsp;</label>
+                                <button type="submit" class="btn btn-secondary btn-block">
+                                    <i class="fas fa-search"></i> 篩選
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label>&nbsp;</label>
+                                <a href="{% url 'reporting:sync_status_list' %}" class="btn btn-outline-secondary btn-block">
+                                    <i class="fas fa-times"></i> 清除
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 同步記錄列表 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list"></i> 同步記錄列表
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if sync_logs %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>同步類型</th>
+                                        <th>狀態</th>
+                                        <th>處理記錄</th>
+                                        <th>新增</th>
+                                        <th>更新</th>
+                                        <th>執行時間</th>
+                                        <th>建立時間</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for sync_log in sync_logs %}
+                                    <tr>
+                                        <td>{{ sync_log.id }}</td>
+                                        <td>
+                                            <span class="badge badge-info">
+                                                {% if sync_log.sync_type == 'work_time' %}
+                                                    工作時間報表
+                                                {% elif sync_log.sync_type == 'work_order' %}
+                                                    工單機種報表
+                                                {% else %}
+                                                    全部同步
+                                                {% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if sync_log.status == 'success' %}
+                                                <span class="badge badge-success">
+                                                    <i class="fas fa-check"></i> 成功
+                                                </span>
+                                            {% elif sync_log.status == 'error' %}
+                                                <span class="badge badge-danger">
+                                                    <i class="fas fa-times"></i> 失敗
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-warning">
+                                                    <i class="fas fa-clock"></i> 等待中
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ sync_log.processed }}</td>
+                                        <td>{{ sync_log.created }}</td>
+                                        <td>{{ sync_log.updated }}</td>
+                                        <td>{{ sync_log.duration_seconds }}秒</td>
+                                        <td>{{ sync_log.created_at|date:"Y-m-d H:i:s" }}</td>
+                                        <td>
+                                            <a href="{% url 'reporting:sync_detail' sync_log.id %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> 詳情
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 分頁 -->
+                        {% if is_paginated %}
+                        <nav aria-label="同步記錄分頁">
+                            <ul class="pagination justify-content-center">
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=1{% if request.GET.sync_type %}&sync_type={{ request.GET.sync_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                                            <i class="fas fa-angle-double-left"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.sync_type %}&sync_type={{ request.GET.sync_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                                            <i class="fas fa-angle-left"></i>
+                                        </a>
+                                    </li>
+                                {% endif %}
+
+                                <li class="page-item active">
+                                    <span class="page-link">
+                                        第 {{ page_obj.number }} 頁，共 {{ page_obj.paginator.num_pages }} 頁
+                                    </span>
+                                </li>
+
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.sync_type %}&sync_type={{ request.GET.sync_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                                            <i class="fas fa-angle-right"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.sync_type %}&sync_type={{ request.GET.sync_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                                            <i class="fas fa-angle-double-right"></i>
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">尚無同步記錄</h5>
+                            <p class="text-muted">執行同步後，記錄將顯示在此處</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近同步狀態 -->
+    {% if recent_syncs %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history"></i> 最近同步狀態
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for sync in recent_syncs %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card border-left-{% if sync.status == 'success' %}success{% elif sync.status == 'error' %}danger{% else %}warning{% endif %}">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="card-title mb-1">
+                                                {% if sync.sync_type == 'work_time' %}
+                                                    工作時間報表
+                                                {% elif sync.sync_type == 'work_order' %}
+                                                    工單機種報表
+                                                {% else %}
+                                                    全部同步
+                                                {% endif %}
+                                            </h6>
+                                            <p class="card-text small text-muted mb-1">
+                                                {{ sync.created_at|date:"m-d H:i" }}
+                                            </p>
+                                            <p class="card-text small mb-0">
+                                                處理: {{ sync.processed }} | 新增: {{ sync.created }} | 更新: {{ sync.updated }}
+                                            </p>
+                                        </div>
+                                        <div class="text-right">
+                                            {% if sync.status == 'success' %}
+                                                <i class="fas fa-check-circle text-success fa-2x"></i>
+                                            {% elif sync.status == 'error' %}
+                                                <i class="fas fa-exclamation-triangle text-danger fa-2x"></i>
+                                            {% else %}
+                                                <i class="fas fa-clock text-warning fa-2x"></i>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 工單數量分擔模態框 -->
+<div class="modal fade" id="allocationModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-calculator"></i> 工單數量分擔
+                </h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <form method="post" action="{% url 'reporting:workorder_allocation' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="workorder_id">工單ID</label>
+                        <input type="number" name="workorder_id" id="workorder_id" class="form-control" required>
+                        <small class="form-text text-muted">請輸入要進行數量分擔的工單ID</small>
+                    </div>
+                    <div class="form-group">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" name="force" id="force_allocation" class="custom-control-input" value="true">
+                            <label class="custom-control-label" for="force_allocation">
+                                強制執行（即使工單未完工）
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-play"></i> 執行分擔
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 設定預設日期為今天
+    var today = new Date().toISOString().split('T')[0];
+    $('#date_from').val(today);
+    $('#date_to').val(today);
+    
+    // 工單數量分擔按鈕
+    $('.btn-allocation').click(function() {
+        $('#allocationModal').modal('show');
+    });
+    
+    // 自動刷新（每30秒）
+    setInterval(function() {
+        location.reload();
+    }, 30000);
+});
+</script>
+{% endblock %} 

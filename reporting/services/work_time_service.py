@@ -17,8 +17,8 @@ from reporting.models import (
     WorkTimeReportCache,
     WorkerPerformanceCache,
     WorkOrderSummaryCache,
-    ReportDataSyncLog
 )
+from system.models import ReportDataSyncLog
 from .base_service import BaseReportService
 
 

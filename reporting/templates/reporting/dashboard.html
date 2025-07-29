@@ -1,43 +1,36 @@
-{# 報表總覽頁，所有報表入口與簡介 #}
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% load static %}
 
-{% block title %}報表儀表板 - MES{% endblock %}
+{% block title %}報表管理儀表板{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <!-- 頁面標題 -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="h3 mb-0">
-                        <i class="fas fa-tachometer-alt text-primary"></i> 報表儀表板
-                    </h1>
-                    <p class="text-muted mb-0">MES 報表管理中心 - 即時監控與分析</p>
-                </div>
-                <div>
-                    <span class="badge badge-success">
-                        <i class="fas fa-circle"></i> 系統正常運行
-                    </span>
-                    <span class="text-muted ml-2">{{ now|date:"Y-m-d H:i" }}</span>
-                </div>
-            </div>
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-chart-line"></i> 報表管理儀表板
+        </h1>
+        <div>
+            <a href="{% url 'reporting:report_export' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-download"></i> 報表匯出
+            </a>
+            <a href="{% url 'reporting:sync_dashboard' %}" class="btn btn-info btn-sm">
+                <i class="fas fa-sync"></i> 同步管理
+            </a>
         </div>
     </div>
 
-    <!-- 統計概覽卡片 -->
-    <div class="row mb-4">
+    <!-- 統計卡片 -->
+    <div class="row">
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-left-primary shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                工作時間報表
+                                今日報表
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_production }}</div>
-                            <div class="text-xs text-muted">今日新增: {{ today_production }}</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">0</div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-calendar fa-2x text-gray-300"></i>
@@ -53,13 +46,12 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                作業員報表
+                                同步狀態
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_operator }}</div>
-                            <div class="text-xs text-muted">活躍作業員: {{ active_operators }}</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">正常</div>
                         </div>
                         <div class="col-auto">
-                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                            <i class="fas fa-sync fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
@@ -72,13 +64,12 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                SMT報表
+                                作業員數量
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_smt }}</div>
-                            <div class="text-xs text-muted">設備運行: {{ running_equipment }}</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">0</div>
                         </div>
                         <div class="col-auto">
-                            <i class="fas fa-microchip fa-2x text-gray-300"></i>
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
@@ -91,13 +82,12 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                平均效率
+                                工單數量
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ avg_efficiency }}%</div>
-                            <div class="text-xs text-muted">目標: 95%</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">0</div>
                         </div>
                         <div class="col-auto">
-                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                            <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
@@ -105,325 +95,100 @@
         </div>
     </div>
 
-    <!-- 快速入口 -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">
-                        <i class="fas fa-rocket"></i> 快速入口
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-lg-3 col-md-6 mb-3">
-                            <div class="text-center">
-                                <a href="{% url 'reporting:operator_performance' %}" class="btn btn-primary btn-lg btn-block mb-2">
-                                    <i class="fas fa-user-clock fa-2x mb-2"></i><br>
-                                    作業員日報表
-                                </a>
-                                <small class="text-muted">查看今日作業員生產數據</small>
-                            </div>
-                        </div>
 
-                        <div class="col-lg-3 col-md-6 mb-3">
-                            <div class="text-center">
-                                <a href="{% url 'reporting:production_daily' %}" class="btn btn-info btn-lg btn-block mb-2">
-                                    <i class="fas fa-industry fa-2x mb-2"></i><br>
-                                    工作時間報表
-                                </a>
-                                <small class="text-muted">整體生產線數據</small>
-                            </div>
-                        </div>
-                        <div class="col-lg-3 col-md-6 mb-3">
-                            <div class="text-center">
-
-                                <small class="text-muted">作業員績效評分</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- 報表分類 -->
     <div class="row">
-        <!-- 作業員報表 -->
+        <!-- 工作時間報表 -->
         <div class="col-lg-6 mb-4">
             <div class="card shadow">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">
-                        <i class="fas fa-user-clock"></i> 作業員報表
+                        <i class="fas fa-clock"></i> 工作時間報表
                     </h6>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:operator_daily_report' %}" class="btn btn-outline-primary btn-block">
-                                <i class="fas fa-calendar-day"></i> 日報表
+                            <a href="{% url 'reporting:work_time_list' %}" class="btn btn-outline-primary btn-block">
+                                <i class="fas fa-list"></i> 報表列表
                             </a>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:operator_monthly_report' %}" class="btn btn-outline-success btn-block">
-                                <i class="fas fa-calendar-alt"></i> 月報表
+                            <a href="{% url 'reporting:work_time_export' %}" class="btn btn-outline-success btn-block">
+                                <i class="fas fa-download"></i> 匯出報表
                             </a>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:operator_score_report' %}" class="btn btn-outline-warning btn-block">
-                                <i class="fas fa-star"></i> 評分報表
-                            </a>
-                        </div>
-                        <div class="col-md-6 mb-3">
-
                         </div>
                     </div>
-                    <small class="text-muted">包含作業員的日產量、月統計、評分分析等完整報表</small>
+                    <small class="text-muted">包含日報表、週報表、月報表等時間維度分類</small>
                 </div>
             </div>
         </div>
 
-        <!-- SMT報表 -->
+        <!-- 工單機種報表 -->
         <div class="col-lg-6 mb-4">
             <div class="card shadow">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-success">
-                        <i class="fas fa-microchip"></i> SMT報表
+                        <i class="fas fa-clipboard-list"></i> 工單機種報表
                     </h6>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:smt_daily_report' %}" class="btn btn-outline-success btn-block">
-                                <i class="fas fa-calendar-day"></i> 日報表
+                            <a href="{% url 'reporting:work_order_list' %}" class="btn btn-outline-success btn-block">
+                                <i class="fas fa-list"></i> 報表列表
                             </a>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:smt_monthly_report' %}" class="btn btn-outline-primary btn-block">
-                                <i class="fas fa-calendar-alt"></i> 月報表
-                            </a>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:smt_score_report' %}" class="btn btn-outline-warning btn-block">
-                                <i class="fas fa-star"></i> 評分報表
-                            </a>
-                        </div>
-
-                    </div>
-                    <small class="text-muted">SMT設備的生產數據、效率分析、設備評分等專業報表</small>
-                </div>
-            </div>
-        </div>
-
-        <!-- 生產報表 -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-info">
-                        <i class="fas fa-industry"></i> 生產報表
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:production_daily' %}" class="btn btn-outline-info btn-block">
-                                <i class="fas fa-calendar-day"></i> 日報表
-                            </a>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:production_monthly_report' %}" class="btn btn-outline-primary btn-block">
-                                <i class="fas fa-calendar-alt"></i> 月報表
-                            </a>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:workorder_progress_report' %}" class="btn btn-outline-success btn-block">
-                                <i class="fas fa-tasks"></i> 工單進度
-                            </a>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:capacity_utilization_report' %}" class="btn btn-outline-warning btn-block">
-                                <i class="fas fa-chart-pie"></i> 產能利用率
-                            </a>
-                        </div>
-                        <div class="col-md-6 mb-3">
-
-                        </div>
-                    </div>
-                    <small class="text-muted">生產線數據、工單追蹤、產能分析等管理報表</small>
-                </div>
-            </div>
-        </div>
-
-        <!-- 品質報表 -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-warning">
-                        <i class="fas fa-shield-alt"></i> 品質報表
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:defect_daily_report' %}" class="btn btn-outline-warning btn-block">
-                                <i class="fas fa-calendar-day"></i> 異常日報
-                            </a>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:defect_monthly_report' %}" class="btn btn-outline-danger btn-block">
-                                <i class="fas fa-calendar-alt"></i> 異常月報
-                            </a>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:defect_analysis_report' %}" class="btn btn-outline-info btn-block">
-                                <i class="fas fa-chart-bar"></i> 異常分析
-                            </a>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <a href="{% url 'reporting:attendance_overtime_report' %}" class="btn btn-outline-secondary btn-block">
-                                <i class="fas fa-clock"></i> 出勤統計
+                            <a href="{% url 'reporting:work_order_export' %}" class="btn btn-outline-primary btn-block">
+                                <i class="fas fa-download"></i> 匯出報表
                             </a>
                         </div>
                     </div>
-                    <small class="text-muted">不良品分析、異常追蹤、出勤統計等品質管理報表</small>
+                    <small class="text-muted">工單機種的生產數據、效率分析等專業報表</small>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 最近數據 -->
-    <div class="row mt-4">
+    <!-- 系統狀態 -->
+    <div class="row">
         <div class="col-12">
             <div class="card shadow">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">
-                        <i class="fas fa-history"></i> 最近報表數據
+                    <h6 class="m-0 font-weight-bold text-info">
+                        <i class="fas fa-server"></i> 系統狀態
                     </h6>
                 </div>
                 <div class="card-body">
-                    <ul class="nav nav-tabs" id="reportTabs" role="tablist">
-                        <li class="nav-item">
-                            <a class="nav-link active" id="production-tab" data-toggle="tab" href="#production" role="tab">
-                                工作時間報表
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" id="operator-tab" data-toggle="tab" href="#operator" role="tab">
-                                作業員報表
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" id="smt-tab" data-toggle="tab" href="#smt" role="tab">
-                                SMT報表
-                            </a>
-                        </li>
-                    </ul>
-                    
-                    <div class="tab-content" id="reportTabsContent">
-                        <div class="tab-pane fade show active" id="production" role="tabpanel">
-                            <div class="table-responsive mt-3">
-                                <table class="table table-sm table-striped">
-                                    <thead class="thead-light">
-                                        <tr>
-                                            <th>日期</th>
-                                            <th>作業員</th>
-                                            <th>生產線</th>
-                                            <th>完成數量</th>
-                                            <th>完成率</th>
-                                            <th>效率</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for report in production_reports %}
-                                        <tr>
-                                            <td>{{ report.date|date:"m-d" }}</td>
-                                            <td>{{ report.operator_name }}</td>
-                                            <td>{{ report.get_line_display }}</td>
-                                            <td>{{ report.completed_quantity }}</td>
-                                            <td>
-                                                <span class="badge badge-{% if report.completion_rate >= 90 %}success{% elif report.completion_rate >= 80 %}warning{% else %}danger{% endif %}">
-                                                    {{ report.completion_rate }}%
-                                                </span>
-                                            </td>
-                                            <td>{{ report.efficiency_rate }}%</td>
-                                        </tr>
-                                        {% empty %}
-                                        <tr>
-                                            <td colspan="6" class="text-center text-muted">無工作時間報表數據</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <i class="fas fa-database fa-2x text-success"></i>
+                                <h6 class="mt-2">資料庫</h6>
+                                <small class="text-success">正常</small>
                             </div>
                         </div>
-                        
-                        <div class="tab-pane fade" id="operator" role="tabpanel">
-                            <div class="table-responsive mt-3">
-                                <table class="table table-sm table-striped">
-                                    <thead class="thead-light">
-                                        <tr>
-                                            <th>作業員</th>
-                                            <th>設備</th>
-                                            <th>生產數量</th>
-                                            <th>使用率</th>
-                                            <th>日期</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for report in operator_reports %}
-                                        <tr>
-                                            <td>{{ report.operator_name }}</td>
-                                            <td>{{ report.equipment_name }}</td>
-                                            <td>{{ report.production_quantity }}</td>
-                                            <td>
-                                                <span class="badge badge-{% if report.equipment_usage_rate >= 90 %}success{% elif report.equipment_usage_rate >= 80 %}warning{% else %}danger{% endif %}">
-                                                    {{ report.equipment_usage_rate }}%
-                                                </span>
-                                            </td>
-                                            <td>{{ report.date|date:"m-d" }}</td>
-                                        </tr>
-                                        {% empty %}
-                                        <tr>
-                                            <td colspan="5" class="text-center text-muted">無作業員報表數據</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <i class="fas fa-sync fa-2x text-success"></i>
+                                <h6 class="mt-2">同步服務</h6>
+                                <small class="text-success">運行中</small>
                             </div>
                         </div>
-                        
-                        <div class="tab-pane fade" id="smt" role="tabpanel">
-                            <div class="table-responsive mt-3">
-                                <table class="table table-sm table-striped">
-                                    <thead class="thead-light">
-                                        <tr>
-                                            <th>日期</th>
-                                            <th>設備</th>
-                                            <th>完成數量</th>
-                                            <th>完成率</th>
-                                            <th>每小時點數</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for report in smt_reports %}
-                                        <tr>
-                                            <td>{{ report.date|date:"m-d" }}</td>
-                                            <td>{{ report.equipment_name }}</td>
-                                            <td>{{ report.completed_quantity }}</td>
-                                            <td>
-                                                <span class="badge badge-{% if report.completion_rate >= 90 %}success{% elif report.completion_rate >= 80 %}warning{% else %}danger{% endif %}">
-                                                    {{ report.completion_rate }}%
-                                                </span>
-                                            </td>
-                                            <td>{{ report.point_per_hour|default:"-" }}</td>
-                                        </tr>
-                                        {% empty %}
-                                        <tr>
-                                            <td colspan="5" class="text-center text-muted">無SMT報表數據</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <i class="fas fa-chart-line fa-2x text-info"></i>
+                                <h6 class="mt-2">報表生成</h6>
+                                <small class="text-info">就緒</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <i class="fas fa-download fa-2x text-primary"></i>
+                                <h6 class="mt-2">匯出功能</h6>
+                                <small class="text-primary">可用</small>
                             </div>
                         </div>
                     </div>

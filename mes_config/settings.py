@@ -38,13 +38,13 @@ INSTALLED_APPS = [
     "process",
     "scheduling.apps.SchedulingConfig",
     "quality",
-    "reporting",
     "system",
     "workorder",
     "kanban.apps.KanbanConfig",
     "erp_integration.apps.ErpIntegrationConfig",
     "ai.apps.AiConfig",
     "production",
+    "reporting",
     "django.contrib.humanize",
 ]
 

@@ -58,15 +58,5 @@ urlpatterns = [
     ),
     path("environment/clean_logs/", views.clean_logs, name="clean_logs"),
     
-    # 報表設定相關路由
-    path("report_settings/", views.report_settings, name="report_settings"),
-    path("report_sync_settings/", views.report_sync_settings, name="report_sync_settings_add"),
-    path("report_sync_settings/<int:setting_id>/", views.report_sync_settings, name="report_sync_settings_edit"),
-    path("report_email_settings/", views.report_email_settings, name="report_email_settings_add"),
-    path("report_email_settings/<int:setting_id>/", views.report_email_settings, name="report_email_settings_edit"),
-    path("delete_report_sync_setting/<int:setting_id>/", views.delete_report_sync_setting, name="delete_report_sync_setting"),
-    path("delete_report_email_setting/<int:setting_id>/", views.delete_report_email_setting, name="delete_report_email_setting"),
-    path("manual_sync_reports/", views.manual_sync_reports, name="manual_sync_reports"),
-    path("sync_logs/", views.sync_logs, name="sync_logs"),
-    path("sync_log_detail/<int:log_id>/", views.sync_log_detail, name="sync_log_detail"),
+
 ]

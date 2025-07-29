@@ -1,150 +1,127 @@
 #!/usr/bin/env python3
 """
-報表數據同步管理命令
-用於將報工記錄同步到報表快取中，提升報表查詢效能
+報表資料同步管理命令
+自動將已核准的報工記錄同步到報表資料表中
+
+使用方法:
+python manage.py sync_report_data --type work_time --date-from 2025-01-01 --date-to 2025-01-31
+python manage.py sync_report_data --type work_order --date-from 2025-01-01 --date-to 2025-01-31
+python manage.py sync_report_data --type all --date-from 2025-01-01 --date-to 2025-01-31
 """
 
-import os
-import sys
-import django
-from datetime import datetime, date, timedelta
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
+from datetime import datetime, timedelta
+from reporting.services.sync_service import ReportDataSyncService
+import logging
 
-# 設定Django環境
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mes_config.settings')
-django.setup()
-
-from reporting.services.work_time_service import WorkTimeReportService
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    """報表數據同步命令"""
-    
-    help = '同步報表數據到快取，提升查詢效能'
-    
+    help = "同步已核准的報工記錄到報表資料表"
+
     def add_arguments(self, parser):
-        """添加命令參數"""
         parser.add_argument(
-            '--sync-type',
+            '--type',
             type=str,
-            choices=['work_time', 'worker_performance', 'workorder_summary', 'all'],
+            choices=['work_time', 'work_order', 'all'],
             default='all',
-            help='同步類型 (work_time/worker_performance/workorder_summary/all)'
+            help='同步類型: work_time(工作時間), work_order(工單機種), all(全部)'
         )
-        
         parser.add_argument(
-            '--start-date',
+            '--date-from',
             type=str,
             help='開始日期 (YYYY-MM-DD)'
         )
-        
         parser.add_argument(
-            '--end-date',
+            '--date-to',
             type=str,
             help='結束日期 (YYYY-MM-DD)'
         )
-        
         parser.add_argument(
-            '--days',
-            type=int,
-            default=30,
-            help='同步最近幾天的數據 (預設30天)'
-        )
-        
-        parser.add_argument(
-            '--clear-cache',
+            '--auto',
             action='store_true',
-            help='同步前清理舊的快取數據'
+            help='自動模式：同步最近7天的資料'
         )
-        
         parser.add_argument(
             '--force',
             action='store_true',
-            help='強制重新同步，覆蓋現有快取'
+            help='強制同步：即使記錄已存在也重新同步'
         )
-    
+
     def handle(self, *args, **options):
-        """執行同步命令"""
-        self.stdout.write(self.style.SUCCESS('開始同步報表數據...'))
-        
-        # 初始化服務
-        service = WorkTimeReportService()
-        
-        # 解析日期參數
-        start_date, end_date = self._parse_dates(options)
-        
-        # 清理快取（如果需要）
-        if options['clear_cache']:
-            self.stdout.write('清理舊的快取數據...')
-            result = service.clear_cache()
-            if result['success']:
-                self.stdout.write(self.style.SUCCESS('快取清理完成'))
-            else:
-                self.stdout.write(self.style.ERROR(f'快取清理失敗: {result["error"]}'))
-        
-        # 執行同步
-        sync_types = self._get_sync_types(options['sync_type'])
-        
-        for sync_type in sync_types:
-            self.stdout.write(f'同步 {sync_type} 數據...')
-            
-            try:
-                result = service.sync_report_data(start_date, end_date, sync_type)
-                
-                if result['success']:
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f'{sync_type} 同步成功: '
-                            f'處理 {result["records_processed"]} 筆記錄, '
-                            f'新增 {result["records_created"]} 筆, '
-                            f'更新 {result["records_updated"]} 筆, '
-                            f'耗時 {result["duration_seconds"]} 秒'
-                        )
-                    )
-                else:
-                    self.stdout.write(
-                        self.style.ERROR(f'{sync_type} 同步失敗: {result["error"]}')
-                    )
-                    
-            except Exception as e:
+        sync_type = options['type']
+        date_from = options['date_from']
+        date_to = options['date_to']
+        auto_mode = options['auto']
+        force_sync = options['force']
+
+        self.stdout.write(
+            self.style.SUCCESS(f"開始執行報表資料同步 - 類型: {sync_type}")
+        )
+
+        try:
+            # 初始化同步服務
+            sync_service = ReportDataSyncService()
+
+            # 處理日期參數
+            if auto_mode:
+                # 自動模式：同步最近7天的資料
+                end_date = timezone.now().date()
+                start_date = end_date - timedelta(days=7)
+                date_from = start_date.strftime('%Y-%m-%d')
+                date_to = end_date.strftime('%Y-%m-%d')
                 self.stdout.write(
-                    self.style.ERROR(f'{sync_type} 同步異常: {str(e)}')
+                    self.style.WARNING(f"自動模式：同步 {date_from} 到 {date_to} 的資料")
                 )
-        
-        self.stdout.write(self.style.SUCCESS('報表數據同步完成'))
-    
-    def _parse_dates(self, options):
-        """解析日期參數"""
-        if options['start_date'] and options['end_date']:
+            else:
+                # 手動模式：使用指定的日期範圍
+                if not date_from:
+                    date_from = (timezone.now().date() - timedelta(days=7)).strftime('%Y-%m-%d')
+                if not date_to:
+                    date_to = timezone.now().date().strftime('%Y-%m-%d')
+
+            # 驗證日期格式
             try:
-                start_date = datetime.strptime(options['start_date'], '%Y-%m-%d').date()
-                end_date = datetime.strptime(options['end_date'], '%Y-%m-%d').date()
+                datetime.strptime(date_from, '%Y-%m-%d')
+                datetime.strptime(date_to, '%Y-%m-%d')
             except ValueError:
-                raise CommandError('日期格式錯誤，請使用 YYYY-MM-DD 格式')
-        else:
-            # 使用預設的最近N天
-            end_date = timezone.now().date()
-            start_date = end_date - timedelta(days=options['days'])
-        
-        return start_date, end_date
-    
-    def _get_sync_types(self, sync_type):
-        """取得要同步的類型列表"""
-        if sync_type == 'all':
-            return ['work_time', 'worker_performance', 'workorder_summary']
-        else:
-            return [sync_type]
+                raise CommandError("日期格式錯誤，請使用 YYYY-MM-DD 格式")
+
+            # 執行同步
+            result = sync_service.sync_data(
+                sync_type=sync_type,
+                date_from=date_from,
+                date_to=date_to,
+                user='system'
+            )
+
+            # 顯示結果
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"同步完成！\n"
+                    f"處理記錄數: {result['processed']}\n"
+                    f"新增記錄數: {result['created']}\n"
+                    f"更新記錄數: {result['updated']}\n"
+                    f"執行時間: {result['duration_seconds']} 秒"
+                )
+            )
+
+            # 顯示詳細統計
+            if result['processed'] > 0:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"同步效率: {result['processed'] / result['duration_seconds']:.2f} 記錄/秒"
+                    )
+                )
+
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f"同步失敗: {str(e)}")
+            )
+            logger.error(f"報表資料同步失敗: {str(e)}")
+            raise CommandError(f"同步失敗: {str(e)}")
 
 
-if __name__ == '__main__':
-    # 直接執行時的測試代碼
-    command = Command()
-    command.handle(
-        sync_type='all',
-        start_date=None,
-        end_date=None,
-        days=7,
-        clear_cache=True,
-        force=False
-    ) 
+ 
