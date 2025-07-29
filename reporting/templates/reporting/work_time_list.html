@@ -2,7 +2,7 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}工作時間報表列表 - MES系統{% endblock %}
+{% block title %}工作報表列表 - MES系統{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -46,17 +46,28 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h1 class="h3 mb-0">
-                        <i class="fas fa-clock text-primary"></i> 工作時間報表列表
+                        <i class="fas fa-clock text-primary"></i> 工作報表列表
                     </h1>
-                    <p class="text-muted mb-0">查看和管理所有工作時間報表記錄</p>
+                    <p class="text-muted mb-0">查看和管理所有工作報表記錄</p>
                 </div>
                 <div class="btn-group">
                     <a href="{% url 'reporting:dashboard' %}" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left"></i> 返回儀表板
                     </a>
-                    <a href="{% url 'reporting:work_time_export' %}" class="btn btn-primary">
+                    <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fas fa-download"></i> 匯出報表
-                    </a>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="exportReport('daily')">
+                            <i class="fas fa-calendar-day"></i> 日報表
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportReport('weekly')">
+                            <i class="fas fa-calendar-week"></i> 週報表
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportReport('monthly')">
+                            <i class="fas fa-calendar-alt"></i> 月報表
+                        </a></li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -68,6 +79,110 @@
             <div class="card search-form">
                 <div class="card-body">
                     <form method="get" class="row g-3">
+                        <!-- 隱藏的報表類型參數 -->
+                        <input type="hidden" name="type" value="{{ report_type }}">
+                        
+                        {% if report_type == 'weekly' %}
+                        <!-- 周報表專用：簡化的週期篩選 -->
+                        <div class="col-md-4">
+                            <label for="week_period" class="form-label">選擇週期</label>
+                            <select class="form-select" id="week_period" name="week_period">
+                                {% for period_value, period_name in week_periods %}
+                                <option value="{{ period_value }}" {% if week_period == period_value %}selected{% endif %}>
+                                    {{ period_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- 自訂週期日期輸入框 -->
+                        <div class="col-md-6" id="custom-date-inputs" style="display: {% if week_period == 'custom' %}block{% else %}none{% endif %};">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="date_from" class="form-label">開始日期</label>
+                                    <input type="date" class="form-control" id="date_from" name="date_from" 
+                                           value="{{ request.GET.date_from }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="date_to" class="form-label">結束日期</label>
+                                    <input type="date" class="form-control" id="date_to" name="date_to" 
+                                           value="{{ request.GET.date_to }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label for="worker" class="form-label">作業員</label>
+                            <select class="form-select" id="worker" name="worker">
+                                <option value="">全部作業員</option>
+                                {% for worker in workers %}
+                                <option value="{{ worker }}" {% if request.GET.worker == worker %}selected{% endif %}>
+                                    {{ worker }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <!-- 週報表不顯示工序篩選 -->
+                        <div class="col-md-5">
+                            <label class="form-label">&nbsp;</label>
+                            <div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> 搜尋
+                                </button>
+                            </div>
+                        </div>
+                        {% elif report_type == 'monthly' %}
+                        <!-- 月報表專用：簡化的週期篩選 -->
+                        <div class="col-md-4">
+                            <label for="month_period" class="form-label">選擇週期</label>
+                            <select class="form-select" id="month_period" name="month_period">
+                                {% for period_value, period_name in month_periods %}
+                                <option value="{{ period_value }}" {% if month_period == period_value %}selected{% endif %}>
+                                    {{ period_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- 自訂週期日期輸入框 -->
+                        <div class="col-md-6" id="custom-month-date-inputs" style="display: {% if month_period == 'custom' %}block{% else %}none{% endif %};">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="date_from" class="form-label">開始日期</label>
+                                    <input type="date" class="form-control" id="date_from" name="date_from" 
+                                           value="{{ request.GET.date_from }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="date_to" class="form-label">結束日期</label>
+                                    <input type="date" class="form-control" id="date_to" name="date_to" 
+                                           value="{{ request.GET.date_to }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-2">
+                            <label for="worker" class="form-label">作業員</label>
+                            <select class="form-select" id="worker" name="worker">
+                                <option value="">全部作業員</option>
+                                {% for worker in workers %}
+                                <option value="{{ worker }}" {% if request.GET.worker == worker %}selected{% endif %}>
+                                    {{ worker }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- 月報表不顯示工序篩選 -->
+                        <div class="col-md-5">
+                            <label class="form-label">&nbsp;</label>
+                            <div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> 搜尋
+                                </button>
+                            </div>
+                        </div>
+                        {% else %}
+                        <!-- 日報表：完整篩選功能 -->
                         <div class="col-md-3">
                             <label for="search" class="form-label">關鍵字搜尋</label>
                             <input type="text" class="form-control" id="search" name="search" 
@@ -113,6 +228,7 @@
                                 </button>
                             </div>
                         </div>
+                        {% endif %}
                     </form>
                 </div>
             </div>
@@ -188,15 +304,15 @@
         <div class="col-12">
             <div class="export-buttons">
                 <div class="btn-group" role="group">
-                    <a href="{% url 'reporting:work_time_export' %}?{{ request.GET.urlencode }}" 
+                    <a href="{% url 'reporting:work_time_export' %}?type={{ report_type }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.week_period %}&week_period={{ request.GET.week_period }}{% endif %}" 
                        class="btn btn-outline-success">
                         <i class="fas fa-file-excel"></i> 匯出 Excel
                     </a>
-                    <a href="{% url 'reporting:work_time_export' %}?format=csv&{{ request.GET.urlencode }}" 
+                    <a href="{% url 'reporting:work_time_export' %}?format=csv&type={{ report_type }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.week_period %}&week_period={{ request.GET.week_period }}{% endif %}" 
                        class="btn btn-outline-info">
                         <i class="fas fa-file-csv"></i> 匯出 CSV
                     </a>
-                    <a href="{% url 'reporting:work_time_export' %}?format=pdf&{{ request.GET.urlencode }}" 
+                    <a href="{% url 'reporting:work_time_export' %}?format=pdf&type={{ report_type }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.week_period %}&week_period={{ request.GET.week_period }}{% endif %}" 
                        class="btn btn-outline-danger">
                         <i class="fas fa-file-pdf"></i> 匯出 PDF
                     </a>
@@ -211,13 +327,13 @@
             <div class="card">
                 <div class="card-body">
                     <div class="btn-group btn-group-lg w-100" role="group" aria-label="報表類型選擇">
-                        <a href="?type=daily&{{ request.GET.urlencode|safe }}" class="btn {% if report_type == 'daily' or not report_type %}btn-primary{% else %}btn-outline-primary{% endif %} report-type-btn">
+                        <a href="?type=daily{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}" class="btn {% if report_type == 'daily' or not report_type %}btn-primary{% else %}btn-outline-primary{% endif %} report-type-btn">
                             <i class="fas fa-calendar-day"></i> 日報表
                         </a>
-                        <a href="?type=weekly&{{ request.GET.urlencode|safe }}" class="btn {% if report_type == 'weekly' %}btn-success{% else %}btn-outline-success{% endif %} report-type-btn">
+                        <a href="?type=weekly{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.week_period %}&week_period={{ request.GET.week_period }}{% endif %}" class="btn {% if report_type == 'weekly' %}btn-success{% else %}btn-outline-success{% endif %} report-type-btn">
                             <i class="fas fa-calendar-week"></i> 週報表
                         </a>
-                        <a href="?type=monthly&{{ request.GET.urlencode|safe }}" class="btn {% if report_type == 'monthly' %}btn-info{% else %}btn-outline-info{% endif %} report-type-btn">
+                        <a href="?type=monthly{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}" class="btn {% if report_type == 'monthly' %}btn-info{% else %}btn-outline-info{% endif %} report-type-btn">
                             <i class="fas fa-calendar-alt"></i> 月報表
                         </a>
                     </div>
@@ -259,95 +375,141 @@
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>報表日期</th>
-                                    <th>作業員</th>
-                                    <th>工單號</th>
-                                    <th>產品編號</th>
-                                    <th>工序</th>
-                                    <th>開始時間</th>
-                                    <th>結束時間</th>
-                                    <th>工作時數</th>
-                                    <th>完成數量</th>
-                                    <th>不良品</th>
-                                    <th>操作</th>
+                                    {% if report_type == 'weekly' %}
+                                        <th>作業員</th>
+                                        <th>週工作時數</th>
+                                        <th>週完成數量</th>
+                                        <th>良品</th>
+                                        <th>不良品</th>
+                                        <th>記錄數</th>
+                                    {% elif report_type == 'monthly' %}
+                                        <th>作業員</th>
+                                        <th>月工作時數</th>
+                                        <th>月完成數量</th>
+                                        <th>良品</th>
+                                        <th>不良品</th>
+                                        <th>記錄數</th>
+                                    {% else %}
+                                        <th>報表日期</th>
+                                        <th>作業員</th>
+                                        <th>工單號</th>
+                                        <th>產品編號</th>
+                                        <th>工序</th>
+                                        <th>開始時間</th>
+                                        <th>結束時間</th>
+                                        <th>工作時數</th>
+                                        <th>完成數量</th>
+                                        <th>不良品</th>
+                                        <th>操作</th>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for report in work_time_reports %}
                                 <tr class="report-card">
-                                    <td>
-                                        {% if report_type == 'weekly' %}
-                                            <span class="badge bg-secondary">{{ report.week_start|date:"Y-m-d" }}</span>
-                                        {% elif report_type == 'monthly' %}
-                                            <span class="badge bg-secondary">{{ report.month_start|date:"Y-m" }}</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">{{ report.report_date|date:"Y-m-d" }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <strong>{{ report.worker_name|default:"-" }}</strong>
-                                    </td>
-                                    <td>
-                                        <code>{{ report.workorder_number|default:"-" }}</code>
-                                    </td>
-                                    <td>
-                                        <span class="text-info">{{ report.product_code|default:"-" }}</span>
-                                    </td>
-                                    <td>{{ report.process_name|default:"-" }}</td>
-                                    <td>
-                                        {% if report_type == 'daily' and report.start_time %}
-                                            {{ report.start_time|date:"H:i" }}
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if report_type == 'daily' and report.end_time %}
-                                            {{ report.end_time|date:"H:i" }}
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if report.total_work_hours %}
+                                    {% if report_type == 'weekly' %}
+                                        <td>
+                                            <strong>{{ report.worker_name|default:"-" }}</strong>
+                                        </td>
+                                        <td>
                                             <span class="badge bg-info">{{ report.total_work_hours|floatformat:1 }}h</span>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-success">{{ report.completed_quantity|intcomma }}</span>
-                                    </td>
-                                    <td>
-                                        {% if report.defect_quantity > 0 %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">{{ report.completed_quantity|intcomma }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">{{ report.completed_quantity|intcomma }}</span>
+                                        </td>
+                                        <td>
                                             <span class="badge bg-warning">{{ report.defect_quantity|intcomma }}</span>
-                                        {% else %}
-                                            <span class="text-muted">0</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if report_type == 'daily' %}
-                                        <div class="btn-group btn-group-sm" role="group">
-                                            <a href="{% url 'reporting:work_time_detail' report.id %}" 
-                                               class="btn btn-outline-primary" title="查看詳情">
-                                                <i class="fas fa-eye"></i> 查看
-                                            </a>
-                                            <a href="{% url 'reporting:work_time_export' %}?id={{ report.id }}" 
-                                               class="btn btn-outline-success" title="匯出">
-                                                <i class="fas fa-download"></i> 匯出
-                                            </a>
-                                        </div>
-                                        {% else %}
-                                        <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ report.report_count }}筆</span>
+                                        </td>
+                                    {% elif report_type == 'monthly' %}
+                                        <td>
+                                            <strong>{{ report.worker_name|default:"-" }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ report.total_work_hours|floatformat:1 }}h</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">{{ report.completed_quantity|intcomma }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">{{ report.completed_quantity|intcomma }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-warning">{{ report.defect_quantity|intcomma }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ report.report_count }}筆</span>
+                                        </td>
+                                    {% else %}
+                                        <td>
+                                            <span class="badge bg-secondary">{{ report.report_date|date:"Y-m-d" }}</span>
+                                        </td>
+                                        <td>
+                                            <strong>{{ report.worker_name|default:"-" }}</strong>
+                                        </td>
+                                        <td>
+                                            <code>{{ report.workorder_number|default:"-" }}</code>
+                                        </td>
+                                        <td>
+                                            <span class="text-info">{{ report.product_code|default:"-" }}</span>
+                                        </td>
+                                        <td>{{ report.process_name|default:"-" }}</td>
+                                        <td>
+                                            {% if report.start_time %}
+                                                {{ report.start_time|date:"H:i" }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.end_time %}
+                                                {{ report.end_time|date:"H:i" }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.actual_work_hours %}
+                                                <span class="badge bg-info">{{ report.actual_work_hours|floatformat:1 }}h</span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">{{ report.completed_quantity|intcomma }}</span>
+                                        </td>
+                                        <td>
+                                            {% if report.defect_quantity > 0 %}
+                                                <span class="badge bg-warning">{{ report.defect_quantity|intcomma }}</span>
+                                            {% else %}
+                                                <span class="text-muted">0</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="{% url 'reporting:work_time_detail' report.id %}" 
+                                                   class="btn btn-outline-primary" title="查看詳情">
+                                                    <i class="fas fa-eye"></i> 查看
+                                                </a>
+                                                <a href="{% url 'reporting:work_time_export' %}?id={{ report.id }}" 
+                                                   class="btn btn-outline-success" title="匯出">
+                                                    <i class="fas fa-download"></i> 匯出
+                                                </a>
+                                            </div>
+                                        </td>
+                                    {% endif %}
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="11" class="text-center py-4">
+                                    <td colspan="{% if report_type == 'weekly' or report_type == 'monthly' %}5{% else %}11{% endif %}" class="text-center py-4">
                                         <div class="text-muted">
                                             <i class="fas fa-inbox fa-3x mb-3"></i>
-                                            <h5>暫無工作時間報表記錄</h5>
+                                            <h5>暫無工作報表記錄</h5>
                                             <p>目前沒有符合搜尋條件的報表記錄</p>
                                         </div>
                                     </td>
@@ -374,12 +536,12 @@
                     <ul class="pagination mb-0">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?page=1&{{ request.GET.urlencode }}">
+                                <a class="page-link" href="?page=1&type={{ report_type }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.week_period %}&week_period={{ request.GET.week_period }}{% endif %}">
                                     <i class="fas fa-angle-double-left"></i>
                                 </a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&type={{ report_type }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.week_period %}&week_period={{ request.GET.week_period }}{% endif %}">
                                     <i class="fas fa-angle-left"></i>
                                 </a>
                             </li>
@@ -392,19 +554,19 @@
                                 </li>
                             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}&{{ request.GET.urlencode }}">{{ num }}</a>
+                                    <a class="page-link" href="?page={{ num }}&type={{ report_type }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.week_period %}&week_period={{ request.GET.week_period }}{% endif %}">{{ num }}</a>
                                 </li>
                             {% endif %}
                         {% endfor %}
 
                         {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}&type={{ report_type }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.week_period %}&week_period={{ request.GET.week_period }}{% endif %}">
                                     <i class="fas fa-angle-right"></i>
                                 </a>
                             </li>
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&{{ request.GET.urlencode }}">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&type={{ report_type }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}{% if request.GET.week_period %}&week_period={{ request.GET.week_period }}{% endif %}">
                                     <i class="fas fa-angle-double-right"></i>
                                 </a>
                             </li>
@@ -420,37 +582,185 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 自動提交搜尋表單
-    $('.search-form select').change(function() {
-        $(this).closest('form').submit();
-    });
+    const searchForm = document.querySelector('.search-form form');
+    if (searchForm) {
+        const selects = searchForm.querySelectorAll('select');
+        selects.forEach(select => {
+            select.addEventListener('change', function() {
+                searchForm.submit();
+            });
+        });
+    }
 
     // 日期範圍驗證
-    $('#date_from, #date_to').change(function() {
-        var dateFrom = $('#date_from').val();
-        var dateTo = $('#date_to').val();
-        
-        if (dateFrom && dateTo && dateFrom > dateTo) {
-            alert('開始日期不能晚於結束日期');
-            $(this).val('');
-        }
-    });
+    const dateFrom = document.getElementById('date_from');
+    const dateTo = document.getElementById('date_to');
+    
+    if (dateFrom && dateTo) {
+        dateFrom.addEventListener('change', validateDateRange);
+        dateTo.addEventListener('change', validateDateRange);
+    }
+
+    // 周報表周期選擇器變更事件
+    const weekPeriod = document.getElementById('week_period');
+    if (weekPeriod) {
+        weekPeriod.addEventListener('change', function() {
+            // 如果是自訂週期，顯示日期選擇器
+            if (this.value === 'custom') {
+                showCustomDateInputs();
+            } else {
+                hideCustomDateInputs();
+            }
+        });
+    }
 
     // 匯出按鈕點擊事件
-    $('.export-buttons .btn').click(function(e) {
-        var $btn = $(this);
-        var originalText = $btn.html();
-        
-        $btn.html('<i class="fas fa-spinner fa-spin"></i> 處理中...');
-        $btn.prop('disabled', true);
-        
-        // 3秒後恢復按鈕狀態
-        setTimeout(function() {
-            $btn.html(originalText);
-            $btn.prop('disabled', false);
-        }, 3000);
+    const exportButtons = document.querySelectorAll('.export-buttons .btn');
+    exportButtons.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            const originalText = this.innerHTML;
+            
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
+            this.disabled = true;
+            
+            // 3秒後恢復按鈕狀態
+            setTimeout(() => {
+                this.innerHTML = originalText;
+                this.disabled = false;
+            }, 3000);
+        });
     });
 });
+
+// 日期範圍驗證函數
+function validateDateRange() {
+    const dateFrom = document.getElementById('date_from');
+    const dateTo = document.getElementById('date_to');
+    
+    if (dateFrom && dateTo && dateFrom.value && dateTo.value && dateFrom.value > dateTo.value) {
+        alert('開始日期不能晚於結束日期');
+        dateTo.value = '';
+    }
+}
+
+// 顯示自訂日期輸入框
+function showCustomDateInputs() {
+    const customDateDiv = document.getElementById('custom-date-inputs');
+    if (customDateDiv) {
+        customDateDiv.style.display = 'block';
+    }
+}
+
+// 隱藏自訂日期輸入框
+function hideCustomDateInputs() {
+    const customDateDiv = document.getElementById('custom-date-inputs');
+    if (customDateDiv) {
+        customDateDiv.style.display = 'none';
+    }
+}
+
+// 周報表篩選功能增強
+function initializeWeeklyReportFilters() {
+    const reportType = new URLSearchParams(window.location.search).get('type');
+    console.log('當前報表類型:', reportType);
+    
+    if (reportType === 'weekly') {
+        // 為周報表添加特殊處理
+        const weekPeriod = document.getElementById('week_period');
+        if (weekPeriod) {
+            console.log('找到周報表周期選擇器:', weekPeriod.value);
+            
+            weekPeriod.addEventListener('change', function() {
+                console.log('周報表周期變更:', this.value);
+                
+                // 如果是自訂週期，顯示日期選擇器
+                if (this.value === 'custom') {
+                    showCustomDateInputs();
+                } else {
+                    hideCustomDateInputs();
+                }
+                
+                // 更新URL參數而不重新載入頁面
+                const url = new URL(window.location);
+                url.searchParams.set('week_period', this.value);
+                url.searchParams.delete('page'); // 重置分頁
+                console.log('導航到新URL:', url.toString());
+                window.location.href = url.toString();
+            });
+        } else {
+            console.log('未找到周報表周期選擇器');
+        }
+        
+        // 檢查自訂日期輸入框
+        const customDateInputs = document.getElementById('custom-date-inputs');
+        if (customDateInputs) {
+            console.log('自訂日期輸入框狀態:', customDateInputs.style.display);
+        }
+    }
+}
+
+// 初始化周報表篩選
+initializeWeeklyReportFilters();
+
+// 月報表篩選功能增強
+function initializeMonthlyReportFilters() {
+    const reportType = new URLSearchParams(window.location.search).get('type');
+    console.log('當前報表類型:', reportType);
+    
+    if (reportType === 'monthly') {
+        // 為月報表添加特殊處理
+        const monthPeriod = document.getElementById('month_period');
+        if (monthPeriod) {
+            console.log('找到月報表周期選擇器:', monthPeriod.value);
+            
+            monthPeriod.addEventListener('change', function() {
+                console.log('月報表周期變更:', this.value);
+                
+                // 如果是自訂週期，顯示日期選擇器
+                if (this.value === 'custom') {
+                    showCustomMonthDateInputs();
+                } else {
+                    hideCustomMonthDateInputs();
+                }
+                
+                // 更新URL參數而不重新載入頁面
+                const url = new URL(window.location);
+                url.searchParams.set('month_period', this.value);
+                url.searchParams.delete('page'); // 重置分頁
+                console.log('導航到新URL:', url.toString());
+                window.location.href = url.toString();
+            });
+        } else {
+            console.log('未找到月報表周期選擇器');
+        }
+        
+        // 檢查自訂日期輸入框
+        const customMonthDateInputs = document.getElementById('custom-month-date-inputs');
+        if (customMonthDateInputs) {
+            console.log('自訂月報表日期輸入框狀態:', customMonthDateInputs.style.display);
+        }
+    }
+}
+
+// 顯示自訂月報表日期輸入框
+function showCustomMonthDateInputs() {
+    const customMonthDateDiv = document.getElementById('custom-month-date-inputs');
+    if (customMonthDateDiv) {
+        customMonthDateDiv.style.display = 'block';
+    }
+}
+
+// 隱藏自訂月報表日期輸入框
+function hideCustomMonthDateInputs() {
+    const customMonthDateDiv = document.getElementById('custom-month-date-inputs');
+    if (customMonthDateDiv) {
+        customMonthDateDiv.style.display = 'none';
+    }
+}
+
+// 初始化月報表篩選
+initializeMonthlyReportFilters();
 </script>
 {% endblock %} 

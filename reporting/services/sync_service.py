@@ -115,7 +115,7 @@ class ReportDataSyncService:
     
     def _sync_work_time_reports(self, date_from, date_to):
         """
-        同步工作時間報表資料
+        同步工作報表資料
         以工作時間為主，記錄作業員和設備的工作時間統計
         
         Args:
@@ -155,21 +155,15 @@ class ReportDataSyncService:
             for report in operator_reports:
                 records_processed += 1
                 
-                # 計算工作時數
-                start_time = report.start_time
-                end_time = report.end_time
-                work_hours = 0
+                # 使用新的工作時數計算器
+                from .work_time_calculator import WorkTimeCalculator
+                work_time_calc = WorkTimeCalculator()
+                work_time_data = work_time_calc.calculate_work_time_for_report(report)
                 
-                if start_time and end_time:
-                    # 計算工作時數
-                    start_dt = datetime.combine(report.work_date, start_time)
-                    end_dt = datetime.combine(report.work_date, end_time)
-                    
-                    # 如果結束時間小於開始時間，表示跨日
-                    if end_dt < start_dt:
-                        end_dt += timedelta(days=1)
-                    
-                    work_hours = (end_dt - start_dt).total_seconds() / 3600
+                work_hours = work_time_data['total_work_hours']
+                actual_work_hours = work_time_data['actual_work_hours']
+                break_hours = work_time_data['break_hours']
+                overtime_hours = work_time_data['overtime_hours']
                 
                 # 計算良率和效率
                 total_quantity = report.work_quantity + report.defect_quantity
@@ -198,7 +192,7 @@ class ReportDataSyncService:
                     self.logger.info(f"跳過重複記錄: {existing_record}")
                     continue
                 
-                # 建立或更新工作時間報表記錄
+                # 建立或更新工作報表記錄
                 work_time_report, created = WorkTimeReport.objects.update_or_create(
                     report_type='daily',
                     report_date=report.work_date,
@@ -213,7 +207,9 @@ class ReportDataSyncService:
                         'start_time': start_time,
                         'end_time': end_time,
                         'total_work_hours': work_hours,
-                        'actual_work_hours': work_hours,
+                        'actual_work_hours': actual_work_hours,
+                        'break_hours': break_hours,
+                        'overtime_hours': overtime_hours,
                         'completed_quantity': report.work_quantity,
                         'defect_quantity': report.defect_quantity,
                         'yield_rate': yield_rate,
@@ -238,19 +234,13 @@ class ReportDataSyncService:
             for report in smt_reports:
                 records_processed += 1
                 
-                # 計算工作時數
-                start_time = report.start_time
-                end_time = report.end_time
-                work_hours = 0
+                # 使用新的工作時數計算器
+                work_time_data = work_time_calc.calculate_work_time_for_report(report)
                 
-                if start_time and end_time:
-                    start_dt = datetime.combine(report.work_date, start_time)
-                    end_dt = datetime.combine(report.work_date, end_time)
-                    
-                    if end_dt < start_dt:
-                        end_dt += timedelta(days=1)
-                    
-                    work_hours = (end_dt - start_dt).total_seconds() / 3600
+                work_hours = work_time_data['total_work_hours']
+                actual_work_hours = work_time_data['actual_work_hours']
+                break_hours = work_time_data['break_hours']
+                overtime_hours = work_time_data['overtime_hours']
                 
                 # 計算良率和效率
                 total_quantity = report.work_quantity + report.defect_quantity
@@ -279,7 +269,7 @@ class ReportDataSyncService:
                     self.logger.info(f"跳過重複記錄: {existing_record}")
                     continue
                 
-                # 建立或更新工作時間報表記錄
+                # 建立或更新工作報表記錄
                 work_time_report, created = WorkTimeReport.objects.update_or_create(
                     report_type='daily',
                     report_date=report.work_date,
@@ -294,7 +284,9 @@ class ReportDataSyncService:
                         'start_time': start_time,
                         'end_time': end_time,
                         'total_work_hours': work_hours,
-                        'actual_work_hours': work_hours,
+                        'actual_work_hours': actual_work_hours,
+                        'break_hours': break_hours,
+                        'overtime_hours': overtime_hours,
                         'completed_quantity': report.work_quantity,
                         'defect_quantity': report.defect_quantity,
                         'yield_rate': yield_rate,
@@ -319,19 +311,13 @@ class ReportDataSyncService:
             for report in supervisor_reports:
                 records_processed += 1
                 
-                # 計算工作時數
-                start_time = report.start_time
-                end_time = report.end_time
-                work_hours = 0
+                # 使用新的工作時數計算器
+                work_time_data = work_time_calc.calculate_work_time_for_report(report)
                 
-                if start_time and end_time:
-                    start_dt = datetime.combine(report.work_date, start_time)
-                    end_dt = datetime.combine(report.work_date, end_time)
-                    
-                    if end_dt < start_dt:
-                        end_dt += timedelta(days=1)
-                    
-                    work_hours = (end_dt - start_dt).total_seconds() / 3600
+                work_hours = work_time_data['total_work_hours']
+                actual_work_hours = work_time_data['actual_work_hours']
+                break_hours = work_time_data['break_hours']
+                overtime_hours = work_time_data['overtime_hours']
                 
                 # 計算良率和效率
                 total_quantity = report.work_quantity + report.defect_quantity
@@ -360,7 +346,7 @@ class ReportDataSyncService:
                     self.logger.info(f"跳過重複記錄: {existing_record}")
                     continue
                 
-                # 建立或更新工作時間報表記錄
+                # 建立或更新工作報表記錄
                 work_time_report, created = WorkTimeReport.objects.update_or_create(
                     report_type='daily',
                     report_date=report.work_date,
@@ -375,7 +361,9 @@ class ReportDataSyncService:
                         'start_time': start_time,
                         'end_time': end_time,
                         'total_work_hours': work_hours,
-                        'actual_work_hours': work_hours,
+                        'actual_work_hours': actual_work_hours,
+                        'break_hours': break_hours,
+                        'overtime_hours': overtime_hours,
                         'completed_quantity': report.work_quantity,
                         'defect_quantity': report.defect_quantity,
                         'yield_rate': yield_rate,
@@ -403,7 +391,7 @@ class ReportDataSyncService:
             }
             
         except Exception as e:
-            self.logger.error(f"同步工作時間報表失敗: {str(e)}")
+            self.logger.error(f"同步工作報表失敗: {str(e)}")
             raise
     
     def _sync_work_order_reports(self, date_from, date_to):

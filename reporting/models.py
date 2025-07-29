@@ -1,6 +1,6 @@
 # 報表系統數據模型
 # 本檔案定義了 MES 系統的所有報表相關數據模型
-# 包含基礎報表模型、工作時間報表、工單機種報表、人員績效報表等
+# 包含基礎報表模型、工作報表、工單機種報表、人員績效報表等
 
 from django.db import models
 from django.utils import timezone
@@ -62,7 +62,7 @@ class BaseReportModel(models.Model):
 
 
 class WorkTimeReport(BaseReportModel):
-    """工作時間報表模型 - 記錄作業員和設備的工作時間統計"""
+    """統一工作報表模型 - 記錄作業員和設備的工作時間統計，支援工作報表和工時報表"""
     
     WORKER_TYPE_CHOICES = [
         ('operator', '作業員'),
@@ -70,12 +70,30 @@ class WorkTimeReport(BaseReportModel):
         ('general', '一般設備'),
     ]
     
+    REPORT_CATEGORY_CHOICES = [
+        ('work_report', '工作報表'),
+        ('work_hour_report', '工時報表'),
+    ]
+    
+    # 報表分類
+    report_category = models.CharField(
+        max_length=20,
+        choices=REPORT_CATEGORY_CHOICES,
+        default='work_report',
+        verbose_name="報表分類"
+    )
+    
     # 工作人員資訊
     worker_name = models.CharField(max_length=100, verbose_name="作業員/設備名稱")
     worker_type = models.CharField(
         max_length=10, 
         choices=WORKER_TYPE_CHOICES,
         verbose_name="工作人員類型"
+    )
+    worker_id = models.CharField(
+        max_length=50, 
+        verbose_name="作業員編號", 
+        blank=True
     )
     
     # 工單資訊
@@ -116,6 +134,10 @@ class WorkTimeReport(BaseReportModel):
         default=0.0, 
         verbose_name="加班時數"
     )
+    regular_hours = models.FloatField(
+        default=0.0, 
+        verbose_name="正常工時"
+    )
     
     # 產量資訊
     completed_quantity = models.IntegerField(verbose_name="完成數量")
@@ -126,7 +148,7 @@ class WorkTimeReport(BaseReportModel):
     yield_rate = models.FloatField(verbose_name="良率 (%)")
     efficiency_rate = models.FloatField(verbose_name="效率 (件/小時)")
     
-    # 數量分配資訊
+    # 數量分配資訊（僅工作報表使用）
     original_quantity = models.IntegerField(
         default=0, 
         verbose_name="原始數量"
@@ -156,32 +178,41 @@ class WorkTimeReport(BaseReportModel):
     )
     
     class Meta:
-        verbose_name = "工作時間報表"
-        verbose_name_plural = "工作時間報表"
+        verbose_name = "工作報表"
+        verbose_name_plural = "工作報表"
         unique_together = [
-            ['report_type', 'report_date', 'worker_name', 'workorder_number']
+            ['report_type', 'report_date', 'report_category', 'worker_name', 'workorder_number']
         ]
         db_table = 'reporting_work_time_report'
+        indexes = [
+            models.Index(fields=['report_date']),
+            models.Index(fields=['worker_name']),
+            models.Index(fields=['workorder_number']),
+            models.Index(fields=['process_name']),
+            models.Index(fields=['report_category']),
+        ]
     
     def __str__(self):
-        return f"{self.report_date} - {self.worker_name} - {self.workorder_number}"
+        return f"{self.get_report_category_display()} - {self.worker_name} - {self.report_date}"
     
     def calculate_efficiency(self):
-        """計算效率率"""
+        """計算效率"""
         if self.actual_work_hours > 0:
-            self.efficiency_rate = round(
-                self.completed_quantity / self.actual_work_hours, 2
-            )
+            self.efficiency_rate = round(self.completed_quantity / self.actual_work_hours, 2)
         return self.efficiency_rate
     
     def calculate_yield_rate(self):
         """計算良率"""
         total_quantity = self.completed_quantity + self.defect_quantity
         if total_quantity > 0:
-            self.yield_rate = round(
-                (self.completed_quantity / total_quantity) * 100, 2
-            )
+            self.yield_rate = round((self.completed_quantity / total_quantity) * 100, 2)
         return self.yield_rate
+    
+    def save(self, *args, **kwargs):
+        """儲存時自動計算效率和良率"""
+        self.calculate_efficiency()
+        self.calculate_yield_rate()
+        super().save(*args, **kwargs)
 
 
 class WorkOrderProductReport(BaseReportModel):
@@ -868,7 +899,7 @@ class ManufacturingWorkHour(models.Model):
 
 class WorkTimeReportCache(models.Model):
     """
-    工作時間報表快取模型
+    工作報表快取模型
     用於儲存預計算的報表數據，提升查詢效能
     """
     
@@ -906,8 +937,8 @@ class WorkTimeReportCache(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
     
     class Meta:
-        verbose_name = "工作時間報表快取"
-        verbose_name_plural = "工作時間報表快取"
+        verbose_name = "工作報表快取"
+        verbose_name_plural = "工作報表快取"
         db_table = 'reporting_work_time_cache'
         indexes = [
             models.Index(fields=['report_type', 'report_date']),

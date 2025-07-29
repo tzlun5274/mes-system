@@ -1,0 +1,403 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}工時報表列表 - MES系統{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .stats-card h3 {
+        color: white;
+        margin-bottom: 10px;
+    }
+    .stats-number {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    .filter-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .table-responsive {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+    .badge {
+        font-size: 0.8em;
+    }
+    .btn-group-sm .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-clock text-primary"></i>
+                        工時報表列表
+                    </h1>
+                    <p class="text-muted mb-0">查看和管理作業員工時統計資料</p>
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#syncModal">
+                        <i class="fas fa-sync-alt"></i> 同步數據
+                    </button>
+                    <a href="{% url 'reporting:work_hour_export' %}" class="btn btn-success">
+                        <i class="fas fa-download"></i> 匯出報表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3><i class="fas fa-users"></i> 參與作業員</h3>
+                <div class="stats-number">{{ total_workers }}</div>
+                <small>人</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3><i class="fas fa-clock"></i> 總工作時數</h3>
+                <div class="stats-number">{{ total_work_hours|floatformat:1 }}</div>
+                <small>小時</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3><i class="fas fa-plus-circle"></i> 加班時數</h3>
+                <div class="stats-number">{{ total_overtime_hours|floatformat:1 }}</div>
+                <small>小時</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3><i class="fas fa-chart-line"></i> 平均效率</h3>
+                <div class="stats-number">{{ avg_efficiency|floatformat:1 }}</div>
+                <small>件/小時</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- 篩選區域 -->
+    <div class="filter-section">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="search" class="form-label">搜尋</label>
+                <input type="text" class="form-control" id="search" name="search" 
+                       value="{{ search }}" placeholder="作業員、工單號、產品編號...">
+            </div>
+            <div class="col-md-2">
+                <label for="date_from" class="form-label">開始日期</label>
+                <input type="date" class="form-control" id="date_from" name="date_from" 
+                       value="{{ date_from }}">
+            </div>
+            <div class="col-md-2">
+                <label for="date_to" class="form-label">結束日期</label>
+                <input type="date" class="form-control" id="date_to" name="date_to" 
+                       value="{{ date_to }}">
+            </div>
+            <div class="col-md-2">
+                <label for="worker" class="form-label">作業員</label>
+                <select class="form-select" id="worker" name="worker">
+                    <option value="">全部作業員</option>
+                    {% for worker in workers %}
+                        <option value="{{ worker }}" {% if worker == selected_worker %}selected{% endif %}>
+                            {{ worker }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="process" class="form-label">工序</label>
+                <select class="form-select" id="process" name="process">
+                    <option value="">全部工序</option>
+                    {% for process in processes %}
+                        <option value="{{ process }}" {% if process == selected_process %}selected{% endif %}>
+                            {{ process }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 報表列表 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list"></i> 工時報表記錄
+                        <span class="badge bg-secondary ms-2">{{ page_obj.paginator.count }}</span>
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>報表日期</th>
+                                    <th>作業員</th>
+                                    <th>作業員編號</th>
+                                    <th>工單號</th>
+                                    <th>產品編號</th>
+                                    <th>工序</th>
+                                    <th>開始時間</th>
+                                    <th>結束時間</th>
+                                    <th>工作時數</th>
+                                    <th>完成數量</th>
+                                    <th>不良品</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for report in work_hour_reports %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ report.report_date|date:"Y-m-d" }}</span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ report.worker_name|default:"-" }}</strong>
+                                    </td>
+                                    <td>
+                                        <code>{{ report.worker_id|default:"-" }}</code>
+                                    </td>
+                                    <td>
+                                        <code>{{ report.workorder_number|default:"-" }}</code>
+                                    </td>
+                                    <td>
+                                        <span class="text-info">{{ report.product_code|default:"-" }}</span>
+                                    </td>
+                                    <td>{{ report.process_name|default:"-" }}</td>
+                                    <td>
+                                        {% if report.start_time %}
+                                            {{ report.start_time|date:"H:i" }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if report.end_time %}
+                                            {{ report.end_time|date:"H:i" }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if report.actual_work_hours %}
+                                            <span class="badge bg-info">{{ report.actual_work_hours|floatformat:1 }}h</span>
+                                            {% if report.overtime_hours > 0 %}
+                                                <br><small class="text-warning">+{{ report.overtime_hours|floatformat:1 }}h</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">{{ report.completed_quantity|intcomma }}</span>
+                                    </td>
+                                    <td>
+                                        {% if report.defect_quantity > 0 %}
+                                            <span class="badge bg-warning">{{ report.defect_quantity|intcomma }}</span>
+                                        {% else %}
+                                            <span class="text-muted">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'reporting:work_hour_detail' report.id %}" 
+                                               class="btn btn-outline-primary" title="查看詳情">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'reporting:work_hour_export' %}?id={{ report.id }}" 
+                                               class="btn btn-outline-success" title="匯出">
+                                                <i class="fas fa-download"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="12" class="text-center py-4">
+                                        <div class="text-muted">
+                                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                                            <h5>暫無工時報表記錄</h5>
+                                            <p>目前沒有符合搜尋條件的報表記錄</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分頁 -->
+    {% if is_paginated %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <nav aria-label="報表分頁">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="pagination-info">
+                        顯示第 {{ page_obj.start_index }} 到 {{ page_obj.end_index }} 筆，
+                        共 {{ page_obj.paginator.count }} 筆記錄
+                    </div>
+                    <ul class="pagination mb-0">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}{% if request.GET.worker %}&worker={{ request.GET.worker }}{% endif %}{% if request.GET.process %}&process={{ request.GET.process }}{% endif %}">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 同步數據模態框 -->
+<div class="modal fade" id="syncModal" tabindex="-1" aria-labelledby="syncModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="syncModalLabel">
+                    <i class="fas fa-sync-alt"></i> 同步工時數據
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="syncForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="sync_date_from" class="form-label">開始日期</label>
+                        <input type="date" class="form-control" id="sync_date_from" name="date_from" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="sync_date_to" class="form-label">結束日期</label>
+                        <input type="date" class="form-control" id="sync_date_to" name="date_to" required>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        同步將從作業員報工記錄中計算工時數據並更新到工時報表中
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-sync-alt"></i> 開始同步
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 同步數據表單提交
+    $('#syncForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        
+        $.ajax({
+            url: '{% url "reporting:work_hour_sync" %}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            beforeSend: function() {
+                $('#syncModal .btn-primary').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 同步中...');
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert(response.message);
+                    location.reload();
+                } else {
+                    alert('同步失敗: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('同步失敗，請稍後再試');
+            },
+            complete: function() {
+                $('#syncModal .btn-primary').prop('disabled', false).html('<i class="fas fa-sync-alt"></i> 開始同步');
+                $('#syncModal').modal('hide');
+            }
+        });
+    });
+    
+    // 設定預設日期範圍（最近7天）
+    const today = new Date();
+    const sevenDaysAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
+    
+    $('#sync_date_to').val(today.toISOString().split('T')[0]);
+    $('#sync_date_from').val(sevenDaysAgo.toISOString().split('T')[0]);
+});
+</script>
+{% endblock %} 

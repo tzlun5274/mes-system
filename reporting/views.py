@@ -10,6 +10,17 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 
+# 從子模組導入視圖
+from .views.report_views import ReportDashboardView
+from .views.sync_views import (
+    SyncStatusListView, SyncDetailView, SyncDashboardView, 
+    SyncSettingsView, ManualSyncView, SyncAPIView, WorkOrderAllocationView
+)
+from .views.setting_views import (
+    AddSyncSettingView, EditSyncSettingView, 
+    DeleteSyncSettingView, ToggleSyncSettingView
+)
+
 # 設定日誌記錄器
 logger = logging.getLogger(__name__)
 
@@ -20,16 +31,6 @@ def reporting_user_required(user):
 def log_user_operation(username, module, action):
     """記錄用戶操作"""
     logger.info(f"用戶操作 - 用戶: {username}, 模組: {module}, 動作: {action}")
-
-# 基礎視圖類別
-class ReportDashboardView(LoginRequiredMixin, TemplateView):
-    """報表儀表板視圖"""
-    template_name = 'reporting/dashboard.html'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['module_display_name'] = '報表管理'
-        return context
 
 # 其他視圖函數都已經移到對應的子模組中：
 # - report_views.py: 報表相關視圖

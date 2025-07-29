@@ -9,6 +9,7 @@ from . import views
 from .views import sync_views
 # 直接從主 views.py 文件導入函數
 from .views.report_views import report_export, execute_report_export
+from .views.work_hour_views import WorkHourReportListView, WorkHourReportDetailView, WorkHourReportExportView, WorkHourSyncView
 
 app_name = 'reporting'
 
@@ -17,10 +18,16 @@ urlpatterns = [
     path('', views.ReportDashboardView.as_view(), name='dashboard'),
     path('', views.ReportDashboardView.as_view(), name='index'),  # 為了與其他模組保持一致
     
-    # 工作時間報表
+    # 工作報表
     path('work-time/', views.WorkTimeReportListView.as_view(), name='work_time_list'),
     path('work-time/detail/<int:pk>/', views.WorkTimeReportDetailView.as_view(), name='work_time_detail'),
     path('work-time/export/', views.WorkTimeReportExportView.as_view(), name='work_time_export'),
+    
+    # 工時報表
+    path('work-hour/', WorkHourReportListView.as_view(), name='work_hour_list'),
+    path('work-hour/detail/<int:pk>/', WorkHourReportDetailView.as_view(), name='work_hour_detail'),
+    path('work-hour/export/', WorkHourReportExportView.as_view(), name='work_hour_export'),
+    path('work-hour/sync/', WorkHourSyncView.as_view(), name='work_hour_sync'),
     
     # 工時單查詢（生產日報）
     path('production-daily/', views.WorkTimeReportListView.as_view(), name='production_daily'),

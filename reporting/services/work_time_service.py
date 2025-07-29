@@ -1,5 +1,5 @@
 """
-工作時間報表服務 - 支援混合模式：直接計算和快取儲存
+工作報表服務 - 支援混合模式：直接計算和快取儲存
 """
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Any, Optional
@@ -23,7 +23,7 @@ from .base_service import BaseReportService
 
 
 class WorkTimeReportService(BaseReportService):
-    """工作時間報表服務 - 混合模式"""
+    """工作報表服務 - 混合模式"""
     
     def __init__(self):
         super().__init__()
@@ -33,7 +33,7 @@ class WorkTimeReportService(BaseReportService):
     
     def get_work_time_data(self, start_date: date, end_date: date, report_type: str = "daily", use_cache: bool = True) -> List[Dict[str, Any]]:
         """
-        取得工作時間資料 - 支援混合模式
+        取得工作資料 - 支援混合模式
         
         Args:
             start_date: 開始日期
@@ -42,7 +42,7 @@ class WorkTimeReportService(BaseReportService):
             use_cache: 是否使用快取模式
             
         Returns:
-            List[Dict[str, Any]]: 工作時間資料列表
+            List[Dict[str, Any]]: 工作資料列表
         """
         # 如果啟用快取，先嘗試從快取取得
         if use_cache and self.use_cache:
@@ -165,7 +165,7 @@ class WorkTimeReportService(BaseReportService):
             records_created = 0
             records_updated = 0
             
-            # 同步工作時間報表數據
+            # 同步工作報表數據
             if sync_type == "work_time":
                 for report_type in ['daily', 'weekly', 'monthly']:
                     data = self._calculate_from_source(start_date, end_date, report_type)
@@ -323,7 +323,7 @@ class WorkTimeReportService(BaseReportService):
                     queryset = queryset.filter(created_at__lt=before_date)
                 count = queryset.count()
                 queryset.delete()
-                self.logger.info(f"清理工作時間報表快取: {count} 筆記錄")
+                self.logger.info(f"清理工作報表快取: {count} 筆記錄")
             
             if cache_type == "all" or cache_type == "worker_performance":
                 queryset = WorkerPerformanceCache.objects.all()
@@ -367,10 +367,9 @@ class WorkTimeReportService(BaseReportService):
         
         data = []
         for report in reports:
-            # 計算工作時數
-            start_datetime = datetime.combine(report.work_date, report.start_time)
-            end_datetime = datetime.combine(report.work_date, report.end_time)
-            work_hours = (end_datetime - start_datetime).total_seconds() / 3600
+            # 使用新的工作時數計算器
+            work_time_data = work_time_calc.calculate_work_time_for_report(report)
+            work_hours = work_time_data['actual_work_hours']  # 使用實際工作時數
             
             data.append({
                 'date': report.work_date,
@@ -402,10 +401,11 @@ class WorkTimeReportService(BaseReportService):
         
         data = []
         for report in reports:
-            # 計算工作時數
-            start_datetime = datetime.combine(report.work_date, report.start_time)
-            end_datetime = datetime.combine(report.work_date, report.end_time)
-            work_hours = (end_datetime - start_datetime).total_seconds() / 3600
+            # 使用新的工作時數計算器
+            from .work_time_calculator import WorkTimeCalculator
+            work_time_calc = WorkTimeCalculator()
+            work_time_data = work_time_calc.calculate_work_time_for_report(report)
+            work_hours = work_time_data['actual_work_hours']  # 使用實際工作時數
             
             # 使用分配數量或原始數量
             final_quantity = report.allocated_quantity if report.allocated_quantity > 0 else report.work_quantity
@@ -442,10 +442,9 @@ class WorkTimeReportService(BaseReportService):
         
         data = []
         for report in reports:
-            # 計算工作時數
-            start_datetime = datetime.combine(report.work_date, report.start_time)
-            end_datetime = datetime.combine(report.work_date, report.end_time)
-            work_hours = (end_datetime - start_datetime).total_seconds() / 3600
+            # 使用新的工作時數計算器
+            work_time_data = work_time_calc.calculate_work_time_for_report(report)
+            work_hours = work_time_data['actual_work_hours']  # 使用實際工作時數
             
             data.append({
                 'date': report.work_date,
