@@ -106,8 +106,8 @@
                                     <label for="sync_type">同步類型</label>
                                     <select name="sync_type" id="sync_type" class="form-control">
                                         <option value="all">全部同步</option>
-                                        <option value="work_time">工作時間報表</option>
-                                        <option value="work_order">工單機種報表</option>
+                                        <option value="work_time">工作報表</option>
+        
                                     </select>
                                 </div>
                             </div>
@@ -149,8 +149,8 @@
                                 <label for="sync_type_filter">同步類型</label>
                                 <select name="sync_type" id="sync_type_filter" class="form-control">
                                     <option value="">全部</option>
-                                    <option value="work_time" {% if request.GET.sync_type == 'work_time' %}selected{% endif %}>工作時間報表</option>
-                                    <option value="work_order" {% if request.GET.sync_type == 'work_order' %}selected{% endif %}>工單機種報表</option>
+                                    <option value="work_time" {% if request.GET.sync_type == 'work_time' %}selected{% endif %}>工作報表</option>
+    
                                     <option value="all" {% if request.GET.sync_type == 'all' %}selected{% endif %}>全部同步</option>
                                 </select>
                             </div>
@@ -233,9 +233,8 @@
                                         <td>
                                             <span class="badge badge-info">
                                                 {% if sync_log.sync_type == 'work_time' %}
-                                                    工作時間報表
-                                                {% elif sync_log.sync_type == 'work_order' %}
-                                                    工單機種報表
+                                                    工作報表
+
                                                 {% else %}
                                                     全部同步
                                                 {% endif %}
@@ -342,9 +341,8 @@
                                         <div>
                                             <h6 class="card-title mb-1">
                                                 {% if sync.sync_type == 'work_time' %}
-                                                    工作時間報表
-                                                {% elif sync.sync_type == 'work_order' %}
-                                                    工單機種報表
+                                                    工作報表
+                                                
                                                 {% else %}
                                                     全部同步
                                                 {% endif %}

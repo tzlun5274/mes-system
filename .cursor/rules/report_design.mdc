@@ -4,6 +4,16 @@ globs: ["**/*"]
 alwaysApply: true
 ---
 
+# 報表系統開發設計文件：`report_design.md` (修正版)
+
+## 1. 報表系統總體架構與功能整合概述
+
+本文件旨在詳細規範 MES 報表模組的開發設計，確保其具備高效、穩定、易於擴展的特性。報表模組作為 MES 的核心組成部分，將提供多維度的數據分析和視覺化能力，輔助管理層進行決策。
+
+### 1.1 報表系統架構 (MES 報表系統開發設計架構與結構規範 - 一、1.1)
+
+報表系統將採用分層架構設計，確保模組化、高內聚、低耦合。
+
 ┌─────────────────────────────────────────────────────────────┐
 │                       報表系統架構                          │
 ├─────────────────────────────────────────────────────────────┤
@@ -19,7 +29,7 @@ alwaysApply: true
 │   └── 報表驗證服務 (reporting/validators/)                  │
 ├─────────────────────────────────────────────────────────────┤
 │   數據存取層 (Data Access Layer)                            │
-│   ├── 報表模型 (reporting/models.py)                        │
+│   ├── 報表模型 (reporting/models.py)                      │
 │   ├── 數據查詢器 (reporting/queries/)                       │
 │   ├── 數據轉換器 (reporting/transformers/)                  │
 │   └── 快取管理 (reporting/cache/)                           │
@@ -30,146 +40,130 @@ alwaysApply: true
 │   ├── 製程管理模組 (process/)                               │
 │   └── ERP整合模組 (erp_integration/)                        │
 └─────────────────────────────────────────────────────────────┘
-1.2 模組職責分工 (MES 報表系統開發設計架構與結構規範 - 一、1.2)
-所有報表相關邏輯和文件都將歸屬於 reporting/ 模組。
 
-reporting/models.py: 報表數據模型定義 (如 ProcessedOperatorReport)
 
-reporting/services/: 報表業務邏輯服務 (如生成報表數據)
+### 1.2 模組職責分工 (MES 報表系統開發設計架構與結構規範 - 一、1.2)
 
-reporting/calculators/: 數據計算引擎 (如工時計算 TimeCalculator)
+所有報表相關邏輯和文件都將歸屬於 `reporting/` 模組。
 
-reporting/allocators/: 智能分配算法 (如 HybridAllocator)
+* `reporting/models.py`: 報表數據模型定義 (如 `ProcessedOperatorReport`)
+* `reporting/services/`: 報表業務邏輯服務 (如生成報表數據)
+* `reporting/calculators/`: 數據計算引擎 (如工時計算 `TimeCalculator`)
+* `reporting/allocators/`: 智能分配算法 (如 `HybridAllocator`)
+* `reporting/validators/`: 數據驗證服務
+* `reporting/queries/`: 數據查詢器 (統一資料獲取邏輯)
+* `reporting/transformers/`: 數據轉換器
+* `reporting/cache/`: 快取管理
+* `reporting/templates/`: 報表模板
+* `reporting/static/`: 靜態資源
 
-reporting/validators/: 數據驗證服務
+### 1.3 功能整合概述 (報表功能整合說明 - 整合概述)
 
-reporting/queries/: 數據查詢器 (統一資料獲取邏輯)
+將原主管功能（`workorder/views.py` 第3873行）中的報表匯出功能完全遷移並整合到 `reporting/` 模組中，實現所有報表匯出功能在 `reporting/views.py` 中統一管理，避免功能重複和衝突。
 
-reporting/transformers/: 數據轉換器
+## 2. 整合後的統一報表功能設計
 
-reporting/cache/: 快取管理
+### 2.1 新的報表匯出功能範圍 (報表功能整合說明 - 整合後的統一功能)
 
-reporting/templates/: 報表模板
+所有報表匯出功能將在 `reporting/views.py` 中實現，涵蓋以下類型：
 
-reporting/static/: 靜態資源
+* **工作報表 (Work Report)**：提供不同時間維度下的基礎工作概覽。這類報表將專注於展示**作業員和設備的原始總工作時數（只計算報工時間段的總時長，不考慮休息和加班）**、工單、機種、數量等。
+    * **日工作報表欄位格式**：
+        * 作業員
+        * 報工日期
+        * 工單號
+        * 產品編號
+        * 開始時間
+        * 結束時間
+        * 工序
+        * 工作數量 (良品數量)
+        * 不良品數量
+        * 操作 (按鈕：查看明細)
+    * **週工作報表欄位格式**：
+        * 作業員
+        * 週工作數量 (良品總數量)
+        * 週不良品數量 (不良品總數量)
+    * **月工作報表欄位格式**：
+        * 作業員
+        * 月工作數量 (良品總數量)
+        * 月不良品數量 (不良品總數量)
+* **工時報表 (Work Hour Report)**：專注於人員和設備的工時統計，**精確計算每日、每週、每月正常工時、加班時數，並從中扣除休息時間**。這會考慮產線的班次、休息時間和加班規則。
+    * 日工時報表 (作業員)
+    * 週工時報表 (作業員)
+    * 月工時報表 (作業員)
+    * 日工時報表 (SMT設備)
+    * 週工時報表 (SMT設備)
+    * 月工時報表 (SMT設備)
+* 作業員報工報表 (屬於人員績效報表類別)
+* SMT報工報表 (屬於設備效率報表類別)
+* 異常報工報表 (屬於品質分析報表類別)
+* 效率分析報表 (屬於綜合分析報表類別)
+* 作業員績效報表 (屬於人員績效報表類別)
 
-1.3 功能整合概述 (報表功能整合說明 - 整合概述)
-將原主管功能（workorder/views.py 第3873行）中的報表匯出功能完全遷移並整合到 reporting/ 模組中，實現所有報表匯出功能在 reporting/views.py 中統一管理，避免功能重複和衝突。
+### 2.2 格式與日期範圍支援 (報表功能整合說明 - 整合後的統一功能)
 
-2. 整合後的統一報表功能設計
-2.1 新的報表匯出功能範圍 (報表功能整合說明 - 整合後的統一功能)
-所有報表匯出功能將在 reporting/views.py 中實現，涵蓋以下類型：
+* **格式支援**：Excel、CSV、PDF (PDF 將初步使用 Excel 格式，待後續實作真正的 PDF 匯出)
+* **日期範圍**：今日、昨日、本週、上週、本月、上月、自訂範圍
 
-工作報表 (Work Report)：提供不同時間維度下的基礎工作概覽，包含工單、機種、數量等。
+## 3. 技術實作方案
 
-日工作報表
+### 3.1 新增與修改檔案 (報表功能整合說明 - 技術實作)
 
-週工作報表
+**新增檔案**：
 
-月工作報表
+* `reporting/views.py`: 實現所有報表匯出相關視圖函數。
+* `reporting/templates/reporting/report_export.html`: 報表匯出功能的前端頁面模板。
+* `reporting/urls.py`: 定義報表模組的 URL 路由。
 
-工時報表 (Work Hour Report)：專注於作業員的工時統計，精確計算每日、每週、每月的工作時數和加班時數。
+**修改檔案**：
 
-日工時報表
+* `workorder/views.py`: 移除原有的報表匯出功能代碼，替換為重定向到 `reporting/` 模組中的統一匯出介面。
+* `workorder/templates/workorder/report/supervisor/functions.html`: 更新相關連結，指向新的 `reporting/` 模組頁面。
+* `reporting/templates/reporting/index.html`: 新增統一的「報表匯出」連結。
 
-週工時報表
+### 3.2 新增功能函數 (報表功能整合說明 - 新增功能函數)
 
-月工時報表
+為實現上述功能，將在 `reporting/views.py` 中新增以下主要函數：
 
-作業員報工報表 (屬於人員績效報表類別)
+* `report_export(request)`: 負責渲染報表匯出頁面 (`report_export.html`)，提供報表類型、格式、日期範圍選擇。
+* `execute_report_export(request)`: 根據前端提交的選擇，呼叫對應的數據獲取函數和匯出函數。
+* `get_operator_report_data(workorder_no, date_range)`: 負責從 `workorder.models.OperatorSupplementReport` 獲取作業員報工資料，並呼叫 `HybridAllocator` 進行智能分配。
+* `get_smt_report_data(date_range)`: 負責從 `workorder.models.SMTProductionReport` 獲取 SMT 報工資料。
+* `get_abnormal_report_data(date_range)`: 負責篩選 `OperatorSupplementReport` 和 `SMTProductionReport` 中 `abnormal_notes` 欄位有內容的異常報工資料。
+* `get_operator_performance_report_data(date_range)`: 負責從 `reporting.models.OperatorPerformance` 獲取作業員績效資料。
+* `export_to_excel(data, report_type, date_range)`: 通用 Excel 匯出函數，使用 `openpyxl` 庫。
+* `export_to_csv(data, report_type, date_range)`: 通用 CSV 匯出函數，使用 `csv` 模組，確保 UTF-8 編碼。
+* `export_to_pdf(data, report_type, date_range)`: 通用 PDF 匯出函數，初期將重定向到 Excel 匯出或提示「PDF 匯出正在開發中」，待未來使用 `reportlab` 等庫實現。
 
-SMT報工報表 (屬於設備效率報表類別)
+### 3.3 數據來源 (報表功能整合說明 - 資料來源)
 
-異常報工報表 (屬於品質分析報表類別)
-
-效率分析報表 (屬於綜合分析報表類別)
-
-作業員績效報表 (屬於人員績效報表類別)
-
-2.2 格式與日期範圍支援 (報表功能整合說明 - 整合後的統一功能)
-格式支援：Excel、CSV、PDF (PDF 將初步使用 Excel 格式，待後續實作真正的 PDF 匯出)
-
-日期範圍：今日、昨日、本週、本月、自訂範圍
-
-3. 技術實作方案
-3.1 新增與修改檔案 (報表功能整合說明 - 技術實作)
-新增檔案：
-
-reporting/views.py: 實現所有報表匯出相關視圖函數。
-
-reporting/templates/reporting/report_export.html: 報表匯出功能的前端頁面模板。
-
-reporting/urls.py: 定義報表模組的 URL 路由。
-
-修改檔案：
-
-workorder/views.py: 移除原有的報表匯出功能代碼，替換為重定向到 reporting/ 模組中的統一匯出介面。
-
-workorder/templates/workorder/report/supervisor/functions.html: 更新相關連結，指向新的 reporting/ 模組頁面。
-
-reporting/templates/reporting/index.html: 新增統一的「報表匯出」連結。
-
-3.2 新增功能函數 (報表功能整合說明 - 新增功能函數)
-為實現上述功能，將在 reporting/views.py 中新增以下主要函數：
-
-report_export(request): 負責渲染報表匯出頁面 (report_export.html)，提供報表類型、格式、日期範圍選擇。
-
-execute_report_export(request): 根據前端提交的選擇，呼叫對應的數據獲取函數和匯出函數。
-
-get_work_report_data(date_range): 負責獲取通用工作報表的數據（基於工單、機種、數量等）。
-
-get_work_hour_report_data(date_range): 負責獲取作業員工時報表的數據，將呼叫 TimeCalculator 進行工時及加班時數計算。
-
-get_operator_report_data(workorder_no, date_range): 負責從 workorder.models.OperatorSupplementReport 獲取作業員報工資料，並呼叫 HybridAllocator 進行智能分配。
-
-get_smt_report_data(date_range): 負責從 workorder.models.SMTProductionReport 獲取 SMT 報工資料。
-
-get_abnormal_report_data(date_range): 負責篩選 OperatorSupplementReport 和 SMTProductionReport 中 abnormal_notes 欄位有內容的異常報工資料。
-
-get_operator_performance_report_data(date_range): 負責從 reporting.models.OperatorPerformance 獲取作業員績效資料。
-
-export_to_excel(data, report_type, date_range): 通用 Excel 匯出函數，使用 openpyxl 庫。
-
-export_to_csv(data, report_type, date_range): 通用 CSV 匯出函數，使用 csv 模組，確保 UTF-8 編碼。
-
-export_to_pdf(data, report_type, date_range): 通用 PDF 匯出函數，初期將重定向到 Excel 匯出或提示「PDF 匯出正在開發中」，待未來使用 reportlab 等庫實現。
-
-3.3 數據來源 (報表功能整合說明 - 資料來源)
 所有報表數據的原始來源將明確定義：
 
-作業員報工資料：workorder.models.OperatorSupplementReport
+* **作業員報工資料**：`workorder.models.OperatorSupplementReport`
+    * 欄位：報工日期、作業員、工單號、工序、數量、異常紀錄、開始時間、結束時間等。
+    * 特別處理：需經過 `HybridAllocator` 處理未填寫數量的記錄。
+* **SMT報工資料**：`workorder.models.SMTProductionReport`
+    * 欄位：設備、報工日期、製令號碼、機種名稱、異常紀錄等。
+* **異常報工資料**：`OperatorSupplementReport` 和 `SMTProductionReport`
+    * 篩選條件：`abnormal_notes` 欄位有內容。
+* **作業員績效資料**：`reporting.models.OperatorPerformance`
+    * 欄位：作業員、工單、產品、數量、時間等。
 
-欄位：報工日期、作業員、工單號、工序、數量、異常紀錄、開始時間、結束時間等。
+## 4. 權限與安全規範實作
 
-特別處理：需經過 HybridAllocator 處理未填寫數量的記錄。
+### 4.1 統一權限控制 (報表功能整合說明 - 權限管理 & MES 報表系統開發設計架構與結構規範 - 九、9.1)
 
-SMT報工資料：workorder.models.SMTProductionReport
-
-欄位：設備、報工日期、製令號碼、機種名稱、異常紀錄等。
-
-異常報工資料：OperatorSupplementReport 和 SMTProductionReport
-
-篩選條件：abnormal_notes 欄位有內容。
-
-作業員績效資料：reporting.models.OperatorPerformance
-
-欄位：作業員、工單、產品、數量、時間等。
-
-4. 權限與安全規範實作
-4.1 統一權限控制 (報表功能整合說明 - 權限管理 & MES 報表系統開發設計架構與結構規範 - 九、9.1)
 所有報表功能將統一由 Django 的權限系統控制：
 
-報表使用者群組：所有報表查看和匯出功能。
+* **報表使用者群組**：所有報表查看和匯出功能。
+* **超級用戶**：自動擁有所有權限。
+* **一般用戶**：默認無法訪問報表功能，除非被明確賦予權限。
 
-超級用戶：自動擁有所有權限。
+### 4.2 權限檢查函數 (報表功能整合說明 - 權限檢查函數)
 
-一般用戶：默認無法訪問報表功能，除非被明確賦予權限。
+將使用此輔助函數進行權限檢查，並應用於 `reporting/views.py` 中所有報表相關的視圖函數：
 
-4.2 權限檢查函數 (報表功能整合說明 - 權限檢查函數)
-將使用此輔助函數進行權限檢查，並應用於 reporting/views.py 中所有報表相關的視圖函數：
-
-Python
-
+```python
 from django.contrib.auth.decorators import user_passes_test
 
 def reporting_user_required(user):
@@ -182,7 +176,7 @@ def reporting_user_required(user):
 # @user_passes_test(reporting_user_required, login_url='/login/')
 # def report_export(request):
 #     # ... 視圖邏輯
-4.3 數據安全規範 (MES 報表系統開發設計架構與結構規範 - 九、9.2)
+4.3 數據安全規範 (MES 報表系統開發設計架步與結構規範 - 九、9.2)
 數據備份：依據系統級策略定期備份報表數據。
 
 操作日誌：使用 Django 的日誌系統，記錄所有報表查詢、匯出等操作。
@@ -207,13 +201,16 @@ REPORT_TYPE_CHOICES = [
     ('DAILY_WORK_REPORT', '日工作報表'),
     ('WEEKLY_WORK_REPORT', '週工作報表'),
     ('MONTHLY_WORK_REPORT', '月工作報表'),
-    ('DAILY_WORK_HOUR_REPORT', '日工時報表'), # 新增
-    ('WEEKLY_WORK_HOUR_REPORT', '週工時報表'), # 新增
-    ('MONTHLY_WORK_HOUR_REPORT', '月工時報表'), # 新增
+    ('DAILY_WORK_HOUR_OPERATOR_REPORT', '日工時報表 (作業員)'),
+    ('WEEKLY_WORK_HOUR_OPERATOR_REPORT', '週工時報表 (作業員)'),
+    ('MONTHLY_WORK_HOUR_OPERATOR_REPORT', '月工時報表 (作業員)'),
+    ('DAILY_WORK_HOUR_SMT_REPORT', '日工時報表 (SMT設備)'),
+    ('WEEKLY_WORK_HOUR_SMT_REPORT', '週工時報表 (SMT設備)'),
+    ('MONTHLY_WORK_HOUR_SMT_REPORT', '月工時報表 (SMT設備)'),
     ('OPERATOR_PERFORMANCE', '作業員績效報表'),
     ('SMT_EQUIPMENT', 'SMT設備效率報表'),
     ('ABNORMAL_REPORT', '異常報工報表'),
-    ('EFFICIENCY_ANALYSIS', '效率分析報表'), # 明確效率分析報表的類別
+    ('EFFICIENCY_ANALYSIS', '效率分析報表'),
     # ... 其他報表類型
 ]
 
@@ -221,19 +218,19 @@ class BaseReportModel(models.Model):
     """報表基礎模型"""
     
     # 報表基本資訊
-    report_type = models.CharField(max_length=50, choices=REPORT_TYPE_CHOICES, verbose_name="報表類型") # 增加 max_length 兼容新報表類型名稱
+    report_type = models.CharField(max_length=50, choices=REPORT_TYPE_CHOICES, verbose_name="報表類型")
     report_date = models.DateField(verbose_name="報表日期")
-    report_period_start = models.DateField(verbose_name="報表期間開始", null=True, blank=True) # 允許空值以適應日報表
-    report_period_end = models.DateField(verbose_name="報表期間結束", null=True, blank=True) # 允許空值以適應日報表
+    report_period_start = models.DateField(verbose_name="報表期間開始", null=True, blank=True)
+    report_period_end = models.DateField(verbose_name="報表期間結束", null=True, blank=True)
     
     # 數據來源標示
-    data_source = models.CharField(max_length=100, verbose_name="數據來源", default="原始報工數據") # 增加 max_length
-    calculation_method = models.CharField(max_length=100, verbose_name="計算方法", default="無或按工時分配") # 增加 max_length
+    data_source = models.CharField(max_length=100, verbose_name="數據來源", default="原始報工數據")
+    calculation_method = models.CharField(max_length=100, verbose_name="計算方法", default="無或按工時分配")
     
     # 系統資訊
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
-    created_by = models.CharField(max_length=100, verbose_name="建立者", default="系統") # 設定預設值
+    created_by = models.CharField(max_length=100, verbose_name="建立者", default="系統")
 
     class Meta:
         abstract = True
@@ -250,27 +247,28 @@ class ProcessedOperatorReport(models.Model):
     這是數據存取層中的報表模型範例。
     """
     original_report_id = models.UUIDField(unique=True, null=True, blank=True,
-                                        help_text="原始 OperatorSupplementReport 的 UUID") # 關聯原始報工
+                                        help_text="原始 OperatorSupplementReport 的 UUID")
     report_date = models.DateField(verbose_name="報工日期")
     operator = models.ForeignKey('auth.User', on_delete=models.CASCADE, verbose_name="作業員")
     work_order_no = models.CharField(max_length=100, verbose_name="工單號")
+    product_sn = models.CharField(max_length=100, null=True, blank=True, verbose_name="產品編號") # 新增產品編號
     process = models.CharField(max_length=100, verbose_name="工序")
     
     # 原始報工數量 (良品與不良品)
     original_quantity = models.IntegerField(null=True, blank=True, verbose_name="原始良品數量")
-    defect_quantity = models.IntegerField(null=True, blank=True, default=0, verbose_name="原始不良品數量") 
+    defect_quantity = models.IntegerField(null=True, blank=True, default=0, verbose_name="原始不良品數量")
 
     # 智能分配的數量 (良品與不良品)
     allocated_quantity = models.IntegerField(null=True, blank=True, verbose_name="系統分配良品數量",
                                              help_text="若原始良品數量為空，此為系統智能分配的良品數量")
     allocated_defect_quantity = models.IntegerField(null=True, blank=True, verbose_name="系統分配不良品數量",
-                                                    help_text="若原始不良品數量為空，此為系統智能分配的不良品數量") 
+                                                    help_text="若原始不良品數量為空，此為系統智能分配的不良品數量")
 
     # 用於報表顯示的最終數量
     final_quantity_for_report = models.IntegerField(null=True, blank=True, verbose_name="報表最終良品數量",
                                                     help_text="用於報表顯示的最終良品數量 (原始或分配)")
     final_total_output_for_report = models.IntegerField(null=True, blank=True, verbose_name="報表最終總產量(良品+不良品)",
-                                                        help_text="用於報表顯示的最終總產量，包含良品與不良品") 
+                                                        help_text="用於報表顯示的最終總產量，包含良品與不良品")
 
     # 工時資訊 (用於分配計算及工時報表)
     start_time = models.DateTimeField(null=True, blank=True, verbose_name="報工開始時間")
@@ -285,8 +283,8 @@ class ProcessedOperatorReport(models.Model):
     abnormal_notes = models.TextField(null=True, blank=True, verbose_name="異常紀錄")
 
     # 系統處理時間
-    synced_at = models.DateTimeField(auto_now_add=True, verbose_name="同步時間") # 首次進入 ProcessedOperatorReport 的時間
-    last_processed_at = models.DateTimeField(auto_now=True, verbose_name="最後處理時間") # 最後一次被分配器處理的時間
+    synced_at = models.DateTimeField(auto_now_add=True, verbose_name="同步時間")
+    last_processed_at = models.DateTimeField(auto_now=True, verbose_name="最後處理時間")
 
     class Meta:
         verbose_name = "加工後作業員報工"
@@ -296,6 +294,7 @@ class ProcessedOperatorReport(models.Model):
             models.Index(fields=['operator']),
             models.Index(fields=['work_order_no']),
             models.Index(fields=['process']),
+            models.Index(fields=['product_sn']), # 新增索引
         ]
 
     def save(self, *args, **kwargs):
@@ -317,7 +316,6 @@ class ProcessedOperatorReport(models.Model):
         self.final_total_output_for_report = self.final_quantity_for_report + current_final_defect_qty
         
         super().save(*args, **kwargs)
-
 5.2 數據模型命名與完整性規範 (MES 報表系統開發設計架構與結構規範 - 三、3.2 & 3.3)
 模型名稱：使用 PascalCase，以 Report 結尾（如 ProductionDailyReport），ProcessedOperatorReport 為加工數據層模型。
 
@@ -338,8 +336,8 @@ class ProcessedOperatorReport(models.Model):
 reporting/services/
 ├── __init__.py
 ├── base_report_service.py     # 基礎報表服務類別
-├── work_report_service.py     # 新增：工作報表相關服務
-├── work_hour_report_service.py # 新增：工時報表相關服務
+├── work_report_service.py     # 新增：工作報表相關服務 (只算總時長，不區分休息加班)
+├── work_hour_report_service.py # 新增：工時報表相關服務 (精確計算正常/加班/休息)
 ├── operator_report_service.py # 作業員報工相關服務
 ├── smt_report_service.py      # SMT報工相關服務
 ├── abnormal_report_service.py # 異常報工相關服務
@@ -379,155 +377,525 @@ class BaseReportService:
         # 實現數據格式化邏輯，例如為匯出準備列名和數據結構
         return data
 
-# reporting/services/operator_report_service.py (示例)
+# reporting/services/work_report_service.py (新增示例)
 from .base_report_service import BaseReportService
-from reporting.queries.operator_query import OperatorReportQuery
-from reporting.allocators.hybrid_allocator import HybridAllocator # 引入分配器
+from reporting.queries.operator_query import OperatorReportQuery # 假設此查詢器能獲取 ProcessedOperatorReport
+from reporting.calculators.time_calculator import TimeCalculator
+from collections import defaultdict # 用於更方便的分組
 
-class OperatorReportService(BaseReportService):
+class WorkReportService(BaseReportService):
     def __init__(self):
         super().__init__()
         self.query_handler = OperatorReportQuery()
-        self.allocator = HybridAllocator()
+        self.time_calculator = TimeCalculator()
 
-    def generate_report(self, date_range, work_order_no=None, **kwargs):
+    def generate_report(self, report_type, date_range, **kwargs):
         """
-        生成作業員報工報表數據。
-        此處會觸發智能分配。
+        生成工作報表數據。
+        此報表只計算原始報工時長，不考慮休息時間，也不區分正常與加班。
+        根據 report_type (日/週/月) 處理不同的匯總邏輯。
         """
-        self.logger.info(f"生成作業員報工報表，工單: {work_order_no}, 日期範圍: {date_range}")
+        self.logger.info(f"生成 {report_type} 工作報表，日期範圍: {date_range}")
         
-        # 1. 獲取原始數據（或加工數據，取決於設計）
-        # 假設 OperatorReportQuery 能獲取 ProcessedOperatorReport 數據，其可能需要定期從原始數據同步
-        raw_reports = self.query_handler.get_operator_supplement_reports(
-            date_range=date_range, 
-            work_order_no=work_order_no
-        )
-        
-        # 2. 執行智能分配
-        # allocate 方法會直接修改並保存 ProcessedOperatorReport 實例
-        processed_reports = self.allocator.allocate(work_order_no, date_range)
-        
-        # 3. 進一步處理或計算統計數據 (如果需要)
-        # 例如，根據 final_quantity_for_report 進行匯總等
-        
-        return processed_reports # 返回用於報表的加工後數據
+        processed_reports = self.query_handler.get_processed_operator_reports_by_date_range(date_range)
+
+        if report_type == 'DAILY_WORK_REPORT':
+            return self._format_daily_report(processed_reports)
+        elif report_type == 'WEEKLY_WORK_REPORT':
+            return self._format_weekly_report(processed_reports, date_range)
+        elif report_type == 'MONTHLY_WORK_REPORT':
+            return self._format_monthly_report(processed_reports, date_range)
+        else:
+            raise ValueError(f"不支援的工作報表類型: {report_type}")
+
+    def _format_daily_report(self, reports):
+        """
+        格式化日工作報表數據。
+        作業員 報工日期 工單號 產品編號 開始時間 結束時間 工序 工作數量 不良品數量 操作(查看明細)
+        """
+        daily_report_data = []
+        for report in reports:
+            daily_report_data.append({
+                'operator': report.operator.username,
+                'report_date': report.report_date.isoformat(),
+                'work_order_no': report.work_order_no,
+                'product_sn': report.product_sn,
+                'start_time': report.start_time.strftime('%Y-%m-%d %H:%M:%S') if report.start_time else '',
+                'end_time': report.end_time.strftime('%Y-%m-%d %H:%M:%S') if report.end_time else '',
+                'process': report.process,
+                'work_quantity': report.final_quantity_for_report, # 良品數量
+                'defect_quantity': report.defect_quantity if report.defect_quantity is not None else 0, # 不良品數量
+                'action': '查看明細', # 前端需渲染為按鈕
+                'report_id': str(report.original_report_id) if report.original_report_id else '' # 用於查看明細的ID
+            })
+        return daily_report_data
+
+    def _format_weekly_report(self, reports, date_range):
+        """
+        格式化週工作報表數據。
+        作業員 週工作數量 週不良品數量
+        """
+        weekly_summary = defaultdict(lambda: {'work_quantity': 0, 'defect_quantity': 0})
+        for report in reports:
+            operator_name = report.operator.username
+            weekly_summary[operator_name]['work_quantity'] += report.final_quantity_for_report if report.final_quantity_for_report is not None else 0
+            weekly_summary[operator_name]['defect_quantity'] += report.defect_quantity if report.defect_quantity is not None else 0
+
+        weekly_report_data = []
+        for operator, data in weekly_summary.items():
+            weekly_report_data.append({
+                'operator': operator,
+                'week_work_quantity': data['work_quantity'],
+                'week_defect_quantity': data['defect_quantity']
+            })
+        return weekly_report_data
+
+    def _format_monthly_report(self, reports, date_range):
+        """
+        格式化月工作報表數據。
+        作業員 月工作數量 月不良品數量
+        """
+        monthly_summary = defaultdict(lambda: {'work_quantity': 0, 'defect_quantity': 0})
+        for report in reports:
+            operator_name = report.operator.username
+            monthly_summary[operator_name]['work_quantity'] += report.final_quantity_for_report if report.final_quantity_for_report is not None else 0
+            monthly_summary[operator_name]['defect_quantity'] += report.defect_quantity if report.defect_quantity is not None else 0
+
+        monthly_report_data = []
+        for operator, data in monthly_summary.items():
+            monthly_report_data.append({
+                'operator': operator,
+                'month_work_quantity': data['work_quantity'],
+                'month_defect_quantity': data['defect_quantity']
+            })
+        return monthly_report_data
+
 
 # reporting/services/work_hour_report_service.py (新增示例)
 from .base_report_service import BaseReportService
 from reporting.queries.operator_query import OperatorReportQuery
+from reporting.queries.production_line_query import ProductionLineQuery # 假設有此查詢器
 from reporting.calculators.time_calculator import TimeCalculator
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 class WorkHourReportService(BaseReportService):
     def __init__(self):
         super().__init__()
         self.query_handler = OperatorReportQuery()
+        self.line_query = ProductionLineQuery() # 實例化產線查詢器
         self.time_calculator = TimeCalculator()
-        # 從設定中獲取每日正常工時上限，例如 8 小時
-        self.daily_normal_hours_limit = 8 # 應從系統設定中獲取
 
-    def generate_report(self, date_range, **kwargs):
+    def generate_report(self, report_type, date_range, production_line_id=None, **kwargs):
         """
-        生成工時報表數據，計算每個作業員的每日/每週/每月工時和加班時數。
+        生成工時報表數據，精確計算每個作業員或SMT設備的正常工時和加班時數。
+        此報表會考慮產線的班次、休息時間和加班規則。
+        :param report_type: 報表類型 (e.g., 'DAILY_WORK_HOUR_OPERATOR_REPORT')
+        :param date_range: 日期範圍 (例如 {'start_date': date, 'end_date': date})
+        :param production_line_id: 相關聯的產線ID，用於獲取其班次設定
         """
-        self.logger.info(f"生成工時報表，日期範圍: {date_range}")
+        self.logger.info(f"生成 {report_type} 報表，日期範圍: {date_range}")
 
-        # 獲取指定日期範圍內的 ProcessedOperatorReport 數據
-        # 這裡假設查詢器可以直接獲取 ProcessedOperatorReport
-        processed_reports = self.query_handler.get_processed_operator_reports_by_date_range(date_range)
+        # 獲取產線設定（這裡假設 ProductionLineQuery.get_production_line_settings
+        # 返回該產線所有班次、休息、加班規則）
+        line_settings = None
+        if production_line_id:
+            line_settings = self.line_query.get_production_line_settings(production_line_id)
+        
+        # 根據報表類型決定數據來源和處理邏輯
+        if 'OPERATOR' in report_type:
+            processed_reports = self.query_handler.get_processed_operator_reports_by_date_range(date_range)
+            return self._calculate_operator_work_hours(processed_reports, date_range, line_settings)
+        elif 'SMT' in report_type:
+            # 假設 SMTProductionReport 包含了設備運行時間的 start_time 和 end_time
+            smt_reports = self.query_handler.get_smt_production_reports_by_date_range(date_range) # 假設有此方法
+            return self._calculate_smt_equipment_work_hours(smt_reports, date_range, line_settings)
+        else:
+            raise ValueError(f"不支援的工時報表類型: {report_type}")
 
-        # 按作業員和日期分組，以便計算每日工時和加班
-        grouped_reports = {}
+    def _calculate_operator_work_hours(self, processed_reports, date_range, line_settings):
+        """
+        計算作業員的工時和加班時數。
+        """
+        work_hour_data = []
+        # 按作業員和日期分組
+        grouped_reports = {} # {(operator_id, date_str): [reports_for_day]}
         for report in processed_reports:
             operator_id = report.operator.id
-            report_date = report.report_date.isoformat() # 使用ISO格式日期作為鍵
+            report_date_str = report.report_date.isoformat()
 
-            if operator_id not in grouped_reports:
-                grouped_reports[operator_id] = {}
-            if report_date not in grouped_reports[operator_id]:
-                grouped_reports[operator_id][report_date] = []
-            grouped_reports[operator_id][report_date].append(report)
+            key = (operator_id, report_date_str)
+            if key not in grouped_reports:
+                grouped_reports[key] = []
+            grouped_reports[key].append(report)
 
-        work_hour_data = []
-        for operator_id, daily_reports in grouped_reports.items():
-            operator_name = processed_reports[0].operator.username # 假設能找到作業員名稱
-
-            total_normal_hours_period = 0
-            total_overtime_hours_period = 0
-
-            for date_str, reports_for_day in daily_reports.items():
-                daily_total_hours = self.time_calculator.calculate_total_work_time(reports_for_day) # 以小時為單位
-                
-                daily_normal_hours = min(daily_total_hours, self.daily_normal_hours_limit)
-                daily_overtime_hours = max(0, daily_total_hours - self.daily_normal_hours_limit)
-
-                work_hour_data.append({
-                    'report_date': date_str,
-                    'operator_id': operator_id,
-                    'operator_name': operator_name,
-                    'daily_total_hours': daily_total_hours,
-                    'daily_normal_hours': daily_normal_hours,
-                    'daily_overtime_hours': daily_overtime_hours,
-                    'calculation_method': '基於報工時間計算'
-                })
-                
-                total_normal_hours_period += daily_normal_hours
-                total_overtime_hours_period += daily_overtime_hours
+        for (operator_id, date_str), reports_for_day in grouped_reports.items():
+            operator_name = reports_for_day[0].operator.username # 從任意一個報告中獲取作業員名稱
+            date_obj = datetime.fromisoformat(date_str).date()
             
-            # 在這裡可以根據 date_range 的類型 (日/週/月) 進行週或月的匯總
-            # 簡化範例，僅展示每日數據，週/月匯總需要在外部或另一個方法中處理
+            # 獲取該日的產線班次設定 (通常一個產線在不同日期可能設定不同的班次)
+            # 這裡需要 ProductionLineQuery 提供一個更精確的方法，根據產線ID和日期獲取當天的班次設定
+            daily_shift_settings = self.line_query.get_line_shift_settings_for_date(
+                line_settings, # 傳入整個產線設定對象
+                date_obj
+            ) if line_settings else None
 
-        return work_hour_data # 返回加工後的工時數據
+            # 使用 TimeCalculator 計算該日的正常工時和加班時數
+            calculated_hours = self.time_calculator.calculate_actual_work_and_overtime(
+                reports_for_day, 
+                daily_shift_settings
+            )
+            
+            work_hour_data.append({
+                'report_date': date_str,
+                'operator_id': operator_id,
+                'operator_name': operator_name,
+                'total_hours_raw': calculated_hours['total_hours_raw'], # 原始計時區間總時數
+                'normal_hours': calculated_hours['normal_hours'],
+                'overtime_hours': calculated_hours['overtime_hours'],
+                'break_deduction_hours': calculated_hours['break_deduction_hours'],
+                'calculation_details': calculated_hours['details']
+            })
+        
+        # 根據 date_range 類型進行週/月匯總（此處僅為每日明細，週/月匯總可以在服務層更上層或報表顯示層實現）
+        return work_hour_data
+
+    def _calculate_smt_equipment_work_hours(self, smt_reports, date_range, line_settings):
+        """
+        計算 SMT 設備的工時和加班時數。
+        邏輯類似作業員，但關注點是設備的運行時間和停機時間，
+        並根據產線班次設定計算正常運行時間和超時運行時間。
+        """
+        smt_hour_data = []
+        # 按設備和日期分組
+        grouped_reports = {} # {(equipment_id, date_str): [reports_for_day]}
+        for report in smt_reports:
+            equipment_id = report.equipment.id # 假設 SMTProductionReport 有 equipment 外鍵
+            report_date_str = report.report_date.isoformat()
+
+            key = (equipment_id, report_date_str)
+            if key not in grouped_reports:
+                grouped_reports[key] = []
+            grouped_reports[key].append(report)
+
+        for (equipment_id, date_str), reports_for_day in grouped_reports.items():
+            equipment_name = reports_for_day[0].equipment.name # 假設能找到設備名稱
+            date_obj = datetime.fromisoformat(date_str).date()
+
+            daily_shift_settings = self.line_query.get_line_shift_settings_for_date(
+                line_settings, 
+                date_obj
+            ) if line_settings else None
+            
+            calculated_hours = self.time_calculator.calculate_smt_equipment_work_hours(
+                reports_for_day, 
+                daily_shift_settings
+            )
+
+            smt_hour_data.append({
+                'report_date': date_str,
+                'equipment_id': equipment_id,
+                'equipment_name': equipment_name,
+                'total_run_hours_raw': calculated_hours['total_run_hours_raw'],
+                'normal_run_hours': calculated_hours['normal_run_hours'],
+                'overtime_run_hours': calculated_hours['overtime_run_hours'],
+                'down_time_hours': calculated_hours['down_time_hours'],
+                'calculation_details': calculated_hours['details']
+            })
+        return smt_hour_data
 6.3 計算引擎設計規範 (MES 報表系統開發設計架構與結構規範 - 四、4.3)
-計算邏輯將在 reporting/calculators/ 下實現，例如 time_calculator.py。TimeCalculator 將擴展以計算正常工時和加班時數。
+計算邏輯將在 reporting/calculators/ 下實現，例如 time_calculator.py。
 
 Python
 
 # reporting/calculators/time_calculator.py
-from datetime import timedelta
+from datetime import timedelta, datetime, time
 
 class TimeCalculator:
     """
-    用於計算作業員工時的計算器。
+    用於計算作業員及SMT設備工時的計算器，考慮產線設定。
     """
-    def calculate_total_work_time(self, reports):
+    
+    def calculate_raw_duration(self, start_time, end_time):
+        """計算兩個時間點之間的原始時長（秒）。"""
+        if start_time and end_time and end_time > start_time:
+            return (end_time - start_time).total_seconds()
+        return 0
+
+    def calculate_operator_total_work_time(self, reports):
         """
-        根據報工記錄計算總工時 (以小時為單位)。
+        【工作報表專用 - 作業員】
+        根據報工記錄計算作業員的總工作時數 (以小時為單位)。
+        此計算只統計報工時間段的原始時長，不考慮休息時間，也不區分正常與加班。
+        通常用於簡單的工作時長概覽。
         :param reports: ProcessedOperatorReport 對象列表
-        :return: 總工時 (小時)
+        :return: 總工作時數 (小時)
         """
         total_duration_seconds = 0
         for report in reports:
-            if report.start_time and report.end_time:
-                duration_seconds = (report.end_time - report.start_time).total_seconds()
-                total_duration_seconds += duration_seconds
-        
+            total_duration_seconds += self.calculate_raw_duration(report.start_time, report.end_time)
         return total_duration_seconds / 3600.0 # 轉換為小時
 
-    def calculate_operator_work_time_detail(self, reports, daily_normal_hours_limit=8):
+    def calculate_smt_total_run_time(self, smt_reports):
         """
-        計算每個作業員在給定報告集合中的總工時、正常工時和加班工時。
-        此方法更適合處理單一作業員在一個時間段內的報工記錄。
-        :param reports: ProcessedOperatorReport 對象列表
-        :param daily_normal_hours_limit: 每日正常工時上限 (小時)
-        :return: 字典 { 'total_hours': ..., 'normal_hours': ..., 'overtime_hours': ... }
+        【工作報表專用 - SMT設備】
+        根據SMT報工記錄計算設備的總運行時數 (以小時為單位)。
+        此計算只統計運行時間段的原始時長。
+        :param smt_reports: SMTProductionReport 對象列表
+        :return: 總運行時數 (小時)
         """
-        total_hours = self.calculate_total_work_time(reports)
+        total_run_seconds = 0
+        for report in smt_reports:
+            # 假設 SMTProductionReport 包含 start_time 和 end_time 表示運行區間
+            if hasattr(report, 'start_time') and hasattr(report, 'end_time'):
+                total_run_seconds += self.calculate_raw_duration(report.start_time, report.end_time)
+        return total_run_seconds / 3600.0
+
+    def calculate_actual_work_and_overtime(self, reports, line_settings):
+        """
+        【工時報表 - 作業員】
+        計算作業員在指定報工記錄集合中的正常工時和加班工時。
+        會考慮產線的上班時間、休息時間和加班規則。
         
-        # 對於每日計算，需要將 reports 按日期分組，然後應用 daily_normal_hours_limit
-        # 這裡簡化為直接應用於總小時，如果需要精確的每日計算，則需要在 service 層按日期遍歷
+        此方法應處理單日、單一作業員的多個報工記錄，並將它們視為連續的，以計算總工時。
         
-        # 簡單範例：假設所有報告都在同一天或不區分日期計算加班
-        normal_hours = min(total_hours, daily_normal_hours_limit)
-        overtime_hours = max(0, total_hours - daily_normal_hours_limit)
+        :param reports: ProcessedOperatorReport 對象列表 (通常是某作業員某天的記錄)
+        :param line_settings: 字典，包含產線設定，如：
+                              {'shift_start': time(8, 0), 'shift_end': time(17, 0),
+                               'break_start': time(12, 0), 'break_end': time(13, 0),
+                               'overtime_start': time(17, 0)}
+        :return: 字典，包含 'total_hours_raw', 'normal_hours', 'overtime_hours', 'break_deduction_hours', 'details'
+        """
+        if not reports:
+            return {
+                'total_hours_raw': 0.0, 'normal_hours': 0.0, 'overtime_hours': 0.0, 
+                'break_deduction_hours': 0.0, 'details': "無有效報工記錄"
+            }
+            
+        report_date = reports[0].report_date # 假設所有 reports 都屬於同一天
+
+        total_seconds_raw = 0
+        normal_seconds = 0
+        overtime_seconds = 0
+        break_seconds_deducted = 0
         
+        details = []
+
+        # 合併並排序報工時間段，處理重疊
+        time_intervals = []
+        for report in reports:
+            if report.start_time and report.end_time and report.end_time > report.start_time:
+                time_intervals.append((report.start_time, report.end_time))
+        
+        # 對時間區間進行合併
+        merged_intervals = []
+        if time_intervals:
+            time_intervals.sort()
+            current_start, current_end = time_intervals[0]
+            for i in range(1, len(time_intervals)):
+                next_start, next_end = time_intervals[i]
+                if next_start <= current_end: # 有重疊或緊密連接
+                    current_end = max(current_end, next_end)
+                else:
+                    merged_intervals.append((current_start, current_end))
+                    current_start, current_end = next_start, next_end
+            merged_intervals.append((current_start, current_end)) # 添加最後一個合併區間
+
+        # 計算原始總時長 (合併後的區間)
+        for start_dt, end_dt in merged_intervals:
+            total_seconds_raw += (end_dt - start_dt).total_seconds()
+
+        # 如果沒有產線設定，則無法區分正常/加班/休息
+        if not line_settings:
+            return {
+                'total_hours_raw': total_seconds_raw / 3600.0,
+                'normal_hours': total_seconds_raw / 3600.0,
+                'overtime_hours': 0.0,
+                'break_deduction_hours': 0.0,
+                'details': "無產線設定，無法精確區分正常/加班/休息"
+            }
+
+        # 根據產線設定，定義當天的班次和休息時間的 datetime 物件
+        shift_start_time = line_settings.get('shift_start', time(0, 0))
+        shift_end_time = line_settings.get('shift_end', time(23, 59))
+        break_start_time = line_settings.get('break_start')
+        break_end_time = line_settings.get('break_end')
+        overtime_start_time = line_settings.get('overtime_start', shift_end_time)
+
+        shift_start_dt = datetime.combine(report_date, shift_start_time)
+        shift_end_dt = datetime.combine(report_date, shift_end_time)
+        overtime_start_dt = datetime.combine(report_date, overtime_start_time)
+
+        break_start_dt = datetime.combine(report_date, break_start_time) if break_start_time else None
+        break_end_dt = datetime.combine(report_date, break_end_time) if break_end_time else None
+
+        for start_dt, end_dt in merged_intervals:
+            # 1. 計算休息時間的扣除
+            if break_start_dt and break_end_dt and break_start_dt < break_end_dt:
+                overlap_break_start = max(start_dt, break_start_dt)
+                overlap_break_end = min(end_dt, break_end_dt)
+                if overlap_break_start < overlap_break_end:
+                    deducted = (overlap_break_end - overlap_break_start).total_seconds()
+                    break_seconds_deducted += deducted
+                    details.append(f"從 {start_dt.time()}-{end_dt.time()} 報工中扣除休息時間 ({break_start_dt.time()}-{break_end_dt.time()}): {round(deducted/60, 2)} 分鐘")
+            
+            # 2. 計算正常工時 (在班次內且不屬於休息時間的部分)
+            # 考慮一個時間區間 [A, B] 和另一個時間區間 [C, D]，計算它們的交集
+            # 正常工作時間段：[shift_start_dt, shift_end_dt]
+            # 去除休息時間的邏輯：可以將班次拆分為多個非休息區間，再計算交集
+            
+            # 方法一：先計算整個區間，再扣除休息和加班
+            # 有效工作時間 = 報工時間段 - 休息時間
+            effective_interval_duration = (end_dt - start_dt).total_seconds() - \
+                                          self._get_overlap_duration(start_dt, end_dt, break_start_dt, break_end_dt)
+
+            # 正常工時：有效工作時間在 [shift_start_dt, overtime_start_dt) 內的交集
+            normal_overlap_start = max(start_dt, shift_start_dt)
+            normal_overlap_end = min(end_dt, overtime_start_dt)
+            
+            if normal_overlap_start < normal_overlap_end:
+                normal_segment_duration = (normal_overlap_end - normal_overlap_start).total_seconds()
+                # 從正常段中扣除休息時間
+                normal_segment_deducted_break = self._get_overlap_duration(
+                    normal_overlap_start, normal_overlap_end, break_start_dt, break_end_dt
+                )
+                normal_seconds += (normal_segment_duration - normal_segment_deducted_break)
+                details.append(f"從 {start_dt.time()}-{end_dt.time()} 報工中計算正常工時段 ({normal_overlap_start.time()}-{normal_overlap_end.time()})：{round((normal_segment_duration - normal_segment_deducted_break)/3600, 2)} 小時")
+
+
+            # 加班工時：有效工作時間在 [overtime_start_dt, 無限大) 內的交集
+            overtime_overlap_start = max(start_dt, overtime_start_dt)
+            overtime_overlap_end = end_dt
+            
+            if overtime_overlap_start < overtime_overlap_end:
+                overtime_segment_duration = (overtime_overlap_end - overtime_overlap_start).total_seconds()
+                # 從加班段中扣除休息時間 (如果加班時段也有休息，通常加班時沒有特定休息)
+                overtime_segment_deducted_break = self._get_overlap_duration(
+                    overtime_overlap_start, overtime_overlap_end, break_start_dt, break_end_dt
+                )
+                overtime_seconds += (overtime_segment_duration - overtime_segment_deducted_break)
+                details.append(f"從 {start_dt.time()}-{end_dt.time()} 報工中計算加班工時段 ({overtime_overlap_start.time()}-{overtime_overlap_end.time()}): {round((overtime_segment_duration - overtime_segment_deducted_break)/3600, 2)} 小時")
+
         return {
-            'total_hours': total_hours,
-            'normal_hours': normal_hours,
-            'overtime_hours': overtime_hours
+            'total_hours_raw': total_seconds_raw / 3600.0,
+            'normal_hours': normal_seconds / 3600.0,
+            'overtime_hours': overtime_seconds / 3600.0,
+            'break_deduction_hours': break_seconds_deducted / 3600.0,
+            'details': "\n".join(details)
         }
 
+    def _get_overlap_duration(self, interval1_start, interval1_end, interval2_start, interval2_end):
+        """計算兩個時間區間的重疊時長（秒）。"""
+        if not interval1_start or not interval1_end or not interval2_start or not interval2_end:
+            return 0
+        
+        overlap_start = max(interval1_start, interval2_start)
+        overlap_end = min(interval1_end, interval2_end)
+        
+        if overlap_start < overlap_end:
+            return (overlap_end - overlap_start).total_seconds()
+        return 0
+
+    def calculate_smt_equipment_work_hours(self, smt_reports, line_settings):
+        """
+        【工時報表 - SMT設備】
+        計算 SMT 設備的正常運行時數和超時運行時數。
+        考慮產線設定中的班次時間。
+        :param smt_reports: SMTProductionReport 對象列表 (通常是某設備某天的記錄)
+        :param line_settings: 字典，包含產線設定，如：
+                              {'shift_start': time(8, 0), 'shift_end': time(17, 0),
+                               'break_start': time(12, 0), 'break_end': time(13, 0),
+                               'overtime_start': time(17, 0)}
+        :return: 字典，包含 'total_run_hours_raw', 'normal_run_hours', 'overtime_run_hours', 'down_time_hours', 'details'
+        """
+        if not smt_reports:
+            return {
+                'total_run_hours_raw': 0.0, 'normal_run_hours': 0.0, 'overtime_run_hours': 0.0, 
+                'down_time_hours': 0.0, 'details': "無有效SMT報表記錄"
+            }
+
+        report_date = smt_reports[0].report_date # 假設所有 reports 都屬於同一天
+        total_run_seconds_raw = 0
+        total_down_seconds = 0
+        
+        details = []
+
+        # 合併並排序設備運行時間段
+        time_intervals = []
+        for report in smt_reports:
+            # 假設 SMTProductionReport 結構中包含運行時間範圍或可計算運行時間的字段
+            # 例如： start_run_time, end_run_time
+            if hasattr(report, 'start_time') and hasattr(report, 'end_time') and report.start_time and report.end_time:
+                if report.end_time > report.start_time:
+                    time_intervals.append((report.start_time, report.end_time))
+            # 假設 report 還有 down_time_minutes 可以直接從原始報工中獲取停機時間
+            if hasattr(report, 'down_time_minutes') and report.down_time_minutes is not None:
+                total_down_seconds += report.down_time_minutes * 60 # 轉換為秒
+
+        merged_intervals = []
+        if time_intervals:
+            time_intervals.sort()
+            current_start, current_end = time_intervals[0]
+            for i in range(1, len(time_intervals)):
+                next_start, next_end = time_intervals[i]
+                if next_start <= current_end: # 有重疊或緊密連接
+                    current_end = max(current_end, next_end)
+                else:
+                    merged_intervals.append((current_start, current_end))
+                    current_start, current_end = next_start, next_end
+            merged_intervals.append((current_start, current_end)) # 添加最後一個合併區間
+
+        for start_dt, end_dt in merged_intervals:
+            total_run_seconds_raw += (end_dt - start_dt).total_seconds()
+
+        total_run_hours_raw = total_run_seconds_raw / 3600.0
+        down_time_hours = total_down_seconds / 3600.0
+
+        if not line_settings:
+            return {
+                'total_run_hours_raw': total_run_hours_raw,
+                'normal_run_hours': total_run_hours_raw,
+                'overtime_run_hours': 0.0,
+                'down_time_hours': down_time_hours,
+                'details': "無產線設定，無法精確區分正常/超時運行"
+            }
+        
+        shift_start_time = line_settings.get('shift_start', time(0, 0))
+        shift_end_time = line_settings.get('shift_end', time(23, 59))
+        overtime_start_time = line_settings.get('overtime_start', shift_end_time) # 設備加班通常從班次結束後算
+
+        shift_start_dt = datetime.combine(report_date, shift_start_time)
+        shift_end_dt = datetime.combine(report_date, shift_end_time)
+        overtime_start_dt = datetime.combine(report_date, overtime_start_time)
+
+        normal_run_seconds = 0
+        overtime_run_seconds = 0
+
+        for start_dt, end_dt in merged_intervals:
+            # 計算與正常班次的重疊
+            normal_overlap_start = max(start_dt, shift_start_dt)
+            normal_overlap_end = min(end_dt, overtime_start_dt) # 正常運行只到加班開始前
+            
+            if normal_overlap_start < normal_overlap_end:
+                normal_run_seconds += (normal_overlap_end - normal_overlap_start).total_seconds()
+                details.append(f"設備從 {start_dt.time()}-{end_dt.time()} 在正常班次內運行 ({normal_overlap_start.time()}-{normal_overlap_end.time()}): {round((normal_overlap_end - normal_overlap_start).total_seconds()/3600, 2)} 小時")
+            
+            # 計算與加班時段的重疊
+            if end_dt > overtime_start_dt: # 設備運行時間超過加班起始點
+                overtime_overlap_start = max(start_dt, overtime_start_dt)
+                overtime_overlap_end = end_dt
+                
+                if overtime_overlap_start < overtime_overlap_end:
+                    overtime_run_seconds += (overtime_overlap_end - overtime_overlap_start).total_seconds()
+                    details.append(f"設備從 {start_dt.time()}-{end_dt.time()} 超出正常班次運行 (加班) ({overtime_overlap_start.time()}-{overtime_overlap_end.time()}): {round((overtime_overlap_end - overtime_overlap_start).total_seconds()/3600, 2)} 小時")
+
+
+        return {
+            'total_run_hours_raw': total_run_hours_raw,
+            'normal_run_hours': normal_run_seconds / 3600.0,
+            'overtime_run_hours': overtime_run_seconds / 3600.0,
+            'down_time_hours': down_time_hours,
+            'details': "\n".join(details)
+        }
 7. 智能分配算法規範 (MES 報表系統開發設計架構與結構規範 - 五、5.1 & 5.2 & 5.3)
 智能分配算法是報表系統的核心業務邏輯之一。
 
@@ -536,8 +904,8 @@ class TimeCalculator:
 
 reporting/allocators/
 ├── __init__.py
-├── base_allocator.py         # 基礎分配器
-├── hybrid_allocator.py       # 混合分配器
+├── base_allocator.py          # 基礎分配器
+├── hybrid_allocator.py        # 混合分配器
 # ... 其他可能需要的分配器
 7.2 HybridAllocator 核心邏輯 (詳細說明)
 HybridAllocator 的核心目標是為那些在報工時未填寫數量（或填寫為零）的作業員，智能地分配其應有的產出數量。這個分配過程會基於已知的工單總數量作為每個工序的目標量，並參考作業員的實際工時投入。
@@ -598,7 +966,7 @@ remaining_quantity_to_allocate_for_process = order_target_quantity - current_pro
 
 計算該工序內未填寫數量作業員的總工時：
 
-使用 self.time_calculator.calculate_operator_work_time(unfilled_reports_in_process_for_allocation) 獲取這些作業員的個別工時。
+使用 self.time_calculator.calculate_operator_total_work_time(unfilled_reports_in_process_for_allocation) 獲取這些作業員的個別工時。
 
 計算這些工時的總和 total_unfilled_work_time_in_process。
 
@@ -675,7 +1043,7 @@ reporting/templates/reporting/report_export.html 將作為統一的報表匯出�
 
 用戶導航到報表匯出頁面。
 
-選擇所需的報表類型（下拉菜單），其中包含「工作報表」和「工時報表」及其時間維度選項。
+選擇所需的報表類型（下拉菜單）。
 
 選擇匯出格式（單選按鈕或下拉菜單）。
 
@@ -692,10 +1060,11 @@ reporting/templates/reporting/report_export.html 將作為統一的報表匯出�
 reporting/queries/
 ├── __init__.py
 ├── base_query.py            # 基礎查詢器
-├── operator_query.py        # 作業員報工查詢器 (用於查詢原始及加工後的作業員報工數據)
+├── operator_query.py        # 作業員報工查詢器
 ├── smt_query.py             # SMT報工查詢器
+├── production_line_query.py # 新增: 產線設定查詢器
 # ... 其他報表類型對應的查詢器
-operator_query.py 中的 get_operator_supplement_reports 應直接從 workorder.models.OperatorSupplementReport 獲取原始數據，或者從 ProcessedOperatorReport 中獲取經過初步處理的數據，具體取決於 ProcessedOperatorReport 的生成時機。在當前設計中，HybridAllocator 負責處理並保存到 ProcessedOperatorReport，因此查詢器可能會主要從 ProcessedOperatorReport 獲取最終報表數據。對於工時報表，get_processed_operator_reports_by_date_range 將直接查詢 ProcessedOperatorReport。
+operator_query.py 中的 get_operator_supplement_reports 應直接從 workorder.models.OperatorSupplementReport 獲取原始數據，或者從 ProcessedOperatorReport 中獲取經過初步處理的數據，具體取決於 ProcessedOperatorReport 的生成時機。在當前設計中，HybridAllocator 負責處理並保存到 ProcessedOperatorReport，因此查詢器可能會主要從 ProcessedOperatorReport 獲取最終報表數據。
 
 9.2 快取策略 (MES 報表系統開發設計架構與結構規範 - 七、7.2)
 報表快取：已生成的複雜報表結果，考慮快取 24 小時。
@@ -739,5 +1108,3 @@ PDF 格式：暫時使用 Excel 格式導出或提示功能正在開發中。未
 資料範圍：異常報工只包含有異常紀錄的資料。日期範圍自訂時，後台需進行嚴格的日期格式和邏輯驗證。
 
 檔案格式：提醒用戶 PDF 格式的限制。
-
-工時計算準確性：工時計算（特別是加班時數）的準確性依賴於 ProcessedOperatorReport 中 start_time 和 end_time 的準確性，以及系統對「每日正常工時上限」的定義。這部分邏輯需要嚴謹測試。

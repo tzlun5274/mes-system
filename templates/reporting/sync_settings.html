@@ -101,9 +101,8 @@
                                         <td>
                                             <span class="badge badge-info">
                                                 {% if setting.sync_type == 'work_time' %}
-                                                    工作時間報表
-                                                {% elif setting.sync_type == 'work_order' %}
-                                                    工單機種報表
+                                                    工作報表
+
                                                 {% else %}
                                                     全部同步
                                                 {% endif %}
@@ -183,9 +182,9 @@
                         <div class="col-md-6">
                             <h6 class="text-primary">同步類型說明</h6>
                             <ul class="list-unstyled">
-                                <li><strong>工作時間報表：</strong>同步作業員的工作時間、完成數量、效率等資料</li>
+                                <li><strong>工作報表：</strong>同步作業員的工作時間、完成數量、效率等資料</li>
                                 <li><strong>工單機種報表：</strong>同步工單的完成狀況、不良品數量、完成率等資料</li>
-                                <li><strong>全部同步：</strong>同時執行工作時間報表和工單機種報表的同步</li>
+                                <li><strong>全部同步：</strong>同時執行工作報表和工單機種報表的同步</li>
                             </ul>
                         </div>
                         <div class="col-md-6">
@@ -233,8 +232,7 @@
                         <label for="setting_sync_type">同步類型</label>
                         <select name="sync_type" id="setting_sync_type" class="form-control" required>
                             <option value="">請選擇同步類型</option>
-                            <option value="work_time">工作時間報表</option>
-                            <option value="work_order">工單機種報表</option>
+                            <option value="work_time">工作報表</option>
                             <option value="all">全部同步</option>
                         </select>
                     </div>
@@ -295,8 +293,7 @@
                     <div class="form-group">
                         <label for="edit_setting_sync_type">同步類型</label>
                         <select name="sync_type" id="edit_setting_sync_type" class="form-control" required>
-                            <option value="work_time">工作時間報表</option>
-                            <option value="work_order">工單機種報表</option>
+                            <option value="work_time">工作報表</option>
                             <option value="all">全部同步</option>
                         </select>
                     </div>

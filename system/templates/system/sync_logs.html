@@ -115,8 +115,8 @@
                 <label for="sync_type" class="form-label">同步類型</label>
                 <select class="form-select" id="sync_type" name="sync_type">
                     <option value="">全部類型</option>
-                    <option value="work_time" {% if sync_type == 'work_time' %}selected{% endif %}>工作時間報表</option>
-                    <option value="work_order" {% if sync_type == 'work_order' %}selected{% endif %}>工單機種報表</option>
+                    <option value="work_time" {% if sync_type == 'work_time' %}selected{% endif %}>工作報表</option>
+                    
                     <option value="personnel" {% if sync_type == 'personnel' %}selected{% endif %}>人員績效報表</option>
                     <option value="equipment" {% if sync_type == 'equipment' %}selected{% endif %}>設備效率報表</option>
                     <option value="quality" {% if sync_type == 'quality' %}selected{% endif %}>品質分析報表</option>

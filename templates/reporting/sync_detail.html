@@ -43,9 +43,8 @@
                                     <td>
                                         <span class="badge badge-info">
                                             {% if sync_log.sync_type == 'work_time' %}
-                                                工作時間報表
-                                            {% elif sync_log.sync_type == 'work_order' %}
-                                                工單機種報表
+                                                工作報表
+                                            
                                             {% else %}
                                                 全部同步
                                             {% endif %}
@@ -123,11 +122,11 @@
                             {{ sync_details.error }}
                         </div>
                     {% else %}
-                        <!-- 工作時間報表同步結果 -->
+                        <!-- 工作報表同步結果 -->
                         {% if sync_details.work_time %}
                         <div class="mb-4">
                             <h6 class="text-primary">
-                                <i class="fas fa-clock"></i> 工作時間報表同步結果
+                                <i class="fas fa-clock"></i> 工作報表同步結果
                             </h6>
                             <div class="row">
                                 <div class="col-md-3">
@@ -166,48 +165,7 @@
                         </div>
                         {% endif %}
 
-                        <!-- 工單機種報表同步結果 -->
-                        {% if sync_details.work_order %}
-                        <div class="mb-4">
-                            <h6 class="text-primary">
-                                <i class="fas fa-clipboard-list"></i> 工單機種報表同步結果
-                            </h6>
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body text-center">
-                                            <h4 class="text-primary">{{ sync_details.work_order.processed }}</h4>
-                                            <p class="mb-0">處理記錄</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body text-center">
-                                            <h4 class="text-success">{{ sync_details.work_order.created }}</h4>
-                                            <p class="mb-0">新增記錄</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body text-center">
-                                            <h4 class="text-info">{{ sync_details.work_order.updated }}</h4>
-                                            <p class="mb-0">更新記錄</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="card bg-light">
-                                        <div class="card-body text-center">
-                                            <h4 class="text-warning">{{ sync_details.work_order.skipped }}</h4>
-                                            <p class="mb-0">跳過記錄</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {% endif %}
+
 
                         <!-- 錯誤訊息 -->
                         {% if sync_details.errors %}

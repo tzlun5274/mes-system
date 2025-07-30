@@ -114,7 +114,7 @@
                             <div class="card bg-light">
                                 <div class="card-body text-center">
                                     <h3 class="text-primary">{{ report_data.work_time_count }}</h3>
-                                    <p class="mb-0">工作時間報表記錄</p>
+                                    <p class="mb-0">工作報表記錄</p>
                                 </div>
                             </div>
                         </div>
@@ -193,9 +193,7 @@
                                         <td>
                                             <span class="badge badge-info">
                                                 {% if sync.sync_type == 'work_time' %}
-                                                    工作時間報表
-                                                {% elif sync.sync_type == 'work_order' %}
-                                                    工單機種報表
+                                                    工作報表
                                                 {% else %}
                                                     全部同步
                                                 {% endif %}
@@ -261,9 +259,7 @@
                                             <p class="card-text small text-muted mb-1">
                                                 類型: 
                                                 {% if setting.sync_type == 'work_time' %}
-                                                    工作時間報表
-                                                {% elif setting.sync_type == 'work_order' %}
-                                                    工單機種報表
+                                                    工作報表
                                                 {% else %}
                                                     全部同步
                                                 {% endif %}
@@ -303,11 +299,9 @@
                         <i class="fas fa-sync"></i> 執行全部同步
                     </button>
                     <button type="button" class="btn btn-success btn-lg mr-3" onclick="manualSync('work_time')">
-                        <i class="fas fa-clock"></i> 同步工作時間報表
+                        <i class="fas fa-clock"></i> 同步工作報表
                     </button>
-                    <button type="button" class="btn btn-info btn-lg" onclick="manualSync('work_order')">
-                        <i class="fas fa-clipboard-list"></i> 同步工單機種報表
-                    </button>
+
                 </div>
             </div>
         </div>
@@ -333,8 +327,8 @@
                         <label for="modal_sync_type">同步類型</label>
                         <select name="sync_type" id="modal_sync_type" class="form-control">
                             <option value="all">全部同步</option>
-                            <option value="work_time">工作時間報表</option>
-                            <option value="work_order">工單機種報表</option>
+                            <option value="work_time">工作報表</option>
+
                         </select>
                     </div>
                     <div class="form-group">
@@ -418,7 +412,7 @@ function initCharts() {
     var syncTypeChart = new Chart(ctx2, {
         type: 'doughnut',
         data: {
-            labels: ['工作時間報表', '工單機種報表', '全部同步'],
+            labels: ['工作報表', '工單機種報表', '全部同步'],
             datasets: [{
                 data: [30, 25, 45],
                 backgroundColor: [

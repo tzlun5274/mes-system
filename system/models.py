@@ -136,7 +136,7 @@ class ReportSyncSettings(models.Model):
     sync_type = models.CharField(
         max_length=20,
         choices=[
-            ("work_time", "工作時間報表"),
+            ("work_time", "工作報表"),
             ("work_order", "工單機種報表"),
             ("personnel", "人員績效報表"),
             ("equipment", "設備效率報表"),
