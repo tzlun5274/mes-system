@@ -19,4 +19,16 @@ urlpatterns = [
     
     # 報表預覽 (AJAX)
     path('preview/', views.report_preview, name='report_preview'),
+    
+    # ==================== 從 workorder 模組移過來的報表匯出功能 ====================
+    
+    # SMT補登報工匯出
+    path('smt-supplement-export/', views.smt_supplement_export, name='smt_supplement_export'),
+    
+    # 作業員補登報工匯出
+    path('operator-supplement-export/', views.operator_supplement_export, name='operator_supplement_export'),
+    
+    # 報工審核列表
+    path('pending-approval/', views.pending_approval_list, name='pending_approval_list'),
+    path('approved-reports/', views.approved_reports_list, name='approved_reports_list'),
 ] 

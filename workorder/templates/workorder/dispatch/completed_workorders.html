@@ -4,6 +4,41 @@
 -->
 {% extends 'base.html' %}
 {% block title %}完工工單列表{% endblock %}
+{% block extra_css %}
+<style>
+    .btn-group .btn {
+        padding: 0.125rem 0.25rem;
+        font-size: 0.7rem;
+        line-height: 1.2;
+        border-radius: 0.2rem;
+        white-space: nowrap;
+        min-width: 35px;
+    }
+    
+    .btn-group .btn.active {
+        background-color: #fff;
+        color: #0d6efd;
+        border-color: #fff;
+    }
+    
+    .btn-group .btn:hover {
+        background-color: #fff;
+        color: #0d6efd;
+        border-color: #fff;
+    }
+    
+    th {
+        position: relative;
+        white-space: nowrap;
+        vertical-align: top;
+    }
+    
+    .sort-buttons {
+        display: inline-block;
+        vertical-align: middle;
+    }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container mt-4">
     <h2>完工工單列表</h2>
@@ -32,12 +67,19 @@
                 <input type="text" name="search" class="form-control me-2" 
                        placeholder="搜尋工單編號、產品編號..." 
                        value="{{ search_query }}">
+                <!-- 保持排序參數 -->
+                {% if current_sort %}
+                <input type="hidden" name="sort" value="{{ current_sort }}">
+                {% endif %}
+                {% if current_direction %}
+                <input type="hidden" name="direction" value="{{ current_direction }}">
+                {% endif %}
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-search"></i> 搜尋
                 </button>
                 {% if search_query %}
-                <a href="{% url 'workorder:completed_workorders' %}" class="btn btn-secondary ms-2">
-                    <i class="fas fa-times"></i> 清除
+                <a href="{% url 'workorder:completed_workorders' %}{% if current_sort %}?sort={{ current_sort }}{% endif %}{% if current_direction %}{% if current_sort %}&{% else %}?{% endif %}direction={{ current_direction }}{% endif %}" class="btn btn-secondary ms-2">
+                    <i class="fas fa-times"></i> 清除搜尋
                 </a>
                 {% endif %}
             </form>
@@ -82,12 +124,82 @@
     <table class="table table-bordered table-hover">
         <thead class="table-primary">
             <tr>
-                <th>工單編號</th>
-                <th>產品編號</th>
-                <th>數量</th>
+                <th>
+                    工單編號
+                    <div class="btn-group btn-group-sm ms-1" role="group">
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=order_number&direction=asc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'order_number' and current_direction == 'asc' %}active{% endif %}"
+                           title="按工單編號升序排列">
+                            <i class="fas fa-sort-up"></i> 升序
+                        </a>
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=order_number&direction=desc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'order_number' and current_direction == 'desc' %}active{% endif %}"
+                           title="按工單編號降序排列">
+                            <i class="fas fa-sort-down"></i> 降序
+                        </a>
+                    </div>
+                </th>
+                <th>
+                    產品編號
+                    <div class="btn-group btn-group-sm ms-1" role="group">
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=product_code&direction=asc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'product_code' and current_direction == 'asc' %}active{% endif %}"
+                           title="按產品編號升序排列">
+                            <i class="fas fa-sort-up"></i> 升序
+                        </a>
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=product_code&direction=desc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'product_code' and current_direction == 'desc' %}active{% endif %}"
+                           title="按產品編號降序排列">
+                            <i class="fas fa-sort-down"></i> 降序
+                        </a>
+                    </div>
+                </th>
+                <th>
+                    數量
+                    <div class="btn-group btn-group-sm ms-1" role="group">
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=quantity&direction=asc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'quantity' and current_direction == 'asc' %}active{% endif %}"
+                           title="按數量升序排列">
+                            <i class="fas fa-sort-up"></i> 升序
+                        </a>
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=quantity&direction=desc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'quantity' and current_direction == 'desc' %}active{% endif %}"
+                           title="按數量降序排列">
+                            <i class="fas fa-sort-down"></i> 降序
+                        </a>
+                    </div>
+                </th>
                 <th>狀態</th>
-                <th>建立時間</th>
-                <th>最後更新</th>
+                <th>
+                    建立時間
+                    <div class="btn-group btn-group-sm ms-1" role="group">
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=created_at&direction=asc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'created_at' and current_direction == 'asc' %}active{% endif %}"
+                           title="按建立時間升序排列">
+                            <i class="fas fa-sort-up"></i> 升序
+                        </a>
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=created_at&direction=desc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'created_at' and current_direction == 'desc' %}active{% endif %}"
+                           title="按建立時間降序排列">
+                            <i class="fas fa-sort-down"></i> 降序
+                        </a>
+                    </div>
+                </th>
+                <th>
+                    最後更新
+                    <div class="btn-group btn-group-sm ms-1" role="group">
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=updated_at&direction=asc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'updated_at' and current_direction == 'asc' %}active{% endif %}"
+                           title="按最後更新時間升序排列">
+                            <i class="fas fa-sort-up"></i> 升序
+                        </a>
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=updated_at&direction=desc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'updated_at' and current_direction == 'desc' %}active{% endif %}"
+                           title="按最後更新時間降序排列">
+                            <i class="fas fa-sort-down"></i> 降序
+                        </a>
+                    </div>
+                </th>
                 <th>操作</th>
             </tr>
         </thead>
@@ -118,12 +230,12 @@
         <ul class="pagination justify-content-center">
             {% if completed_orders.has_previous %}
             <li class="page-item">
-                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}">
+                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_direction %}&direction={{ current_direction }}{% endif %}">
                     <i class="fas fa-angle-double-left"></i> 第一頁
                 </a>
             </li>
             <li class="page-item">
-                <a class="page-link" href="?page={{ completed_orders.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">
+                <a class="page-link" href="?page={{ completed_orders.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_direction %}&direction={{ current_direction }}{% endif %}">
                     <i class="fas fa-angle-left"></i> 上一頁
                 </a>
             </li>
@@ -136,19 +248,19 @@
                 </li>
                 {% elif num > completed_orders.number|add:'-3' and num < completed_orders.number|add:'3' %}
                 <li class="page-item">
-                    <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}">{{ num }}</a>
+                    <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_direction %}&direction={{ current_direction }}{% endif %}">{{ num }}</a>
                 </li>
                 {% endif %}
             {% endfor %}
             
             {% if completed_orders.has_next %}
             <li class="page-item">
-                <a class="page-link" href="?page={{ completed_orders.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">
+                <a class="page-link" href="?page={{ completed_orders.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_direction %}&direction={{ current_direction }}{% endif %}">
                     下一頁 <i class="fas fa-angle-right"></i>
                 </a>
             </li>
             <li class="page-item">
-                <a class="page-link" href="?page={{ completed_orders.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}">
+                <a class="page-link" href="?page={{ completed_orders.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_direction %}&direction={{ current_direction }}{% endif %}">
                     最後頁 <i class="fas fa-angle-double-right"></i>
                 </a>
             </li>

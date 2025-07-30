@@ -58,7 +58,13 @@
     {% if processes %}
     <div class="card">
         <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-            <h4 class="mb-0">工序明細</h4>
+            <h4 class="mb-0">
+                工序明細
+                {% if is_completed_workorder %}
+                <small class="text-light">（從實際報工資料生成）</small>
+                {% endif %}
+            </h4>
+            {% if not is_completed_workorder %}
             <div>
                 <button class="btn btn-light btn-sm" onclick="showAddProcessModal()">
                     <i class="fas fa-plus"></i> 新增工序
@@ -67,6 +73,7 @@
                     <i class="fas fa-sync-alt"></i> 重新整理
                 </button>
             </div>
+            {% endif %}
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -77,15 +84,26 @@
                             <th>工序名稱</th>
                             <th>計劃數量</th>
                             <th>完成數量</th>
+                            {% if is_completed_workorder %}
+                            <th>不良品數量</th>
+                            {% endif %}
                             <th>完成率</th>
                             <th>狀態</th>
                             <th>分配設備</th>
                             <th>分配作業員</th>
+                            {% if not is_completed_workorder %}
                             <th>產能倍數</th>
-                            <th>目標每小時產出</th> <!-- 新增這一欄 -->
+                            <th>目標每小時產出</th>
+                            {% endif %}
                             <th>預計工時</th>
                             <th>開始時間</th>
+                            {% if is_completed_workorder %}
+                            <th>結束時間</th>
+                            <th>異常紀錄</th>
+                            {% endif %}
+                            {% if not is_completed_workorder %}
                             <th>操作</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -95,14 +113,32 @@
                             <td>{{ process.process_name }}</td>
                             <td>{{ process.planned_quantity }}</td>
                             <td>{{ process.completed_quantity }}</td>
+                            {% if is_completed_workorder %}
+                            <td>{{ process.defect_quantity|default:0 }}</td>
+                            {% endif %}
                             <td>{{ process.completion_rate }}</td>
                             <td>{{ process.get_status_display }}</td>
                             <td>{{ process.assigned_equipment|default:'-' }}</td>
                             <td>{{ process.assigned_operator|default:'-' }}</td>
+                            {% if not is_completed_workorder %}
                             <td>{{ process.capacity_multiplier }}</td>
-                            <td>{{ process.target_hourly_output|default:'-' }}</td> <!-- 新增這一格 -->
+                            <td>{{ process.target_hourly_output|default:'-' }}</td>
+                            {% endif %}
                             <td>{{ process.estimated_hours }}</td>
                             <td>{{ process.actual_start_time|date:'Y-m-d H:i'|default:'-' }}</td>
+                            {% if is_completed_workorder %}
+                            <td>{{ process.actual_end_time|date:'Y-m-d H:i'|default:'-' }}</td>
+                            <td>
+                                {% if process.abnormal_notes %}
+                                <span class="badge bg-warning text-dark" title="{{ process.abnormal_notes }}">
+                                    <i class="fas fa-exclamation-triangle"></i> 有異常
+                                </span>
+                                {% else %}
+                                <span class="badge bg-success">正常</span>
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                            {% if not is_completed_workorder %}
                             <td>
                                 <div class="btn-group-vertical btn-group-sm" role="group">
                                     <!-- 上下移動按鈕 -->
@@ -125,6 +161,7 @@
                                     </button>
                                 </div>
                             </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -134,12 +171,17 @@
     </div>
     {% else %}
         <div class="alert alert-info mt-4">
-            此工單尚未建立工序明細。
-            {% if request.user.is_staff or request.user.is_superuser %}
-                <form method="post" action="{% url 'workorder:create_workorder_processes' workorder.id %}" style="display:inline;">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-primary btn-sm ms-2">自動建立工序明細</button>
-                </form>
+            {% if is_completed_workorder %}
+                此完工工單目前沒有報工資料，無法顯示工序明細。
+                <br><small class="text-muted">工序明細會從實際的報工記錄中自動生成。</small>
+            {% else %}
+                此工單尚未建立工序明細。
+                {% if request.user.is_staff or request.user.is_superuser %}
+                    <form method="post" action="{% url 'workorder:create_workorder_processes' workorder.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary btn-sm ms-2">自動建立工序明細</button>
+                    </form>
+                {% endif %}
             {% endif %}
         </div>
     {% endif %}

@@ -141,14 +141,14 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-3 mb-2">
-                            <a href="{% url 'workorder:pending_approval_list' %}" class="btn btn-warning btn-block quick-action-btn">
+                            <a href="{% url 'reporting:pending_approval_list' %}" class="btn btn-warning btn-block quick-action-btn">
                                 <i class="fas fa-clock"></i><br>
                                 待審核清單<br>
                                 <small>({{ stats.total_pending|default:0 }})</small>
                             </a>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <a href="{% url 'workorder:approved_reports_list' %}" class="btn btn-success btn-block quick-action-btn">
+                            <a href="{% url 'reporting:approved_reports_list' %}" class="btn btn-success btn-block quick-action-btn">
                                 <i class="fas fa-check-circle"></i><br>
                                 已核准清單<br>
                                 <small>({{ stats.total_approved|default:0 }})</small>
@@ -236,7 +236,7 @@ $(document).ready(function() {
     $('.stats-card').click(function() {
         var cardType = $(this).find('.stats-label').text();
         if (cardType.includes('待審核')) {
-            window.location.href = "{% url 'workorder:pending_approval_list' %}";
+            window.location.href = "{% url 'reporting:pending_approval_list' %}";
         } else if (cardType.includes('異常')) {
             window.location.href = "{% url 'workorder:abnormal_management' %}";
         }

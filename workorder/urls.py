@@ -167,219 +167,218 @@ urlpatterns = [
     ),
     path("report/smt/on_site/", views.smt_on_site_report, name="smt_on_site_report"),
     path("report/smt/submit/", views.submit_smt_report, name="submit_smt_report"),
-    path(
-        "api/get_workorders_by_equipment/",
-        views.get_workorders_by_equipment,
-        name="get_workorders_by_equipment",
-    ),
-    path(
-        "api/get_processes_by_workorder/",
-        views.get_processes_by_workorder,
-        name="get_processes_by_workorder",
-    ),
-    path(
-        "api/operator/get_workorders_by_operator/",
-        views.get_workorders_by_operator,
-        name="get_workorders_by_operator",
-    ),
-    path(
-        "api/operator/get_processes_by_workorder/",
-        views.get_processes_by_workorder_for_operator,
-        name="get_processes_by_workorder_for_operator",
-    ),
-    path(
-        "api/operator/submit_report/",
-        views.submit_operator_report,
-        name="submit_operator_report",
-    ),
-    # SMT補登報工功能
-    path(
-        "report/smt/supplement/",
-        views.smt_supplement_report_index,
-        name="smt_supplement_report_index",
-    ),
-    path(
-        "report/smt/supplement/create/",
-        views.smt_supplement_report_create,
-        name="smt_supplement_report_create",
-    ),
-    path(
-        "report/smt/supplement/edit/<int:report_id>/",
-        views.smt_supplement_report_edit,
-        name="smt_supplement_report_edit",
-    ),
-    path(
-        "report/smt/supplement/delete/<int:report_id>/",
-        views.smt_supplement_report_delete,
-        name="smt_supplement_report_delete",
-    ),
-    path(
-        "report/smt/supplement/detail/<int:report_id>/",
-        views.smt_supplement_report_detail,
-        name="smt_supplement_report_detail",
-    ),
-    path(
-        "report/smt/supplement/approve/<int:report_id>/",
-        views.smt_supplement_report_approve,
-        name="smt_supplement_report_approve",
-    ),
-    path(
-        "report/smt/supplement/reject/<int:report_id>/",
-        views.smt_supplement_report_reject,
-        name="smt_supplement_report_reject",
-    ),
-    path(
-        "report/smt/supplement/batch/",
-        views.smt_supplement_batch,
-        name="smt_supplement_batch",
-    ),
-    path(
-        "report/smt/supplement/export/",
-        views.smt_supplement_export,
-        name="smt_supplement_export",
-    ),
-    path(
-        "report/smt/supplement/template/",
-        views.smt_supplement_template,
-        name="smt_supplement_template",
-    ),
+    # path(
+    #     "api/get_workorders_by_equipment/",
+    #     views.get_workorders_by_equipment,
+    #     name="get_workorders_by_equipment",
+    # ),
+    # path(
+    #     "api/get_processes_by_workorder/",
+    #     views.get_processes_by_workorder,
+    #     name="get_processes_by_workorder",
+    # ),
+    # path(
+    #     "api/operator/get_workorders_by_operator/",
+    #     views.get_workorders_by_operator,
+    #     name="get_workorders_by_operator",
+    # ),
+    # path(
+    #     "api/operator/get_processes_by_workorder/",
+    #     views.get_processes_by_workorder_for_operator,
+    #     name="get_processes_by_workorder_for_operator",
+    # ),
+    # path(
+    #     "api/operator/submit_report/",
+    #     views.submit_operator_report,
+    #     name="submit_operator_report",
+    # ),
+    # SMT補登報工功能 - 暫時停用
+    # path(
+    #     "report/smt/supplement/",
+    #     views.smt_supplement_report_index,
+    #     name="smt_supplement_report_index",
+    # ),
+    # path(
+    #     "report/smt/supplement/create/",
+    #     views.smt_supplement_report_create,
+    #     name="smt_supplement_report_create",
+    # ),
+    # path(
+    #     "report/smt/supplement/edit/<int:report_id>/",
+    #     views.smt_supplement_report_edit,
+    #     name="smt_supplement_report_edit",
+    # ),
+    # path(
+    #     "report/smt/supplement/delete/<int:report_id>/",
+    #     views.smt_supplement_report_delete,
+    #     name="smt_supplement_report_delete",
+    # ),
+    # path(
+    #     "report/smt/supplement/detail/<int:report_id>/",
+    #     views.smt_supplement_report_detail,
+    #     name="smt_supplement_report_detail",
+    # ),
+    # path(
+    #     "report/smt/supplement/approve/<int:report_id>/",
+    #     views.smt_supplement_report_approve,
+    #     name="smt_supplement_report_approve",
+    # ),
+    # path(
+    #     "report/smt/supplement/reject/<int:report_id>/",
+    #     views.smt_supplement_report_reject,
+    #     name="smt_supplement_report_reject",
+    # ),
+    # path(
+    #     "report/smt/supplement/batch/",
+    #     views.smt_supplement_batch,
+    #     name="smt_supplement_batch",
+    # ),
+    # path(
+    #     "report/smt/supplement/export/",
+    #     views.smt_supplement_export,
+    #     name="smt_supplement_export",
+    # ),
+    # path(
+    #     "report/smt/supplement/template/",
+    #     views.smt_supplement_template,
+    #     name="smt_supplement_template",
+    # ),
     # SMTRD樣品補登功能 - 暫時停用，等待實作
     # path('report/smt/rd_sample_supplement/', views.smt_rd_sample_supplement_index, name='smt_rd_sample_supplement_index'),
-    path(
-        "api/smt/supplement/batch_create/",
-        views.smt_supplement_batch_create,
-        name="smt_supplement_batch_create",
-    ),
-    path(
-        "api/smt/get_workorders_by_equipment/",
-        views.get_smt_workorders_by_equipment,
-        name="get_smt_workorders_by_equipment",
-    ),
-    path(
-        "api/get_workorders_by_product/",
-        views.get_workorders_by_product,
-        name="get_workorders_by_product",
-    ),
-    path(
-        "api/get_workorder_details/",
-        views.get_workorder_details,
-        name="get_workorder_details",
-    ),
-    # 作業員現場報工功能
-    path(
-        "report/operator/on_site/",
-        views.operator_on_site_report,
-        name="operator_on_site_report",
-    ),
-    path(
-        "api/operator/get_workorder_info/",
-        views.get_workorder_info,
-        name="get_workorder_info",
-    ),
-    path(
-        "report/operator/quick_report/",
-        views.operator_quick_report,
-        name="operator_quick_report",
-    ),
-    path(
-        "report/operator/change_status/",
-        views.operator_change_status,
-        name="operator_change_status",
-    ),
-    path(
-        "report/operator/delete_workorder/",
-        views.operator_delete_workorder,
-        name="operator_delete_workorder",
-    ),
-    path(
-        "report/operator/start_process/",
-        views.operator_start_process,
-        name="operator_start_process",
-    ),
-    path(
-        "report/operator/report_progress/",
-        views.operator_report_progress,
-        name="operator_report_progress",
-    ),
-    path(
-        "report/operator/workorder_detail/",
-        views.operator_workorder_detail,
-        name="operator_workorder_detail",
-    ),
-    # 派工功能已移至派工單管理模組
-    # path('report/operator/assign_workorder/', views.operator_assign_workorder, name='operator_assign_workorder'),
-    path(
-        "report/operator/report_work/",
-        views.operator_report_work,
-        name="operator_report_work",
-    ),
-    path("report/operator/detail/", views.operator_detail, name="operator_detail"),
-    path(
-        "report/operator/report_detail/",
-        views.operator_report_detail,
-        name="operator_report_detail",
-    ),
-    # 作業員補登報工功能
-    path(
-        "report/operator/supplement/",
-        views.operator_supplement_report_index,
-        name="operator_supplement_report_index",
-    ),
-    path(
-        "report/operator/supplement/create/",
-        views.operator_supplement_report_create,
-        name="operator_supplement_report_create",
-    ),
-    path(
-        "report/operator/supplement/edit/<int:report_id>/",
-        views.operator_supplement_report_edit,
-        name="operator_supplement_report_edit",
-    ),
-    path(
-        "report/operator/supplement/delete/<int:report_id>/",
-        views.operator_supplement_report_delete,
-        name="operator_supplement_report_delete",
-    ),
-    path(
-        "report/operator/supplement/detail/<int:report_id>/",
-        views.operator_supplement_report_detail,
-        name="operator_supplement_report_detail",
-    ),
-    path(
-        "report/operator/supplement/approve/<int:report_id>/",
-        views.operator_supplement_report_approve,
-        name="operator_supplement_report_approve",
-    ),
-    path(
-        "report/operator/supplement/reject/<int:report_id>/",
-        views.operator_supplement_report_reject,
-        name="operator_supplement_report_reject",
-    ),
-    path(
-        "report/operator/supplement/batch/",
-        views.operator_supplement_batch,
-        name="operator_supplement_batch",
-    ),
-    path(
-        "report/operator/supplement/export/",
-        views.operator_supplement_export,
-        name="operator_supplement_export",
-    ),
-    path(
-        "report/operator/supplement/template/",
-        views.operator_supplement_template,
-        name="operator_supplement_template",
-    ),
-    path(
-        "api/operator/supplement/batch_create/",
-        views.operator_supplement_batch_create,
-        name="operator_supplement_batch_create",
-    ),
-    path(
-        "api/operator/get_workorders_by_operator/",
-        views.get_workorders_by_operator,
-        name="get_workorders_by_operator",
-    ),
+    # path(
+    #     "api/smt/supplement/batch_create/",
+    #     views.smt_supplement_batch_create,
+    #     name="smt_supplement_batch_create",
+    # ),
+    # path(
+    #     "api/smt/get_workorders_by_equipment/",
+    #     views.get_smt_workorders_by_equipment,
+    #     name="get_smt_workorders_by_equipment",
+    # ),
+    # path(
+    #     "api/get_workorders_by_product/",
+    #     views.get_workorders_by_product,
+    #     name="get_workorders_by_product",
+    # ),
+    # path(
+    #     "api/get_workorder_details/",
+    #     views.get_workorder_details,
+    #     name="get_workorder_details",
+    # ),
+    # 作業員現場報工功能 - 暫時停用
+    # path(
+    #     "report/operator/on_site/",
+    #     views.operator_on_site_report,
+    #     name="operator_on_site_report",
+    # ),
+    # path(
+    #     "api/operator/get_workorder_info/",
+    #     views.get_workorder_info,
+    #     name="get_workorder_info",
+    # ),
+    # path(
+    #     "report/operator/quick_report/",
+    #     views.operator_quick_report,
+    #     name="operator_quick_report",
+    # ),
+    # path(
+    #     "report/operator/change_status/",
+    #     views.operator_change_status,
+    #     name="operator_change_status",
+    # ),
+    # 作業員報工功能 - 暫時停用
+    # path(
+    #     "report/operator/delete_workorder/",
+    #     views.operator_delete_workorder,
+    #     name="operator_delete_workorder",
+    # ),
+    # path(
+    #     "report/operator/start_process/",
+    #     views.operator_start_process,
+    #     name="operator_start_process",
+    # ),
+    # path(
+    #     "report/operator/report_progress/",
+    #     views.operator_report_progress,
+    #     name="operator_report_progress",
+    # ),
+    # path(
+    #     "report/operator/workorder_detail/",
+    #     views.operator_workorder_detail,
+    #     name="operator_workorder_detail",
+    # ),
+    # path(
+    #     "report/operator/report_work/",
+    #     views.operator_report_work,
+    #     name="operator_report_work",
+    # ),
+    # path("report/operator/detail/", views.operator_detail, name="operator_detail"),
+    # path(
+    #     "report/operator/report_detail/",
+    #     views.operator_report_detail,
+    #     name="operator_report_detail",
+    # ),
+    # 作業員補登報工功能 - 暫時停用
+    # path(
+    #     "report/operator/supplement/",
+    #     views.operator_supplement_report_index,
+    #     name="operator_supplement_report_index",
+    # ),
+    # path(
+    #     "report/operator/supplement/create/",
+    #     views.operator_supplement_report_create,
+    #     name="operator_supplement_report_create",
+    # ),
+    # path(
+    #     "report/operator/supplement/edit/<int:report_id>/",
+    #     views.operator_supplement_report_edit,
+    #     name="operator_supplement_report_edit",
+    # ),
+    # path(
+    #     "report/operator/supplement/delete/<int:report_id>/",
+    #     views.operator_supplement_report_delete,
+    #     name="operator_supplement_report_delete",
+    # ),
+    # path(
+    #     "report/operator/supplement/detail/<int:report_id>/",
+    #     views.operator_supplement_report_detail,
+    #     name="operator_supplement_report_detail",
+    # ),
+    # path(
+    #     "report/operator/supplement/approve/<int:report_id>/",
+    #     views.operator_supplement_report_approve,
+    #     name="operator_supplement_report_approve",
+    # ),
+    # path(
+    #     "report/operator/supplement/reject/<int:report_id>/",
+    #     views.operator_supplement_report_reject,
+    #     name="operator_supplement_report_reject",
+    # ),
+    # path(
+    #     "report/operator/supplement/batch/",
+    #     views.operator_supplement_batch,
+    #     name="operator_supplement_batch",
+    # ),
+    # path(
+    #     "report/operator/supplement/export/",
+    #     views.operator_supplement_export,
+    #     name="operator_supplement_export",
+    # ),
+    # path(
+    #     "report/operator/supplement/template/",
+    #     views.operator_supplement_template,
+    #     name="operator_supplement_template",
+    # ),
+    # path(
+    #     "api/operator/supplement/batch_create/",
+    #     views.operator_supplement_batch_create,
+    #     name="operator_supplement_batch_create",
+    # ),
+    # path(
+    #     "api/operator/get_workorders_by_operator/",
+    #     views.get_workorders_by_operator,
+    #     name="get_workorders_by_operator",
+    # ),
     # RD樣品補登報工功能 - 暫時停用，等待實作
     # path('report/operator/supplement/rd_sample/create/', views.rd_sample_supplement_report_create, name='rd_sample_supplement_report_create'),
     # path('report/operator/supplement/rd_sample/edit/<int:report_id>/', views.rd_sample_supplement_report_edit, name='rd_sample_supplement_report_edit'),
