@@ -677,6 +677,23 @@ class SMTProductionReport(models.Model):
         default=timezone.now,
     )
 
+    # SMT 工時計算欄位（SMT 中午不休息，16:30 以後算加班）
+    work_hours_calculated = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name="正常工時",
+        help_text="16:30 之前的工時",
+    )
+
+    overtime_hours_calculated = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name="加班工時",
+        help_text="16:30 以後的工時",
+    )
+
     # 數量資訊
     work_quantity = models.IntegerField(
         verbose_name="工作數量",
@@ -888,6 +905,61 @@ class SMTProductionReport(models.Model):
         self.approved_at = timezone.now()
         self.rejection_reason = reason
         self.save()
+
+    def calculate_work_hours(self):
+        """計算 SMT 工作時數和加班時數（SMT 中午不休息，16:30 以後算加班）"""
+        if self.start_time and self.end_time:
+            from datetime import datetime, timedelta, time
+
+            start_dt = datetime.combine(self.work_date, self.start_time)
+            end_dt = datetime.combine(self.work_date, self.end_time)
+            if end_dt < start_dt:
+                end_dt += timedelta(days=1)
+            
+            # 計算總時數（SMT 不扣除休息時間）
+            duration = end_dt - start_dt
+            total_hours = round(duration.total_seconds() / 3600, 2)
+            
+            # 計算正常工時和加班時數
+            # 加班時數：超過16:30以後的時間才算加班
+            overtime_start_time = time(16, 30)  # 16:30開始算加班
+            
+            # 計算加班時數：如果結束時間超過16:30，則計算加班時數
+            if self.end_time > overtime_start_time:
+                # 計算從16:30到結束時間的加班時數
+                overtime_start_dt = datetime.combine(self.work_date, overtime_start_time)
+                end_dt = datetime.combine(self.work_date, self.end_time)
+                if end_dt < overtime_start_dt:
+                    end_dt += timedelta(days=1)
+                
+                overtime_duration = end_dt - overtime_start_dt
+                overtime_hours = round(overtime_duration.total_seconds() / 3600, 2)
+                
+                self.overtime_hours_calculated = overtime_hours
+                
+                # 正常工時 = 總工時 - 加班時數（但不能小於0）
+                self.work_hours_calculated = round(max(0, total_hours - overtime_hours), 2)
+            else:
+                # 結束時間在16:30之前，無加班
+                self.overtime_hours_calculated = 0.0
+                self.work_hours_calculated = round(total_hours, 2)
+            
+            return {
+                'total_hours': total_hours,
+                'work_hours': self.work_hours_calculated,
+                'overtime_hours': self.overtime_hours_calculated,
+            }
+        return {
+            'total_hours': 0.0,
+            'work_hours': 0.0,
+            'overtime_hours': 0.0,
+        }
+
+    def save(self, *args, **kwargs):
+        """儲存時自動計算工作時數和加班時數"""
+        # 自動計算工作時數和加班時數
+        self.calculate_work_hours()
+        super().save(*args, **kwargs)
 
 
 class OperatorSupplementReport(models.Model):

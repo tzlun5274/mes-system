@@ -4745,7 +4745,7 @@ def smt_supplement_report_index(request):
         models.Q(name__icontains='Place')
     ).order_by('name')
     
-    # 查詢補登記錄
+    # 查詢補登記錄 - 優先顯示待核准的資料
     supplement_reports = SMTProductionReport.objects.all()
     
     # 篩選條件
@@ -4769,8 +4769,17 @@ def smt_supplement_report_index(request):
     if date_to:
         supplement_reports = supplement_reports.filter(work_date__lte=date_to)
     
-    # 排序
-    supplement_reports = supplement_reports.order_by('-work_date', '-start_time')
+    # 排序 - 優先顯示待核准的資料
+    supplement_reports = supplement_reports.order_by(
+        models.Case(
+            models.When(approval_status='pending', then=models.Value(0)),
+            models.When(approval_status='approved', then=models.Value(1)),
+            models.When(approval_status='rejected', then=models.Value(2)),
+            default=models.Value(3),
+            output_field=models.IntegerField(),
+        ),
+        '-work_date', '-start_time'
+    )
     
     # 分頁
     paginator = Paginator(supplement_reports, 20)

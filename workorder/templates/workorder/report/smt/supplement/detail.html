@@ -235,8 +235,24 @@
                             <div class="detail-value">{{ supplement_report.work_quantity }} 件</div>
                         </div>
                         <div class="detail-item">
-                            <div class="detail-label">工作時數</div>
+                            <div class="detail-label">開始時間</div>
+                            <div class="detail-value">{{ supplement_report.start_time|time:"H:i" }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">結束時間</div>
+                            <div class="detail-value">{{ supplement_report.end_time|time:"H:i" }}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">總工時</div>
                             <div class="detail-value">{{ supplement_report.work_duration|floatformat:2 }} 小時</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">正常工時</div>
+                            <div class="detail-value">{{ supplement_report.work_hours_calculated|floatformat:2 }} 小時</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">加班工時</div>
+                            <div class="detail-value">{{ supplement_report.overtime_hours_calculated|floatformat:2 }} 小時</div>
                         </div>
                         <div class="detail-item">
                             <div class="detail-label">效率計算</div>
