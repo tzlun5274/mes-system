@@ -15,7 +15,7 @@ from .models import (
     SMTProductionReport,
 )
 from .tasks import get_standard_processes
-from .forms import WorkOrderForm
+from .forms import WorkOrderForm, OperatorSupplementReportForm, SMTProductionReportForm, OperatorOnSiteReportForm
 from django.contrib import messages
 
 from datetime import datetime, timedelta, date
@@ -67,6 +67,39 @@ def index(request):
     context = {
         "workorders": workorders,
         "is_debug": settings.DEBUG,  # 傳遞是否為測試環境
+    }
+    return render(request, "workorder/workorder/workorder_list.html", context)
+
+# 工單詳情
+def detail(request, pk):
+    workorder = get_object_or_404(WorkOrder, pk=pk)
+    context = {
+        "workorder": workorder,
+    }
+    return render(request, "workorder/workorder/workorder_detail.html", context)
+
+# 工單列表視圖
+def list_view(request):
+    workorders = WorkOrder.objects.all().order_by("-created_at")
+    
+    # 搜尋功能
+    search = request.GET.get('search', '')
+    if search:
+        workorders = workorders.filter(
+            Q(order_number__icontains=search) |
+            Q(product_code__icontains=search) |
+            Q(company_code__icontains=search)
+        )
+    
+    # 分頁
+    paginator = Paginator(workorders, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        "page_obj": page_obj,
+        "search": search,
+        "total_count": workorders.count(),
     }
     return render(request, "workorder/workorder/workorder_list.html", context)
 
@@ -4640,4 +4673,1376 @@ def submit_smt_report(request):
         return JsonResponse({
             'status': 'error',
             'message': f'提交失敗：{str(e)}'
+        })
+
+# ============================================================================
+# 作業員補登報工功能視圖函數
+# ============================================================================
+
+@login_required
+def operator_supplement_report_index(request):
+    """作業員補登報工記錄列表"""
+    reports = OperatorSupplementReport.objects.all().order_by('-report_date', '-created_at')
+    
+    # 搜尋功能
+    search = request.GET.get('search', '')
+    if search:
+        reports = reports.filter(
+            Q(operator__username__icontains=search) |
+            Q(workorder__order_number__icontains=search) |
+            Q(process__icontains=search)
+        )
+    
+    # 分頁
+    paginator = Paginator(reports, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'search': search,
+        'total_count': reports.count(),
+    }
+    return render(request, 'workorder/report/operator/supplement/index.html', context)
+
+@login_required
+def operator_supplement_report_create(request):
+    """新增作業員補登報工"""
+    if request.method == 'POST':
+        form = OperatorSupplementReportForm(request.POST)
+        if form.is_valid():
+            report = form.save(commit=False)
+            report.created_by = request.user.username
+            report.save()
+            messages.success(request, '作業員報工記錄新增成功！')
+            return redirect('workorder:operator_supplement_report_index')
+    else:
+        form = OperatorSupplementReportForm()
+    
+    context = {
+        'form': form,
+        'title': '新增作業員報工記錄',
+    }
+    return render(request, 'workorder/report/operator/supplement/form.html', context)
+
+@login_required
+def operator_supplement_report_edit(request, report_id):
+    """編輯作業員補登報工"""
+    try:
+        report = OperatorSupplementReport.objects.get(id=report_id)
+    except OperatorSupplementReport.DoesNotExist:
+        messages.error(request, '找不到指定的報工記錄！')
+        return redirect('workorder:operator_supplement_report_index')
+    
+    if request.method == 'POST':
+        form = OperatorSupplementReportForm(request.POST, instance=report)
+        if form.is_valid():
+            form.save()
+            messages.success(request, '作業員報工記錄更新成功！')
+            return redirect('workorder:operator_supplement_report_index')
+    else:
+        form = OperatorSupplementReportForm(instance=report)
+    
+    context = {
+        'form': form,
+        'report': report,
+        'title': '編輯作業員報工記錄',
+    }
+    return render(request, 'workorder/report/operator/supplement/form.html', context)
+
+@login_required
+def operator_supplement_report_delete(request, report_id):
+    """刪除作業員補登報工"""
+    try:
+        report = OperatorSupplementReport.objects.get(id=report_id)
+        report.delete()
+        messages.success(request, '作業員報工記錄刪除成功！')
+    except OperatorSupplementReport.DoesNotExist:
+        messages.error(request, '找不到指定的報工記錄！')
+    
+    return redirect('workorder:operator_supplement_report_index')
+
+@login_required
+def operator_supplement_report_detail(request, report_id):
+    """作業員補登報工詳情"""
+    try:
+        report = OperatorSupplementReport.objects.get(id=report_id)
+    except OperatorSupplementReport.DoesNotExist:
+        messages.error(request, '找不到指定的報工記錄！')
+        return redirect('workorder:operator_supplement_report_index')
+    
+    context = {
+        'report': report,
+    }
+    return render(request, 'workorder/report/operator/supplement/detail.html', context)
+
+@login_required
+def operator_on_site_report(request):
+    """作業員現場報工"""
+    if request.method == 'POST':
+        form = OperatorOnSiteReportForm(request.POST)
+        if form.is_valid():
+            report = form.save(commit=False)
+            report.created_by = request.user.username
+            report.report_date = timezone.now().date()
+            report.save()
+            messages.success(request, '現場報工記錄提交成功！')
+            return redirect('workorder:operator_on_site_report')
+    else:
+        form = OperatorOnSiteReportForm()
+    
+    context = {
+        'form': form,
+        'title': '作業員現場報工',
+    }
+    return render(request, 'workorder/report/operator/on_site.html', context)
+
+# ============================================================================
+# SMT補登報工功能視圖函數
+# ============================================================================
+
+@login_required
+def smt_supplement_report_index(request):
+    """SMT補登報工記錄列表"""
+    reports = SMTProductionReport.objects.all().order_by('-work_date', '-created_at')
+    
+    # 搜尋功能
+    search = request.GET.get('search', '')
+    if search:
+        reports = reports.filter(
+            Q(equipment__name__icontains=search) |
+            Q(workorder__order_number__icontains=search) |
+            Q(product_id__icontains=search)
+        )
+    
+    # 分頁
+    paginator = Paginator(reports, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'search': search,
+        'total_count': reports.count(),
+    }
+    return render(request, 'workorder/report/smt/supplement/index.html', context)
+
+@login_required
+def smt_supplement_report_create(request):
+    """新增SMT補登報工"""
+    if request.method == 'POST':
+        form = SMTProductionReportForm(request.POST)
+        if form.is_valid():
+            report = form.save(commit=False)
+            report.created_by = request.user.username
+            report.save()
+            messages.success(request, 'SMT報工記錄新增成功！')
+            return redirect('workorder:smt_supplement_report_index')
+    else:
+        form = SMTProductionReportForm()
+    
+    context = {
+        'form': form,
+        'title': '新增SMT報工記錄',
+    }
+    return render(request, 'workorder/report/smt/supplement/form.html', context)
+
+@login_required
+def smt_supplement_report_edit(request, report_id):
+    """編輯SMT補登報工"""
+    try:
+        report = SMTProductionReport.objects.get(id=report_id)
+    except SMTProductionReport.DoesNotExist:
+        messages.error(request, '找不到指定的SMT報工記錄！')
+        return redirect('workorder:smt_supplement_report_index')
+    
+    if request.method == 'POST':
+        form = SMTProductionReportForm(request.POST, instance=report)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'SMT報工記錄更新成功！')
+            return redirect('workorder:smt_supplement_report_index')
+    else:
+        form = SMTProductionReportForm(instance=report)
+    
+    context = {
+        'form': form,
+        'report': report,
+        'title': '編輯SMT報工記錄',
+    }
+    return render(request, 'workorder/report/smt/supplement/form.html', context)
+
+@login_required
+def smt_supplement_report_delete(request, report_id):
+    """刪除SMT補登報工"""
+    try:
+        report = SMTProductionReport.objects.get(id=report_id)
+        report.delete()
+        messages.success(request, 'SMT報工記錄刪除成功！')
+    except SMTProductionReport.DoesNotExist:
+        messages.error(request, '找不到指定的SMT報工記錄！')
+    
+    return redirect('workorder:smt_supplement_report_index')
+
+@login_required
+def smt_supplement_report_detail(request, report_id):
+    """SMT補登報工詳情"""
+    try:
+        report = SMTProductionReport.objects.get(id=report_id)
+    except SMTProductionReport.DoesNotExist:
+        messages.error(request, '找不到指定的SMT報工記錄！')
+        return redirect('workorder:smt_supplement_report_index')
+    
+    context = {
+        'report': report,
+    }
+    return render(request, 'workorder/report/smt/supplement/detail.html', context)
+
+# ============================================================================
+# 主管審核功能視圖函數
+# ============================================================================
+
+@login_required
+def supervisor_approve_reports(request):
+    """主管審核報工記錄"""
+    pending_reports = OperatorSupplementReport.objects.filter(
+        is_approved=False
+    ).order_by('-report_date', '-created_at')
+    
+    # 搜尋功能
+    search = request.GET.get('search', '')
+    if search:
+        pending_reports = pending_reports.filter(
+            Q(operator__username__icontains=search) |
+            Q(workorder__order_number__icontains=search)
+        )
+    
+    # 分頁
+    paginator = Paginator(pending_reports, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'search': search,
+        'total_count': pending_reports.count(),
+    }
+    return render(request, 'workorder/report/supervisor/approve.html', context)
+
+@login_required
+def approve_report(request, report_id):
+    """審核單筆報工記錄"""
+    try:
+        report = OperatorSupplementReport.objects.get(id=report_id)
+        report.is_approved = True
+        report.approved_by = request.user.username
+        report.approved_at = timezone.now()
+        report.save()
+        messages.success(request, '報工記錄審核通過！')
+    except OperatorSupplementReport.DoesNotExist:
+        messages.error(request, '找不到指定的報工記錄！')
+    
+    return redirect('workorder:supervisor_approve_reports')
+
+@login_required
+def reject_report(request, report_id):
+    """駁回單筆報工記錄"""
+    try:
+        report = OperatorSupplementReport.objects.get(id=report_id)
+        report.is_approved = False
+        report.approved_by = request.user.username
+        report.approved_at = timezone.now()
+        report.save()
+        messages.success(request, '報工記錄已駁回！')
+    except OperatorSupplementReport.DoesNotExist:
+        messages.error(request, '找不到指定的報工記錄！')
+    
+    return redirect('workorder:supervisor_approve_reports')
+
+# ============================================================================
+# API功能視圖函數
+# ============================================================================
+
+@require_GET
+@csrf_exempt
+def api_get_operator_reports(request):
+    """API：取得作業員報工記錄"""
+    try:
+        reports = OperatorSupplementReport.objects.all().order_by('-report_date')
+        
+        # 篩選條件
+        operator_id = request.GET.get('operator_id')
+        if operator_id:
+            reports = reports.filter(operator_id=operator_id)
+        
+        workorder_id = request.GET.get('workorder_id')
+        if workorder_id:
+            reports = reports.filter(workorder_id=workorder_id)
+        
+        date_from = request.GET.get('date_from')
+        if date_from:
+            reports = reports.filter(report_date__gte=date_from)
+        
+        date_to = request.GET.get('date_to')
+        if date_to:
+            reports = reports.filter(report_date__lte=date_to)
+        
+        # 序列化資料
+        data = []
+        for report in reports:
+            data.append({
+                'id': report.id,
+                'operator': report.operator.username,
+                'workorder': report.workorder.order_number,
+                'process': report.process,
+                'quantity': report.quantity,
+                'report_date': report.report_date.isoformat(),
+                'is_approved': report.is_approved,
+                'created_at': report.created_at.isoformat(),
+            })
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': data,
+            'total_count': len(data)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        })
+
+@require_GET
+@csrf_exempt
+def api_get_smt_reports(request):
+    """API：取得SMT報工記錄"""
+    try:
+        reports = SMTProductionReport.objects.all().order_by('-work_date')
+        
+        # 篩選條件
+        equipment_id = request.GET.get('equipment_id')
+        if equipment_id:
+            reports = reports.filter(equipment_id=equipment_id)
+        
+        workorder_id = request.GET.get('workorder_id')
+        if workorder_id:
+            reports = reports.filter(workorder_id=workorder_id)
+        
+        date_from = request.GET.get('date_from')
+        if date_from:
+            reports = reports.filter(work_date__gte=date_from)
+        
+        date_to = request.GET.get('date_to')
+        if date_to:
+            reports = reports.filter(work_date__lte=date_to)
+        
+        # 序列化資料
+        data = []
+        for report in reports:
+            data.append({
+                'id': report.id,
+                'equipment': report.equipment.name,
+                'workorder': report.workorder.order_number,
+                'product_id': report.product_id,
+                'work_quantity': report.work_quantity,
+                'defect_quantity': report.defect_quantity,
+                'work_date': report.work_date.isoformat(),
+                'created_at': report.created_at.isoformat(),
+            })
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': data,
+            'total_count': len(data)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        })
+
+# ============================================================================
+# 報表匯出功能視圖函數
+# ============================================================================
+
+@login_required
+def export_operator_reports(request):
+    """匯出作業員報工記錄"""
+    try:
+        reports = OperatorSupplementReport.objects.all().order_by('-report_date')
+        
+        # 篩選條件
+        date_from = request.GET.get('date_from')
+        if date_from:
+            reports = reports.filter(report_date__gte=date_from)
+        
+        date_to = request.GET.get('date_to')
+        if date_to:
+            reports = reports.filter(report_date__lte=date_to)
+        
+        # 建立Excel檔案
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "作業員報工記錄"
+        
+        # 設定標題
+        headers = ['作業員', '工單號', '工序', '數量', '報工日期', '審核狀態', '建立時間']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
+        
+        # 填入資料
+        for row, report in enumerate(reports, 2):
+            ws.cell(row=row, column=1, value=report.operator.username)
+            ws.cell(row=row, column=2, value=report.workorder.order_number)
+            ws.cell(row=row, column=3, value=report.process)
+            ws.cell(row=row, column=4, value=report.quantity)
+            ws.cell(row=row, column=5, value=report.report_date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=6, value='已審核' if report.is_approved else '待審核')
+            ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
+        
+        # 調整欄寬
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # 儲存檔案
+        from django.http import HttpResponse
+        from io import BytesIO
+        
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="作業員報工記錄_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+        
+        return response
+        
+    except Exception as e:
+        messages.error(request, f'匯出失敗：{str(e)}')
+        return redirect('workorder:operator_supplement_report_index')
+
+@login_required
+def export_smt_reports(request):
+    """匯出SMT報工記錄"""
+    try:
+        reports = SMTProductionReport.objects.all().order_by('-work_date')
+        
+        # 篩選條件
+        date_from = request.GET.get('date_from')
+        if date_from:
+            reports = reports.filter(work_date__gte=date_from)
+        
+        date_to = request.GET.get('date_to')
+        if date_to:
+            reports = reports.filter(work_date__lte=date_to)
+        
+        # 建立Excel檔案
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "SMT報工記錄"
+        
+        # 設定標題
+        headers = ['設備', '工單號', '產品編號', '良品數量', '不良品數量', '報工日期', '建立時間']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
+        
+        # 填入資料
+        for row, report in enumerate(reports, 2):
+            ws.cell(row=row, column=1, value=report.equipment.name)
+            ws.cell(row=row, column=2, value=report.workorder.order_number)
+            ws.cell(row=row, column=3, value=report.product_id)
+            ws.cell(row=row, column=4, value=report.work_quantity)
+            ws.cell(row=row, column=5, value=report.defect_quantity)
+            ws.cell(row=row, column=6, value=report.work_date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
+        
+        # 調整欄寬
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # 儲存檔案
+        from django.http import HttpResponse
+        from io import BytesIO
+        
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="SMT報工記錄_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+        
+        return response
+        
+    except Exception as e:
+        messages.error(request, f'匯出失敗：{str(e)}')
+        return redirect('workorder:smt_supplement_report_index')
+
+# ============================================================================
+# 審核功能視圖函數
+# ============================================================================
+
+@login_required
+def operator_supplement_report_approve(request, report_id):
+    """審核作業員補登報工"""
+    try:
+        report = OperatorSupplementReport.objects.get(id=report_id)
+        report.is_approved = True
+        report.approved_by = request.user.username
+        report.approved_at = timezone.now()
+        report.save()
+        messages.success(request, '作業員報工記錄審核通過！')
+    except OperatorSupplementReport.DoesNotExist:
+        messages.error(request, '找不到指定的報工記錄！')
+    
+    return redirect('workorder:operator_supplement_report_index')
+
+@login_required
+def operator_supplement_report_reject(request, report_id):
+    """駁回作業員補登報工"""
+    try:
+        report = OperatorSupplementReport.objects.get(id=report_id)
+        report.is_approved = False
+        report.approved_by = request.user.username
+        report.approved_at = timezone.now()
+        report.save()
+        messages.success(request, '作業員報工記錄已駁回！')
+    except OperatorSupplementReport.DoesNotExist:
+        messages.error(request, '找不到指定的報工記錄！')
+    
+    return redirect('workorder:operator_supplement_report_index')
+
+@login_required
+def smt_supplement_report_approve(request, report_id):
+    """審核SMT補登報工"""
+    try:
+        report = SMTProductionReport.objects.get(id=report_id)
+        report.is_approved = True
+        report.approved_by = request.user.username
+        report.approved_at = timezone.now()
+        report.save()
+        messages.success(request, 'SMT報工記錄審核通過！')
+    except SMTProductionReport.DoesNotExist:
+        messages.error(request, '找不到指定的SMT報工記錄！')
+    
+    return redirect('workorder:smt_supplement_report_index')
+
+@login_required
+def smt_supplement_report_reject(request, report_id):
+    """駁回SMT補登報工"""
+    try:
+        report = SMTProductionReport.objects.get(id=report_id)
+        report.is_approved = False
+        report.approved_by = request.user.username
+        report.approved_at = timezone.now()
+        report.save()
+        messages.success(request, 'SMT報工記錄已駁回！')
+    except SMTProductionReport.DoesNotExist:
+        messages.error(request, '找不到指定的SMT報工記錄！')
+    
+    return redirect('workorder:smt_supplement_report_index')
+
+# ============================================================================
+# 批次處理功能視圖函數
+# ============================================================================
+
+@login_required
+def operator_supplement_batch(request):
+    """作業員補登報工批次處理"""
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        report_ids = request.POST.getlist('report_ids')
+        
+        if not report_ids:
+            messages.error(request, '請選擇要處理的報工記錄！')
+            return redirect('workorder:operator_supplement_report_index')
+        
+        try:
+            reports = OperatorSupplementReport.objects.filter(id__in=report_ids)
+            
+            if action == 'approve':
+                reports.update(
+                    is_approved=True,
+                    approved_by=request.user.username,
+                    approved_at=timezone.now()
+                )
+                messages.success(request, f'已審核 {len(reports)} 筆作業員報工記錄！')
+            elif action == 'reject':
+                reports.update(
+                    is_approved=False,
+                    approved_by=request.user.username,
+                    approved_at=timezone.now()
+                )
+                messages.success(request, f'已駁回 {len(reports)} 筆作業員報工記錄！')
+            elif action == 'delete':
+                count = reports.count()
+                reports.delete()
+                messages.success(request, f'已刪除 {count} 筆作業員報工記錄！')
+            else:
+                messages.error(request, '無效的操作！')
+                
+        except Exception as e:
+            messages.error(request, f'批次處理失敗：{str(e)}')
+    
+    return redirect('workorder:operator_supplement_report_index')
+
+@login_required
+def smt_supplement_batch(request):
+    """SMT補登報工批次處理"""
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        report_ids = request.POST.getlist('report_ids')
+        
+        if not report_ids:
+            messages.error(request, '請選擇要處理的SMT報工記錄！')
+            return redirect('workorder:smt_supplement_report_index')
+        
+        try:
+            reports = SMTProductionReport.objects.filter(id__in=report_ids)
+            
+            if action == 'approve':
+                reports.update(
+                    is_approved=True,
+                    approved_by=request.user.username,
+                    approved_at=timezone.now()
+                )
+                messages.success(request, f'已審核 {len(reports)} 筆SMT報工記錄！')
+            elif action == 'reject':
+                reports.update(
+                    is_approved=False,
+                    approved_by=request.user.username,
+                    approved_at=timezone.now()
+                )
+                messages.success(request, f'已駁回 {len(reports)} 筆SMT報工記錄！')
+            elif action == 'delete':
+                count = reports.count()
+                reports.delete()
+                messages.success(request, f'已刪除 {count} 筆SMT報工記錄！')
+            else:
+                messages.error(request, '無效的操作！')
+                
+        except Exception as e:
+            messages.error(request, f'批次處理失敗：{str(e)}')
+    
+    return redirect('workorder:smt_supplement_report_index')
+
+# ============================================================================
+# 匯出功能視圖函數
+# ============================================================================
+
+@login_required
+def operator_supplement_export(request):
+    """匯出作業員補登報工記錄"""
+    try:
+        reports = OperatorSupplementReport.objects.all().order_by('-report_date')
+        
+        # 篩選條件
+        date_from = request.GET.get('date_from')
+        if date_from:
+            reports = reports.filter(report_date__gte=date_from)
+        
+        date_to = request.GET.get('date_to')
+        if date_to:
+            reports = reports.filter(report_date__lte=date_to)
+        
+        operator_id = request.GET.get('operator_id')
+        if operator_id:
+            reports = reports.filter(operator_id=operator_id)
+        
+        # 建立Excel檔案
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "作業員補登報工記錄"
+        
+        # 設定標題
+        headers = ['作業員', '工單號', '工序', '數量', '報工日期', '審核狀態', '建立時間', '審核者', '審核時間']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
+        
+        # 填入資料
+        for row, report in enumerate(reports, 2):
+            ws.cell(row=row, column=1, value=report.operator.username)
+            ws.cell(row=row, column=2, value=report.workorder.order_number)
+            ws.cell(row=row, column=3, value=report.process)
+            ws.cell(row=row, column=4, value=report.quantity)
+            ws.cell(row=row, column=5, value=report.report_date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=6, value='已審核' if report.is_approved else '待審核')
+            ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
+            ws.cell(row=row, column=8, value=report.approved_by or '')
+            ws.cell(row=row, column=9, value=report.approved_at.strftime('%Y-%m-%d %H:%M:%S') if report.approved_at else '')
+        
+        # 調整欄寬
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # 儲存檔案
+        from django.http import HttpResponse
+        from io import BytesIO
+        
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="作業員補登報工記錄_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+        
+        return response
+        
+    except Exception as e:
+        messages.error(request, f'匯出失敗：{str(e)}')
+        return redirect('workorder:operator_supplement_report_index')
+
+@login_required
+def smt_supplement_export(request):
+    """匯出SMT補登報工記錄"""
+    try:
+        reports = SMTProductionReport.objects.all().order_by('-work_date')
+        
+        # 篩選條件
+        date_from = request.GET.get('date_from')
+        if date_from:
+            reports = reports.filter(work_date__gte=date_from)
+        
+        date_to = request.GET.get('date_to')
+        if date_to:
+            reports = reports.filter(work_date__lte=date_to)
+        
+        equipment_id = request.GET.get('equipment_id')
+        if equipment_id:
+            reports = reports.filter(equipment_id=equipment_id)
+        
+        # 建立Excel檔案
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "SMT補登報工記錄"
+        
+        # 設定標題
+        headers = ['設備', '工單號', '產品編號', '良品數量', '不良品數量', '報工日期', '建立時間', '審核者', '審核時間']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
+        
+        # 填入資料
+        for row, report in enumerate(reports, 2):
+            ws.cell(row=row, column=1, value=report.equipment.name)
+            ws.cell(row=row, column=2, value=report.workorder.order_number)
+            ws.cell(row=row, column=3, value=report.product_id)
+            ws.cell(row=row, column=4, value=report.work_quantity)
+            ws.cell(row=row, column=5, value=report.defect_quantity)
+            ws.cell(row=row, column=6, value=report.work_date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
+            ws.cell(row=row, column=8, value=report.approved_by or '')
+            ws.cell(row=row, column=9, value=report.approved_at.strftime('%Y-%m-%d %H:%M:%S') if report.approved_at else '')
+        
+        # 調整欄寬
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # 儲存檔案
+        from django.http import HttpResponse
+        from io import BytesIO
+        
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="SMT補登報工記錄_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+        
+        return response
+        
+    except Exception as e:
+        messages.error(request, f'匯出失敗：{str(e)}')
+        return redirect('workorder:smt_supplement_report_index')
+
+# ============================================================================
+# 模板下載功能視圖函數
+# ============================================================================
+
+@login_required
+def operator_supplement_template(request):
+    """下載作業員補登報工模板"""
+    try:
+        # 建立Excel檔案
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "作業員補登報工模板"
+        
+        # 設定標題
+        headers = ['作業員', '工單號', '工序', '數量', '報工日期', '備註']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
+        
+        # 添加範例資料
+        example_data = [
+            ['張三', 'WO2024001', '組裝', 100, '2024-01-15', '正常生產'],
+            ['李四', 'WO2024002', '測試', 50, '2024-01-15', '品質檢查'],
+        ]
+        
+        for row, data in enumerate(example_data, 2):
+            for col, value in enumerate(data, 1):
+                ws.cell(row=row, column=col, value=value)
+        
+        # 調整欄寬
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # 儲存檔案
+        from django.http import HttpResponse
+        from io import BytesIO
+        
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="作業員補登報工模板_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+        
+        return response
+        
+    except Exception as e:
+        messages.error(request, f'模板下載失敗：{str(e)}')
+        return redirect('workorder:operator_supplement_report_index')
+
+@login_required
+def smt_supplement_template(request):
+    """下載SMT補登報工模板"""
+    try:
+        # 建立Excel檔案
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "SMT補登報工模板"
+        
+        # 設定標題
+        headers = ['設備', '工單號', '產品編號', '良品數量', '不良品數量', '報工日期', '備註']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
+        
+        # 添加範例資料
+        example_data = [
+            ['SMT-001', 'WO2024001', 'PROD001', 100, 2, '2024-01-15', '正常生產'],
+            ['SMT-002', 'WO2024002', 'PROD002', 50, 1, '2024-01-15', '品質檢查'],
+        ]
+        
+        for row, data in enumerate(example_data, 2):
+            for col, value in enumerate(data, 1):
+                ws.cell(row=row, column=col, value=value)
+        
+        # 調整欄寬
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # 儲存檔案
+        from django.http import HttpResponse
+        from io import BytesIO
+        
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="SMT補登報工模板_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+        
+        return response
+        
+    except Exception as e:
+        messages.error(request, f'模板下載失敗：{str(e)}')
+        return redirect('workorder:smt_supplement_report_index')
+
+# ============================================================================
+# API功能視圖函數
+# ============================================================================
+
+@require_POST
+@csrf_exempt
+def operator_supplement_batch_create(request):
+    """API：批次建立作業員補登報工"""
+    try:
+        data = json.loads(request.body)
+        reports_data = data.get('reports', [])
+        
+        created_count = 0
+        errors = []
+        
+        for report_data in reports_data:
+            try:
+                # 驗證必要欄位
+                required_fields = ['operator_id', 'workorder_id', 'process', 'quantity', 'report_date']
+                for field in required_fields:
+                    if field not in report_data:
+                        errors.append(f'缺少必要欄位：{field}')
+                        continue
+                
+                # 建立報工記錄
+                report = OperatorSupplementReport.objects.create(
+                    operator_id=report_data['operator_id'],
+                    workorder_id=report_data['workorder_id'],
+                    process=report_data['process'],
+                    quantity=report_data['quantity'],
+                    report_date=report_data['report_date'],
+                    notes=report_data.get('notes', ''),
+                    created_by=request.user.username if request.user.is_authenticated else 'system'
+                )
+                created_count += 1
+                
+            except Exception as e:
+                errors.append(f'建立記錄失敗：{str(e)}')
+        
+        return JsonResponse({
+            'status': 'success',
+            'created_count': created_count,
+            'errors': errors
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        })
+
+@require_POST
+@csrf_exempt
+def smt_supplement_batch_create(request):
+    """API：批次建立SMT補登報工"""
+    try:
+        data = json.loads(request.body)
+        reports_data = data.get('reports', [])
+        
+        created_count = 0
+        errors = []
+        
+        for report_data in reports_data:
+            try:
+                # 驗證必要欄位
+                required_fields = ['equipment_id', 'workorder_id', 'product_id', 'work_quantity', 'work_date']
+                for field in required_fields:
+                    if field not in report_data:
+                        errors.append(f'缺少必要欄位：{field}')
+                        continue
+                
+                # 建立報工記錄
+                report = SMTProductionReport.objects.create(
+                    equipment_id=report_data['equipment_id'],
+                    workorder_id=report_data['workorder_id'],
+                    product_id=report_data['product_id'],
+                    work_quantity=report_data['work_quantity'],
+                    defect_quantity=report_data.get('defect_quantity', 0),
+                    work_date=report_data['work_date'],
+                    remarks=report_data.get('remarks', ''),
+                    created_by=request.user.username if request.user.is_authenticated else 'system'
+                )
+                created_count += 1
+                
+            except Exception as e:
+                errors.append(f'建立記錄失敗：{str(e)}')
+        
+        return JsonResponse({
+            'status': 'success',
+            'created_count': created_count,
+            'errors': errors
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        })
+
+# ============================================================================
+# 主管功能視圖函數
+# ============================================================================
+
+@login_required
+def supervisor_index(request):
+    """主管功能首頁"""
+    # 統計資料
+    total_operator_reports = OperatorSupplementReport.objects.count()
+    pending_operator_reports = OperatorSupplementReport.objects.filter(is_approved=False).count()
+    approved_operator_reports = OperatorSupplementReport.objects.filter(is_approved=True).count()
+    
+    total_smt_reports = SMTProductionReport.objects.count()
+    pending_smt_reports = SMTProductionReport.objects.filter(is_approved=False).count()
+    approved_smt_reports = SMTProductionReport.objects.filter(is_approved=True).count()
+    
+    context = {
+        'total_operator_reports': total_operator_reports,
+        'pending_operator_reports': pending_operator_reports,
+        'approved_operator_reports': approved_operator_reports,
+        'total_smt_reports': total_smt_reports,
+        'pending_smt_reports': pending_smt_reports,
+        'approved_smt_reports': approved_smt_reports,
+    }
+    return render(request, 'workorder/report/supervisor/index.html', context)
+
+# ============================================================================
+# 其他API功能視圖函數
+# ============================================================================
+
+@require_GET
+@csrf_exempt
+def get_workorders_by_operator(request):
+    """API：根據作業員取得工單"""
+    try:
+        operator_id = request.GET.get('operator_id')
+        if not operator_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': '請提供作業員ID'
+            })
+        
+        workorders = WorkOrder.objects.filter(
+            workorderprocess__operator_id=operator_id
+        ).distinct()
+        
+        data = []
+        for workorder in workorders:
+            data.append({
+                'id': workorder.id,
+                'order_number': workorder.order_number,
+                'product_code': workorder.product_code,
+                'quantity': workorder.quantity,
+            })
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        })
+
+@require_GET
+@csrf_exempt
+def get_processes_by_workorder_for_operator(request):
+    """API：根據工單取得工序（作業員用）"""
+    try:
+        workorder_id = request.GET.get('workorder_id')
+        if not workorder_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': '請提供工單ID'
+            })
+        
+        processes = WorkOrderProcess.objects.filter(workorder_id=workorder_id)
+        
+        data = []
+        for process in processes:
+            data.append({
+                'id': process.id,
+                'process_name': process.process_name,
+                'sequence': process.sequence,
+            })
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        })
+
+@require_POST
+@csrf_exempt
+def submit_operator_report(request):
+    """API：提交作業員報工"""
+    try:
+        data = json.loads(request.body)
+        
+        # 驗證必要欄位
+        required_fields = ['operator_id', 'workorder_id', 'process_id', 'quantity']
+        for field in required_fields:
+            if field not in data:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'缺少必要欄位：{field}'
+                })
+        
+        # 建立報工記錄
+        report = OperatorSupplementReport.objects.create(
+            operator_id=data['operator_id'],
+            workorder_id=data['workorder_id'],
+            process=data.get('process_name', ''),
+            quantity=data['quantity'],
+            report_date=data.get('report_date', timezone.now().date()),
+            notes=data.get('notes', ''),
+            created_by=request.user.username if request.user.is_authenticated else 'system'
+        )
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': '報工記錄提交成功',
+            'report_id': report.id
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        })
+
+@require_GET
+@csrf_exempt
+def get_smt_workorders_by_equipment(request):
+    """API：根據設備取得工單（SMT用）"""
+    try:
+        equipment_id = request.GET.get('equipment_id')
+        if not equipment_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': '請提供設備ID'
+            })
+        
+        workorders = WorkOrder.objects.filter(
+            workorderprocess__equipment_id=equipment_id
+        ).distinct()
+        
+        data = []
+        for workorder in workorders:
+            data.append({
+                'id': workorder.id,
+                'order_number': workorder.order_number,
+                'product_code': workorder.product_code,
+                'quantity': workorder.quantity,
+            })
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        })
+
+@require_GET
+@csrf_exempt
+def get_workorders_by_product(request):
+    """API：根據產品取得工單"""
+    try:
+        product_code = request.GET.get('product_code')
+        if not product_code:
+            return JsonResponse({
+                'status': 'error',
+                'message': '請提供產品編號'
+            })
+        
+        workorders = WorkOrder.objects.filter(product_code__icontains=product_code)
+        
+        data = []
+        for workorder in workorders:
+            data.append({
+                'id': workorder.id,
+                'order_number': workorder.order_number,
+                'product_code': workorder.product_code,
+                'quantity': workorder.quantity,
+                'status': workorder.status,
+            })
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        })
+
+@require_GET
+@csrf_exempt
+def get_workorder_details(request):
+    """API：取得工單詳細資料"""
+    try:
+        workorder_id = request.GET.get('workorder_id')
+        if not workorder_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': '請提供工單ID'
+            })
+        
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by('sequence')
+        
+        process_data = []
+        for process in processes:
+            process_data.append({
+                'id': process.id,
+                'process_name': process.process_name,
+                'sequence': process.sequence,
+                'equipment': process.equipment.name if process.equipment else None,
+                'operator': process.operator.username if process.operator else None,
+            })
+        
+        data = {
+            'id': workorder.id,
+            'order_number': workorder.order_number,
+            'product_code': workorder.product_code,
+            'quantity': workorder.quantity,
+            'status': workorder.status,
+            'processes': process_data,
+        }
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': data
+        })
+        
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': '找不到指定的工單'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        })
+
+@require_GET
+@csrf_exempt
+def get_workorder_info(request):
+    """API：取得工單基本資訊"""
+    try:
+        workorder_id = request.GET.get('workorder_id')
+        if not workorder_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': '請提供工單ID'
+            })
+        
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        
+        data = {
+            'id': workorder.id,
+            'order_number': workorder.order_number,
+            'product_code': workorder.product_code,
+            'quantity': workorder.quantity,
+            'status': workorder.status,
+        }
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': data
+        })
+        
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': '找不到指定的工單'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
         })

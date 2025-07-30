@@ -2337,3 +2337,352 @@ class RDSampleSupplementReportForm(forms.ModelForm):
             "remarks": "請輸入備註說明（可選）",
             "approval_status": "請選擇審核狀態",
         }
+
+
+# ==================== SMT補登報工表單 ====================
+
+class SMTProductionReportForm(forms.ModelForm):
+    """
+    SMT補登報工表單
+    用於創建和編輯SMT補登報工記錄
+    """
+    
+    # 設備選擇
+    equipment = forms.ModelChoiceField(
+        queryset=None,
+        label="設備",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "equipment_select",
+                "placeholder": "請選擇SMT設備",
+            }
+        ),
+        required=True,
+        help_text="請選擇SMT設備",
+    )
+    
+    # 工單選擇
+    workorder = forms.ModelChoiceField(
+        queryset=None,
+        label="工單號碼",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "workorder_select",
+                "placeholder": "請選擇工單號碼",
+            }
+        ),
+        required=True,
+        help_text="請選擇工單號碼",
+    )
+    
+    # 產品編號
+    product_id = forms.CharField(
+        max_length=100,
+        label="產品編號",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "id": "product_id_input",
+                "placeholder": "請輸入產品編號",
+            }
+        ),
+        required=True,
+        help_text="請輸入產品編號",
+    )
+    
+    # 工序
+    operation = forms.CharField(
+        max_length=100,
+        label="工序",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "id": "operation_input",
+                "placeholder": "請輸入工序名稱",
+            }
+        ),
+        required=True,
+        help_text="請輸入工序名稱",
+    )
+    
+    # 日期
+    work_date = forms.DateField(
+        label="報工日期",
+        widget=forms.DateInput(
+            attrs={
+                "class": "form-control",
+                "type": "date",
+                "id": "work_date_input",
+            }
+        ),
+        required=True,
+        help_text="請選擇報工日期",
+    )
+    
+    # 開始時間
+    start_time = forms.TimeField(
+        label="開始時間",
+        widget=forms.TimeInput(
+            attrs={
+                "class": "form-control",
+                "type": "time",
+                "id": "start_time_input",
+            }
+        ),
+        required=True,
+        help_text="請選擇開始時間",
+    )
+    
+    # 結束時間
+    end_time = forms.TimeField(
+        label="結束時間",
+        widget=forms.TimeInput(
+            attrs={
+                "class": "form-control",
+                "type": "time",
+                "id": "end_time_input",
+            }
+        ),
+        required=True,
+        help_text="請選擇結束時間",
+    )
+    
+    # 良品數量
+    work_quantity = forms.IntegerField(
+        label="良品數量",
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": "0",
+                "id": "work_quantity_input",
+                "placeholder": "請輸入良品數量",
+            }
+        ),
+        required=True,
+        help_text="請輸入良品數量",
+    )
+    
+    # 不良品數量
+    defect_quantity = forms.IntegerField(
+        label="不良品數量",
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": "0",
+                "id": "defect_quantity_input",
+                "placeholder": "請輸入不良品數量",
+            }
+        ),
+        required=False,
+        initial=0,
+        help_text="請輸入不良品數量",
+    )
+    
+    # 是否完工
+    is_completed = forms.BooleanField(
+        label="是否完工",
+        required=False,
+        help_text="是否已完工",
+    )
+    
+    # 備註
+    remarks = forms.CharField(
+        label="備註",
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": "3",
+                "id": "remarks_input",
+                "placeholder": "請輸入備註",
+            }
+        ),
+        required=False,
+        help_text="請輸入備註",
+    )
+    
+    class Meta:
+        model = SMTProductionReport
+        fields = [
+            "equipment",
+            "workorder",
+            "product_id",
+            "operation",
+            "work_date",
+            "start_time",
+            "end_time",
+            "work_quantity",
+            "defect_quantity",
+            "is_completed",
+            "remarks",
+        ]
+        labels = {
+            "equipment": "設備",
+            "workorder": "工單號碼",
+            "product_id": "產品編號",
+            "operation": "工序",
+            "work_date": "報工日期",
+            "start_time": "開始時間",
+            "end_time": "結束時間",
+            "work_quantity": "良品數量",
+            "defect_quantity": "不良品數量",
+            "is_completed": "是否完工",
+            "remarks": "備註",
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # 設定設備查詢集
+        from equip.models import Equipment
+        self.fields['equipment'].queryset = Equipment.objects.filter(
+            equipment_type__icontains='SMT'
+        ).order_by('name')
+        
+        # 設定工單查詢集
+        self.fields['workorder'].queryset = WorkOrder.objects.filter(
+            status__in=['pending', 'in_progress']
+        ).order_by('-created_at')
+
+
+# ==================== 作業員現場報工表單 ====================
+
+class OperatorOnSiteReportForm(forms.ModelForm):
+    """
+    作業員現場報工表單
+    用於作業員現場報工記錄
+    """
+    
+    # 作業員選擇
+    operator = forms.ModelChoiceField(
+        queryset=None,
+        label="作業員",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "operator_select",
+                "placeholder": "請選擇作業員",
+            }
+        ),
+        required=True,
+        help_text="請選擇作業員",
+    )
+    
+    # 工單選擇
+    workorder = forms.ModelChoiceField(
+        queryset=None,
+        label="工單號碼",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "workorder_select",
+                "placeholder": "請選擇工單號碼",
+            }
+        ),
+        required=True,
+        help_text="請選擇工單號碼",
+    )
+    
+    # 工序選擇
+    process = forms.ModelChoiceField(
+        queryset=None,
+        label="工序",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "process_select",
+                "placeholder": "請選擇工序",
+            }
+        ),
+        required=True,
+        help_text="請選擇工序",
+    )
+    
+    # 設備選擇
+    equipment = forms.ModelChoiceField(
+        queryset=None,
+        label="設備",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "equipment_select",
+                "placeholder": "請選擇設備",
+            }
+        ),
+        required=False,
+        help_text="請選擇設備（可選）",
+    )
+    
+    # 數量
+    quantity = forms.IntegerField(
+        label="完成數量",
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": "0",
+                "id": "quantity_input",
+                "placeholder": "請輸入完成數量",
+            }
+        ),
+        required=True,
+        help_text="請輸入完成數量",
+    )
+    
+    # 備註
+    notes = forms.CharField(
+        label="備註",
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": "3",
+                "id": "notes_input",
+                "placeholder": "請輸入備註",
+            }
+        ),
+        required=False,
+        help_text="請輸入備註",
+    )
+    
+    class Meta:
+        model = OperatorSupplementReport
+        fields = [
+            "operator",
+            "workorder",
+            "process",
+            "equipment",
+            "quantity",
+            "notes",
+        ]
+        labels = {
+            "operator": "作業員",
+            "workorder": "工單號碼",
+            "process": "工序",
+            "equipment": "設備",
+            "quantity": "完成數量",
+            "notes": "備註",
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # 設定作業員查詢集
+        from process.models import Operator
+        self.fields['operator'].queryset = Operator.objects.all().order_by('name')
+        
+        # 設定工單查詢集
+        self.fields['workorder'].queryset = WorkOrder.objects.filter(
+            status__in=['pending', 'in_progress']
+        ).order_by('-created_at')
+        
+        # 設定工序查詢集
+        from process.models import ProcessName
+        self.fields['process'].queryset = ProcessName.objects.exclude(
+            name__icontains='SMT'
+        ).order_by('name')
+        
+        # 設定設備查詢集
+        from equip.models import Equipment
+        self.fields['equipment'].queryset = Equipment.objects.exclude(
+            equipment_type__icontains='SMT'
+        ).order_by('name')
