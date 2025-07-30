@@ -540,6 +540,9 @@
                                     </div>
                                 </div>
                             </div>
+                            
+                            <!-- 休息時間相關功能已移除，系統完全在後端計算 -->
+                            
                         </div>
 
                         <!-- 狀態與備註區塊 -->
@@ -754,58 +757,70 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('workorderSelect:', workorderSelect);
     console.log('plannedQuantityInput:', plannedQuantityInput);
     
+    // 載入工單的函數
+    function loadWorkordersByProduct(productCode) {
+        console.log('載入產品編號相關工單:', productCode);
+        
+        if (productCode) {
+            // 呼叫API取得相關工單
+            fetch(`{% url 'workorder:get_workorders_by_product' %}?product_id=${encodeURIComponent(productCode)}`, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => {
+                    console.log('API回應狀態:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('API回應資料:', data);
+                    if (data.status === 'success' && data.workorders.length > 0) {
+                        // 更新工單下拉選單
+                        workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                        
+                        data.workorders.forEach(workorder => {
+                            const option = document.createElement('option');
+                            option.value = workorder.id;
+                            option.textContent = `${workorder.company_code} - ${workorder.order_number}`;
+                            workorderSelect.appendChild(option);
+                        });
+                        
+                        // 如果只有一個工單，自動選擇
+                        if (data.workorders.length === 1) {
+                            workorderSelect.value = data.workorders[0].id;
+                            workorderSelect.dispatchEvent(new Event('change'));
+                        }
+                    } else {
+                        workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                        console.log('沒有找到相關工單');
+                    }
+                })
+                .catch(error => {
+                    console.error('API錯誤:', error);
+                    workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                });
+        } else {
+            workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+        }
+    }
+    
     // 產品編號選擇事件（自動帶出工單）
     if (productInput) {
+        // 檢查初始值，如果產品編號已經有值，自動載入工單
+        if (productInput.value) {
+            console.log('產品編號已有初始值:', productInput.value);
+            loadWorkordersByProduct(productInput.value);
+        }
+        
         productInput.addEventListener('change', function() {
             const productCode = this.value;
             console.log('產品編號變更:', productCode);
-            
-            if (productCode) {
-                // 呼叫API取得相關工單
-                fetch(`{% url 'workorder:get_workorders_by_product' %}?product_id=${encodeURIComponent(productCode)}`, {
-                    method: 'GET',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Content-Type': 'application/json',
-                    },
-                })
-                    .then(response => {
-                        console.log('API回應狀態:', response.status);
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('API回應資料:', data);
-                        if (data.status === 'success' && data.workorders.length > 0) {
-                            // 更新工單下拉選單
-                            workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                            
-                            data.workorders.forEach(workorder => {
-                                const option = document.createElement('option');
-                                option.value = workorder.id;
-                                option.textContent = `${workorder.company_code} - ${workorder.order_number}`;
-                                workorderSelect.appendChild(option);
-                            });
-                            
-                            // 如果只有一個工單，自動選擇
-                            if (data.workorders.length === 1) {
-                                workorderSelect.value = data.workorders[0].id;
-                                workorderSelect.dispatchEvent(new Event('change'));
-                            }
-                        } else {
-                            workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                            console.log('沒有找到相關工單');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('API錯誤:', error);
-                        workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                    });
-            } else {
-                workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-            }
+            loadWorkordersByProduct(productCode);
         });
     }
     
@@ -852,16 +867,43 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             // 自動帶入工單日期
                             if (workorder.work_date) {
-                                let dateStr = workorder.work_date.replace(/\//g, '-');
-                                if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                                    const d = new Date(workorder.work_date);
-                                    if (!isNaN(d)) {
-                                        dateStr = d.toISOString().slice(0, 10);
+                                let dateStr = workorder.work_date;
+                                console.log('原始工單日期:', dateStr, '類型:', typeof dateStr);
+                                
+                                // 處理不同的日期格式
+                                if (typeof dateStr === 'string') {
+                                    // 如果是字串格式，先嘗試替換斜線為橫線
+                                    dateStr = dateStr.replace(/\//g, '-');
+                                    
+                                    // 檢查是否符合 YYYY-MM-DD 格式
+                                    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                                        // 如果不是標準格式，嘗試用 Date 物件解析
+                                        const d = new Date(dateStr);
+                                        if (!isNaN(d)) {
+                                            dateStr = d.toISOString().slice(0, 10);
+                                        } else {
+                                            // 如果解析失敗，設為今天的日期
+                                            dateStr = new Date().toISOString().slice(0, 10);
+                                        }
                                     }
+                                } else if (dateStr instanceof Date) {
+                                    // 如果已經是 Date 物件
+                                    dateStr = dateStr.toISOString().slice(0, 10);
+                                } else {
+                                    // 其他情況，設為今天的日期
+                                    dateStr = new Date().toISOString().slice(0, 10);
                                 }
+                                
                                 const workDateInput = document.getElementById('{{ form.work_date.id_for_label }}');
                                 if (workDateInput) {
-                                    workDateInput.value = dateStr;
+                                    // 確保日期格式正確
+                                    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                                        workDateInput.value = dateStr;
+                                        console.log('成功設定工單日期:', dateStr);
+                                    } else {
+                                        console.warn('日期格式不正確，使用今天日期:', dateStr);
+                                        workDateInput.value = new Date().toISOString().slice(0, 10);
+                                    }
                                 }
                             }
                             

@@ -5699,6 +5699,12 @@ def get_workorders_by_product(request):
         workorders = WorkOrder.objects.filter(
             product_code=product_id
         ).exclude(
+            order_number__icontains="RD樣品"  # 排除RD樣品工單
+        ).exclude(
+            order_number__icontains="RD-樣品"  # 排除RD-樣品工單
+        ).exclude(
+            order_number__icontains="RD樣本"  # 排除RD樣本工單
+        ).exclude(
             status="completed"  # 排除已完工的工單
         ).order_by('-created_at')
         
@@ -6557,10 +6563,19 @@ def operator_supplement_report_index(request):
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
     
-    # 查詢補登報工記錄
+    # 查詢補登報工記錄 - 優先顯示待核准的資料
     supplement_reports = OperatorSupplementReport.objects.select_related(
         'operator', 'workorder', 'process'
-    ).all()
+    ).order_by(
+        models.Case(
+            models.When(approval_status='pending', then=models.Value(0)),
+            models.When(approval_status='approved', then=models.Value(1)),
+            models.When(approval_status='rejected', then=models.Value(2)),
+            default=models.Value(3),
+            output_field=models.IntegerField(),
+        ),
+        '-work_date', '-start_time'
+    )
     
     # 應用篩選條件
     if operator:

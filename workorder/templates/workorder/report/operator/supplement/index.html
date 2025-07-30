@@ -394,13 +394,13 @@
                         <ul class="pagination justify-content-center">
                             {% if supplement_reports.has_previous %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page=1&{{ request.GET.urlencode }}" title="第一頁">
+                                    <a class="page-link" href="?{% if request.GET.operator %}operator={{ request.GET.operator }}{% endif %}{% if request.GET.workorder %}{% if request.GET.operator %}&{% endif %}workorder={{ request.GET.workorder }}{% endif %}{% if request.GET.process %}{% if request.GET.operator or request.GET.workorder %}&{% endif %}process={{ request.GET.process }}{% endif %}{% if request.GET.status %}{% if request.GET.operator or request.GET.workorder or request.GET.process %}&{% endif %}status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status %}&{% endif %}date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status or request.GET.date_from %}&{% endif %}date_to={{ request.GET.date_to }}{% endif %}&page=1" title="第一頁">
                                         <i class="fas fa-angle-double-left"></i>
                                         <span class="d-none d-sm-inline">第一頁</span>
                                     </a>
                                 </li>
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ supplement_reports.previous_page_number }}&{{ request.GET.urlencode }}" title="上一頁">
+                                    <a class="page-link" href="?{% if request.GET.operator %}operator={{ request.GET.operator }}{% endif %}{% if request.GET.workorder %}{% if request.GET.operator %}&{% endif %}workorder={{ request.GET.workorder }}{% endif %}{% if request.GET.process %}{% if request.GET.operator or request.GET.workorder %}&{% endif %}process={{ request.GET.process }}{% endif %}{% if request.GET.status %}{% if request.GET.operator or request.GET.workorder or request.GET.process %}&{% endif %}status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status %}&{% endif %}date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status or request.GET.date_from %}&{% endif %}date_to={{ request.GET.date_to }}{% endif %}&page={{ supplement_reports.previous_page_number }}" title="上一頁">
                                         <i class="fas fa-angle-left"></i>
                                         <span class="d-none d-sm-inline">上一頁</span>
                                     </a>
@@ -414,20 +414,20 @@
                                 </li>
                                 {% elif num > supplement_reports.number|add:'-3' and num < supplement_reports.number|add:'3' %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}&{{ request.GET.urlencode }}">{{ num }}</a>
+                                    <a class="page-link" href="?{% if request.GET.operator %}operator={{ request.GET.operator }}{% endif %}{% if request.GET.workorder %}{% if request.GET.operator %}&{% endif %}workorder={{ request.GET.workorder }}{% endif %}{% if request.GET.process %}{% if request.GET.operator or request.GET.workorder %}&{% endif %}process={{ request.GET.process }}{% endif %}{% if request.GET.status %}{% if request.GET.operator or request.GET.workorder or request.GET.process %}&{% endif %}status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status %}&{% endif %}date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status or request.GET.date_from %}&{% endif %}date_to={{ request.GET.date_to }}{% endif %}&page={{ num }}">{{ num }}</a>
                                 </li>
                                 {% endif %}
                             {% endfor %}
                             
                             {% if supplement_reports.has_next %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ supplement_reports.next_page_number }}&{{ request.GET.urlencode }}" title="下一頁">
+                                    <a class="page-link" href="?{% if request.GET.operator %}operator={{ request.GET.operator }}{% endif %}{% if request.GET.workorder %}{% if request.GET.operator %}&{% endif %}workorder={{ request.GET.workorder }}{% endif %}{% if request.GET.process %}{% if request.GET.operator or request.GET.workorder %}&{% endif %}process={{ request.GET.process }}{% endif %}{% if request.GET.status %}{% if request.GET.operator or request.GET.workorder or request.GET.process %}&{% endif %}status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status %}&{% endif %}date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status or request.GET.date_from %}&{% endif %}date_to={{ request.GET.date_to }}{% endif %}&page={{ supplement_reports.next_page_number }}" title="下一頁">
                                         <i class="fas fa-angle-right"></i>
                                         <span class="d-none d-sm-inline">下一頁</span>
                                     </a>
                                 </li>
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ supplement_reports.paginator.num_pages }}&{{ request.GET.urlencode }}" title="最後一頁">
+                                    <a class="page-link" href="?{% if request.GET.operator %}operator={{ request.GET.operator }}{% endif %}{% if request.GET.workorder %}{% if request.GET.operator %}&{% endif %}workorder={{ request.GET.workorder }}{% endif %}{% if request.GET.process %}{% if request.GET.operator or request.GET.workorder %}&{% endif %}process={{ request.GET.process }}{% endif %}{% if request.GET.status %}{% if request.GET.operator or request.GET.workorder or request.GET.process %}&{% endif %}status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status %}&{% endif %}date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status or request.GET.date_from %}&{% endif %}date_to={{ request.GET.date_to }}{% endif %}&page={{ supplement_reports.paginator.num_pages }}" title="最後一頁">
                                         <i class="fas fa-angle-double-right"></i>
                                         <span class="d-none d-sm-inline">最後一頁</span>
                                     </a>

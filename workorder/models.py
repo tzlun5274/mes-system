@@ -1003,6 +1003,52 @@ class OperatorSupplementReport(models.Model):
         default=timezone.now,
     )
 
+    # 休息時間相關欄位
+    has_break = models.BooleanField(
+        default=False,
+        verbose_name="是否有休息時間",
+        help_text="系統自動判斷是否橫跨中午休息時間",
+    )
+
+    break_start_time = models.TimeField(
+        blank=True,
+        null=True,
+        verbose_name="休息開始時間",
+        help_text="中午休息開始時間（固定為12:00）",
+    )
+
+    break_end_time = models.TimeField(
+        blank=True,
+        null=True,
+        verbose_name="休息結束時間",
+        help_text="中午休息結束時間（固定為13:00）",
+    )
+
+    break_hours = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=0,
+        verbose_name="休息時數",
+        help_text="中午休息時數（固定為1小時）",
+    )
+
+    # 新增：工作時數和加班時數欄位
+    work_hours_calculated = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name="工作時數",
+        help_text="扣除休息時間後的實際工作時數",
+    )
+
+    overtime_hours_calculated = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name="加班時數",
+        help_text="超過正常工時的部分",
+    )
+
     # 數量資訊
     work_quantity = models.IntegerField(
         verbose_name="工作數量",
@@ -1212,16 +1258,39 @@ class OperatorSupplementReport(models.Model):
 
     @property
     def work_hours(self):
-        """計算工作時數"""
+        """計算工作時數（扣除休息時間）"""
         if self.start_time and self.end_time:
-            from datetime import datetime, timedelta
+            from datetime import datetime, timedelta, time
 
             start_dt = datetime.combine(self.work_date, self.start_time)
             end_dt = datetime.combine(self.work_date, self.end_time)
             if end_dt < start_dt:
                 end_dt += timedelta(days=1)
+            
+            # 計算總時數
             duration = end_dt - start_dt
-            return round(duration.total_seconds() / 3600, 2)
+            total_hours = round(duration.total_seconds() / 3600, 2)
+            
+            # 檢查是否橫跨中午休息時間（12:00-13:00）
+            lunch_start = time(12, 0)
+            lunch_end = time(13, 0)
+            
+            # 判斷是否橫跨休息時間
+            if (self.start_time < lunch_start and self.end_time > lunch_end):
+                # 有橫跨休息時間，扣除1小時
+                total_hours = max(0, total_hours - 1.0)
+                self.has_break = True
+                self.break_start_time = lunch_start
+                self.break_end_time = lunch_end
+                self.break_hours = 1.0
+            else:
+                # 沒有橫跨休息時間
+                self.has_break = False
+                self.break_start_time = None
+                self.break_end_time = None
+                self.break_hours = 0.0
+            
+            return round(total_hours, 2)
         return 0.0
 
     @property
@@ -1338,6 +1407,90 @@ class OperatorSupplementReport(models.Model):
 
         return auto_completed
 
+    def calculate_work_hours(self):
+        """計算工作時數和加班時數"""
+        if self.start_time and self.end_time:
+            from datetime import datetime, timedelta, time
+
+            start_dt = datetime.combine(self.work_date, self.start_time)
+            end_dt = datetime.combine(self.work_date, self.end_time)
+            if end_dt < start_dt:
+                end_dt += timedelta(days=1)
+            
+            # 計算總時數（從開始到結束的完整時數）
+            duration = end_dt - start_dt
+            total_hours = round(duration.total_seconds() / 3600, 2)
+            
+            # 檢查是否橫跨中午休息時間（12:00-13:00）
+            lunch_start = time(12, 0)
+            lunch_end = time(13, 0)
+            
+            # 判斷是否橫跨休息時間
+            if (self.start_time < lunch_start and self.end_time > lunch_end):
+                # 有橫跨休息時間，扣除1小時
+                actual_work_hours = max(0, total_hours - 1.0)
+                self.has_break = True
+                self.break_start_time = lunch_start
+                self.break_end_time = lunch_end
+                self.break_hours = 1.0
+            else:
+                # 沒有橫跨休息時間
+                actual_work_hours = total_hours
+                self.has_break = False
+                self.break_start_time = None
+                self.break_end_time = None
+                self.break_hours = 0.0
+            
+            # 計算正常工時和加班時數
+            # 加班時數：超過17:30以後的時間才算加班
+            overtime_start_time = time(17, 30)  # 17:30開始算加班
+            
+            # 計算加班時數：如果結束時間超過17:30，則計算加班時數
+            if self.end_time > overtime_start_time:
+                # 計算從17:30到結束時間的加班時數
+                overtime_start_dt = datetime.combine(self.work_date, overtime_start_time)
+                end_dt = datetime.combine(self.work_date, self.end_time)
+                if end_dt < overtime_start_dt:
+                    end_dt += timedelta(days=1)
+                
+                overtime_duration = end_dt - overtime_start_dt
+                overtime_hours = round(overtime_duration.total_seconds() / 3600, 2)
+                
+                # 如果加班時間橫跨休息時間，需要扣除休息時間
+                if self.has_break and overtime_start_time < lunch_start and self.end_time > lunch_end:
+                    # 加班時間有橫跨休息時間，扣除休息時間
+                    overtime_hours = max(0, overtime_hours - 1.0)
+                
+                self.overtime_hours_calculated = overtime_hours
+                
+                # 正常工時 = 實際工作時數 - 加班時數
+                self.work_hours_calculated = round(actual_work_hours - overtime_hours, 2)
+            else:
+                # 結束時間在17:30之前，無加班
+                self.overtime_hours_calculated = 0.0
+                self.work_hours_calculated = round(actual_work_hours, 2)
+            
+            return {
+                'total_hours': total_hours,
+                'actual_work_hours': actual_work_hours,
+                'work_hours': self.work_hours_calculated,
+                'overtime_hours': self.overtime_hours_calculated,
+                'break_hours': float(self.break_hours)
+            }
+        return {
+            'total_hours': 0.0,
+            'actual_work_hours': 0.0,
+            'work_hours': 0.0,
+            'overtime_hours': 0.0,
+            'break_hours': 0.0
+        }
+
+    def save(self, *args, **kwargs):
+        """儲存時自動計算工作時數和加班時數"""
+        # 自動計算工作時數和加班時數
+        self.calculate_work_hours()
+        super().save(*args, **kwargs)
+
     def get_completion_status_display(self):
         """取得完工狀態顯示文字"""
         if self.is_completed:
@@ -1435,6 +1588,52 @@ class SupervisorProductionReport(models.Model):
         verbose_name="結束時間",
         help_text="請輸入實際結束時間 (24小時制)，例如 18:30",
         default=timezone.now,
+    )
+
+    # 休息時間相關欄位
+    has_break = models.BooleanField(
+        default=False,
+        verbose_name="是否有休息時間",
+        help_text="系統自動判斷是否橫跨中午休息時間",
+    )
+
+    break_start_time = models.TimeField(
+        blank=True,
+        null=True,
+        verbose_name="休息開始時間",
+        help_text="中午休息開始時間（固定為12:00）",
+    )
+
+    break_end_time = models.TimeField(
+        blank=True,
+        null=True,
+        verbose_name="休息結束時間",
+        help_text="中午休息結束時間（固定為13:00）",
+    )
+
+    break_hours = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=0,
+        verbose_name="休息時數",
+        help_text="中午休息時數（固定為1小時）",
+    )
+
+    # 新增：工作時數和加班時數欄位
+    work_hours_calculated = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name="工作時數",
+        help_text="扣除休息時間後的實際工作時數",
+    )
+
+    overtime_hours_calculated = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name="加班時數",
+        help_text="超過正常工時的部分",
     )
 
     # 數量資訊
@@ -1599,7 +1798,7 @@ class SupervisorProductionReport(models.Model):
 
     @property
     def work_hours(self):
-        """計算工作時數"""
+        """計算工作時數（扣除休息時間）"""
         if self.start_time and self.end_time:
             start_dt = timezone.datetime.combine(self.work_date, self.start_time)
             end_dt = timezone.datetime.combine(self.work_date, self.end_time)
@@ -1609,9 +1808,98 @@ class SupervisorProductionReport(models.Model):
                 end_dt += timezone.timedelta(days=1)
 
             duration = end_dt - start_dt
-            hours = duration.total_seconds() / 3600
-            return round(hours, 2)
+            total_hours = duration.total_seconds() / 3600
+            
+            # 如果有休息時間，扣除休息時間
+            if self.has_break and self.break_hours:
+                total_hours -= float(self.break_hours)
+                return round(max(0, total_hours), 2)  # 確保不會是負數
+            
+            return round(total_hours, 2)
         return 0.0
+
+    def calculate_work_hours(self):
+        """計算工作時數和加班時數"""
+        if self.start_time and self.end_time:
+            from datetime import datetime, timedelta, time
+
+            start_dt = datetime.combine(self.work_date, self.start_time)
+            end_dt = datetime.combine(self.work_date, self.end_time)
+            if end_dt < start_dt:
+                end_dt += timedelta(days=1)
+            
+            # 計算總時數
+            duration = end_dt - start_dt
+            total_hours = round(duration.total_seconds() / 3600, 2)
+            
+            # 檢查是否橫跨中午休息時間（12:00-13:00）
+            lunch_start = time(12, 0)
+            lunch_end = time(13, 0)
+            
+            # 判斷是否橫跨休息時間
+            if (self.start_time < lunch_start and self.end_time > lunch_end):
+                # 有橫跨休息時間，扣除1小時
+                actual_work_hours = max(0, total_hours - 1.0)
+                self.has_break = True
+                self.break_start_time = lunch_start
+                self.break_end_time = lunch_end
+                self.break_hours = 1.0
+            else:
+                # 沒有橫跨休息時間
+                actual_work_hours = total_hours
+                self.has_break = False
+                self.break_start_time = None
+                self.break_end_time = None
+                self.break_hours = 0.0
+            
+            # 計算工作時數和加班時數
+            # 加班時數：超過17:30以後的時間才算加班
+            overtime_start_time = time(17, 30)  # 17:30開始算加班
+            
+            # 計算工作時數（扣除休息時間後的實際工作時數）
+            self.work_hours_calculated = round(actual_work_hours, 2)
+            
+            # 計算加班時數：如果結束時間超過17:30，則計算加班時數
+            if self.end_time > overtime_start_time:
+                # 計算從17:30到結束時間的加班時數
+                overtime_start_dt = datetime.combine(self.work_date, overtime_start_time)
+                end_dt = datetime.combine(self.work_date, self.end_time)
+                if end_dt < overtime_start_dt:
+                    end_dt += timedelta(days=1)
+                
+                overtime_duration = end_dt - overtime_start_dt
+                overtime_hours = round(overtime_duration.total_seconds() / 3600, 2)
+                
+                # 如果加班時間橫跨休息時間，需要扣除休息時間
+                if self.has_break and overtime_start_time < lunch_start and self.end_time > lunch_end:
+                    # 加班時間有橫跨休息時間，扣除休息時間
+                    overtime_hours = max(0, overtime_hours - 1.0)
+                
+                self.overtime_hours_calculated = overtime_hours
+            else:
+                # 結束時間在17:30之前，無加班
+                self.overtime_hours_calculated = 0.0
+            
+            return {
+                'total_hours': total_hours,
+                'actual_work_hours': actual_work_hours,
+                'work_hours': self.work_hours_calculated,
+                'overtime_hours': self.overtime_hours_calculated,
+                'break_hours': float(self.break_hours)
+            }
+        return {
+            'total_hours': 0.0,
+            'actual_work_hours': 0.0,
+            'work_hours': 0.0,
+            'overtime_hours': 0.0,
+            'break_hours': 0.0
+        }
+
+    def save(self, *args, **kwargs):
+        """儲存時自動計算工作時數和加班時數"""
+        # 自動計算工作時數和加班時數
+        self.calculate_work_hours()
+        super().save(*args, **kwargs)
 
     @property
     def yield_rate(self):

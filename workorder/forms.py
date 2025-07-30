@@ -8,6 +8,7 @@ from .models import WorkOrderAssignment
 from datetime import datetime, date, timedelta
 from .models import SupervisorProductionReport
 from .models import OperatorSupplementReport
+from django.contrib.auth.models import User
 
 
 # 工單管理表單，支援新增與編輯
@@ -1037,117 +1038,185 @@ class OperatorSupplementReportForm(forms.ModelForm):
         help_text="請選擇核准狀態",
     )
 
+    # 休息時間相關欄位已完全移除，系統自動計算
+
     def __init__(self, *args, **kwargs):
-        self.request = kwargs.pop("request", None)
+        self.user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
 
-        # 動態設定作業員選項
-        from process.models import Operator
-
-        self.fields["operator"].queryset = Operator.objects.all().order_by("name")
-
-        # 動態設定工序選項（排除SMT相關工序）
-        from process.models import ProcessName
-
-        self.fields["process"].queryset = (
-            ProcessName.objects.all()
-            .exclude(name__icontains="SMT")
-            .exclude(name__icontains="表面貼裝")
-            .exclude(name__icontains="貼片")
-            .order_by("name")
-        )
-
-        # 動態設定設備選項（排除SMT相關設備）
+        # 確保所有 ModelChoiceField 都有有效的 queryset
+        from .models import WorkOrder
         from equip.models import Equipment
+        from django.contrib.auth.models import User
 
-        self.fields["equipment"].queryset = (
-            Equipment.objects.all()
-            .exclude(name__icontains="SMT")
-            .exclude(name__icontains="表面貼裝")
-            .exclude(name__icontains="貼片")
-            .order_by("name")
-        )
+        try:
+            # 設置產品編號選項（從工單中取得所有產品編號）
+            self.fields["product_id"].choices = self.get_product_choices()
 
-        # 動態設定產品編號選項
+            # 設置工單號碼選項（比照SMT報工，顯示所有未完工的工單）
+            self.fields["workorder"].queryset = self.get_workorder_queryset()
+
+            # 設置作業員選項
+            from process.models import Operator
+            operators = Operator.objects.all().order_by("name")
+            self.fields["operator"].queryset = operators
+
+            # 設置工序選項（排除SMT相關工序）
+            from process.models import ProcessName
+            from django.db import models
+
+            non_smt_processes = ProcessName.objects.exclude(
+                models.Q(name__icontains="SMT")
+                | models.Q(name__icontains="貼片")
+                | models.Q(name__icontains="Pick")
+                | models.Q(name__icontains="Place")
+            ).order_by("name")
+
+            self.fields["process"].queryset = non_smt_processes
+
+            # 設置設備選項（排除SMT相關設備）
+            non_smt_equipment = Equipment.objects.exclude(
+                models.Q(name__icontains="SMT")
+                | models.Q(name__icontains="貼片")
+                | models.Q(name__icontains="Pick")
+                | models.Q(name__icontains="Place")
+            ).order_by("name")
+
+            self.fields["equipment"].queryset = non_smt_equipment
+
+        except Exception as e:
+            print(f"作業員補登報工表單初始化失敗: {e}")
+            # 如果任何查詢失敗，設置空的查詢集
+            self.fields["workorder"].queryset = WorkOrder.objects.none()
+            from process.models import Operator
+            self.fields["operator"].queryset = Operator.objects.none()
+            self.fields["process"].queryset = ProcessName.objects.none()
+            self.fields["equipment"].queryset = Equipment.objects.none()
+
+        # 如果是編輯現有記錄，設定初始值
+        if self.instance and self.instance.pk:
+            # 編輯模式：設定初始值
+            if self.instance.workorder:
+                self.fields["product_id"].initial = self.instance.workorder.product_code
+                self.fields["workorder"].initial = self.instance.workorder
+                self.fields["planned_quantity"].initial = self.instance.workorder.quantity
+
+                # 設定時間欄位的初始值
+                if self.instance.start_time:
+                    self.fields["start_time"].initial = self.instance.start_time.strftime("%H:%M")
+                if self.instance.end_time:
+                    self.fields["end_time"].initial = self.instance.end_time.strftime("%H:%M")
+
+        # 如果是編輯現有記錄，檢查核准狀態
+        if self.instance and self.instance.pk:
+            # 只有當記錄已核准且非超級管理員時，才禁用欄位
+            if self.instance.approval_status == "approved" and not (
+                self.user and self.user.is_superuser
+            ):
+                # 已核准且非超級管理員，禁用所有欄位
+                for field_name in self.fields:
+                    self.fields[field_name].widget.attrs["readonly"] = "readonly"
+                    self.fields[field_name].widget.attrs["disabled"] = "disabled"
+
+        # 為產品編號欄位添加變更事件處理
+        self.fields["product_id"].widget.attrs.update({
+            "onchange": "updateWorkorderOptions(this.value);",
+            "data-url": "/workorder/api/get-workorders-by-product/"
+        })
+
+    def get_product_choices(self):
+        """取得產品編號選項列表"""
+        choices = [("", "請選擇產品編號")]
+        try:
+            from .models import WorkOrder
+            
+            # 從工單中取得所有產品編號（排除RD樣品工單）
+            product_codes = (
+                WorkOrder.objects.exclude(
+                    order_number__icontains="RD樣品"
+                )
+                .exclude(order_number__icontains="RD-樣品")
+                .exclude(order_number__icontains="RD樣本")
+                .exclude(status="completed")
+                .values_list("product_code", flat=True)
+                .distinct()
+                .order_by("product_code")
+            )
+            
+            for product_code in product_codes:
+                if product_code:  # 確保產品編號不為空
+                    choices.append((product_code, product_code))
+                    
+        except Exception as e:
+            print(f"取得產品編號選項失敗: {e}")
+        return choices
+
+    def get_workorder_choices(self):
+        """取得工單選項列表（比照SMT報工）"""
+        choices = [("", "請選擇工單號碼")]
+        try:
+            workorders = self.get_workorder_queryset()
+            for workorder in workorders:
+                choices.append(
+                    (
+                        workorder.id,
+                        f"{workorder.company_code} - {workorder.order_number}",
+                    )
+                )
+        except Exception as e:
+            print(f"取得工單選項失敗: {e}")
+        return choices
+
+    def get_workorder_queryset(self, product_code=None):
+        """取得工單查詢集（比照SMT報工）"""
         from .models import WorkOrder
 
-        product_choices = [("", "請選擇產品編號")]
-        products = (
-            WorkOrder.objects.exclude(
-                order_number__icontains="RD樣品"
-            )  # 排除RD樣品工單
-            .exclude(order_number__icontains="RD-樣品")  # 排除RD-樣品工單
-            .exclude(order_number__icontains="RD樣本")  # 排除RD樣本工單
-            .exclude(status="completed")  # 排除已完工的工單
-            .values_list("product_code", "product_code")
-            .distinct()
-            .order_by("product_code")
-        )
-
-        for product_code, _ in products:
-            product_choices.append((product_code, product_code))
-
-        self.fields["product_id"].choices = product_choices
-
-        # 動態設定工單選項
-        from .models import WorkOrder
-
-        # 載入所有有效工單（新增和編輯模式都使用相同的邏輯）
         # 補登報工只能選擇現存派工單上的工單（未完工的工單）
-        related_workorders = (
+        # 排除已完工的工單和RD樣品相關工單
+        queryset = (
             WorkOrder.objects.exclude(
                 order_number__icontains="RD樣品"  # 排除RD樣品工單
             )
             .exclude(order_number__icontains="RD-樣品")  # 排除RD-樣品工單
             .exclude(order_number__icontains="RD樣本")  # 排除RD樣本工單
             .exclude(status="completed")  # 排除已完工的工單
-            .order_by("-created_at")
         )
+        
+        # 如果指定了產品編號，則過濾該產品編號的工單
+        if product_code:
+            queryset = queryset.filter(product_code=product_code)
+            
+        return queryset.order_by("-created_at")
 
-        # 如果是編輯模式，設定初始值
-        if self.instance and self.instance.pk:
-            # 編輯模式：只處理正式報工記錄
-            if self.instance.report_type == "normal" and self.instance.workorder:
-                self.fields["product_id"].initial = self.instance.workorder.product_code
-                self.fields["workorder"].initial = self.instance.workorder
-                self.fields["planned_quantity"].initial = (
-                    self.instance.workorder.quantity
-                )
+    def get_rd_sample_workorder_choices(self):
+        """取得RD樣品模式的工單選項列表"""
+        # 在RD樣品模式下，直接使用工單號碼 "RD樣品"
+        return [("RD樣品", "RD樣品")]
 
-                # 設定時間欄位的初始值
-                if self.instance.start_time:
-                    self.fields["start_time"].initial = (
-                        self.instance.start_time.strftime("%H:%M")
-                    )
-                if self.instance.end_time:
-                    self.fields["end_time"].initial = self.instance.end_time.strftime(
-                        "%H:%M"
-                    )
-        else:
-            # 新增模式：設定時間欄位的預設值
-            self.fields["start_time"].initial = "08:30"
-            self.fields["end_time"].initial = "17:30"
+    def get_operation_choices(self):
+        """取得工序選項"""
+        from process.models import ProcessName
+        from django.db import models
 
-        # 設定工單選項，確保包含當前實例的工單（如果存在）
-        if self.instance and self.instance.pk and self.instance.workorder:
-            # 如果是編輯模式，確保當前工單在選項中
-            if self.instance.workorder not in related_workorders:
-                related_workorders = list(related_workorders) + [
-                    self.instance.workorder
-                ]
+        # 只顯示SMT相關工序
+        smt_processes = ProcessName.objects.filter(
+            models.Q(name__icontains="SMT")
+            | models.Q(name__icontains="貼片")
+            | models.Q(name__icontains="Pick")
+            | models.Q(name__icontains="Place")
+        ).order_by("name")
 
-        # 設定工單選項，使用 ModelChoiceField 的 queryset
-        self.fields["workorder"].queryset = related_workorders
+        choices = [("", "請選擇工序")]
+        for process in smt_processes:
+            choices.append((process.name, process.name))
+
+        return choices
 
     class Meta:
         model = OperatorSupplementReport
         fields = [
-            "report_type",
-            "product_id",
-            "workorder",
-            "planned_quantity",
             "operator",
-            "process",
+            "process", 
             "equipment",
             "work_date",
             "start_time",
@@ -1159,12 +1228,10 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "remarks",
             "abnormal_notes",
             "approval_status",
+            # 休息時間相關欄位已移除，系統自動計算
         ]
 
         labels = {
-            "product_id": "產品編號",
-            "workorder": "工單號碼",
-            "planned_quantity": "工單預設生產數量",
             "operator": "作業員",
             "process": "工序",
             "equipment": "設備",
@@ -1179,17 +1246,15 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "abnormal_notes": "異常記錄",
             "approval_status": "核准狀態",
         }
+
         help_texts = {
-            "product_id": "請選擇產品編號，選擇後會自動帶出相關工單",
-            "workorder": "請選擇工單號碼，或透過產品編號自動帶出",
-            "planned_quantity": "此為工單規劃的總生產數量，不可修改",
             "operator": "請選擇進行補登報工的作業員",
             "process": "請選擇此次補登的工序（排除SMT相關工序）",
             "equipment": "請選擇此次補登的設備（排除SMT相關設備）",
             "work_date": "請選擇實際報工日期",
             "start_time": "請輸入實際開始時間 (24小時制)，例如 16:00",
             "end_time": "請輸入實際結束時間 (24小時制)，例如 18:30",
-            "work_quantity": "請輸入該時段內實際完成的合格產品數量",
+            "work_quantity": "請輸入該時段內實際完成的合格產品數量（可為0）",
             "defect_quantity": "請輸入本次生產中產生的不良品數量，若無則留空或填寫0",
             "is_completed": "若此工單在此工序上已全部完成，請勾選",
             "completion_method": "請選擇完工判斷方式",
@@ -1198,188 +1263,60 @@ class OperatorSupplementReportForm(forms.ModelForm):
             "approval_status": "請選擇核准狀態",
         }
 
-    def clean(self):
-        """表單驗證"""
-        cleaned_data = super().clean()
-
-        # 取得欄位資料
-        product_id = cleaned_data.get("product_id")
-        workorder = cleaned_data.get("workorder")
-        start_time = cleaned_data.get("start_time")
-        end_time = cleaned_data.get("end_time")
-        work_quantity = cleaned_data.get("work_quantity")
-
-        # 正式報工模式驗證 - 進一步放寬驗證條件
-        # 允許只選擇工單，或只選擇產品編號，或兩者都不選（由用戶自行決定）
-        # if not workorder and not product_id:
-        #     raise forms.ValidationError("必須選擇工單號碼或產品編號")
-
-        # 驗證時間格式
-        if start_time:
-            try:
-                from datetime import datetime
-
-                datetime.strptime(start_time, "%H:%M")
-            except ValueError:
-                raise forms.ValidationError("開始時間格式錯誤，請使用 HH:MM 格式")
-
-        if end_time:
-            try:
-                from datetime import datetime
-
-                datetime.strptime(end_time, "%H:%M")
-            except ValueError:
-                raise forms.ValidationError("結束時間格式錯誤，請使用 HH:MM 格式")
-
-        # 驗證時間邏輯
-        if start_time and end_time:
-            try:
-                from datetime import datetime
-
-                start = datetime.strptime(start_time, "%H:%M")
-                end = datetime.strptime(end_time, "%H:%M")
-                if start >= end:
-                    raise forms.ValidationError("結束時間必須大於開始時間")
-            except ValueError:
-                pass  # 時間格式錯誤已在上面處理
-
-        # 驗證數量
-        if work_quantity is not None and work_quantity < 0:
-            raise forms.ValidationError("工作數量不能為負數")
-
-        # 驗證核准狀態
-        approval_status = cleaned_data.get("approval_status")
-        if not approval_status:
-            raise forms.ValidationError("核准狀態為必填欄位")
-
-        return cleaned_data
-
-    def clean_workorder(self):
-        """工單號碼驗證 - 處理工單選擇"""
-        workorder = self.cleaned_data.get("workorder")
-
-        # 如果沒有選擇工單，返回None（允許空值）
-        if not workorder:
-            return None
-
-        # 如果選擇了工單，確保它是有效的
-        try:
-            from .models import WorkOrder
-
-            if isinstance(workorder, WorkOrder):
-                return workorder
-            else:
-                # 如果是ID，嘗試查找工單
-                workorder_obj = WorkOrder.objects.get(id=workorder)
-                return workorder_obj
-        except WorkOrder.DoesNotExist:
-            raise forms.ValidationError("選擇的工單不存在")
-        except Exception as e:
-            raise forms.ValidationError(f"工單驗證錯誤：{str(e)}")
-
-    def clean_workorder(self):
-        """工單號碼驗證 - 處理工單選擇"""
-        workorder = self.cleaned_data.get("workorder")
-
-        # 如果沒有選擇工單，返回None（允許空值）
-        if not workorder:
-            return None
-
-        # 如果選擇了工單，確保它是有效的
-        try:
-            from .models import WorkOrder
-
-            if isinstance(workorder, WorkOrder):
-                return workorder
-            else:
-                # 如果是ID，嘗試查找工單
-                workorder_obj = WorkOrder.objects.get(id=workorder)
-                return workorder_obj
-        except WorkOrder.DoesNotExist:
-            raise forms.ValidationError("選擇的工單不存在")
-        except Exception as e:
-            raise forms.ValidationError(f"工單驗證錯誤：{str(e)}")
-
     def save(self, commit=True):
-        """儲存表單資料"""
+        """
+        儲存表單，處理時間欄位的轉換和工單關聯
+        """
+        from datetime import datetime
+        
+        # 先取得實例但不儲存
         instance = super().save(commit=False)
-
-        # 處理時間欄位
-        start_time_str = self.cleaned_data.get("start_time")
-        end_time_str = self.cleaned_data.get("end_time")
-
-        if start_time_str:
-            from datetime import datetime
-
+        
+        # 處理時間欄位轉換
+        if self.cleaned_data.get('start_time'):
             try:
-                start_time = datetime.strptime(start_time_str, "%H:%M").time()
-                instance.start_time = start_time
-            except ValueError:
-                pass
-
-        if end_time_str:
-            from datetime import datetime
-
+                # 將字串時間轉換為 TimeField
+                start_time_str = self.cleaned_data['start_time']
+                if ':' in start_time_str:
+                    hour, minute = map(int, start_time_str.split(':'))
+                    from datetime import time
+                    instance.start_time = time(hour, minute)
+            except (ValueError, TypeError) as e:
+                print(f"開始時間轉換失敗: {e}")
+        
+        if self.cleaned_data.get('end_time'):
             try:
-                end_time = datetime.strptime(end_time_str, "%H:%M").time()
-                instance.end_time = end_time
-            except ValueError:
-                pass
-
-        # 處理工單關聯和報工類型
-        workorder = self.cleaned_data.get("workorder")
-        if workorder:
-            instance.workorder = workorder
-            instance.planned_quantity = workorder.quantity
-            instance.product_id = (
-                workorder.product_code if workorder.product_code else ""
-            )
-
-            # 根據工單號碼自動判斷是否為RD樣品
-            if instance.is_rd_sample_by_workorder():
-                instance.report_type = "rd_sample"
-                instance.rd_workorder_number = workorder.order_number
-                instance.rd_product_code = (
-                    workorder.product_code if workorder.product_code else ""
-                )
-                print(
-                    f"DEBUG: save() - 自動識別為RD樣品，工單號碼: {workorder.order_number}"
-                )
-            else:
-                instance.report_type = "normal"
-                instance.rd_workorder_number = ""
-                instance.rd_product_code = ""
-        else:
-            # 沒有選擇工單的情況
-            instance.report_type = "normal"
-            instance.rd_workorder_number = ""
-            instance.rd_product_code = ""
-            instance.planned_quantity = 0
-            instance.product_id = ""
-
-        # 設定 operation 欄位（從 process 欄位取得工序名稱）
-        process = self.cleaned_data.get("process")
-        if process:
-            instance.operation = process.name
-        else:
-            instance.operation = ""
-
-        # 設定建立人員
-        if not instance.pk:  # 新增時才設置
-            from django.contrib.auth.models import AnonymousUser
-
-            if hasattr(self, "request") and hasattr(self.request, "user"):
-                user = self.request.user
-                if not isinstance(user, AnonymousUser):
-                    instance.created_by = user.username
-                else:
-                    instance.created_by = "system"
-            else:
-                instance.created_by = "system"
-
+                # 將字串時間轉換為 TimeField
+                end_time_str = self.cleaned_data['end_time']
+                if ':' in end_time_str:
+                    hour, minute = map(int, end_time_str.split(':'))
+                    from datetime import time
+                    instance.end_time = time(hour, minute)
+            except (ValueError, TypeError) as e:
+                print(f"結束時間轉換失敗: {e}")
+        
+        # 處理工單關聯
+        if self.cleaned_data.get('workorder'):
+            instance.workorder = self.cleaned_data['workorder']
+            # 如果有工單，設定相關欄位
+            if instance.workorder:
+                instance.rd_workorder_number = instance.workorder.order_number
+                instance.product_id = instance.workorder.product_code
+        
+        # 處理產品編號（如果沒有工單但有產品編號）
+        if not instance.workorder and self.cleaned_data.get('product_id'):
+            instance.product_id = self.cleaned_data['product_id']
+        
+        # 設定建立者
+        if hasattr(self, 'request') and self.request.user.is_authenticated:
+            instance.created_by = self.request.user.username
+        
+        # 設定核准狀態為待核准
+        instance.approval_status = 'pending'
+        
         if commit:
             instance.save()
-
+        
         return instance
 
 

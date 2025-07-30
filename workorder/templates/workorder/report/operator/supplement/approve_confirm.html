@@ -159,8 +159,16 @@
                                     <span class="summary-value">{{ report.start_time|time:"H:i" }} - {{ report.end_time|time:"H:i" }}</span>
                                 </div>
                                 <div class="summary-item">
-                                    <span class="summary-label">工時：</span>
+                                    <span class="summary-label">總工時：</span>
                                     <span class="summary-value">{{ report.work_hours }} 小時</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">正常工時：</span>
+                                    <span class="summary-value">{{ report.work_hours_calculated|floatformat:2 }} 小時</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">加班工時：</span>
+                                    <span class="summary-value">{{ report.overtime_hours_calculated|floatformat:2 }} 小時</span>
                                 </div>
                             </div>
                         </div>

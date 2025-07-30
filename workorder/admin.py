@@ -187,7 +187,7 @@ class OperatorSupplementReportAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ("基本資訊", {"fields": ("operator", "workorder", "process", "equipment")}),
-        ("時間資訊", {"fields": ("work_date", "start_time", "end_time")}),
+        ("時間資訊", {"fields": ("work_date", "start_time", "end_time", "has_break", "break_start_time", "break_end_time", "break_hours")}),
         ("數量資訊", {"fields": ("work_quantity", "defect_quantity", "is_completed")}),
         (
             "完工判斷",

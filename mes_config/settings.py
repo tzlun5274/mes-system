@@ -261,6 +261,12 @@ mimetypes.add_type("text/css", ".css")
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("image/x-icon", ".ico")
 
+# 日期格式設定
+DATE_FORMAT = 'Y-m-d'
+DATE_INPUT_FORMATS = ['%Y-%m-%d', '%Y/%m/%d', '%d/%m/%Y', '%d-%m-%Y']
+DATETIME_FORMAT = 'Y-m-d H:i:s'
+DATETIME_INPUT_FORMATS = ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y/%m/%d %H:%M:%S', '%Y/%m/%d %H:%M']
+
 # 新增的 EMAIL 設置
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
 EMAIL_PORT = os.environ.get("EMAIL_PORT", "25")

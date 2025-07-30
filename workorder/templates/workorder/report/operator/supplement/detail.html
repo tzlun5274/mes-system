@@ -367,9 +367,19 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="detail-item">
-                                    <span class="detail-label">工時：</span>
+                                    <span class="detail-label">總工時：</span>
                                     <span class="detail-value">{{ report.work_hours|floatformat:2 }} 小時</span>
                                 </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">正常工時：</span>
+                                    <span class="detail-value">{{ report.work_hours_calculated|floatformat:2 }} 小時</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">加班工時：</span>
+                                    <span class="detail-value">{{ report.overtime_hours_calculated|floatformat:2 }} 小時</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
                                 <div class="detail-item">
                                     <span class="detail-label">報工時間：</span>
                                     <span class="detail-value">{{ report.work_date|date:"Y-m-d" }} {{ report.start_time|time:"H:i" }}</span>
@@ -377,6 +387,16 @@
                                 <div class="detail-item">
                                     <span class="detail-label">時間區間：</span>
                                     <span class="detail-value">{{ report.start_time|time:"H:i" }} - {{ report.end_time|time:"H:i" }}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">休息時間：</span>
+                                    <span class="detail-value">
+                                        {% if report.has_break %}
+                                            {{ report.break_start_time|time:"H:i" }} - {{ report.break_end_time|time:"H:i" }} ({{ report.break_hours|floatformat:2 }} 小時)
+                                        {% else %}
+                                            無休息時間
+                                        {% endif %}
+                                    </span>
                                 </div>
                             </div>
                         </div>
