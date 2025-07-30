@@ -1,0 +1,320 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}報表管理 - MES系統{% endblock %}
+
+{% block extra_css %}
+<style>
+    .reporting-dashboard {
+        padding: 20px;
+    }
+    
+    .reporting-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        overflow: hidden;
+    }
+    
+    .reporting-card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        font-size: 18px;
+        font-weight: 600;
+    }
+    
+    .reporting-card-body {
+        padding: 20px;
+    }
+    
+    .reporting-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    
+    .reporting-item {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 20px;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .reporting-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        border-color: #667eea;
+    }
+    
+    .reporting-item-icon {
+        font-size: 2.5rem;
+        margin-bottom: 15px;
+        color: #667eea;
+    }
+    
+    .reporting-item-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 10px;
+        color: #333;
+    }
+    
+    .reporting-item-description {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 15px;
+    }
+    
+    .btn-reporting {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-reporting:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .stat-item {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 15px;
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 24px;
+        font-weight: bold;
+        color: #667eea;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        font-size: 14px;
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reporting-dashboard">
+    <!-- 頁面標題 -->
+    <div class="reporting-card">
+        <div class="reporting-card-header">
+            <h1 class="mb-0">
+                <i class="fas fa-chart-bar me-2"></i>
+                報表管理系統
+            </h1>
+        </div>
+        <div class="reporting-card-body">
+            <p class="text-muted mb-0">
+                提供多維度的數據分析和視覺化能力，輔助管理層進行決策
+            </p>
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="reporting-card">
+        <div class="reporting-card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-line me-2"></i>
+                系統統計
+            </h5>
+        </div>
+        <div class="reporting-card-body">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">{{ total_reports|default:"0" }}</div>
+                    <div class="stat-label">總報表數</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">{{ today_exports|default:"0" }}</div>
+                    <div class="stat-label">今日匯出</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">{{ pending_reports|default:"0" }}</div>
+                    <div class="stat-label">待處理</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">{{ completed_reports|default:"0" }}</div>
+                    <div class="stat-label">已完成</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表功能 -->
+    <div class="reporting-card">
+        <div class="reporting-card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-file-alt me-2"></i>
+                報表功能
+            </h5>
+        </div>
+        <div class="reporting-card-body">
+            <div class="reporting-grid">
+                <!-- 工作報表 -->
+                <div class="reporting-item">
+                    <div class="reporting-item-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="reporting-item-title">工作報表</div>
+                    <div class="reporting-item-description">
+                        提供不同時間維度下的基礎工作概覽，展示作業員和設備的原始總工作時數
+                    </div>
+                    <a href="{% url 'reporting:report_export' %}?type=WORK_REPORT" class="btn-reporting">
+                        查看報表
+                    </a>
+                </div>
+
+                <!-- 工時報表 -->
+                <div class="reporting-item">
+                    <div class="reporting-item-icon">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                    <div class="reporting-item-title">工時報表</div>
+                    <div class="reporting-item-description">
+                        精確計算每日、每週、每月正常工時、加班時數，並從中扣除休息時間
+                    </div>
+                    <a href="{% url 'reporting:report_export' %}?type=WORK_HOUR_REPORT" class="btn-reporting">
+                        查看報表
+                    </a>
+                </div>
+
+                <!-- 工單報表 -->
+                <div class="reporting-item">
+                    <div class="reporting-item-icon">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <div class="reporting-item-title">工單報表</div>
+                    <div class="reporting-item-description">
+                        工單機種相關的統計報表，包含生產進度和完成狀況
+                    </div>
+                    <a href="{% url 'reporting:report_export' %}?type=WORKORDER_REPORT" class="btn-reporting">
+                        查看報表
+                    </a>
+                </div>
+
+                <!-- 人員績效報表 -->
+                <div class="reporting-item">
+                    <div class="reporting-item-icon">
+                        <i class="fas fa-user-chart"></i>
+                    </div>
+                    <div class="reporting-item-title">人員績效報表</div>
+                    <div class="reporting-item-description">
+                        作業員績效分析，包含工作效率和產出統計
+                    </div>
+                    <a href="{% url 'reporting:report_export' %}?type=OPERATOR_PERFORMANCE" class="btn-reporting">
+                        查看報表
+                    </a>
+                </div>
+
+                <!-- 設備效率報表 -->
+                <div class="reporting-item">
+                    <div class="reporting-item-icon">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <div class="reporting-item-title">設備效率報表</div>
+                    <div class="reporting-item-description">
+                        SMT設備效率分析，包含運行時間和產能統計
+                    </div>
+                    <a href="{% url 'reporting:report_export' %}?type=SMT_EQUIPMENT" class="btn-reporting">
+                        查看報表
+                    </a>
+                </div>
+
+                <!-- 異常報工報表 -->
+                <div class="reporting-item">
+                    <div class="reporting-item-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="reporting-item-title">異常報工報表</div>
+                    <div class="reporting-item-description">
+                        異常報工記錄分析，包含設備故障和品質問題統計
+                    </div>
+                    <a href="{% url 'reporting:report_export' %}?type=ABNORMAL_REPORT" class="btn-reporting">
+                        查看報表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速操作 -->
+    <div class="reporting-card">
+        <div class="reporting-card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-bolt me-2"></i>
+                快速操作
+            </h5>
+        </div>
+        <div class="reporting-card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <a href="{% url 'reporting:report_export' %}" class="btn btn-primary btn-lg w-100 mb-3">
+                        <i class="fas fa-download me-2"></i>
+                        報表匯出
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{% url 'reporting:export_log_list' %}" class="btn btn-info btn-lg w-100 mb-3">
+                        <i class="fas fa-history me-2"></i>
+                        匯出記錄
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 頁面載入動畫
+    $('.reporting-item').each(function(index) {
+        $(this).css('animation-delay', (index * 0.1) + 's');
+    });
+    
+    // 統計數字動畫
+    $('.stat-number').each(function() {
+        var $this = $(this);
+        var countTo = $this.text();
+        
+        $({ countNum: 0 }).animate({
+            countNum: countTo
+        }, {
+            duration: 2000,
+            easing: 'swing',
+            step: function() {
+                $this.text(Math.floor(this.countNum));
+            },
+            complete: function() {
+                $this.text(this.countNum);
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 

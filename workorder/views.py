@@ -4532,7 +4532,10 @@ def submit_smt_report(request):
             defect_quantity=0,
             is_completed=False,
             remarks=notes,
-            created_by=request.user.username if request.user.is_authenticated else 'system'
+            created_by=request.user.username if request.user.is_authenticated else 'system',
+            report_type='normal',  # 明確設定 report_type
+            # 新增：設定工單號碼欄位
+            rd_workorder_number=workorder.order_number if workorder else None
         )
         
         return JsonResponse({
@@ -8067,7 +8070,10 @@ def submit_operator_report(request):
             defect_quantity=0,
             is_completed=(production_status == 'complete'),
             remarks=notes,
-            created_by=request.user.username if request.user.is_authenticated else 'system'
+            created_by=request.user.username if request.user.is_authenticated else 'system',
+            report_type='normal',  # 明確設定 report_type
+            # 新增：設定工單號碼欄位
+            rd_workorder_number=workorder.order_number if workorder else None
         )
         
         # 更新工序狀態

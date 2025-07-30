@@ -1,0 +1,332 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}匯出記錄 - 報表管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    .export-log-container {
+        padding: 20px;
+    }
+    
+    .log-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .log-card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px 8px 0 0;
+    }
+    
+    .log-card-body {
+        padding: 20px;
+    }
+    
+    .table-responsive {
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    
+    .table {
+        margin-bottom: 0;
+    }
+    
+    .table th {
+        background: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        color: #333;
+    }
+    
+    .table td {
+        vertical-align: middle;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .status-success {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-error {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-pending {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .btn-back {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-back:hover {
+        background: #5a6268;
+        color: white;
+        text-decoration: none;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #666;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+        color: #ccc;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="export-log-container">
+    <!-- 頁面標題 -->
+    <div class="log-card">
+        <div class="log-card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-history me-2"></i>
+                    匯出記錄
+                </h2>
+                <a href="{% url 'reporting:index' %}" class="btn-back">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    返回首頁
+                </a>
+            </div>
+        </div>
+        <div class="log-card-body">
+            <p class="text-muted mb-4">
+                顯示最近 100 筆報表匯出記錄，包含匯出狀態、檔案資訊和操作時間
+            </p>
+            
+            {% if logs %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>報表類型</th>
+                                <th>匯出格式</th>
+                                <th>日期範圍</th>
+                                <th>匯出狀態</th>
+                                <th>檔案大小</th>
+                                <th>操作者</th>
+                                <th>匯出時間</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                            <tr>
+                                <td>
+                                    <strong>{{ log.get_report_type_display }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ log.get_export_format_display }}</span>
+                                </td>
+                                <td>
+                                    {% if log.date_range == 'CUSTOM' %}
+                                        {{ log.custom_start_date|date:"Y-m-d" }} ~ {{ log.custom_end_date|date:"Y-m-d" }}
+                                    {% else %}
+                                        {{ log.get_date_range_display }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.export_status == 'SUCCESS' %}
+                                        <span class="status-badge status-success">
+                                            <i class="fas fa-check-circle me-1"></i>成功
+                                        </span>
+                                    {% elif log.export_status == 'ERROR' %}
+                                        <span class="status-badge status-error">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>失敗
+                                        </span>
+                                    {% else %}
+                                        <span class="status-badge status-pending">
+                                            <i class="fas fa-clock me-1"></i>處理中
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.file_size %}
+                                        {% if log.file_size < 1024 %}
+                                            {{ log.file_size }} B
+                                        {% elif log.file_size < 1048576 %}
+                                            {{ log.file_size|floatformat:1 }} KB
+                                        {% else %}
+                                            {{ log.file_size|floatformat:1 }} MB
+                                        {% endif %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <i class="fas fa-user me-1"></i>
+                                    {{ log.created_by.username }}
+                                </td>
+                                <td>
+                                    <i class="fas fa-calendar-alt me-1"></i>
+                                    {{ log.created_at|date:"Y-m-d H:i" }}
+                                </td>
+                                <td>
+                                    {% if log.export_status == 'SUCCESS' and log.file_path %}
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                onclick="downloadFile('{{ log.file_path }}', '{{ log.get_report_type_display }}_{{ log.created_at|date:"Ymd_His" }}')">
+                                            <i class="fas fa-download me-1"></i>下載
+                                        </button>
+                                    {% elif log.export_status == 'ERROR' %}
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="showError('{{ log.error_message|escapejs }}')">
+                                            <i class="fas fa-exclamation-circle me-1"></i>錯誤
+                                        </button>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- 統計資訊 -->
+                <div class="row mt-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-success">{{ logs|length }}</h5>
+                                <p class="card-text">總記錄數</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-success">
+                                    {% for log in logs %}
+                                        {% if log.export_status == 'SUCCESS' %}
+                                            {% if forloop.first %}{% endif %}
+                                            {% if forloop.last %}{{ forloop.counter }}{% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                </h5>
+                                <p class="card-text">成功匯出</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-danger">
+                                    {% for log in logs %}
+                                        {% if log.export_status == 'ERROR' %}
+                                            {% if forloop.first %}{% endif %}
+                                            {% if forloop.last %}{{ forloop.counter }}{% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                </h5>
+                                <p class="card-text">匯出失敗</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-warning">
+                                    {% for log in logs %}
+                                        {% if log.export_status == 'PENDING' %}
+                                            {% if forloop.first %}{% endif %}
+                                            {% if forloop.last %}{{ forloop.counter }}{% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                </h5>
+                                <p class="card-text">處理中</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <h4>尚無匯出記錄</h4>
+                    <p>您還沒有匯出過任何報表，開始使用報表匯出功能吧！</p>
+                    <a href="{% url 'reporting:report_export' %}" class="btn btn-primary">
+                        <i class="fas fa-download me-2"></i>
+                        開始匯出報表
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 錯誤訊息模態框 -->
+<div class="modal fade" id="errorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+                    匯出錯誤詳情
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="errorMessage" class="alert alert-danger">
+                    <!-- 錯誤訊息將在這裡顯示 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function downloadFile(filePath, fileName) {
+    // 建立下載連結
+    var link = document.createElement('a');
+    link.href = filePath;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function showError(errorMessage) {
+    // 顯示錯誤訊息模態框
+    document.getElementById('errorMessage').innerHTML = errorMessage;
+    var errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+    errorModal.show();
+}
+
+// 自動刷新頁面（每5分鐘）
+setTimeout(function() {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %} 

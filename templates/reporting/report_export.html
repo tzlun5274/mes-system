@@ -1,0 +1,373 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}報表匯出 - 報表管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-export-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .export-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .export-card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px 8px 0 0;
+    }
+    
+    .export-card-body {
+        padding: 30px;
+    }
+    
+    .form-group {
+        margin-bottom: 25px;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 8px;
+        display: block;
+    }
+    
+    .form-control, .form-select {
+        border: 2px solid #e9ecef;
+        border-radius: 6px;
+        padding: 12px 15px;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    
+    .btn-export {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 6px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-export:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        color: white;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 6px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+        color: white;
+    }
+    
+    .date-range-group {
+        display: none;
+    }
+    
+    .date-range-group.show {
+        display: block;
+    }
+    
+    .help-text {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+    }
+    
+    .alert {
+        border-radius: 6px;
+        border: none;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+    }
+    
+    .loading-spinner {
+        display: none;
+        text-align: center;
+        padding: 20px;
+    }
+    
+    .spinner-border {
+        width: 3rem;
+        height: 3rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="report-export-container">
+    <!-- 頁面標題 -->
+    <div class="export-card">
+        <div class="export-card-header">
+            <h2 class="mb-0">
+                <i class="fas fa-download me-2"></i>
+                報表匯出
+            </h2>
+        </div>
+        <div class="export-card-body">
+            <p class="text-muted mb-4">
+                選擇報表類型、匯出格式和日期範圍，系統將自動生成並下載報表檔案
+            </p>
+            
+            <!-- 錯誤訊息顯示 -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        <i class="fas fa-{% if message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'success' %}check-circle{% else %}info-circle{% endif %} me-2"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            <!-- 載入動畫 -->
+            <div class="loading-spinner" id="loadingSpinner">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">載入中...</span>
+                </div>
+                <p class="mt-2">正在生成報表，請稍候...</p>
+            </div>
+            
+            <!-- 報表匯出表單 -->
+            <form method="post" id="exportForm">
+                {% csrf_token %}
+                
+                <!-- 報表類型選擇 -->
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        報表類型 *
+                    </label>
+                    <select name="report_type" class="form-select" required>
+                        <option value="">請選擇報表類型</option>
+                        {% for value, label in report_types %}
+                            <option value="{{ value }}" {% if request.GET.type == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="help-text">
+                        選擇要匯出的報表類型，不同類型提供不同的數據分析視角
+                    </div>
+                </div>
+                
+                <!-- 匯出格式選擇 -->
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-file-alt me-2"></i>
+                        匯出格式 *
+                    </label>
+                    <select name="export_format" class="form-select" required>
+                        <option value="">請選擇匯出格式</option>
+                        {% for value, label in export_formats %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="help-text">
+                        Excel 格式支援完整樣式，CSV 格式支援中文編碼，PDF 格式正在開發中
+                    </div>
+                </div>
+                
+                <!-- 日期範圍選擇 -->
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fas fa-calendar-alt me-2"></i>
+                        日期範圍 *
+                    </label>
+                    <select name="date_range" class="form-select" id="dateRangeSelect" required>
+                        <option value="">請選擇日期範圍</option>
+                        {% for value, label in date_ranges %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="help-text">
+                        選擇報表涵蓋的時間範圍，支援預設範圍和自訂範圍
+                    </div>
+                </div>
+                
+                <!-- 自訂日期範圍 -->
+                <div class="form-group date-range-group" id="customDateGroup">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fas fa-calendar-plus me-2"></i>
+                                開始日期 *
+                            </label>
+                            <input type="date" name="custom_start_date" class="form-control" id="customStartDate">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fas fa-calendar-minus me-2"></i>
+                                結束日期 *
+                            </label>
+                            <input type="date" name="custom_end_date" class="form-control" id="customEndDate">
+                        </div>
+                    </div>
+                    <div class="help-text">
+                        選擇自訂日期範圍的開始和結束日期
+                    </div>
+                </div>
+                
+                <!-- 報表目標選擇 (僅工時報表) -->
+                <div class="form-group" id="reportTargetGroup" style="display: none;">
+                    <label class="form-label">
+                        <i class="fas fa-users me-2"></i>
+                        報表目標
+                    </label>
+                    <select name="report_target" class="form-select">
+                        <option value="operator">作業員</option>
+                        <option value="smt">SMT設備</option>
+                    </select>
+                    <div class="help-text">
+                        選擇工時報表的分析目標（作業員或SMT設備）
+                    </div>
+                </div>
+                
+                <!-- 操作按鈕 -->
+                <div class="form-group">
+                    <div class="d-flex gap-3">
+                        <button type="submit" class="btn btn-export" id="exportBtn">
+                            <i class="fas fa-download me-2"></i>
+                            匯出報表
+                        </button>
+                        <a href="{% url 'reporting:index' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>
+                            返回首頁
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 使用說明 -->
+    <div class="export-card">
+        <div class="export-card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-question-circle me-2"></i>
+                使用說明
+            </h5>
+        </div>
+        <div class="export-card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-info-circle text-primary me-2"></i>報表類型說明</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>工作報表：</strong>基礎工作概覽，包含原始工作時數</li>
+                        <li><strong>工時報表：</strong>精確工時計算，區分正常和加班時數</li>
+                        <li><strong>工單報表：</strong>工單進度和完成狀況統計</li>
+                        <li><strong>人員績效：</strong>作業員工作效率分析</li>
+                        <li><strong>設備效率：</strong>SMT設備運行效率統計</li>
+                        <li><strong>異常報工：</strong>異常記錄和問題分析</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-clock text-success me-2"></i>匯出時間</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>小型報表：</strong>1-3 秒</li>
+                        <li><strong>中型報表：</strong>3-10 秒</li>
+                        <li><strong>大型報表：</strong>10-30 秒</li>
+                        <li><strong>複雜報表：</strong>30 秒以上</li>
+                    </ul>
+                    <p class="text-muted small mt-2">
+                        * 匯出時間取決於數據量和報表複雜度
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 日期範圍選擇處理
+    $('#dateRangeSelect').change(function() {
+        var selectedValue = $(this).val();
+        if (selectedValue === 'CUSTOM') {
+            $('#customDateGroup').addClass('show');
+            $('#customStartDate, #customEndDate').prop('required', true);
+        } else {
+            $('#customDateGroup').removeClass('show');
+            $('#customStartDate, #customEndDate').prop('required', false);
+        }
+    });
+    
+    // 報表類型選擇處理
+    $('select[name="report_type"]').change(function() {
+        var selectedValue = $(this).val();
+        if (selectedValue === 'WORK_HOUR_REPORT') {
+            $('#reportTargetGroup').show();
+        } else {
+            $('#reportTargetGroup').hide();
+        }
+    });
+    
+    // 表單提交處理
+    $('#exportForm').submit(function(e) {
+        // 顯示載入動畫
+        $('#loadingSpinner').show();
+        $('#exportBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>匯出中...');
+        
+        // 驗證自訂日期範圍
+        var dateRange = $('#dateRangeSelect').val();
+        if (dateRange === 'CUSTOM') {
+            var startDate = $('#customStartDate').val();
+            var endDate = $('#customEndDate').val();
+            
+            if (!startDate || !endDate) {
+                alert('請填寫自訂日期範圍的開始和結束日期');
+                $('#loadingSpinner').hide();
+                $('#exportBtn').prop('disabled', false).html('<i class="fas fa-download me-2"></i>匯出報表');
+                e.preventDefault();
+                return false;
+            }
+            
+            if (startDate > endDate) {
+                alert('開始日期不能晚於結束日期');
+                $('#loadingSpinner').hide();
+                $('#exportBtn').prop('disabled', false).html('<i class="fas fa-download me-2"></i>匯出報表');
+                e.preventDefault();
+                return false;
+            }
+        }
+    });
+    
+    // 設定預設日期範圍
+    var today = new Date();
+    var yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    
+    $('#customStartDate').attr('max', today.toISOString().split('T')[0]);
+    $('#customEndDate').attr('max', today.toISOString().split('T')[0]);
+    
+    // 如果URL中有預設類型，觸發change事件
+    if ($('select[name="report_type"]').val()) {
+        $('select[name="report_type"]').trigger('change');
+    }
+});
+</script>
+{% endblock %} 
