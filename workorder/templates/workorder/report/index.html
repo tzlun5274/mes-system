@@ -107,18 +107,18 @@
         <div class="col-lg-4 col-md-6 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">
-                        <i class="fas fa-user-cog mr-2"></i>作業員報工
+                    <h6 class="m-0 font-weight-bold text-primary text-center">
+                        <i class="fas fa-user-cog mr-2"></i>作業員
                     </h6>
                 </div>
                 <div class="card-body">
                     <p class="card-text">作業員補登報工記錄管理，支援歷史數據輸入和批量處理。</p>
                     <div class="btn-group-vertical w-100" role="group">
-                        <a href="{% url 'workorder:operator_supplement_report_index' %}" class="btn btn-primary mb-2">
-                            <i class="fas fa-list mr-2"></i>作業員報工記錄列表
+                        <a href="{% url 'workorder:operator_report_index' %}" class="btn btn-primary mb-2">
+                            <i class="fas fa-list mr-2"></i>作業員報工
                         </a>
                         <a href="{% url 'workorder:operator_supplement_report_create' %}" class="btn btn-success mb-2">
-                            <i class="fas fa-plus mr-2"></i>新增作業員報工
+                            <i class="fas fa-plus mr-2"></i>作業員補登報工
                         </a>
                         <a href="{% url 'workorder:operator_on_site_report' %}" class="btn btn-info">
                             <i class="fas fa-user-clock mr-2"></i>作業員現場報工
@@ -132,20 +132,20 @@
         <div class="col-lg-4 col-md-6 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-success">
-                        <i class="fas fa-cogs mr-2"></i>SMT報工
+                    <h6 class="m-0 font-weight-bold text-success text-center">
+                        <i class="fas fa-cogs mr-2"></i>SMT
                     </h6>
                 </div>
                 <div class="card-body">
                     <p class="card-text">SMT設備自動化報工記錄管理，支援設備狀態監控。</p>
                     <div class="btn-group-vertical w-100" role="group">
-                        <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-success mb-2">
-                            <i class="fas fa-list mr-2"></i>SMT報工列表
+                        <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-primary mb-2">
+                            <i class="fas fa-list mr-2"></i>SMT報工
                         </a>
-                        <a href="{% url 'workorder:smt_supplement_report_create' %}" class="btn btn-primary mb-2">
-                            <i class="fas fa-plus mr-2"></i>新增SMT報工
+                        <a href="{% url 'workorder:smt_supplement_report_create' %}" class="btn btn-success mb-2">
+                            <i class="fas fa-plus mr-2"></i>SMT補登報工
                         </a>
-                        <a href="{% url 'workorder:smt_on_site_report' %}" class="btn btn-warning">
+                        <a href="{% url 'workorder:smt_on_site_report' %}" class="btn btn-info">
                             <i class="fas fa-desktop mr-2"></i>SMT現場報工
                         </a>
                     </div>

@@ -105,31 +105,84 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
     """
     model = OperatorSupplementReport
     template_name = 'workorder/report/operator/supplement/index.html'
-    context_object_name = 'reports'
+    context_object_name = 'supplement_reports'
     paginate_by = 20
     ordering = ['-work_date', '-start_time']
 
     def get_queryset(self):
         """取得查詢集，支援搜尋功能"""
         queryset = super().get_queryset()
-        search = self.request.GET.get('search', '')
-        operator = self.request.GET.get('operator', '')
-        process = self.request.GET.get('process', '')
         
+        # 篩選條件
+        operator_id = self.request.GET.get('operator')
+        if operator_id:
+            queryset = queryset.filter(operator_id=operator_id)
+        
+        workorder_number = self.request.GET.get('workorder')
+        if workorder_number:
+            queryset = queryset.filter(workorder__order_number__icontains=workorder_number)
+        
+        process_id = self.request.GET.get('process')
+        if process_id:
+            queryset = queryset.filter(process_id=process_id)
+        
+        status = self.request.GET.get('status')
+        if status:
+            queryset = queryset.filter(approval_status=status)
+        
+        date_from = self.request.GET.get('date_from')
+        if date_from:
+            queryset = queryset.filter(work_date__gte=date_from)
+        
+        date_to = self.request.GET.get('date_to')
+        if date_to:
+            queryset = queryset.filter(work_date__lte=date_to)
+        
+        # 搜尋功能
+        search = self.request.GET.get('search', '')
         if search:
             queryset = queryset.filter(
+                Q(operator__name__icontains=search) |
                 Q(workorder__order_number__icontains=search) |
-                Q(product_id__icontains=search) |
-                Q(operator__name__icontains=search)
+                Q(process__name__icontains=search)
             )
-        
-        if operator:
-            queryset = queryset.filter(operator_id=operator)
-            
-        if process:
-            queryset = queryset.filter(process_id=process)
             
         return queryset
+
+    def get_context_data(self, **kwargs):
+        """提供模板所需的上下文數據"""
+        context = super().get_context_data(**kwargs)
+        
+        # 取得選項資料
+        from process.models import Operator, ProcessName
+        operator_list = Operator.objects.all().order_by('name')
+        process_list = ProcessName.objects.all().order_by('name')
+        
+        # 統計資料
+        queryset = self.get_queryset()
+        total_reports = queryset.count()
+        pending_reports = queryset.filter(approval_status='pending').count()
+        approved_reports = queryset.filter(approval_status='approved').count()
+        rejected_reports = queryset.filter(approval_status='rejected').count()
+        
+        # 添加額外的上下文數據
+        context.update({
+            'search': self.request.GET.get('search', ''),
+            'total_count': total_reports,
+            'pending_count': pending_reports,
+            'approved_count': approved_reports,
+            'rejected_count': rejected_reports,
+            'operator_list': operator_list,
+            'process_list': process_list,
+            'selected_operator': self.request.GET.get('operator'),
+            'selected_workorder': self.request.GET.get('workorder'),
+            'selected_process': self.request.GET.get('process'),
+            'selected_status': self.request.GET.get('status'),
+            'selected_date_from': self.request.GET.get('date_from'),
+            'selected_date_to': self.request.GET.get('date_to'),
+        })
+        
+        return context
 
 
 class OperatorSupplementReportCreateView(LoginRequiredMixin, CreateView):

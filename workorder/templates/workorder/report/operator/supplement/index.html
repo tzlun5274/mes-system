@@ -319,7 +319,7 @@
                                 {% if supplement_reports %}
                                     {% for report in supplement_reports %}
                                     <tr>
-                                        <td>{{ report.work_date|date:"Y-m-d" }} {{ report.start_time|time:"H:i" }}-{{ report.end_time|time:"H:i" }}</td>
+                                        <td>{{ report.work_date|date:"Y-m-d" }} {% if report.start_time %}{{ report.start_time|time:"H:i" }}{% else %}-{% endif %}-{% if report.end_time %}{{ report.end_time|time:"H:i" }}{% else %}-{% endif %}</td>
                                         <td>
                                             {% if report.report_type == 'rd_sample' or not report.workorder %}
                                                 <span class="badge badge-success">RD樣品</span>
@@ -327,7 +327,7 @@
                                                 <span class="badge badge-warning">正式報工</span>
                                             {% endif %}
                                         </td>
-                                        <td>{{ report.operator.name }}</td>
+                                        <td>{{ report.operator.name|default:"-" }}</td>
                                         <td>
                                             {% if report.report_type == 'rd_sample' or not report.workorder %}
                                                 {{ report.rd_product_code|default:report.workorder_number|default:"-" }}
@@ -335,9 +335,9 @@
                                                 {{ report.workorder.order_number|default:"-" }}
                                             {% endif %}
                                         </td>
-                                        <td>{{ report.process.name }}</td>
-                                        <td>{{ report.work_quantity }}</td>
-                                        <td>{{ report.work_hours }}小時</td>
+                                        <td>{{ report.process.name|default:"-" }}</td>
+                                        <td>{{ report.work_quantity|default:"0" }}</td>
+                                        <td>{{ report.work_hours|floatformat:2 }}小時</td>
                                         <td>
                                             <span class="status-badge status-{{ report.approval_status }}">
                                                 {{ report.get_approval_status_display }}
@@ -353,15 +353,23 @@
                                                 
                                                 <!-- 修改按鈕 - 只有待核准或已駁回時顯示 -->
                                                 {% if report.approval_status == 'pending' or report.approval_status == 'rejected' %}
-                                                {% if report.report_type == 'rd_sample' %}
-                                                <a href="{% url 'workorder:rd_sample_supplement_report_edit' report.id %}" class="btn btn-warning btn-sm">
-                                                    <i class="fas fa-edit me-1"></i>修改
-                                                </a>
-                                                {% else %}
                                                 <a href="{% url 'workorder:operator_supplement_report_edit' report.id %}" class="btn btn-warning btn-sm">
                                                     <i class="fas fa-edit me-1"></i>修改
                                                 </a>
                                                 {% endif %}
+                                                
+                                                <!-- 核准按鈕 - 只有待核准時顯示 -->
+                                                {% if report.approval_status == 'pending' and user.is_staff %}
+                                                <a href="#" class="btn btn-success btn-sm" onclick="approveReport({{ report.id }})">
+                                                    <i class="fas fa-check me-1"></i>核准
+                                                </a>
+                                                {% endif %}
+                                                
+                                                <!-- 駁回按鈕 - 只有待核准時顯示 -->
+                                                {% if report.approval_status == 'pending' and user.is_staff %}
+                                                <a href="#" class="btn btn-danger btn-sm" onclick="rejectReport({{ report.id }})">
+                                                    <i class="fas fa-times me-1"></i>駁回
+                                                </a>
                                                 {% endif %}
                                                 
                                                 <!-- 刪除按鈕 - 核准後只有超級管理員可以刪除 -->

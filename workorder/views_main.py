@@ -4806,6 +4806,8 @@ def operator_report_index(request):
         approval_status='approved'
     ).count()
     
+
+    
     # 取得最近報工記錄
     recent_reports = OperatorSupplementReport.objects.select_related(
         'operator', 'workorder', 'process'
@@ -5077,8 +5079,10 @@ def submit_smt_report(request):
 def operator_supplement_report_index(request):
     """作業員補登報工記錄列表"""
     from django.db.models import Q
+    from django.core.paginator import Paginator
     from process.models import Operator
     from process.models import ProcessName
+    from .workorder_reporting.models import OperatorSupplementReport
     
     reports = OperatorSupplementReport.objects.all().order_by('-work_date', '-created_at')
     
