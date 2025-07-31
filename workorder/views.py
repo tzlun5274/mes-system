@@ -4844,9 +4844,44 @@ def operator_on_site_report(request):
     else:
         form = OperatorOnSiteReportForm()
     
+    # 獲取作業員列表 - 使用真正的作業員模型，而不是 Django User 模型
+    from process.models import Operator
+    operator_list = Operator.objects.all().order_by('name')
+    
+    # 獲取設備列表
+    from equip.models import Equipment
+    equipment_list = Equipment.objects.all()  # 獲取所有設備，因為 Equipment 模型沒有 is_active 欄位
+    
+    # 獲取當前時間
+    from django.utils import timezone
+    current_time = timezone.now()
+    
+    # 獲取統計資料
+    from workorder.models import OperatorSupplementReport
+    today_reports = OperatorSupplementReport.objects.filter(
+        work_date=timezone.now().date()
+    ).count()
+    
+    # 獲取進行中的工單數量
+    from workorder.models import WorkOrder
+    active_workorders = WorkOrder.objects.filter(status='in_progress').count()
+    pending_workorders = WorkOrder.objects.filter(status='pending').count()
+    
+    # 獲取工作中作業員數量（這裡可以根據實際需求調整邏輯）
+    working_operators = operator_list.count()  # 簡化計算，實際應該根據報工狀態
+    
     context = {
         'form': form,
         'title': '作業員現場報工',
+        'operator_list': operator_list,
+        'equipment_list': equipment_list,
+        'current_time': current_time,
+        'working_operators': working_operators,
+        'today_reports': today_reports,
+        'active_workorders': active_workorders,
+        'pending_workorders': pending_workorders,
+        'operator_status_list': [],  # 可以根據需求實作作業員狀態
+        'recent_reports': [],  # 可以根據需求實作最近報工記錄
     }
     return render(request, 'workorder/report/operator/on_site.html', context)
 
@@ -5845,23 +5880,28 @@ def get_workorders_by_operator(request):
                 'message': '請提供作業員ID'
             })
         
-        workorders = WorkOrder.objects.filter(
-            workorderprocess__operator_id=operator_id
-        ).distinct()
+        # 移除所有過濾：顯示所有工單，完全自由選擇
+        workorders = WorkOrder.objects.all().distinct()
         
-        data = []
+        workorders_data = []
         for workorder in workorders:
-            data.append({
+            # 檢查工單是否有進行中的工序
+            has_in_progress = workorder.processes.filter(status='in_progress').exists()
+            process_status = 'in_progress' if has_in_progress else 'pending'
+            
+            workorders_data.append({
                 'id': workorder.id,
                 'order_number': workorder.order_number,
                 'company_code': workorder.company_code,
                 'product_code': workorder.product_code,
                 'quantity': workorder.quantity,
+                'status': workorder.status,
+                'process_status': process_status
             })
         
         return JsonResponse({
             'status': 'success',
-            'data': data
+            'workorders': workorders_data
         })
         
     except Exception as e:
@@ -5873,7 +5913,7 @@ def get_workorders_by_operator(request):
 @require_GET
 @csrf_exempt
 def get_processes_by_workorder_for_operator(request):
-    """API：根據工單取得工序（作業員用）"""
+    """API：根據工單取得工序（作業員用），自動排除SMT工序"""
     try:
         workorder_id = request.GET.get('workorder_id')
         if not workorder_id:
@@ -5881,23 +5921,22 @@ def get_processes_by_workorder_for_operator(request):
                 'status': 'error',
                 'message': '請提供工單ID'
             })
-        
-        processes = WorkOrderProcess.objects.filter(workorder_id=workorder_id).order_by('step_order')
-        
+        from workorder.models import WorkOrderProcess
+        processes = WorkOrderProcess.objects.filter(
+            workorder_id=workorder_id
+        ).exclude(process_name__icontains='SMT').order_by('step_order')
         data = []
         for process in processes:
             data.append({
                 'id': process.id,
                 'process_name': process.process_name,
-                'sequence': process.step_order,  # 修正欄位名稱
+                'sequence': process.step_order,
                 'status': process.status,
             })
-        
         return JsonResponse({
             'status': 'success',
             'processes': data
         })
-        
     except Exception as e:
         return JsonResponse({
             'status': 'error',
