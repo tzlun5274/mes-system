@@ -459,13 +459,18 @@
         // 工單選擇事件
         const workorderSelect = document.getElementById('workorder_select');
         workorderSelect.addEventListener('change', function() {
+            console.log('工單選擇變更事件觸發');
             const selectedOption = this.options[this.selectedIndex];
+            console.log('選中的選項:', selectedOption);
+            
             if (selectedOption && selectedOption.value) {
+                console.log('選中工單ID:', selectedOption.value);
                 // 載入工單數量
                 loadWorkorderQuantity(selectedOption.value);
                 // 載入該工單的工序列表
                 loadProcesses(selectedOption.value);
             } else {
+                console.log('沒有選中工單，清空相關欄位');
                 // 清空工單數量、報工數量和工序
                 document.getElementById('workorder_quantity').value = '';
                 document.getElementById('report_quantity').value = '';
@@ -602,7 +607,7 @@
         console.log('開始載入工單，設備ID:', equipmentId);
         document.getElementById('workorder_select').innerHTML = '<option value="">載入中...</option>';
         
-        fetch('{% url "workorder:get_workorders_by_equipment" %}?equipment_id=' + equipmentId, {
+        fetch('{% url "workorder:get_smt_workorders_by_equipment" %}?equipment_id=' + equipmentId, {
             method: 'GET',
             headers: {
                 'X-CSRFToken': '{{ csrf_token }}'
@@ -620,7 +625,7 @@
                             '[待生產]';
                         
                         options += `<option value="${workorder.id}" data-status="${workorder.process_status}" data-quantity="${workorder.quantity}">
-                            ${workorder.order_number} - ${workorder.product_code} 
+                            ${workorder.company_code} - ${workorder.order_number} 
                             (${workorder.quantity}件) ${statusText}
                         </option>`;
                     });
@@ -650,17 +655,29 @@
                 'X-CSRFToken': '{{ csrf_token }}'
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('API 回應狀態:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('API 回應數據:', data);
             if (data.status === 'success') {
-                document.getElementById('workorder_quantity').value = data.workorder.quantity || 0;
+                const quantity = data.workorder.quantity || 0;
+                console.log('設置工單數量:', quantity);
+                const quantityField = document.getElementById('workorder_quantity');
+                if (quantityField) {
+                    quantityField.value = quantity;
+                    console.log('工單數量已設置為:', quantityField.value);
+                } else {
+                    console.error('找不到工單數量欄位');
+                }
             } else {
-                document.getElementById('workorder_quantity').value = '';
                 console.error('載入工單數量失敗：', data.message);
+                document.getElementById('workorder_quantity').value = '';
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('載入工單數量時發生錯誤:', error);
             document.getElementById('workorder_quantity').value = '';
         });
     }
@@ -671,7 +688,7 @@
         console.log('開始載入工序，工單ID:', workorderId);
         document.getElementById('process_select').innerHTML = '<option value="">載入中...</option>';
         
-        fetch('{% url "workorder:get_processes_by_workorder" %}?workorder_id=' + workorderId, {
+        fetch('{% url "workorder:get_processes_by_workorder_for_operator" %}?workorder_id=' + workorderId, {
             method: 'GET',
             headers: {
                 'X-CSRFToken': '{{ csrf_token }}'

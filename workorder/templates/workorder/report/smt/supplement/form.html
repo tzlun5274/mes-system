@@ -751,7 +751,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                     .then(data => {
                         console.log('API回應資料:', data);
-                        if (data.status === 'success' && data.workorders.length > 0) {
+                        if (data.status === 'success' && data.workorders && data.workorders.length > 0) {
                             // 更新工單下拉選單
                             workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
                             
@@ -806,7 +806,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                     .then(data => {
                         console.log('工單詳情API回應:', data);
-                        if (data.status === 'success') {
+                        if (data.status === 'success' && data.workorder) {
                             const workorder = data.workorder;
                             
                             // 更新工單預設生產數量

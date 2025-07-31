@@ -318,6 +318,7 @@ class SMTSupplementReportForm(forms.ModelForm):
     class Meta:
         model = SMTProductionReport
         fields = [
+            "product_id",
             "workorder",
             "planned_quantity",
             "operation",
@@ -2534,10 +2535,10 @@ class SMTProductionReportForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # 設定設備查詢集
+        # 設定設備查詢集 - 根據設備名稱過濾SMT設備
         from equip.models import Equipment
         self.fields['equipment'].queryset = Equipment.objects.filter(
-            equipment_type__icontains='SMT'
+            name__icontains='SMT'
         ).order_by('name')
         
         # 設定工單查詢集
@@ -2681,8 +2682,8 @@ class OperatorOnSiteReportForm(forms.ModelForm):
             name__icontains='SMT'
         ).order_by('name')
         
-        # 設定設備查詢集
+        # 設定設備查詢集 - 排除SMT相關設備
         from equip.models import Equipment
         self.fields['equipment'].queryset = Equipment.objects.exclude(
-            equipment_type__icontains='SMT'
+            name__icontains='SMT'
         ).order_by('name')

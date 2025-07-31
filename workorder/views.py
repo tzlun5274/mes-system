@@ -15,7 +15,7 @@ from .models import (
     SMTProductionReport,
 )
 from .tasks import get_standard_processes
-from .forms import WorkOrderForm, OperatorSupplementReportForm, SMTProductionReportForm, OperatorOnSiteReportForm
+from .forms import WorkOrderForm, OperatorSupplementReportForm, SMTProductionReportForm, OperatorOnSiteReportForm, SMTSupplementReportForm
 from django.contrib import messages
 
 from datetime import datetime, timedelta, date
@@ -2409,6 +2409,7 @@ def mobile_get_workorder_info(request):
                 {
                     "id": wo.id,
                     "order_number": wo.order_number,
+                    "company_code": wo.company_code,
                     "product_code": wo.product_code,
                     "quantity": wo.quantity,
                     "status": wo.status,
@@ -2467,6 +2468,7 @@ def mobile_get_process_info(request):
                 "workorder": {
                     "id": workorder.id,
                     "order_number": workorder.order_number,
+                    "company_code": workorder.company_code,
                     "product_code": workorder.product_code,
                     "quantity": workorder.quantity,
                     "status": workorder.status,
@@ -4682,26 +4684,77 @@ def submit_smt_report(request):
 @login_required
 def operator_supplement_report_index(request):
     """作業員補登報工記錄列表"""
-    reports = OperatorSupplementReport.objects.all().order_by('-report_date', '-created_at')
+    from django.db.models import Q
+    from process.models import Operator
+    from process.models import ProcessName
+    
+    reports = OperatorSupplementReport.objects.all().order_by('-work_date', '-created_at')
+    
+    # 篩選條件
+    operator_id = request.GET.get('operator')
+    if operator_id:
+        reports = reports.filter(operator_id=operator_id)
+    
+    workorder_number = request.GET.get('workorder')
+    if workorder_number:
+        reports = reports.filter(workorder__order_number__icontains=workorder_number)
+    
+    process_id = request.GET.get('process')
+    if process_id:
+        reports = reports.filter(process_id=process_id)
+    
+    status = request.GET.get('status')
+    if status:
+        reports = reports.filter(approval_status=status)
+    
+    date_from = request.GET.get('date_from')
+    if date_from:
+        reports = reports.filter(work_date__gte=date_from)
+    
+    date_to = request.GET.get('date_to')
+    if date_to:
+        reports = reports.filter(work_date__lte=date_to)
     
     # 搜尋功能
     search = request.GET.get('search', '')
     if search:
         reports = reports.filter(
-            Q(operator__username__icontains=search) |
+            Q(operator__name__icontains=search) |
             Q(workorder__order_number__icontains=search) |
-            Q(process__icontains=search)
+            Q(process__name__icontains=search)
         )
+    
+    # 統計資料
+    total_reports = reports.count()
+    pending_reports = reports.filter(approval_status='pending').count()
+    approved_reports = reports.filter(approval_status='approved').count()
+    rejected_reports = reports.filter(approval_status='rejected').count()
     
     # 分頁
     paginator = Paginator(reports, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # 取得選項資料
+    operator_list = Operator.objects.all().order_by('name')
+    process_list = ProcessName.objects.all().order_by('name')
+    
     context = {
+        'supplement_reports': page_obj,
         'page_obj': page_obj,
         'search': search,
-        'total_count': reports.count(),
+        'total_count': total_reports,
+        'pending_count': pending_reports,
+        'approved_count': approved_reports,
+        'rejected_count': rejected_reports,
+        'operator_list': operator_list,
+        'process_list': process_list,
+        'selected_operator': operator_id,
+        'selected_workorder': workorder_number,
+        'selected_process': process_id,
+        'selected_status': status,
+        'selected_date_from': date_from,
+        'selected_date_to': date_to,
     }
     return render(request, 'workorder/report/operator/supplement/index.html', context)
 
@@ -4784,7 +4837,7 @@ def operator_on_site_report(request):
         if form.is_valid():
             report = form.save(commit=False)
             report.created_by = request.user.username
-            report.report_date = timezone.now().date()
+            report.work_date = timezone.now().date()
             report.save()
             messages.success(request, '現場報工記錄提交成功！')
             return redirect('workorder:operator_on_site_report')
@@ -4831,19 +4884,19 @@ def smt_supplement_report_index(request):
 def smt_supplement_report_create(request):
     """新增SMT補登報工"""
     if request.method == 'POST':
-        form = SMTProductionReportForm(request.POST)
+        form = SMTSupplementReportForm(request.POST)
         if form.is_valid():
             report = form.save(commit=False)
             report.created_by = request.user.username
             report.save()
-            messages.success(request, 'SMT報工記錄新增成功！')
+            messages.success(request, 'SMT補登報工記錄新增成功！')
             return redirect('workorder:smt_supplement_report_index')
     else:
-        form = SMTProductionReportForm()
+        form = SMTSupplementReportForm()
     
     context = {
         'form': form,
-        'title': '新增SMT報工記錄',
+        'title': '新增SMT補登報工記錄',
     }
     return render(request, 'workorder/report/smt/supplement/form.html', context)
 
@@ -4853,22 +4906,22 @@ def smt_supplement_report_edit(request, report_id):
     try:
         report = SMTProductionReport.objects.get(id=report_id)
     except SMTProductionReport.DoesNotExist:
-        messages.error(request, '找不到指定的SMT報工記錄！')
+        messages.error(request, '找不到指定的SMT補登報工記錄！')
         return redirect('workorder:smt_supplement_report_index')
     
     if request.method == 'POST':
-        form = SMTProductionReportForm(request.POST, instance=report)
+        form = SMTSupplementReportForm(request.POST, instance=report)
         if form.is_valid():
             form.save()
-            messages.success(request, 'SMT報工記錄更新成功！')
+            messages.success(request, 'SMT補登報工記錄更新成功！')
             return redirect('workorder:smt_supplement_report_index')
     else:
-        form = SMTProductionReportForm(instance=report)
+        form = SMTSupplementReportForm(instance=report)
     
     context = {
         'form': form,
         'report': report,
-        'title': '編輯SMT報工記錄',
+        'title': '編輯SMT補登報工記錄',
     }
     return render(request, 'workorder/report/smt/supplement/form.html', context)
 
@@ -4878,9 +4931,9 @@ def smt_supplement_report_delete(request, report_id):
     try:
         report = SMTProductionReport.objects.get(id=report_id)
         report.delete()
-        messages.success(request, 'SMT報工記錄刪除成功！')
+        messages.success(request, 'SMT補登報工記錄刪除成功！')
     except SMTProductionReport.DoesNotExist:
-        messages.error(request, '找不到指定的SMT報工記錄！')
+        messages.error(request, '找不到指定的SMT補登報工記錄！')
     
     return redirect('workorder:smt_supplement_report_index')
 
@@ -4888,13 +4941,13 @@ def smt_supplement_report_delete(request, report_id):
 def smt_supplement_report_detail(request, report_id):
     """SMT補登報工詳情"""
     try:
-        report = SMTProductionReport.objects.get(id=report_id)
+        supplement_report = SMTProductionReport.objects.get(id=report_id)
     except SMTProductionReport.DoesNotExist:
-        messages.error(request, '找不到指定的SMT報工記錄！')
+        messages.error(request, '找不到指定的SMT補登報工記錄！')
         return redirect('workorder:smt_supplement_report_index')
     
     context = {
-        'report': report,
+        'supplement_report': supplement_report,
     }
     return render(request, 'workorder/report/smt/supplement/detail.html', context)
 
@@ -4907,7 +4960,7 @@ def supervisor_approve_reports(request):
     """主管審核報工記錄"""
     pending_reports = OperatorSupplementReport.objects.filter(
         is_approved=False
-    ).order_by('-report_date', '-created_at')
+            ).order_by('-work_date', '-created_at')
     
     # 搜尋功能
     search = request.GET.get('search', '')
@@ -4968,7 +5021,7 @@ def reject_report(request, report_id):
 def api_get_operator_reports(request):
     """API：取得作業員報工記錄"""
     try:
-        reports = OperatorSupplementReport.objects.all().order_by('-report_date')
+        reports = OperatorSupplementReport.objects.all().order_by('-work_date')
         
         # 篩選條件
         operator_id = request.GET.get('operator_id')
@@ -4981,11 +5034,11 @@ def api_get_operator_reports(request):
         
         date_from = request.GET.get('date_from')
         if date_from:
-            reports = reports.filter(report_date__gte=date_from)
+            reports = reports.filter(work_date__gte=date_from)
         
         date_to = request.GET.get('date_to')
         if date_to:
-            reports = reports.filter(report_date__lte=date_to)
+            reports = reports.filter(work_date__lte=date_to)
         
         # 序列化資料
         data = []
@@ -4996,7 +5049,7 @@ def api_get_operator_reports(request):
                 'workorder': report.workorder.order_number,
                 'process': report.process,
                 'quantity': report.quantity,
-                'report_date': report.report_date.isoformat(),
+                'work_date': report.work_date.isoformat(),
                 'is_approved': report.is_approved,
                 'created_at': report.created_at.isoformat(),
             })
@@ -5071,16 +5124,16 @@ def api_get_smt_reports(request):
 def export_operator_reports(request):
     """匯出作業員報工記錄"""
     try:
-        reports = OperatorSupplementReport.objects.all().order_by('-report_date')
+        reports = OperatorSupplementReport.objects.all().order_by('-work_date')
         
         # 篩選條件
         date_from = request.GET.get('date_from')
         if date_from:
-            reports = reports.filter(report_date__gte=date_from)
+            reports = reports.filter(work_date__gte=date_from)
         
         date_to = request.GET.get('date_to')
         if date_to:
-            reports = reports.filter(report_date__lte=date_to)
+            reports = reports.filter(work_date__lte=date_to)
         
         # 建立Excel檔案
         from openpyxl import Workbook
@@ -5103,7 +5156,7 @@ def export_operator_reports(request):
             ws.cell(row=row, column=2, value=report.workorder.order_number)
             ws.cell(row=row, column=3, value=report.process)
             ws.cell(row=row, column=4, value=report.quantity)
-            ws.cell(row=row, column=5, value=report.report_date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=5, value=report.work_date.strftime('%Y-%m-%d'))
             ws.cell(row=row, column=6, value='已審核' if report.is_approved else '待審核')
             ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
         
@@ -5369,16 +5422,16 @@ def smt_supplement_batch(request):
 def operator_supplement_export(request):
     """匯出作業員補登報工記錄"""
     try:
-        reports = OperatorSupplementReport.objects.all().order_by('-report_date')
+        reports = OperatorSupplementReport.objects.all().order_by('-work_date')
         
         # 篩選條件
         date_from = request.GET.get('date_from')
         if date_from:
-            reports = reports.filter(report_date__gte=date_from)
+            reports = reports.filter(work_date__gte=date_from)
         
         date_to = request.GET.get('date_to')
         if date_to:
-            reports = reports.filter(report_date__lte=date_to)
+            reports = reports.filter(work_date__lte=date_to)
         
         operator_id = request.GET.get('operator_id')
         if operator_id:
@@ -5405,7 +5458,7 @@ def operator_supplement_export(request):
             ws.cell(row=row, column=2, value=report.workorder.order_number)
             ws.cell(row=row, column=3, value=report.process)
             ws.cell(row=row, column=4, value=report.quantity)
-            ws.cell(row=row, column=5, value=report.report_date.strftime('%Y-%m-%d'))
+            ws.cell(row=row, column=5, value=report.work_date.strftime('%Y-%m-%d'))
             ws.cell(row=row, column=6, value='已審核' if report.is_approved else '待審核')
             ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
             ws.cell(row=row, column=8, value=report.approved_by or '')
@@ -5669,7 +5722,7 @@ def operator_supplement_batch_create(request):
         for report_data in reports_data:
             try:
                 # 驗證必要欄位
-                required_fields = ['operator_id', 'workorder_id', 'process', 'quantity', 'report_date']
+                required_fields = ['operator_id', 'workorder_id', 'process', 'quantity', 'work_date']
                 for field in required_fields:
                     if field not in report_data:
                         errors.append(f'缺少必要欄位：{field}')
@@ -5681,7 +5734,7 @@ def operator_supplement_batch_create(request):
                     workorder_id=report_data['workorder_id'],
                     process=report_data['process'],
                     quantity=report_data['quantity'],
-                    report_date=report_data['report_date'],
+                    work_date=report_data['work_date'],
                     notes=report_data.get('notes', ''),
                     created_by=request.user.username if request.user.is_authenticated else 'system'
                 )
@@ -5801,6 +5854,7 @@ def get_workorders_by_operator(request):
             data.append({
                 'id': workorder.id,
                 'order_number': workorder.order_number,
+                'company_code': workorder.company_code,
                 'product_code': workorder.product_code,
                 'quantity': workorder.quantity,
             })
@@ -5828,25 +5882,26 @@ def get_processes_by_workorder_for_operator(request):
                 'message': '請提供工單ID'
             })
         
-        processes = WorkOrderProcess.objects.filter(workorder_id=workorder_id)
+        processes = WorkOrderProcess.objects.filter(workorder_id=workorder_id).order_by('step_order')
         
         data = []
         for process in processes:
             data.append({
                 'id': process.id,
                 'process_name': process.process_name,
-                'sequence': process.sequence,
+                'sequence': process.step_order,  # 修正欄位名稱
+                'status': process.status,
             })
         
         return JsonResponse({
             'status': 'success',
-            'data': data
+            'processes': data
         })
         
     except Exception as e:
         return JsonResponse({
             'status': 'error',
-            'message': str(e)
+            'message': f'載入失敗:{str(e)}'
         })
 
 @require_POST
@@ -5871,7 +5926,7 @@ def submit_operator_report(request):
             workorder_id=data['workorder_id'],
             process=data.get('process_name', ''),
             quantity=data['quantity'],
-            report_date=data.get('report_date', timezone.now().date()),
+            work_date=data.get('work_date', timezone.now().date()),
             notes=data.get('notes', ''),
             created_by=request.user.username if request.user.is_authenticated else 'system'
         )
@@ -5900,28 +5955,46 @@ def get_smt_workorders_by_equipment(request):
                 'message': '請提供設備ID'
             })
         
+        # 修正查詢條件：使用 processes 作為 related_name
         workorders = WorkOrder.objects.filter(
-            workorderprocess__equipment_id=equipment_id
+            processes__assigned_equipment=equipment_id
         ).distinct()
         
         data = []
         for workorder in workorders:
+            # 取得該工單的工序狀態
+            processes = WorkOrderProcess.objects.filter(
+                workorder=workorder,
+                assigned_equipment=equipment_id
+            ).order_by('step_order')
+            
+            # 檢查是否有正在進行的工序
+            process_status = 'pending'
+            for process in processes:
+                if process.status == 'in_progress':
+                    process_status = 'in_progress'
+                    break
+                elif process.status == 'completed':
+                    process_status = 'completed'
+            
             data.append({
                 'id': workorder.id,
                 'order_number': workorder.order_number,
+                'company_code': workorder.company_code,
                 'product_code': workorder.product_code,
                 'quantity': workorder.quantity,
+                'process_status': process_status,
             })
         
         return JsonResponse({
             'status': 'success',
-            'data': data
+            'workorders': data
         })
         
     except Exception as e:
         return JsonResponse({
             'status': 'error',
-            'message': str(e)
+            'message': f'載入失敗:{str(e)}'
         })
 
 @require_GET
@@ -5929,7 +6002,7 @@ def get_smt_workorders_by_equipment(request):
 def get_workorders_by_product(request):
     """API：根據產品取得工單"""
     try:
-        product_code = request.GET.get('product_code')
+        product_code = request.GET.get('product_id') or request.GET.get('product_code')
         if not product_code:
             return JsonResponse({
                 'status': 'error',
@@ -5943,6 +6016,7 @@ def get_workorders_by_product(request):
             data.append({
                 'id': workorder.id,
                 'order_number': workorder.order_number,
+                'company_code': workorder.company_code,
                 'product_code': workorder.product_code,
                 'quantity': workorder.quantity,
                 'status': workorder.status,
@@ -5950,7 +6024,7 @@ def get_workorders_by_product(request):
         
         return JsonResponse({
             'status': 'success',
-            'data': data
+            'workorders': data
         })
         
     except Exception as e:
@@ -5972,21 +6046,22 @@ def get_workorder_details(request):
             })
         
         workorder = WorkOrder.objects.get(id=workorder_id)
-        processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by('sequence')
+        processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by('step_order')
         
         process_data = []
         for process in processes:
             process_data.append({
                 'id': process.id,
                 'process_name': process.process_name,
-                'sequence': process.sequence,
-                'equipment': process.equipment.name if process.equipment else None,
-                'operator': process.operator.username if process.operator else None,
+                'sequence': process.step_order,  # 修正欄位名稱
+                'assigned_equipment': process.assigned_equipment,  # 修正欄位名稱
+                'assigned_operator': process.assigned_operator,  # 修正欄位名稱
             })
         
         data = {
             'id': workorder.id,
             'order_number': workorder.order_number,
+            'company_code': workorder.company_code,
             'product_code': workorder.product_code,
             'quantity': workorder.quantity,
             'status': workorder.status,
@@ -5995,7 +6070,7 @@ def get_workorder_details(request):
         
         return JsonResponse({
             'status': 'success',
-            'data': data
+            'workorder': data
         })
         
     except WorkOrder.DoesNotExist:
@@ -6006,7 +6081,7 @@ def get_workorder_details(request):
     except Exception as e:
         return JsonResponse({
             'status': 'error',
-            'message': str(e)
+            'message': f'載入失敗:{str(e)}'
         })
 
 @require_GET
@@ -6026,6 +6101,7 @@ def get_workorder_info(request):
         data = {
             'id': workorder.id,
             'order_number': workorder.order_number,
+            'company_code': workorder.company_code,
             'product_code': workorder.product_code,
             'quantity': workorder.quantity,
             'status': workorder.status,

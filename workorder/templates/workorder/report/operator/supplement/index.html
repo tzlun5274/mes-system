@@ -150,23 +150,22 @@
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="operator-stat-card">
-                <div class="operator-stat-number text-warning">{{ pending_reports|default:0 }}</div>
-                                        <div class="operator-stat-label">待核准</div>
+                <div class="operator-stat-number text-warning">{{ pending_count|default:0 }}</div>
+                <div class="operator-stat-label">待核准</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="operator-stat-card">
-                <div class="operator-stat-number text-success">{{ approved_reports|default:0 }}</div>
-                                        <div class="operator-stat-label">已核准</div>
+                <div class="operator-stat-number text-success">{{ approved_count|default:0 }}</div>
+                <div class="operator-stat-label">已核准</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="operator-stat-card">
-                <div class="operator-stat-number text-danger">{{ rejected_reports|default:0 }}</div>
+                <div class="operator-stat-number text-danger">{{ rejected_count|default:0 }}</div>
                 <div class="operator-stat-label">已駁回</div>
             </div>
         </div>
-
     </div>
 
     <!-- 功能按鈕 -->
@@ -197,7 +196,7 @@
                             </a>
                         </div>
                         <div class="col-md-2">
-                            <a href="{% url 'reporting:operator_supplement_export' %}" class="btn btn-success btn-lg btn-block mb-2">
+                            <a href="{% url 'workorder:operator_supplement_export' %}" class="btn btn-success btn-lg btn-block mb-2">
                                 <i class="fas fa-download"></i> 匯出資料
                             </a>
                         </div>

@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+{% load static %}
+
+<!--
+這個檔案是「作業員現場報工」的前端畫面模板。
+風格、排版、互動都與SMT現場報工一致，只是主體改為作業員。
+-->
+
+{% block title %}作業員現場報工{% endblock %}
+
+{% block extra_head %}
+<style>
+    .operator-on-site-container {
+        padding: 20px;
+    }
+    .operator-on-site-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease-in-out;
+    }
+    .operator-on-site-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .operator-on-site-card .card-header {
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+    }
+    .page-header {
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .page-header h2 {
+        margin: 0;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    .real-time-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background-color: #28a745;
+        border-radius: 50%;
+        margin-right: 8px;
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2>
+                        <i class="fas fa-user-check"></i>
+                        作業員現場報工
+                        <span class="real-time-indicator"></span>
+                        <small>即時模式</small>
+                    </h2>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                            <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">作業員現場報工</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報工表單 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card operator-on-site-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit"></i> 報工資訊填寫
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="operator_reporting_form">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="operator_select" class="form-label">作業員</label>
+                                <select class="form-select" id="operator_select" name="operator_id" required>
+                                    <option value="{{ user.id }}">{{ user.username }}</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="workorder_select" class="form-label">工單號碼</label>
+                                <select class="form-select" id="workorder_select" name="workorder_id" required>
+                                    <option value="">請選擇工單...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="process_select" class="form-label">工序</label>
+                                <select class="form-select" id="process_select" name="process_id" required>
+                                    <option value="">請先選擇工單...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="workorder_quantity" class="form-label">工單數量</label>
+                                <input type="number" class="form-control bg-light" id="workorder_quantity" name="workorder_quantity" readonly style="cursor: not-allowed;">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="report_quantity" class="form-label">報工數量</label>
+                                <input type="number" class="form-control" id="report_quantity" name="quantity" min="0" placeholder="請輸入報工數量">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="report_notes" class="form-label">備註說明</label>
+                                <textarea class="form-control" id="report_notes" name="notes" rows="1" placeholder="可填寫異常、說明等"></textarea>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save"></i> 確認報工
+                                </button>
+                                <button type="reset" class="btn btn-secondary">
+                                    <i class="fas fa-undo"></i> 重置表單
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 今日報工記錄（可依需求擴充） -->
+    <!-- ...如需顯示今日報工記錄，可參考SMT頁面設計... -->
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 頁面載入時自動載入工單
+window.addEventListener('DOMContentLoaded', function() {
+    loadWorkorders();
+});
+
+// 載入工單下拉選單（公司代碼 - 工單號碼）
+function loadWorkorders() {
+    fetch('{% url "workorder:get_workorders_by_operator" %}?operator_id={{ user.id }}')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('workorder_select');
+            select.innerHTML = '<option value="">請選擇工單...</option>';
+            if (data.status === 'success' && data.data) {
+                data.data.forEach(workorder => {
+                    const option = document.createElement('option');
+                    option.value = workorder.id;
+                    option.textContent = `${workorder.company_code} - ${workorder.order_number}`;
+                    select.appendChild(option);
+                });
+            }
+        });
+}
+
+// 工單選擇事件，載入對應工序與工單數量
+const workorderSelect = document.getElementById('workorder_select');
+if (workorderSelect) {
+    workorderSelect.addEventListener('change', function() {
+        const workorderId = this.value;
+        if (workorderId) {
+            loadProcesses(workorderId);
+            loadWorkorderQuantity(workorderId);
+        } else {
+            document.getElementById('process_select').innerHTML = '<option value="">請先選擇工單...</option>';
+            document.getElementById('workorder_quantity').value = '';
+        }
+    });
+}
+
+// 載入工序下拉選單
+function loadProcesses(workorderId) {
+    fetch('{% url "workorder:get_processes_by_workorder_for_operator" %}?workorder_id=' + workorderId)
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('process_select');
+            select.innerHTML = '<option value="">請選擇工序...</option>';
+            if (data.status === 'success' && data.processes) {
+                data.processes.forEach(process => {
+                    const option = document.createElement('option');
+                    option.value = process.id;
+                    option.textContent = process.process_name;
+                    select.appendChild(option);
+                });
+            }
+        });
+}
+
+	// 載入工單數量
+	function loadWorkorderQuantity(workorderId) {
+	    fetch('{% url "workorder:get_workorder_details" %}?workorder_id=' + workorderId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success' && data.workorder) {
+                document.getElementById('workorder_quantity').value = data.workorder.quantity || '';
+            } else {
+                document.getElementById('workorder_quantity').value = '';
+            }
+        });
+}
+
+// 表單送出事件
+const form = document.getElementById('operator_reporting_form');
+if (form) {
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const operatorId = document.getElementById('operator_select').value;
+        const workorderId = document.getElementById('workorder_select').value;
+        const processId = document.getElementById('process_select').value;
+        const quantity = document.getElementById('report_quantity').value;
+        const notes = document.getElementById('report_notes').value;
+        if (!operatorId || !workorderId || !processId) {
+            alert('請完整填寫所有必填欄位！');
+            return;
+        }
+        fetch('{% url "workorder:submit_operator_report" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: JSON.stringify({
+                operator_id: operatorId,
+                workorder_id: workorderId,
+                process_id: processId,
+                quantity: quantity,
+                notes: notes
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('報工成功！');
+                form.reset();
+            } else {
+                alert('報工失敗：' + (data.message || '未知錯誤'));
+            }
+        })
+        .catch(error => {
+            alert('送出失敗，請稍後再試！');
+        });
+    });
+}
+</script>
+{% endblock %} 
