@@ -16,13 +16,20 @@ class WorkOrderDispatchForm(forms.ModelForm):
     
     class Meta:
         model = WorkOrderDispatch
-        fields = ['work_order', 'operator', 'process', 'planned_quantity', 'status', 'notes']
+        fields = ['order_number', 'product_code', 'planned_quantity', 'status', 'notes']
         widgets = {
-            'work_order': forms.Select(
+            'order_number': forms.TextInput(
                 attrs={
                     'class': 'form-control',
                     'required': True,
-                    'placeholder': '選擇工單'
+                    'placeholder': '輸入工單號碼'
+                }
+            ),
+            'product_code': forms.TextInput(
+                attrs={
+                    'class': 'form-control',
+                    'required': True,
+                    'placeholder': '輸入產品編號'
                 }
             ),
             'operator': forms.TextInput(
@@ -64,11 +71,6 @@ class WorkOrderDispatchForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # 設定工單選項
-        self.fields['work_order'].queryset = WorkOrder.objects.filter(
-            status__in=['pending', 'in_progress']
-        ).order_by('-created_at')
-        
         # 設定狀態選項（新增時不顯示狀態欄位）
         if not self.instance.pk:
             self.fields['status'].widget = forms.HiddenInput()
@@ -87,26 +89,29 @@ class WorkOrderDispatchForm(forms.ModelForm):
         
         return planned_quantity
 
-    def clean_work_order(self):
-        """驗證工單"""
-        work_order = self.cleaned_data.get('work_order')
+    def clean_order_number(self):
+        """驗證工單號碼"""
+        order_number = self.cleaned_data.get('order_number')
         
-        if work_order and work_order.status == 'completed':
-            raise forms.ValidationError('無法為已完成的工單建立派工單')
+        if order_number:
+            try:
+                work_order = WorkOrder.objects.get(order_number=order_number)
+                if work_order.status == 'completed':
+                    raise forms.ValidationError('無法為已完成的工單建立派工單')
+            except WorkOrder.DoesNotExist:
+                raise forms.ValidationError('找不到指定的工單號碼')
         
-        return work_order
+        return order_number
 
     def clean(self):
         """整體表單驗證"""
         cleaned_data = super().clean()
-        work_order = cleaned_data.get('work_order')
-        process = cleaned_data.get('process')
+        order_number = cleaned_data.get('order_number')
         
-        # 檢查是否已存在相同的工單和工序組合
-        if work_order and process:
+        # 檢查是否已存在相同的工單號碼
+        if order_number:
             existing_dispatch = WorkOrderDispatch.objects.filter(
-                work_order=work_order,
-                process=process
+                order_number=order_number
             )
             
             if self.instance.pk:
@@ -114,7 +119,7 @@ class WorkOrderDispatchForm(forms.ModelForm):
             
             if existing_dispatch.exists():
                 raise forms.ValidationError(
-                    f'工單 {work_order.order_number} 的 {process} 工序已有派工單'
+                    f'工單 {order_number} 已有派工單'
                 )
         
         return cleaned_data

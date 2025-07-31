@@ -16,7 +16,7 @@ class SMTProductionReportAdmin(admin.ModelAdmin):
         'work_quantity', 'defect_quantity', 'approval_status', 'created_at'
     ]
     list_filter = ['report_type', 'approval_status', 'work_date', 'created_at']
-    search_fields = ['workorder__order_number', 'operation', 'equipment__name']
+    search_fields = ['workorder_id__order_number', 'operation', 'equipment__name']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['-work_date', '-start_time']
 
@@ -52,7 +52,7 @@ class OperatorSupplementReportAdmin(admin.ModelAdmin):
         'work_quantity', 'defect_quantity', 'approval_status', 'created_at'
     ]
     list_filter = ['report_type', 'approval_status', 'work_date', 'created_at']
-    search_fields = ['operator__name', 'workorder__order_number', 'process__name']
+    search_fields = ['operator__name', 'workorder_id__order_number', 'process__name']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['-work_date', '-start_time']
 
@@ -91,7 +91,7 @@ class SupervisorProductionReportAdmin(admin.ModelAdmin):
         'work_quantity', 'defect_quantity', 'approval_status', 'created_at'
     ]
     list_filter = ['approval_status', 'work_date', 'created_at']
-    search_fields = ['supervisor', 'workorder__order_number', 'process__name']
+    search_fields = ['supervisor', 'workorder_id__order_number', 'process__name']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['-work_date', '-start_time']
 

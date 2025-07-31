@@ -773,50 +773,48 @@ class SMTSupplementReportForm(ProductionReportBaseForm):
 
     def get_product_choices(self):
         """取得產品編號選項（從派工單取得）"""
-        from .models import WorkOrderDispatch
-        from django.db import models
-
-        # 從派工單中取得所有產品編號
-        products = (
-            WorkOrderDispatch.objects.filter(
-                status__in=["dispatched", "in_production"]  # 只選擇已派工或生產中的派工單
-            )
-            .exclude(product_code__isnull=True)
-            .exclude(product_code="")
-            .values_list("product_code", flat=True)
-            .distinct()
-            .order_by("product_code")
-        )
-
         choices = [("", "請選擇產品編號")]
-
-        for product in products:
-            if product:  # 排除空值
-                choices.append((product, product))
-
+        try:
+            from .workorder_dispatch.models import WorkOrderDispatch
+            
+            # 從派工單中取得所有產品編號（直接從派工單表的 product_code 欄位取得）
+            product_codes = (
+                WorkOrderDispatch.objects.filter(
+                    status__in=["dispatched", "in_production"]  # 只選擇已派工或生產中的派工單
+                )
+                .values_list("product_code", flat=True)  # 直接使用 product_code 欄位
+                .distinct()
+                .order_by("product_code")
+            )
+            
+            for product_code in product_codes:
+                if product_code:  # 確保產品編號不為空
+                    choices.append((product_code, product_code))
+                    
+        except Exception as e:
+            print(f"取得產品編號選項失敗: {e}")
         return choices
 
-    def get_workorder_queryset(self):
+    def get_workorder_queryset(self, product_code=None):
         """取得工單查詢集（從派工單取得）"""
-        from .models import WorkOrder, WorkOrderDispatch
-
-        # 從派工單中取得工單號碼列表
-        dispatch_queryset = WorkOrderDispatch.objects.filter(
-            status__in=["dispatched", "in_production"]  # 只選擇已派工或生產中的派工單
-        )
-        
-        # 取得派工單中的工單號碼列表
-        order_numbers = dispatch_queryset.values_list('order_number', flat=True)
-        
-        # 根據派工單的工單號碼查詢工單
-        return (
-            WorkOrder.objects.filter(order_number__in=order_numbers)
-            .exclude(order_number__icontains="RD樣品")  # 排除RD樣品工單
-            .exclude(order_number__icontains="RD-樣品")  # 排除RD-樣品工單
-            .exclude(order_number__icontains="RD樣本")  # 排除RD樣本工單
-            .exclude(status="completed")  # 排除已完工的工單
-            .order_by("-created_at")
-        )
+        from .models import WorkOrder
+        try:
+            from .workorder_dispatch.models import WorkOrderDispatch
+            # 補登報工只能選擇現存派工單上的工單
+            dispatch_queryset = WorkOrderDispatch.objects.filter(
+                status__in=["dispatched", "in_production"]
+            )
+            if product_code:
+                dispatch_queryset = dispatch_queryset.filter(product_code=product_code)  # 直接使用 product_code 欄位
+            # 取得派工單中的工單號碼列表（直接使用 order_number 欄位）
+            order_numbers = dispatch_queryset.values_list('order_number', flat=True)  # 直接使用 order_number 欄位
+            queryset = WorkOrder.objects.filter(
+                order_number__in=order_numbers
+            ).order_by("-created_at")
+            return queryset
+        except Exception as e:
+            print(f"取得工單查詢集失敗: {e}")
+            return WorkOrder.objects.none()
 
     def get_workorder_choices(self):
         """取得工單選項列表"""
@@ -1123,6 +1121,34 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
             "approval_status": "請選擇核准狀態",
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # 載入作業員選項（排除SMT相關作業員）
+        from process.models import Operator
+        operators = Operator.objects.all().exclude(name__icontains="SMT").order_by("name")
+        self.fields["operator"].queryset = operators
+
+        # 載入工序選項（排除SMT相關工序）
+        from process.models import ProcessName
+        processes = ProcessName.objects.all().exclude(name__icontains="SMT").order_by("name")
+        self.fields["process"].queryset = processes
+
+        # 載入設備選項（排除SMT相關設備）
+        from equip.models import Equipment
+        equipments = Equipment.objects.all().exclude(name__icontains="SMT").order_by("name")
+        self.fields["equipment"].queryset = equipments
+
+        # 設定工單查詢集
+        from .models import WorkOrder
+        workorders = WorkOrder.objects.exclude(status="completed").order_by("-created_at")
+        self.fields["workorder"].queryset = workorders
+
+        # 設定預設日期為今天（只在新增時）
+        if not self.instance.pk:
+            from datetime import date
+            self.fields["work_date"].initial = date.today()
+
     # 工單預設生產數量（唯讀）
     planned_quantity = forms.IntegerField(
         label="工單預設生產數量",
@@ -1375,6 +1401,7 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
         from .models import WorkOrder
         from equip.models import Equipment
         from django.contrib.auth.models import User
+        from process.models import Operator, ProcessName
 
         try:
             # 設置產品編號選項（從工單中取得所有產品編號）
@@ -1384,12 +1411,10 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
             self.fields["workorder"].queryset = self.get_workorder_queryset()
 
             # 設置作業員選項
-            from process.models import Operator
             operators = Operator.objects.all().order_by("name")
             self.fields["operator"].queryset = operators
 
             # 設置工序選項（排除SMT相關工序）
-            from process.models import ProcessName
             from django.db import models
 
             non_smt_processes = ProcessName.objects.exclude(
@@ -1415,8 +1440,9 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
             print(f"作業員補登報工表單初始化失敗: {e}")
             # 如果任何查詢失敗，設置空的查詢集
             self.fields["workorder"].queryset = WorkOrder.objects.none()
-            from process.models import Operator
             self.fields["operator"].queryset = Operator.objects.none()
+            # 重新導入 ProcessName 以避免 UnboundLocalError
+            from process.models import ProcessName
             self.fields["process"].queryset = ProcessName.objects.none()
             self.fields["equipment"].queryset = Equipment.objects.none()
 
@@ -1452,15 +1478,15 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
         })
 
     def get_product_choices(self):
-        """取得產品編號選項列表（從派工單取得）"""
+        """取得產品編號選項列表（從工單取得）"""
         choices = [("", "請選擇產品編號")]
         try:
-            from .models import WorkOrderDispatch
+            from .models import WorkOrder
             
-            # 從派工單中取得所有產品編號
+            # 從工單中取得所有產品編號
             product_codes = (
-                WorkOrderDispatch.objects.filter(
-                    status__in=["dispatched", "in_production"]  # 只選擇已派工或生產中的派工單
+                WorkOrder.objects.filter(
+                    status__in=["pending", "in_progress"]  # 只選擇待處理或進行中的工單
                 )
                 .values_list("product_code", flat=True)
                 .distinct()
@@ -1497,36 +1523,29 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
         return choices
 
     def get_workorder_queryset(self, product_code=None):
-        """取得工單查詢集（從派工單取得）"""
-        from .models import WorkOrderDispatch
-
-        # 補登報工只能選擇現存派工單上的工單
-        # 從派工單中取得工單號碼，然後查詢對應的工單
-        dispatch_queryset = WorkOrderDispatch.objects.filter(
-            status__in=["dispatched", "in_production"]  # 只選擇已派工或生產中的派工單
-        )
-        
-        # 如果指定了產品編號，則過濾該產品編號的派工單
-        if product_code:
-            dispatch_queryset = dispatch_queryset.filter(product_code=product_code)
-        
-        # 取得派工單中的工單號碼列表
-        order_numbers = dispatch_queryset.values_list('order_number', flat=True)
-        
-        # 根據派工單的工單號碼查詢工單
-        queryset = WorkOrder.objects.filter(
-            order_number__in=order_numbers
-        ).exclude(
-            order_number__icontains="RD樣品"  # 排除RD樣品工單
-        ).exclude(
-            order_number__icontains="RD-樣品"  # 排除RD-樣品工單
-        ).exclude(
-            order_number__icontains="RD樣本"  # 排除RD樣本工單
-        ).exclude(
-            status="completed"  # 排除已完工的工單
-        )
+        """取得工單查詢集（從工單表取得）"""
+        from .models import WorkOrder
+        try:
+            # 直接從工單表取得資料
+            queryset = WorkOrder.objects.filter(
+                status__in=["pending", "in_progress"]  # 只選擇待處理或進行中的工單
+            ).exclude(
+                order_number__icontains="RD樣品"
+            ).exclude(
+                order_number__icontains="RD-樣品"
+            ).exclude(
+                order_number__icontains="RD樣本"
+            ).exclude(
+                status="completed"
+            )
             
-        return queryset.order_by("-created_at")
+            if product_code:
+                queryset = queryset.filter(product_code=product_code)
+            
+            return queryset
+        except Exception as e:
+            print(f"從工單取得工單查詢集失敗: {e}")
+            return WorkOrder.objects.none()
 
     def get_rd_sample_workorder_choices(self):
         """取得RD樣品模式的工單選項列表"""

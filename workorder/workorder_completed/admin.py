@@ -12,17 +12,17 @@ class WorkOrderCompletedAdmin(admin.ModelAdmin):
     已完工工單管理介面
     """
     list_display = [
-        'workorder_dispatch', 'completion_date', 'completion_method',
+        'workorder', 'completion_date', 'completion_method',
         'total_work_quantity', 'total_defect_quantity', 'confirmed_by'
     ]
     list_filter = ['completion_method', 'completion_date', 'created_at']
-    search_fields = ['workorder_dispatch__order_number']
+    search_fields = ['workorder__order_number']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['-completion_date']
 
     fieldsets = (
         ('基本資訊', {
-            'fields': ('workorder_dispatch', 'completion_method')
+            'fields': ('workorder', 'completion_method')
         }),
         ('完工統計', {
             'fields': ('total_work_quantity', 'total_defect_quantity', 'total_production_days')
@@ -49,7 +49,7 @@ class WorkOrderCompletedProcessAdmin(admin.ModelAdmin):
         'total_work_quantity', 'total_defect_quantity', 'report_count'
     ]
     list_filter = ['process_name', 'created_at']
-    search_fields = ['workorder_completed__workorder_dispatch__order_number', 'process_name']
+    search_fields = ['workorder_completed__workorder__order_number', 'process_name']
     readonly_fields = ['created_at']
     ordering = ['workorder_completed', 'step_order']
 

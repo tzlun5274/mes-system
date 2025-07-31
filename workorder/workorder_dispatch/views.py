@@ -43,9 +43,9 @@ class DispatchListView(LoginRequiredMixin, ListView):
         search = self.request.GET.get('search', '').strip()
         if search:
             queryset = queryset.filter(
-                Q(work_order__order_number__icontains=search) |
-                Q(operator__icontains=search) |
-                Q(process__icontains=search)
+                Q(order_number__icontains=search) |  # 直接使用 order_number 欄位
+                Q(product_code__icontains=search) |  # 直接使用 product_code 欄位
+                Q(company_code__icontains=search)
             )
         
         # 狀態篩選
@@ -194,9 +194,7 @@ def dispatch_dashboard(request):
     ).count()
     
     # 最近派工單
-    recent_dispatches = WorkOrderDispatch.objects.select_related(
-        'work_order'
-    ).order_by('-created_at')[:10]
+    recent_dispatches = WorkOrderDispatch.objects.order_by('-created_at')[:10]
     
     context = {
         'total_dispatches': total_dispatches,
@@ -255,9 +253,9 @@ def bulk_dispatch(request):
                 try:
                     work_order = WorkOrder.objects.get(order_number=work_order_no)
                     WorkOrderDispatch.objects.create(
-                        work_order=work_order,
-                        operator=operator_id,
-                        process=process,
+                        order_number=work_order.order_number,
+                        product_code=work_order.product_code,
+                        planned_quantity=work_order.quantity,
                         status='pending',
                         created_by=request.user
                     )

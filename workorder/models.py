@@ -452,7 +452,7 @@ class DispatchLog(models.Model):
 class WorkOrderProduction(models.Model):
     """
     生產中工單表：專門記錄正在生產的工單
-    當派工單開始生產時，會在此表建立記錄
+    當工單開始生產時，會在此表建立記錄
     """
     STATUS_CHOICES = [
         ("in_production", "生產中"),
@@ -460,11 +460,11 @@ class WorkOrderProduction(models.Model):
         ("completed", "已完工"),
     ]
 
-    # 關聯派工單
-    workorder_dispatch = models.OneToOneField(
-        'workorder_dispatch.WorkOrderDispatch',
+    # 關聯工單
+    workorder = models.OneToOneField(
+        WorkOrder,
         on_delete=models.CASCADE,
-        verbose_name="派工單",
+        verbose_name="工單",
         related_name="production_record"
     )
     
@@ -488,7 +488,7 @@ class WorkOrderProduction(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"生產中：{self.workorder_dispatch.order_number}"
+        return f"生產中：{self.workorder.order_number}"
 
 
 class WorkOrderProductionDetail(models.Model):
@@ -545,7 +545,7 @@ class WorkOrderProductionDetail(models.Model):
         ordering = ["-report_date", "-report_time"]
 
     def __str__(self):
-        return f"{self.workorder_production.workorder_dispatch.order_number} - {self.process_name} - {self.report_date}"
+        return f"{self.workorder_production.workorder.order_number} - {self.process_name} - {self.report_date}"
 
 
 

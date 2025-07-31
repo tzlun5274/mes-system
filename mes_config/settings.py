@@ -23,16 +23,14 @@ SITE_URL = f"http://{os.environ.get('HOST_IP', 'localhost')}:8000"
 
 # 已安裝的應用
 INSTALLED_APPS = [
+    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.contrib.admin",  # 添加 admin 介面
-    "django_celery_beat",
-    "django_celery_results",
-    "rosetta",
     "corsheaders",  # 添加 django-cors-headers
+    "django_celery_beat",  # 添加 Celery Beat 支援
     "equip",
     "material",
     "process",

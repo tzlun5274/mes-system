@@ -25,7 +25,7 @@ class WorkOrderAdmin(admin.ModelAdmin):
         "created_at",
     ]
     list_filter = ["status", "company_code", "created_at"]
-    search_fields = ["order_number", "product_code"]
+    search_fields = ["order_number", "product_code", "status"]
     ordering = ["-created_at"]
 
 
@@ -85,7 +85,7 @@ class WorkOrderAssignmentAdmin(admin.ModelAdmin):
 class WorkOrderProductionAdmin(admin.ModelAdmin):
     """生產中工單管理介面"""
     list_display = [
-        "workorder_dispatch",
+        "workorder",
         "status",
         "current_process",
         "production_start_date",
@@ -93,7 +93,7 @@ class WorkOrderProductionAdmin(admin.ModelAdmin):
         "created_at",
     ]
     list_filter = ["status", "production_start_date", "created_at"]
-    search_fields = ["workorder_dispatch__order_number"]
+    search_fields = ["workorder__order_number", "status", "current_process"]
     ordering = ["-created_at"]
     readonly_fields = ["created_at", "updated_at"]
 

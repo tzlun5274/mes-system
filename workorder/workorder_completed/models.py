@@ -12,11 +12,11 @@ class WorkOrderCompleted(models.Model):
     已完工工單表：專門記錄已完工的工單
     只做記錄，不會頻繁修改數據
     """
-    # 關聯派工單
-    workorder_dispatch = models.OneToOneField(
-        'workorder_dispatch.WorkOrderDispatch',
+    # 關聯工單
+    workorder = models.OneToOneField(
+        'workorder.WorkOrder',
         on_delete=models.CASCADE,
-        verbose_name="派工單",
+        verbose_name="工單",
         related_name="completed_record"
     )
     
@@ -59,7 +59,7 @@ class WorkOrderCompleted(models.Model):
         ordering = ["-completion_date"]
 
     def __str__(self):
-        return f"已完工：{self.workorder_dispatch.order_number}"
+        return f"已完工：{self.workorder.order_number}"
 
 
 class WorkOrderCompletedProcess(models.Model):
@@ -103,4 +103,4 @@ class WorkOrderCompletedProcess(models.Model):
         ordering = ["workorder_completed", "step_order"]
 
     def __str__(self):
-        return f"{self.workorder_completed.workorder_dispatch.order_number} - {self.process_name} 統計" 
+        return f"{self.workorder_completed.workorder.order_number} - {self.process_name} 統計" 
