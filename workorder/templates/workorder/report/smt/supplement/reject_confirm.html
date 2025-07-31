@@ -185,20 +185,22 @@
 
 {% block extra_js %}
 <script>
-    $(document).ready(function() {
+    document.addEventListener('DOMContentLoaded', function() {
         // 卡片懸停效果
-        $('.reject-confirm-card').hover(
-            function() {
-                $(this).addClass('shadow-lg');
-            },
-            function() {
-                $(this).removeClass('shadow-lg');
-            }
-        );
+        const rejectCards = document.querySelectorAll('.reject-confirm-card');
+        rejectCards.forEach(function(card) {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow-lg');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow-lg');
+            });
+        });
         
         // 表單驗證
-        $('form').on('submit', function(e) {
-            const remarks = $('#rejection_remarks').val().trim();
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(e) {
+            const remarks = document.getElementById('rejection_remarks').value.trim();
             if (!remarks) {
                 alert('請輸入駁回原因');
                 e.preventDefault();

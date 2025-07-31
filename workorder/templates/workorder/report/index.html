@@ -183,7 +183,7 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 自動刷新統計數據（每5分鐘）
     setInterval(function() {
         location.reload();

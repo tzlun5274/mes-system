@@ -338,18 +338,24 @@
 {% block extra_js %}
 <script>
     // 刪除確認專用 JavaScript
-    $(document).ready(function() {
+    document.addEventListener('DOMContentLoaded', function() {
         // 監聽確認選項
-        $('input[type="checkbox"]').on('change', function() {
-            const allChecked = $('input[type="checkbox"]:checked').length === 3;
-            $('#deleteButton').prop('disabled', !allChecked);
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        const deleteButton = document.getElementById('deleteButton');
+        
+        checkboxes.forEach(function(checkbox) {
+            checkbox.addEventListener('change', function() {
+                const allChecked = document.querySelectorAll('input[type="checkbox"]:checked').length === 3;
+                deleteButton.disabled = !allChecked;
+            });
         });
         
         // 表單提交前確認
-        $('#deleteForm').on('submit', function(e) {
+        const deleteForm = document.getElementById('deleteForm');
+        deleteForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            const allChecked = $('input[type="checkbox"]:checked').length === 3;
+            const allChecked = document.querySelectorAll('input[type="checkbox"]:checked').length === 3;
             if (!allChecked) {
                 alert('請確認所有選項後再進行刪除操作！');
                 return false;

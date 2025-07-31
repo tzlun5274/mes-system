@@ -226,31 +226,32 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 自動刷新頁面數據（每5分鐘）
     setInterval(function() {
         location.reload();
     }, 300000);
     
     // 統計卡片點擊事件
-    $('.stats-card').click(function() {
-        var cardType = $(this).find('.stats-label').text();
-        if (cardType.includes('待審核')) {
-            window.location.href = "{% url 'reporting:pending_approval_list' %}";
-        } else if (cardType.includes('異常')) {
-            window.location.href = "{% url 'workorder:abnormal_management' %}";
-        }
+    const statsCards = document.querySelectorAll('.stats-card');
+    statsCards.forEach(function(card) {
+        card.addEventListener('click', function() {
+            const cardType = this.querySelector('.stats-label').textContent;
+            if (cardType.includes('待審核')) {
+                window.location.href = "{% url 'reporting:pending_approval_list' %}";
+            } else if (cardType.includes('異常')) {
+                window.location.href = "{% url 'workorder:abnormal_management' %}";
+            }
+        });
+        
+        // 統計卡片懸停效果
+        card.addEventListener('mouseenter', function() {
+            this.classList.add('shadow-lg');
+        });
+        card.addEventListener('mouseleave', function() {
+            this.classList.remove('shadow-lg');
+        });
     });
-    
-    // 統計卡片懸停效果
-    $('.stats-card').hover(
-        function() {
-            $(this).addClass('shadow-lg');
-        },
-        function() {
-            $(this).removeClass('shadow-lg');
-        }
-    );
 });
 </script>
 {% endblock %} 

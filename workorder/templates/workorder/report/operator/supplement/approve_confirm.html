@@ -280,9 +280,10 @@
 {% block extra_js %}
 <script>
     // 核准通過確認專用 JavaScript
-    $(document).ready(function() {
+    document.addEventListener('DOMContentLoaded', function() {
         // 表單提交前確認
-        $('#approveForm').on('submit', function(e) {
+        const approveForm = document.getElementById('approveForm');
+        approveForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
             if (confirmAction('確定要核准通過此補登報工記錄嗎？此操作將正式生效並影響生產統計數據。')) {

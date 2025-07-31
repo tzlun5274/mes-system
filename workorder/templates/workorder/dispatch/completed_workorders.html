@@ -53,20 +53,77 @@
                     <a class="nav-link" href="{% url 'workorder:company_orders' %}">公司製令</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link active" href="{% url 'workorder:completed_workorders' %}">完工工單</a>
+                    <a class="nav-link active" href="{% url 'workorder:completed_workorders' %}">完工工單明細</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'workorder:completed_workorders_process_stats' %}">工序統計</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'workorder:fix_completed_workorders' %}">狀態修正</a>
                 </li>
             </ul>
         </div>
     </div>
     <div class="alert alert-info">本頁只顯示狀態為「完工」的工單。</div>
     
-    <!-- 搜尋功能 -->
+    <!-- 統計資訊卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4 class="card-title">{{ total_count }}</h4>
+                    <p class="card-text">總完工工單數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4 class="card-title">{{ total_quantity }}</h4>
+                    <p class="card-text">總完工數量</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4 class="card-title">{{ avg_quantity }}</h4>
+                    <p class="card-text">平均工單數量</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h4 class="card-title">{{ recent_count }}</h4>
+                    <p class="card-text">近30天完工數</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 搜尋和篩選功能 -->
     <div class="row mb-3">
-        <div class="col-md-6">
-            <form method="get" class="d-flex">
-                <input type="text" name="search" class="form-control me-2" 
-                       placeholder="搜尋工單編號、產品編號..." 
-                       value="{{ search_query }}">
+        <div class="col-md-8">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="搜尋工單編號、產品編號..." 
+                           value="{{ search_query }}">
+                </div>
+                <div class="col-md-3">
+                    <input type="date" name="date_from" class="form-control" 
+                           placeholder="開始日期" value="{{ date_from }}">
+                </div>
+                <div class="col-md-3">
+                    <input type="date" name="date_to" class="form-control" 
+                           placeholder="結束日期" value="{{ date_to }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i> 搜尋
+                    </button>
+                </div>
                 <!-- 保持排序參數 -->
                 {% if current_sort %}
                 <input type="hidden" name="sort" value="{{ current_sort }}">
@@ -74,24 +131,36 @@
                 {% if current_direction %}
                 <input type="hidden" name="direction" value="{{ current_direction }}">
                 {% endif %}
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-search"></i> 搜尋
-                </button>
-                {% if search_query %}
-                <a href="{% url 'workorder:completed_workorders' %}{% if current_sort %}?sort={{ current_sort }}{% endif %}{% if current_direction %}{% if current_sort %}&{% else %}?{% endif %}direction={{ current_direction }}{% endif %}" class="btn btn-secondary ms-2">
-                    <i class="fas fa-times"></i> 清除搜尋
-                </a>
-                {% endif %}
             </form>
         </div>
-        <div class="col-md-6 text-end">
-            <span class="text-muted">共找到 {{ total_count }} 筆完工工單</span>
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <a href="{% url 'workorder:export_completed_workorders' %}?format=excel{% if search_query %}&search={{ search_query }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" 
+                   class="btn btn-success btn-sm">
+                    <i class="fas fa-file-excel"></i> 匯出Excel
+                </a>
+                <a href="{% url 'workorder:export_completed_workorders' %}?format=csv{% if search_query %}&search={{ search_query }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" 
+                   class="btn btn-info btn-sm">
+                    <i class="fas fa-file-csv"></i> 匯出CSV
+                </a>
+            </div>
         </div>
     </div>
     
+    <!-- 清除搜尋按鈕 -->
+    {% if search_query or date_from or date_to %}
+    <div class="row mb-3">
+        <div class="col-12">
+            <a href="{% url 'workorder:completed_workorders' %}{% if current_sort %}?sort={{ current_sort }}{% endif %}{% if current_direction %}{% if current_sort %}&{% else %}?{% endif %}direction={{ current_direction }}{% endif %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-times"></i> 清除所有篩選條件
+            </a>
+        </div>
+    </div>
+    {% endif %}
+    
     <!-- 功能按鈕區域 -->
     <div class="row mb-3">
-        <div class="col-md-6">
+        <div class="col-md-4">
             <!-- 匯入歷史派工單按鈕 -->
             <div class="alert alert-info">
                 <div class="d-flex justify-content-between align-items-center">
@@ -105,7 +174,21 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
+            <!-- 批量操作按鈕 -->
+            <div class="alert alert-secondary">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-tasks"></i>
+                        <strong>批量操作</strong> - 選擇性刪除完工工單
+                    </div>
+                    <button type="button" class="btn btn-warning btn-sm" onclick="selectAllWorkorders()">
+                        <i class="fas fa-check-square"></i> 全選
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
             <!-- 測試期間清除按鈕 -->
             <div class="alert alert-warning">
                 <div class="d-flex justify-content-between align-items-center">
@@ -121,9 +204,14 @@
         </div>
     </div>
     
-    <table class="table table-bordered table-hover">
-        <thead class="table-primary">
-            <tr>
+    <form id="batchDeleteForm" method="post" action="{% url 'workorder:batch_delete_completed_workorders' %}">
+        {% csrf_token %}
+        <table class="table table-bordered table-hover">
+            <thead class="table-primary">
+                <tr>
+                    <th>
+                        <input type="checkbox" id="selectAll" onchange="toggleAllWorkorders()">
+                    </th>
                 <th>
                     工單編號
                     <div class="btn-group btn-group-sm ms-1" role="group">
@@ -135,6 +223,21 @@
                         <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=order_number&direction=desc" 
                            class="btn btn-outline-light btn-sm {% if current_sort == 'order_number' and current_direction == 'desc' %}active{% endif %}"
                            title="按工單編號降序排列">
+                            <i class="fas fa-sort-down"></i> 降序
+                        </a>
+                    </div>
+                </th>
+                <th>
+                    公司代號
+                    <div class="btn-group btn-group-sm ms-1" role="group">
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=company_code&direction=asc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'company_code' and current_direction == 'asc' %}active{% endif %}"
+                           title="按公司代號升序排列">
+                            <i class="fas fa-sort-up"></i> 升序
+                        </a>
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=company_code&direction=desc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'company_code' and current_direction == 'desc' %}active{% endif %}"
+                           title="按公司代號降序排列">
                             <i class="fas fa-sort-down"></i> 降序
                         </a>
                     </div>
@@ -206,7 +309,11 @@
         <tbody>
             {% for order in completed_orders %}
             <tr>
+                <td>
+                    <input type="checkbox" name="workorder_ids" value="{{ order.id }}" class="workorder-checkbox">
+                </td>
                 <td>{{ order.order_number }}</td>
+                <td>{{ order.company_code|default:"-" }}</td>
                 <td>{{ order.product_code }}</td>
                 <td>{{ order.quantity }}</td>
                 <td><span class="badge bg-success">已完工</span></td>
@@ -218,11 +325,22 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="7" class="text-center">目前沒有已完工工單</td>
+                <td colspan="9" class="text-center">目前沒有已完工工單</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    
+    <!-- 批量操作按鈕 -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <button type="button" class="btn btn-danger" onclick="confirmBatchDelete()">
+                <i class="fas fa-trash"></i> 刪除選中的完工工單
+            </button>
+            <span class="ms-3 text-muted" id="selectedCount">已選擇 0 個工單</span>
+        </div>
+    </div>
+    </form>
     
     <!-- 分頁功能 -->
     {% if completed_orders.has_other_pages %}
@@ -269,12 +387,93 @@
     </nav>
     {% endif %}
     
+    <!-- 公司統計資訊 -->
+    {% if company_stats %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> 按公司統計
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for stat in company_stats %}
+                        <div class="col-md-3 mb-3">
+                            <div class="border rounded p-3 text-center">
+                                <h6 class="text-muted">公司 {{ stat.company_code|default:"未分類" }}</h6>
+                                <h4 class="text-primary">{{ stat.count }}</h4>
+                                <p class="mb-0">完工工單數</p>
+                                <small class="text-muted">總數量: {{ stat.total_qty }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
     <div class="row mt-3">
         <div class="col-12">
-            <a href="{% url 'workorder:dispatch_list' %}" class="btn btn-secondary">
+            <a href="{% url 'workorder:index' %}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> 返回工單管理
             </a>
         </div>
     </div>
 </div>
+
+<script>
+// 全選/取消全選功能
+function toggleAllWorkorders() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.workorder-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+    
+    updateSelectedCount();
+}
+
+// 全選功能
+function selectAllWorkorders() {
+    const selectAll = document.getElementById('selectAll');
+    selectAll.checked = true;
+    toggleAllWorkorders();
+}
+
+// 更新已選擇數量
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.workorder-checkbox:checked');
+    const countElement = document.getElementById('selectedCount');
+    countElement.textContent = `已選擇 ${checkboxes.length} 個工單`;
+}
+
+// 確認批量刪除
+function confirmBatchDelete() {
+    const checkboxes = document.querySelectorAll('.workorder-checkbox:checked');
+    
+    if (checkboxes.length === 0) {
+        alert('請選擇要刪除的完工工單');
+        return;
+    }
+    
+    if (confirm(`確定要刪除選中的 ${checkboxes.length} 個完工工單嗎？此操作無法復原！`)) {
+        document.getElementById('batchDeleteForm').submit();
+    }
+}
+
+// 監聽選擇框變化
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.workorder-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedCount);
+    });
+    
+    updateSelectedCount();
+});
+</script>
 {% endblock %} 

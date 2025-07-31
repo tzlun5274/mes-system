@@ -430,16 +430,17 @@
 {% block extra_js %}
 <script>
     // SMT補登報工詳情專用 JavaScript
-    $(document).ready(function() {
+    document.addEventListener('DOMContentLoaded', function() {
         // 卡片懸停效果
-        $('.smt-supplement-detail-card').hover(
-            function() {
-                $(this).addClass('shadow-lg');
-            },
-            function() {
-                $(this).removeClass('shadow-lg');
-            }
-        );
+        const detailCards = document.querySelectorAll('.smt-supplement-detail-card');
+        detailCards.forEach(function(card) {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow-lg');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow-lg');
+            });
+        });
         
         // 自動隱藏訊息提示
         setTimeout(function() {

@@ -786,7 +786,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         data.workorders.forEach(workorder => {
                             const option = document.createElement('option');
                             option.value = workorder.id;
-                            option.textContent = `${workorder.company_code} - ${workorder.order_number}`;
+                            // 格式化公司代號，確保是兩位數格式（例如：2 -> 02）
+                            let formattedCompanyCode = workorder.company_code;
+                            if (formattedCompanyCode && /^\d+$/.test(formattedCompanyCode)) {
+                                formattedCompanyCode = formattedCompanyCode.padStart(2, '0');
+                            }
+                            option.textContent = `${formattedCompanyCode} - ${workorder.order_number}`;
                             workorderSelect.appendChild(option);
                         });
                         

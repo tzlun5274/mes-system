@@ -1,0 +1,376 @@
+<!--
+完工工單工序統計列表模板
+此模板顯示按工序類型統計的完工工單數據
+-->
+{% extends 'base.html' %}
+{% block title %}完工工單工序統計{% endblock %}
+{% block extra_css %}
+<style>
+    .btn-group .btn {
+        padding: 0.125rem 0.25rem;
+        font-size: 0.7rem;
+        line-height: 1.2;
+        border-radius: 0.2rem;
+        white-space: nowrap;
+        min-width: 35px;
+    }
+    
+    .btn-group .btn.active {
+        background-color: #fff;
+        color: #0d6efd;
+        border-color: #fff;
+    }
+    
+    .btn-group .btn:hover {
+        background-color: #fff;
+        color: #0d6efd;
+        border-color: #fff;
+    }
+    
+    th {
+        position: relative;
+        white-space: nowrap;
+        vertical-align: top;
+    }
+    
+    .sort-buttons {
+        display: inline-block;
+        vertical-align: middle;
+    }
+    
+    .efficiency-badge {
+        font-size: 0.8rem;
+    }
+    
+    .process-name {
+        font-weight: bold;
+        color: #2c3e50;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>完工工單工序統計</h2>
+    <div class="row mb-3">
+        <div class="col-12">
+            <!-- 完工工單子選單（分頁按鈕） -->
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'workorder:dispatch_list' %}">派工單</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'workorder:company_orders' %}">公司製令</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'workorder:completed_workorders' %}">完工工單明細</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="{% url 'workorder:completed_workorders_process_stats' %}">工序統計</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="alert alert-info">本頁顯示按工序類型統計的完工工單數據，用於分析各工序的整體表現。</div>
+    
+    <!-- 統計資訊卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4 class="card-title">{{ total_processes }}</h4>
+                    <p class="card-text">工序類型數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4 class="card-title">{{ total_workorders }}</h4>
+                    <p class="card-text">總完工工單數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4 class="card-title">{{ total_quantity }}</h4>
+                    <p class="card-text">總完工數量</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h4 class="card-title">{{ avg_efficiency }}%</h4>
+                    <p class="card-text">平均效率</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 搜尋和篩選功能 -->
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="搜尋工序名稱..." 
+                           value="{{ search_query }}">
+                </div>
+                <div class="col-md-3">
+                    <input type="date" name="date_from" class="form-control" 
+                           placeholder="開始日期" value="{{ date_from }}">
+                </div>
+                <div class="col-md-3">
+                    <input type="date" name="date_to" class="form-control" 
+                           placeholder="結束日期" value="{{ date_to }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i> 搜尋
+                    </button>
+                </div>
+                <!-- 保持排序參數 -->
+                {% if current_sort %}
+                <input type="hidden" name="sort" value="{{ current_sort }}">
+                {% endif %}
+                {% if current_direction %}
+                <input type="hidden" name="direction" value="{{ current_direction }}">
+                {% endif %}
+            </form>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <!-- 匯出功能暫時停用 -->
+                <button class="btn btn-success btn-sm" disabled>
+                    <i class="fas fa-file-excel"></i> 匯出Excel
+                </button>
+                <button class="btn btn-info btn-sm" disabled>
+                    <i class="fas fa-file-csv"></i> 匯出CSV
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 清除搜尋按鈕 -->
+    {% if search_query or date_from or date_to %}
+    <div class="row mb-3">
+        <div class="col-12">
+            <a href="{% url 'workorder:completed_workorders_process_stats' %}{% if current_sort %}?sort={{ current_sort }}{% endif %}{% if current_direction %}{% if current_sort %}&{% else %}?{% endif %}direction={{ current_direction }}{% endif %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-times"></i> 清除所有篩選條件
+            </a>
+        </div>
+    </div>
+    {% endif %}
+    
+    <table class="table table-bordered table-hover">
+        <thead class="table-primary">
+            <tr>
+                <th>
+                    工序名稱
+                    <div class="btn-group btn-group-sm ms-1" role="group">
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=process_name&direction=asc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'process_name' and current_direction == 'asc' %}active{% endif %}"
+                           title="按工序名稱升序排列">
+                            <i class="fas fa-sort-up"></i> 升序
+                        </a>
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=process_name&direction=desc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'process_name' and current_direction == 'desc' %}active{% endif %}"
+                           title="按工序名稱降序排列">
+                            <i class="fas fa-sort-down"></i> 降序
+                        </a>
+                    </div>
+                </th>
+                <th>
+                    完工工單數
+                    <div class="btn-group btn-group-sm ms-1" role="group">
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=total_workorders&direction=asc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'total_workorders' and current_direction == 'asc' %}active{% endif %}"
+                           title="按完工工單數升序排列">
+                            <i class="fas fa-sort-up"></i> 升序
+                        </a>
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=total_workorders&direction=desc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'total_workorders' and current_direction == 'desc' %}active{% endif %}"
+                           title="按完工工單數降序排列">
+                            <i class="fas fa-sort-down"></i> 降序
+                        </a>
+                    </div>
+                </th>
+                <th>
+                    總完工數量
+                    <div class="btn-group btn-group-sm ms-1" role="group">
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=total_completed_quantity&direction=asc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'total_completed_quantity' and current_direction == 'asc' %}active{% endif %}"
+                           title="按總完工數量升序排列">
+                            <i class="fas fa-sort-up"></i> 升序
+                        </a>
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=total_completed_quantity&direction=desc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'total_completed_quantity' and current_direction == 'desc' %}active{% endif %}"
+                           title="按總完工數量降序排列">
+                            <i class="fas fa-sort-down"></i> 降序
+                        </a>
+                    </div>
+                </th>
+                <th>
+                    平均數量
+                    <div class="btn-group btn-group-sm ms-1" role="group">
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=avg_completed_quantity&direction=asc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'avg_completed_quantity' and current_direction == 'asc' %}active{% endif %}"
+                           title="按平均數量升序排列">
+                            <i class="fas fa-sort-up"></i> 升序
+                        </a>
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=avg_completed_quantity&direction=desc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'avg_completed_quantity' and current_direction == 'desc' %}active{% endif %}"
+                           title="按平均數量降序排列">
+                            <i class="fas fa-sort-down"></i> 降序
+                        </a>
+                    </div>
+                </th>
+                <th>
+                    完成率
+                    <div class="btn-group btn-group-sm ms-1" role="group">
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=avg_completion_rate&direction=asc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'avg_completion_rate' and current_direction == 'asc' %}active{% endif %}"
+                           title="按完成率升序排列">
+                            <i class="fas fa-sort-up"></i> 升序
+                        </a>
+                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}sort=avg_completion_rate&direction=desc" 
+                           class="btn btn-outline-light btn-sm {% if current_sort == 'avg_completion_rate' and current_direction == 'desc' %}active{% endif %}"
+                           title="按完成率降序排列">
+                            <i class="fas fa-sort-down"></i> 降序
+                        </a>
+                    </div>
+                </th>
+                <th>參與作業員</th>
+                <th>使用設備</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stat in process_stats %}
+            <tr>
+                <td>
+                    <span class="process-name">{{ stat.process_name }}</span>
+                </td>
+                <td>
+                    <span class="badge bg-primary">{{ stat.total_workorders }}</span>
+                </td>
+                <td>
+                    <strong>{{ stat.total_completed_quantity|default:0 }}</strong>
+                </td>
+                <td>
+                    {{ stat.avg_completed_quantity|default:0|floatformat:0 }}
+                </td>
+                <td>
+                    {% if stat.avg_completion_rate >= 95 %}
+                        <span class="badge bg-success efficiency-badge">{{ stat.avg_completion_rate|floatformat:1 }}%</span>
+                    {% elif stat.avg_completion_rate >= 85 %}
+                        <span class="badge bg-warning efficiency-badge">{{ stat.avg_completion_rate|floatformat:1 }}%</span>
+                    {% else %}
+                        <span class="badge bg-danger efficiency-badge">{{ stat.avg_completion_rate|floatformat:1 }}%</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if stat.operators %}
+                        <small>
+                            {% for operator in stat.operators|slice:":3" %}
+                                <span class="badge bg-info">{{ operator }}</span>
+                            {% endfor %}
+                            {% if stat.operators|length > 3 %}
+                                <span class="badge bg-secondary">+{{ stat.operators|length|add:"-3" }}</span>
+                            {% endif %}
+                        </small>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if stat.equipments %}
+                        <small>
+                            {% for equipment in stat.equipments|slice:":2" %}
+                                <span class="badge bg-secondary">{{ equipment }}</span>
+                            {% endfor %}
+                            {% if stat.equipments|length > 2 %}
+                                <span class="badge bg-secondary">+{{ stat.equipments|length|add:"-2" }}</span>
+                            {% endif %}
+                        </small>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <button type="button" class="btn btn-info btn-sm" onclick="showProcessDetails('{{ stat.process_name }}')">
+                        <i class="fas fa-chart-bar"></i> 詳情
+                    </button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="text-center">目前沒有工序統計資料</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <!-- 分頁功能 -->
+    {% if process_stats.has_other_pages %}
+    <nav aria-label="工序統計分頁">
+        <ul class="pagination justify-content-center">
+            {% if process_stats.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_direction %}&direction={{ current_direction }}{% endif %}">
+                    <i class="fas fa-angle-double-left"></i> 第一頁
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ process_stats.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_direction %}&direction={{ current_direction }}{% endif %}">
+                    <i class="fas fa-angle-left"></i> 上一頁
+                </a>
+            </li>
+            {% endif %}
+            
+            {% for num in process_stats.paginator.page_range %}
+                {% if process_stats.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+                {% elif num > process_stats.number|add:'-3' and num < process_stats.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_direction %}&direction={{ current_direction }}{% endif %}">{{ num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if process_stats.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ process_stats.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_direction %}&direction={{ current_direction }}{% endif %}">
+                    下一頁 <i class="fas fa-angle-right"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ process_stats.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_direction %}&direction={{ current_direction }}{% endif %}">
+                    最後頁 <i class="fas fa-angle-double-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+    
+    <div class="row mt-3">
+        <div class="col-12">
+            <a href="{% url 'workorder:completed_workorders' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回完工工單明細
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+// 顯示工序詳情（未來可擴展為彈出視窗或新頁面）
+function showProcessDetails(processName) {
+    alert(`工序 "${processName}" 的詳細統計資訊功能正在開發中...`);
+    // 未來可以實作彈出視窗或跳轉到詳細頁面
+}
+</script>
+{% endblock %} 

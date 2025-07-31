@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ function_name }} - 報表管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-tools"></i> {{ function_name }}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="text-center py-5">
+                        <div class="mb-4">
+                            <i class="fas fa-cog fa-5x text-muted"></i>
+                        </div>
+                        <h4 class="text-muted mb-3">功能開發中</h4>
+                        <p class="text-muted">此功能正在開發中，敬請期待...</p>
+                        <a href="{% url 'reporting:index' %}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left"></i> 返回報表管理
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

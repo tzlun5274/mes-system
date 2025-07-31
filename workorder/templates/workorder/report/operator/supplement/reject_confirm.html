@@ -327,9 +327,10 @@
 {% block extra_js %}
 <script>
     // 駁回確認專用 JavaScript
-    $(document).ready(function() {
+    document.addEventListener('DOMContentLoaded', function() {
         // 表單提交前確認
-        $('#rejectForm').on('submit', function(e) {
+        const rejectForm = document.getElementById('rejectForm');
+        rejectForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
             const reason = document.getElementById('rejection_reason').value.trim();

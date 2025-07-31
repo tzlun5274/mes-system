@@ -240,23 +240,27 @@ function viewDetail(reportType, reportId) {
     }
 }
 
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 表格行懸停效果
-    $('.approved-reports-table tbody tr').hover(
-        function() {
-            $(this).addClass('table-active');
-        },
-        function() {
-            $(this).removeClass('table-active');
-        }
-    );
+    const tableRows = document.querySelectorAll('.approved-reports-table tbody tr');
+    tableRows.forEach(function(row) {
+        row.addEventListener('mouseenter', function() {
+            this.classList.add('table-active');
+        });
+        row.addEventListener('mouseleave', function() {
+            this.classList.remove('table-active');
+        });
+    });
     
     // 統計卡片點擊效果
-    $('.stats-card').click(function() {
-        $(this).addClass('shadow-lg');
-        setTimeout(() => {
-            $(this).removeClass('shadow-lg');
-        }, 200);
+    const statsCards = document.querySelectorAll('.stats-card');
+    statsCards.forEach(function(card) {
+        card.addEventListener('click', function() {
+            this.classList.add('shadow-lg');
+            setTimeout(() => {
+                this.classList.remove('shadow-lg');
+            }, 200);
+        });
     });
 });
 </script>

@@ -11,6 +11,221 @@ from .models import OperatorSupplementReport
 from django.contrib.auth.models import User
 
 
+class ProductionReportBaseForm(forms.ModelForm):
+    """
+    【規範】報工共用表單
+    - 任何報工表單都必須繼承這個類別
+    - 共用欄位：工單號碼、產品編號、工序、設備、日期、開始/結束時間、數量、不良品、備註
+    - 禁止在子類別重複定義這些欄位
+    """
+    
+    # 工單號碼欄位
+    workorder = forms.ModelChoiceField(
+        queryset=None,
+        label="工單號碼",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "placeholder": "請選擇工單號碼",
+            }
+        ),
+        required=True,
+        help_text="請選擇工單號碼",
+    )
+    
+    # 產品編號欄位
+    product_id = forms.CharField(
+        max_length=100,
+        label="產品編號",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "請輸入產品編號",
+            }
+        ),
+        required=True,
+        help_text="請輸入產品編號",
+    )
+    
+    # 工序欄位
+    process = forms.CharField(
+        max_length=100,
+        label="工序",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "請輸入工序名稱",
+            }
+        ),
+        required=True,
+        help_text="請輸入工序名稱",
+    )
+    
+    # 設備欄位
+    equipment = forms.ModelChoiceField(
+        queryset=None,
+        label="設備",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "placeholder": "請選擇設備",
+            }
+        ),
+        required=False,
+        help_text="請選擇設備（可選）",
+    )
+    
+    # 日期欄位
+    work_date = forms.DateField(
+        label="報工日期",
+        widget=forms.DateInput(
+            attrs={
+                "class": "form-control",
+                "type": "date",
+                "placeholder": "請選擇報工日期",
+            }
+        ),
+        required=True,
+        help_text="請選擇報工日期",
+    )
+    
+    # 開始時間欄位（24小時制）
+    start_time = forms.CharField(
+        label="開始時間",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "例如：16:00",
+                "autocomplete": "off",
+            }
+        ),
+        required=True,
+        help_text="請輸入實際開始時間 (24小時制)，例如 16:00",
+    )
+    
+    # 結束時間欄位（24小時制）
+    end_time = forms.CharField(
+        label="結束時間",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "例如：18:30",
+                "autocomplete": "off",
+            }
+        ),
+        required=True,
+        help_text="請輸入實際結束時間 (24小時制)，例如 18:30",
+    )
+    
+    # 工作數量欄位
+    work_quantity = forms.IntegerField(
+        label="工作數量",
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": "0",
+                "placeholder": "請輸入本次實際完成的數量",
+            }
+        ),
+        required=True,
+        help_text="請輸入該時段內實際完成的合格產品數量",
+    )
+    
+    # 不良品數量欄位
+    defect_quantity = forms.IntegerField(
+        label="不良品數量",
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": "0",
+                "placeholder": "請輸入本次產生的不良品數量",
+            }
+        ),
+        required=False,
+        initial=0,
+        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0",
+    )
+    
+    # 備註欄位
+    remarks = forms.CharField(
+        label="備註",
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": "3",
+                "placeholder": "可填寫設備標記、操作說明等",
+            }
+        ),
+        required=False,
+        help_text="請輸入任何需要補充的資訊，如設備標記、操作說明等",
+    )
+    
+    # 異常記錄欄位
+    abnormal_notes = forms.CharField(
+        label="異常記錄",
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": "3",
+                "placeholder": "記錄生產過程中的異常情況，如設備故障、品質問題等",
+            }
+        ),
+        required=False,
+        help_text="記錄生產過程中的異常情況，如設備故障、品質問題等",
+    )
+    
+    # 是否完工欄位
+    is_completed = forms.BooleanField(
+        label="是否已完工？",
+        widget=forms.CheckboxInput(
+            attrs={"class": "form-check-input"}
+        ),
+        required=False,
+        help_text="若此工單在此工序上已全部完成，請勾選",
+    )
+    
+    class Meta:
+        abstract = True
+    
+    def clean_start_time(self):
+        """驗證開始時間格式"""
+        start_time = self.cleaned_data.get('start_time')
+        if start_time:
+            # 驗證時間格式 (HH:MM)
+            import re
+            if not re.match(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$', start_time):
+                raise forms.ValidationError('開始時間格式不正確，請使用 24 小時制格式，例如：16:00')
+        return start_time
+    
+    def clean_end_time(self):
+        """驗證結束時間格式"""
+        end_time = self.cleaned_data.get('end_time')
+        if end_time:
+            # 驗證時間格式 (HH:MM)
+            import re
+            if not re.match(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$', end_time):
+                raise forms.ValidationError('結束時間格式不正確，請使用 24 小時制格式，例如：18:30')
+        return end_time
+    
+    def clean(self):
+        """整體驗證"""
+        cleaned_data = super().clean()
+        start_time = cleaned_data.get('start_time')
+        end_time = cleaned_data.get('end_time')
+        
+        if start_time and end_time:
+            # 驗證結束時間是否晚於開始時間
+            try:
+                start_dt = datetime.strptime(start_time, '%H:%M').time()
+                end_dt = datetime.strptime(end_time, '%H:%M').time()
+                if end_dt <= start_dt:
+                    raise forms.ValidationError('結束時間必須晚於開始時間')
+            except ValueError:
+                pass
+        
+        return cleaned_data
+
+
 # 工單管理表單，支援新增與編輯
 class WorkOrderForm(forms.ModelForm):
     # 公司代號欄位（手動輸入或下拉）
@@ -102,40 +317,57 @@ class WorkOrderForm(forms.ModelForm):
 # ==================== SMT 補登報工表單 ====================
 
 
-class SMTSupplementReportForm(forms.ModelForm):
+class SMTSupplementReportForm(ProductionReportBaseForm):
     """
-    SMT補登報工表單
-    用於創建和編輯SMT補登報工記錄
-    支援RD樣品補登報工模式
+    【規範】SMT補登報工表單
+    - 繼承共用表單，無額外欄位
+    - 工序和設備限制為SMT相關
     """
-
-    # 產品編號下拉選單（從工單自動帶出選項）
-    product_id = forms.ChoiceField(
-        choices=[],
-        label="產品編號",
-        widget=forms.Select(
-            attrs={
-                "class": "form-control",
-                "placeholder": "請選擇產品編號",
-            }
-        ),
-        required=False,
-        help_text="請選擇產品編號，或從工單自動帶出",
-    )
-
-    # 工單號碼欄位 - 改為下拉選單
-    workorder = forms.ChoiceField(
-        choices=[],
-        label="工單號碼",
-        widget=forms.Select(
-            attrs={
-                "class": "form-control",
-                "placeholder": "請選擇工單號碼，或透過產品編號自動帶出",
-            }
-        ),
-        required=False,
-        help_text="請選擇工單號碼，或透過產品編號自動帶出",
-    )
+    
+    class Meta:
+        model = SMTProductionReport
+        fields = [
+            "workorder",
+            "product_id", 
+            "process",
+            "equipment",
+            "work_date",
+            "start_time",
+            "end_time",
+            "work_quantity",
+            "defect_quantity",
+            "is_completed",
+            "remarks",
+            "abnormal_notes",
+        ]
+        labels = {
+            "workorder": "工單號碼",
+            "product_id": "產品編號",
+            "process": "工序",
+            "equipment": "設備",
+            "work_date": "報工日期",
+            "start_time": "開始時間",
+            "end_time": "結束時間",
+            "work_quantity": "工作數量",
+            "defect_quantity": "不良品數量",
+            "is_completed": "是否已完工",
+            "remarks": "備註",
+            "abnormal_notes": "異常記錄",
+        }
+        help_texts = {
+            "workorder": "請選擇工單號碼",
+            "product_id": "請輸入產品編號",
+            "process": "請輸入SMT相關工序",
+            "equipment": "請選擇SMT相關設備",
+            "work_date": "請選擇報工日期",
+            "start_time": "請輸入實際開始時間 (24小時制)，例如 16:00",
+            "end_time": "請輸入實際結束時間 (24小時制)，例如 18:30",
+            "work_quantity": "請輸入該時段內實際完成的合格產品數量",
+            "defect_quantity": "請輸入本次生產中產生的不良品數量，若無則留空或填寫0",
+            "is_completed": "若此工單在此工序上已全部完成，請勾選",
+            "remarks": "請輸入任何需要補充的資訊，如設備標記、操作說明等",
+            "abnormal_notes": "記錄生產過程中的異常情況，如設備故障、品質問題等",
+        }
 
     # 工單預設生產數量（唯讀）
     planned_quantity = forms.IntegerField(
@@ -540,18 +772,17 @@ class SMTSupplementReportForm(forms.ModelForm):
         return instance
 
     def get_product_choices(self):
-        """取得產品編號選項"""
-        from .models import WorkOrder
+        """取得產品編號選項（從派工單取得）"""
+        from .models import WorkOrderDispatch
         from django.db import models
 
-        # 從未完工的工單中取得所有產品編號（排除RD樣品相關的工單）
+        # 從派工單中取得所有產品編號
         products = (
-            WorkOrder.objects.exclude(product_code__isnull=True)
+            WorkOrderDispatch.objects.filter(
+                status__in=["dispatched", "in_production"]  # 只選擇已派工或生產中的派工單
+            )
+            .exclude(product_code__isnull=True)
             .exclude(product_code="")
-            .exclude(order_number__icontains="RD樣品")  # 排除RD樣品工單
-            .exclude(order_number__icontains="RD-樣品")  # 排除RD-樣品工單
-            .exclude(order_number__icontains="RD樣本")  # 排除RD樣本工單
-            .exclude(status="completed")  # 排除已完工的工單
             .values_list("product_code", flat=True)
             .distinct()
             .order_by("product_code")
@@ -566,15 +797,21 @@ class SMTSupplementReportForm(forms.ModelForm):
         return choices
 
     def get_workorder_queryset(self):
-        """取得工單查詢集"""
-        from .models import WorkOrder
+        """取得工單查詢集（從派工單取得）"""
+        from .models import WorkOrder, WorkOrderDispatch
 
-        # 補登報工只能選擇現存派工單上的工單（未完工的工單）
-        # 排除已完工的工單和RD樣品相關工單
+        # 從派工單中取得工單號碼列表
+        dispatch_queryset = WorkOrderDispatch.objects.filter(
+            status__in=["dispatched", "in_production"]  # 只選擇已派工或生產中的派工單
+        )
+        
+        # 取得派工單中的工單號碼列表
+        order_numbers = dispatch_queryset.values_list('order_number', flat=True)
+        
+        # 根據派工單的工單號碼查詢工單
         return (
-            WorkOrder.objects.exclude(
-                order_number__icontains="RD樣品"  # 排除RD樣品工單
-            )
+            WorkOrder.objects.filter(order_number__in=order_numbers)
+            .exclude(order_number__icontains="RD樣品")  # 排除RD樣品工單
             .exclude(order_number__icontains="RD-樣品")  # 排除RD-樣品工單
             .exclude(order_number__icontains="RD樣本")  # 排除RD樣本工單
             .exclude(status="completed")  # 排除已完工的工單
@@ -587,10 +824,15 @@ class SMTSupplementReportForm(forms.ModelForm):
         try:
             workorders = self.get_workorder_queryset()
             for workorder in workorders:
+                # 格式化公司代號，確保是兩位數格式（例如：2 -> 02）
+                formatted_company_code = workorder.company_code
+                if formatted_company_code and formatted_company_code.isdigit():
+                    formatted_company_code = formatted_company_code.zfill(2)
+                
                 choices.append(
                     (
                         workorder.id,
-                        f"{workorder.company_code} - {workorder.order_number}",
+                        f"{formatted_company_code} - {workorder.order_number}",
                     )
                 )
         except Exception as e:
@@ -752,50 +994,134 @@ class SMTSupplementBatchForm(forms.Form):
 # ==================== 作業員補登報工表單 ====================
 
 
-class OperatorSupplementReportForm(forms.ModelForm):
+class OperatorSupplementReportForm(ProductionReportBaseForm):
     """
-    作業員補登報工表單
-    用於創建和編輯作業員補登報工記錄
-    支援兩種報工模式：正式報工和作業員RD樣品補登報工
+    【規範】作業員補登報工表單
+    - 繼承共用表單，支援兩種報工模式：正式報工和作業員RD樣品補登報工
+    - 工序和設備排除SMT相關
     """
-
+    
     # 隱藏的報工類型欄位（固定為正式報工）
     report_type = forms.CharField(
         widget=forms.HiddenInput(),
         initial="normal",
         required=False,
     )
-
-    # 產品編號欄位（根據報工類型動態調整）
-    product_id = forms.ChoiceField(
-        choices=[],
-        label="產品編號",
-        widget=forms.Select(
-            attrs={
-                "class": "form-control",
-                "id": "product_id_input",
-                "placeholder": "請選擇或輸入產品編號",
-            }
-        ),
-        required=False,
-        initial="",
-        help_text="請選擇產品編號，選擇後會自動帶出相關工單（作業員RD樣品補登報工時可自由輸入產品編號）",
-    )
-
-    # 工單號碼欄位（根據報工類型動態調整）
-    workorder = forms.ModelChoiceField(
+    
+    # 作業員選擇
+    operator = forms.ModelChoiceField(
         queryset=None,
-        label="工單號碼",
+        label="作業員",
         widget=forms.Select(
             attrs={
                 "class": "form-control",
-                "id": "workorder_select",
-                "placeholder": "請選擇工單號碼，或透過產品編號自動帶出",
+                "id": "operator_select",
+                "placeholder": "請選擇進行補登報工的作業員",
+            }
+        ),
+        required=True,
+        help_text="請選擇進行補登報工的作業員",
+    )
+    
+    # 完工判斷方式
+    COMPLETION_METHOD_CHOICES = [
+        ("manual", "手動勾選"),
+        ("auto_quantity", "自動依數量判斷"),
+        ("auto_time", "自動依工時判斷"),
+        ("auto_operator", "作業員確認"),
+        ("auto_system", "系統自動判斷"),
+    ]
+
+    completion_method = forms.ChoiceField(
+        choices=COMPLETION_METHOD_CHOICES,
+        label="完工判斷方式",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "completion_method_select",
+                "placeholder": "請選擇完工判斷方式",
             }
         ),
         required=False,
-        help_text="請選擇工單號碼，或透過產品編號自動帶出（作業員RD樣品補登報工時固定為RD樣品）",
+        initial="manual",
+        help_text="請選擇完工判斷方式",
     )
+    
+    # 核准狀態
+    APPROVAL_STATUS_CHOICES = [
+        ("pending", "待核准"),
+        ("approved", "已核准"),
+        ("rejected", "已駁回"),
+    ]
+
+    approval_status = forms.ChoiceField(
+        choices=APPROVAL_STATUS_CHOICES,
+        label="核准狀態",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "approval_status_select",
+                "placeholder": "請選擇核准狀態",
+            }
+        ),
+        required=False,
+        initial="pending",
+        help_text="請選擇核准狀態",
+    )
+    
+    class Meta:
+        model = OperatorSupplementReport
+        fields = [
+            "operator",
+            "workorder",
+            "product_id",
+            "process", 
+            "equipment",
+            "work_date",
+            "start_time",
+            "end_time",
+            "work_quantity",
+            "defect_quantity",
+            "is_completed",
+            "completion_method",
+            "remarks",
+            "abnormal_notes",
+            "approval_status",
+        ]
+        labels = {
+            "operator": "作業員",
+            "workorder": "工單號碼",
+            "product_id": "產品編號",
+            "process": "工序",
+            "equipment": "設備",
+            "work_date": "報工日期",
+            "start_time": "開始時間",
+            "end_time": "結束時間",
+            "work_quantity": "工作數量",
+            "defect_quantity": "不良品數量",
+            "is_completed": "是否已完工",
+            "completion_method": "完工判斷方式",
+            "remarks": "備註",
+            "abnormal_notes": "異常記錄",
+            "approval_status": "核准狀態",
+        }
+        help_texts = {
+            "operator": "請選擇進行補登報工的作業員",
+            "workorder": "請選擇工單號碼，或透過產品編號自動帶出",
+            "product_id": "請輸入產品編號",
+            "process": "請選擇此次補登的工序（排除SMT相關工序）",
+            "equipment": "請選擇此次補登的設備（排除SMT相關設備）",
+            "work_date": "請選擇報工日期",
+            "start_time": "請輸入實際開始時間 (24小時制)，例如 16:00",
+            "end_time": "請輸入實際結束時間 (24小時制)，例如 18:30",
+            "work_quantity": "請輸入該時段內實際完成的合格產品數量",
+            "defect_quantity": "請輸入本次生產中產生的不良品數量，若無則留空或填寫0",
+            "is_completed": "若此工單在此工序上已全部完成，請勾選",
+            "completion_method": "請選擇完工判斷方式",
+            "remarks": "請輸入備註說明（可選）",
+            "abnormal_notes": "記錄生產過程中的異常情況，如設備故障、品質問題等",
+            "approval_status": "請選擇核准狀態",
+        }
 
     # 工單預設生產數量（唯讀）
     planned_quantity = forms.IntegerField(
@@ -1126,19 +1452,16 @@ class OperatorSupplementReportForm(forms.ModelForm):
         })
 
     def get_product_choices(self):
-        """取得產品編號選項列表"""
+        """取得產品編號選項列表（從派工單取得）"""
         choices = [("", "請選擇產品編號")]
         try:
-            from .models import WorkOrder
+            from .models import WorkOrderDispatch
             
-            # 從工單中取得所有產品編號（排除RD樣品工單）
+            # 從派工單中取得所有產品編號
             product_codes = (
-                WorkOrder.objects.exclude(
-                    order_number__icontains="RD樣品"
+                WorkOrderDispatch.objects.filter(
+                    status__in=["dispatched", "in_production"]  # 只選擇已派工或生產中的派工單
                 )
-                .exclude(order_number__icontains="RD-樣品")
-                .exclude(order_number__icontains="RD樣本")
-                .exclude(status="completed")
                 .values_list("product_code", flat=True)
                 .distinct()
                 .order_by("product_code")
@@ -1158,10 +1481,15 @@ class OperatorSupplementReportForm(forms.ModelForm):
         try:
             workorders = self.get_workorder_queryset()
             for workorder in workorders:
+                # 格式化公司代號，確保是兩位數格式（例如：2 -> 02）
+                formatted_company_code = workorder.company_code
+                if formatted_company_code and formatted_company_code.isdigit():
+                    formatted_company_code = formatted_company_code.zfill(2)
+                
                 choices.append(
                     (
                         workorder.id,
-                        f"{workorder.company_code} - {workorder.order_number}",
+                        f"{formatted_company_code} - {workorder.order_number}",
                     )
                 )
         except Exception as e:
@@ -1169,23 +1497,34 @@ class OperatorSupplementReportForm(forms.ModelForm):
         return choices
 
     def get_workorder_queryset(self, product_code=None):
-        """取得工單查詢集（比照SMT報工）"""
-        from .models import WorkOrder
+        """取得工單查詢集（從派工單取得）"""
+        from .models import WorkOrderDispatch
 
-        # 補登報工只能選擇現存派工單上的工單（未完工的工單）
-        # 排除已完工的工單和RD樣品相關工單
-        queryset = (
-            WorkOrder.objects.exclude(
-                order_number__icontains="RD樣品"  # 排除RD樣品工單
-            )
-            .exclude(order_number__icontains="RD-樣品")  # 排除RD-樣品工單
-            .exclude(order_number__icontains="RD樣本")  # 排除RD樣本工單
-            .exclude(status="completed")  # 排除已完工的工單
+        # 補登報工只能選擇現存派工單上的工單
+        # 從派工單中取得工單號碼，然後查詢對應的工單
+        dispatch_queryset = WorkOrderDispatch.objects.filter(
+            status__in=["dispatched", "in_production"]  # 只選擇已派工或生產中的派工單
         )
         
-        # 如果指定了產品編號，則過濾該產品編號的工單
+        # 如果指定了產品編號，則過濾該產品編號的派工單
         if product_code:
-            queryset = queryset.filter(product_code=product_code)
+            dispatch_queryset = dispatch_queryset.filter(product_code=product_code)
+        
+        # 取得派工單中的工單號碼列表
+        order_numbers = dispatch_queryset.values_list('order_number', flat=True)
+        
+        # 根據派工單的工單號碼查詢工單
+        queryset = WorkOrder.objects.filter(
+            order_number__in=order_numbers
+        ).exclude(
+            order_number__icontains="RD樣品"  # 排除RD樣品工單
+        ).exclude(
+            order_number__icontains="RD-樣品"  # 排除RD-樣品工單
+        ).exclude(
+            order_number__icontains="RD樣本"  # 排除RD樣本工單
+        ).exclude(
+            status="completed"  # 排除已完工的工單
+        )
             
         return queryset.order_by("-created_at")
 
@@ -2008,12 +2347,13 @@ class SupervisorProductionReportBatchForm(forms.Form):
         return cleaned_data
 
 
-class RDSampleSupplementReportForm(forms.ModelForm):
+class RDSampleSupplementReportForm(ProductionReportBaseForm):
     """
-    RD樣品補登報工表單
-    專門用於RD樣品的報工記錄，包含RD樣品特有的欄位
+    【規範】RD樣品補登報工表單
+    - 繼承共用表單，專門用於RD樣品的報工記錄
+    - 工序和設備排除SMT相關
     """
-
+    
     # 作業員選擇
     operator = forms.ModelChoiceField(
         queryset=None,
@@ -2028,36 +2368,100 @@ class RDSampleSupplementReportForm(forms.ModelForm):
         required=True,
         help_text="請選擇進行作業員RD樣品補登報工的作業員",
     )
-
-    # 工序選擇（排除SMT相關工序）
-    process = forms.ModelChoiceField(
-        queryset=None,
-        label="工序",
+    
+    # 完工判斷方式
+    completion_method = forms.ChoiceField(
+        choices=[
+            ("manual", "手動勾選"),
+            ("auto_quantity", "自動依數量判斷"),
+            ("auto_time", "自動依工時判斷"),
+            ("auto_operator", "作業員確認"),
+            ("auto_system", "系統自動判斷"),
+        ],
+        label="完工判斷方式",
         widget=forms.Select(
             attrs={
                 "class": "form-control",
-                "id": "process_select",
-                "placeholder": "請選擇此次RD樣品報工的工序（排除SMT相關工序）",
-            }
-        ),
-        required=True,
-        help_text="請選擇此次RD樣品報工的工序（排除SMT相關工序）",
-    )
-
-    # 設備選擇（排除SMT相關設備）
-    equipment = forms.ModelChoiceField(
-        queryset=None,
-        label="設備",
-        widget=forms.Select(
-            attrs={
-                "class": "form-control",
-                "id": "equipment_select",
-                "placeholder": "請選擇此次RD樣品報工的設備（排除SMT相關設備）",
+                "id": "completion_method_select",
             }
         ),
         required=False,
-        help_text="請選擇此次RD樣品報工的設備（排除SMT相關設備）",
+        initial="manual",
+        help_text="請選擇完工判斷方式",
     )
+    
+    # 核准狀態
+    approval_status = forms.ChoiceField(
+        choices=[
+            ("pending", "待核准"),
+            ("approved", "已核准"),
+            ("rejected", "已駁回"),
+        ],
+        label="審核狀態",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "approval_status_select",
+            }
+        ),
+        required=False,
+        initial="pending",
+        help_text="請選擇審核狀態",
+    )
+    
+    class Meta:
+        model = OperatorSupplementReport
+        fields = [
+            "operator",
+            "workorder",
+            "product_id",
+            "process",
+            "equipment",
+            "work_date",
+            "start_time",
+            "end_time",
+            "work_quantity",
+            "defect_quantity",
+            "is_completed",
+            "completion_method",
+            "remarks",
+            "abnormal_notes",
+            "approval_status",
+        ]
+        labels = {
+            "operator": "作業員",
+            "workorder": "工單號碼",
+            "product_id": "產品編號",
+            "process": "工序",
+            "equipment": "設備",
+            "work_date": "報工日期",
+            "start_time": "開始時間",
+            "end_time": "結束時間",
+            "work_quantity": "完成數量",
+            "defect_quantity": "不良品數量",
+            "is_completed": "是否已完工",
+            "completion_method": "完工判斷方式",
+            "remarks": "備註",
+            "abnormal_notes": "異常記錄",
+            "approval_status": "審核狀態",
+        }
+        help_texts = {
+            "operator": "請選擇進行作業員RD樣品補登報工的作業員",
+            "workorder": "請選擇工單號碼（RD樣品固定為RD樣品）",
+            "product_id": "請輸入RD樣品的產品編號",
+            "process": "請選擇此次RD樣品報工的工序（排除SMT相關工序）",
+            "equipment": "請選擇此次RD樣品報工的設備（排除SMT相關設備）",
+            "work_date": "請選擇實際RD樣品報工日期",
+            "start_time": "請輸入實際開始時間 (24小時制)，例如 16:00",
+            "end_time": "請輸入實際結束時間 (24小時制)，例如 18:30",
+            "work_quantity": "請輸入該時段內實際完成的樣品數量",
+            "defect_quantity": "請輸入本次製作中產生的不良品數量，若無則留空或填寫0",
+            "is_completed": "若此RD樣品製作已全部完成，請勾選",
+            "completion_method": "請選擇完工判斷方式",
+            "remarks": "請輸入備註說明（可選）",
+            "abnormal_notes": "記錄生產過程中的異常情況，如設備故障、品質問題等",
+            "approval_status": "請選擇審核狀態",
+        }
 
     # 時間資訊
     work_date = forms.DateField(

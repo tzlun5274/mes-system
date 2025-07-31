@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - MES系統{% endblock %}
+
+{% block extra_css %}
+<style>
+    .placeholder-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 60vh;
+        padding: 40px 20px;
+    }
+    
+    .placeholder-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        padding: 60px 40px;
+        text-align: center;
+        max-width: 500px;
+        width: 100%;
+    }
+    
+    .placeholder-icon {
+        font-size: 5rem;
+        color: #ddd;
+        margin-bottom: 30px;
+    }
+    
+    .placeholder-title {
+        font-size: 28px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        color: #333;
+    }
+    
+    .placeholder-message {
+        font-size: 16px;
+        color: #666;
+        line-height: 1.6;
+        margin-bottom: 30px;
+    }
+    
+    .placeholder-actions {
+        margin-top: 30px;
+    }
+    
+    .btn-back {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 6px;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s ease;
+        font-weight: 500;
+    }
+    
+    .btn-back:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        color: white;
+        text-decoration: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="placeholder-container">
+    <div class="placeholder-card">
+        <div class="placeholder-icon">
+            <i class="fas fa-tools"></i>
+        </div>
+        <div class="placeholder-title">{{ title }}</div>
+        <div class="placeholder-message">
+            {{ message }}
+        </div>
+        <div class="placeholder-actions">
+            <a href="{% url 'reporting:index' %}" class="btn-back">
+                <i class="fas fa-arrow-left me-2"></i>
+                返回報表管理
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 簡單的載入動畫
+    $('.placeholder-card').hide().fadeIn(800);
+});
+</script>
+{% endblock %} 
