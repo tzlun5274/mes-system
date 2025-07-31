@@ -20,9 +20,17 @@ class WorkOrderDispatch(models.Model):
         ("cancelled", "已取消"),
     ]
 
-    company_code = models.CharField(max_length=10, verbose_name="公司代號", null=True, blank=True)
-    order_number = models.CharField(max_length=50, verbose_name="工單號碼", unique=True)
-    product_code = models.CharField(max_length=100, verbose_name="產品編號")
+    # 關聯工單
+    work_order = models.ForeignKey(
+        'workorder.WorkOrder',
+        on_delete=models.CASCADE,
+        verbose_name="工單",
+        related_name="dispatches"
+    )
+    
+    # 派工相關資訊
+    operator = models.CharField(max_length=100, verbose_name="作業員", null=True, blank=True)
+    process = models.CharField(max_length=100, verbose_name="工序")
     planned_quantity = models.PositiveIntegerField(verbose_name="計劃數量")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending", verbose_name="派工狀態")
     
@@ -30,6 +38,9 @@ class WorkOrderDispatch(models.Model):
     dispatch_date = models.DateField(verbose_name="派工日期", null=True, blank=True)
     planned_start_date = models.DateField(verbose_name="計劃開始日期", null=True, blank=True)
     planned_end_date = models.DateField(verbose_name="計劃完成日期", null=True, blank=True)
+    
+    # 備註
+    notes = models.TextField(verbose_name="備註", blank=True)
     
     # 系統欄位
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
@@ -43,11 +54,7 @@ class WorkOrderDispatch(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        # 格式化公司代號，確保是兩位數格式（例如：2 -> 02）
-        formatted_company_code = self.company_code
-        if formatted_company_code and formatted_company_code.isdigit():
-            formatted_company_code = formatted_company_code.zfill(2)
-        return f"[{formatted_company_code}] 派工單 {self.order_number}"
+        return f"派工單 {self.work_order.order_number} - {self.process}"
 
 
 class WorkOrderDispatchProcess(models.Model):

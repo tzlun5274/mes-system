@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title|default:"派工單" }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workorder_dispatch/css/dispatch.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="bi bi-clipboard-plus"></i> {{ title|default:"派工單" }}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="dispatchForm">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.work_order.id_for_label }}" class="form-label">
+                                        <i class="bi bi-file-earmark-text"></i> 工單 <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.work_order }}
+                                    {% if form.work_order.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.work_order.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.operator.id_for_label }}" class="form-label">
+                                        <i class="bi bi-person"></i> 作業員
+                                    </label>
+                                    {{ form.operator }}
+                                    {% if form.operator.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.operator.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.process.id_for_label }}" class="form-label">
+                                        <i class="bi bi-gear"></i> 工序 <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.process }}
+                                    {% if form.process.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.process.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.planned_quantity.id_for_label }}" class="form-label">
+                                        <i class="bi bi-boxes"></i> 計劃數量 <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.planned_quantity }}
+                                    {% if form.planned_quantity.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.planned_quantity.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if form.status %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.status.id_for_label }}" class="form-label">
+                                        <i class="bi bi-flag"></i> 狀態
+                                    </label>
+                                    {{ form.status }}
+                                    {% if form.status.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.status.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                        <i class="bi bi-chat-text"></i> 備註
+                                    </label>
+                                    {{ form.notes }}
+                                    {% if form.notes.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.notes.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'workorder_dispatch:dispatch_list' %}" class="btn btn-secondary">
+                                        <i class="bi bi-arrow-left"></i> 返回列表
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-check-circle"></i> {{ submit_text|default:"儲存" }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'workorder_dispatch/js/dispatch.js' %}"></script>
+<script>
+$(document).ready(function() {
+    // 為表單欄位添加 Bootstrap 樣式
+    $('#dispatchForm select, #dispatchForm input, #dispatchForm textarea').addClass('form-control');
+    
+    // 工單選擇變更時自動載入相關資訊
+    $('#id_work_order').change(function() {
+        var workOrderId = $(this).val();
+        if (workOrderId) {
+            // 這裡可以添加 AJAX 請求來載入工單相關資訊
+            console.log('選擇的工單ID:', workOrderId);
+        }
+    });
+});
+</script>
+{% endblock %} 

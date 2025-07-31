@@ -126,39 +126,189 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 class CompanyOrderListView(LoginRequiredMixin, ListView):
     """
     公司製令單列表視圖
-    顯示從 ERP 同步的公司製令單
+    顯示從 ERP 同步的公司製令單，支援管理員設定功能
     """
     model = CompanyOrder
-    template_name = 'workorder/company_order_list.html'
-    context_object_name = 'company_orders'
+    template_name = 'workorder/dispatch/company_orders.html'
+    context_object_name = 'workorders'
     paginate_by = 20
     ordering = ['-sync_time']
 
     def get_queryset(self):
-        """取得查詢集，支援搜尋功能"""
+        """取得查詢集，支援搜尋和排序功能"""
         queryset = super().get_queryset()
-        search = self.request.GET.get('search', '')
-        company_code = self.request.GET.get('company_code', '')
+        search = self.request.GET.get('search', '').strip()
+        sort = self.request.GET.get('sort', '')
         
+        # 搜尋條件
         if search:
             queryset = queryset.filter(
+                Q(company_code__icontains=search) |
                 Q(mkordno__icontains=search) |
                 Q(product_id__icontains=search)
             )
         
-        if company_code:
-            queryset = queryset.filter(company_code=company_code)
+        # 排序條件
+        if sort == "est_stock_out_date_asc":
+            queryset = queryset.order_by("est_stock_out_date")
+        elif sort == "est_stock_out_date_desc":
+            queryset = queryset.order_by("-est_stock_out_date")
+        else:
+            queryset = queryset.order_by("-sync_time")
             
         return queryset
 
     def get_context_data(self, **kwargs):
-        """添加上下文資料"""
+        """添加上下文資料，包含統計數據和設定資訊"""
         context = super().get_context_data(**kwargs)
+        
+        # 取得所有公司配置
+        from erp_integration.models import CompanyConfig
+        context['companies'] = CompanyConfig.objects.all()
+        
         # 取得所有公司代號供篩選使用
         context['company_codes'] = CompanyOrder.objects.values_list(
             'company_code', flat=True
         ).distinct().order_by('company_code')
+        
+        # 計算統計數據
+        queryset = self.get_queryset()
+        context['total_orders'] = queryset.count()
+        context['converted_orders'] = queryset.filter(is_converted=True).count()
+        context['unconverted_orders'] = queryset.filter(is_converted=False).count()
+        
+        # 讀取系統設定
+        from workorder.workorder_erp.models import SystemConfig
+        
+        # 自動轉換工單間隔設定（預設 30 分鐘）
+        auto_convert_interval = 30
+        try:
+            config = SystemConfig.objects.get(key="auto_convert_interval")
+            auto_convert_interval = int(config.value)
+        except SystemConfig.DoesNotExist:
+            pass
+        context['auto_convert_interval'] = auto_convert_interval
+        
+        # 自動同步製令間隔（預設 30 分鐘）
+        auto_sync_companyorder_interval = 30
+        try:
+            config = SystemConfig.objects.get(key="auto_sync_companyorder_interval")
+            auto_sync_companyorder_interval = int(config.value)
+        except SystemConfig.DoesNotExist:
+            pass
+        context['auto_sync_companyorder_interval'] = auto_sync_companyorder_interval
+        
+        # 不分攤關鍵字設定（預設：只計算最後一天,不分攤,不分配）
+        no_distribute_keywords = "只計算最後一天,不分攤,不分配"
+        try:
+            config = SystemConfig.objects.get(key="no_distribute_keywords")
+            no_distribute_keywords = config.value
+        except SystemConfig.DoesNotExist:
+            pass
+        context['no_distribute_keywords'] = no_distribute_keywords
+        
+        # 轉換成字典格式，保持與原本模板的相容性
+        workorders_list = []
+        for order in self.get_queryset():
+            # 格式化公司代號，確保是兩位數格式（例如：2 -> 02）
+            formatted_company_code = order.company_code
+            if formatted_company_code and formatted_company_code.isdigit():
+                formatted_company_code = formatted_company_code.zfill(2)
+            
+            workorder_dict = {
+                "MKOrdNO": f"{formatted_company_code}_{order.mkordno}",
+                "ProductID": order.product_id,
+                "ProdtQty": order.prodt_qty,
+                "EstTakeMatDate": order.est_take_mat_date,
+                "EstStockOutDate": order.est_stock_out_date,
+                "is_converted": order.is_converted,
+                "conversion_status": "已轉換" if order.is_converted else "未轉換",
+            }
+            workorders_list.append(workorder_dict)
+        
+        context['workorders'] = workorders_list
+        
         return context
+
+    def post(self, request, *args, **kwargs):
+        """處理 POST 請求，用於管理員設定功能"""
+        if not (request.user.is_staff or request.user.is_superuser):
+            messages.error(request, "您沒有權限執行此操作")
+            return self.get(request, *args, **kwargs)
+        
+        from workorder.workorder_erp.models import SystemConfig
+        from django.core.management import call_command
+        import logging
+        
+        workorder_logger = logging.getLogger('workorder')
+        
+        if "no_distribute_keywords" in request.POST:
+            new_no_distribute_keywords = request.POST.get("no_distribute_keywords")
+            if new_no_distribute_keywords:
+                old_value = request.POST.get("current_no_distribute_keywords", "")
+                SystemConfig.objects.update_or_create(
+                    key="no_distribute_keywords",
+                    defaults={"value": new_no_distribute_keywords},
+                )
+                workorder_logger.info(
+                    f"管理員 {request.user} 變更不分攤關鍵字設定，原值：{old_value}，新值：{new_no_distribute_keywords}。IP: {request.META.get('REMOTE_ADDR')}"
+                )
+                messages.success(request, "不分攤關鍵字設定已更新！")
+        else:
+            # 自動轉換/同步間隔設定
+            new_convert_interval = request.POST.get("auto_convert_interval")
+            new_sync_interval = request.POST.get("auto_sync_companyorder_interval")
+            interval_changed = False
+            
+            if (
+                new_convert_interval
+                and new_convert_interval.isdigit()
+                and int(new_convert_interval) > 0
+            ):
+                old_value = request.POST.get("current_auto_convert_interval", "30")
+                SystemConfig.objects.update_or_create(
+                    key="auto_convert_interval",
+                    defaults={"value": new_convert_interval},
+                )
+                workorder_logger.info(
+                    f"管理員 {request.user} 變更自動轉換工單間隔，原值：{old_value} 分鐘，新值：{new_convert_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
+                )
+                interval_changed = True
+                
+            if (
+                new_sync_interval
+                and new_sync_interval.isdigit()
+                and int(new_sync_interval) > 0
+            ):
+                old_value = request.POST.get("current_auto_sync_companyorder_interval", "30")
+                SystemConfig.objects.update_or_create(
+                    key="auto_sync_companyorder_interval",
+                    defaults={"value": new_sync_interval},
+                )
+                workorder_logger.info(
+                    f"管理員 {request.user} 變更自動同步製令間隔，原值：{old_value} 分鐘，新值：{new_sync_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
+                )
+                interval_changed = True
+            
+            # 如果間隔設定有變更，重新設定定時任務
+            if interval_changed:
+                try:
+                    call_command("setup_workorder_tasks")
+                    workorder_logger.info(
+                        f"管理員 {request.user} 重新設定定時任務成功。IP: {request.META.get('REMOTE_ADDR')}"
+                    )
+                    messages.success(request, "間隔設定已更新，定時任務已重新設定！")
+                except Exception as e:
+                    workorder_logger.error(
+                        f"重新設定定時任務失敗：{str(e)}。IP: {request.META.get('REMOTE_ADDR')}"
+                    )
+                    messages.warning(request, f"間隔設定已更新，但重新設定定時任務失敗：{str(e)}")
+        
+        workorder_logger.info(
+            f"使用者 {request.user} 檢視公司製令單列表。IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        
+        return self.get(request, *args, **kwargs)
 
 
 @require_GET

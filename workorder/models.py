@@ -5,8 +5,8 @@ from equip.models import Equipment
 import logging
 from datetime import datetime
 
-# 導入派工單子模組的模型
-from .workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess
+# 導入派工單子模組的模型（使用字串引用避免循環依賴）
+# from .workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess
 
 # 導入公司製令單子模組的模型
 from .workorder_erp.models import PrdMKOrdMain, PrdMkOrdMats, CompanyOrder, SystemConfig
@@ -462,7 +462,7 @@ class WorkOrderProduction(models.Model):
 
     # 關聯派工單
     workorder_dispatch = models.OneToOneField(
-        WorkOrderDispatch,
+        'workorder_dispatch.WorkOrderDispatch',
         on_delete=models.CASCADE,
         verbose_name="派工單",
         related_name="production_record"

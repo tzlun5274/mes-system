@@ -439,176 +439,8 @@ def dispatch_list(request):
 
 
 # 公司製令單列表（依公司分群）
-def company_orders(request):
-    """
-    公司製令單列表：顯示所有公司 MES 資料庫的 ERP 製令單，工單號前加公司代號，不分公司顯示
-    只顯示未結案的製令單（BillStatus=1）
-    """
-    from erp_integration.models import CompanyConfig
-
-    companies = CompanyConfig.objects.all()
-    search = request.GET.get("search", "").strip()
-    sort = request.GET.get("sort", "")
-    status = request.GET.get("status", "")
-
-    # 讀取目前自動轉換工單間隔設定（預設 30 分鐘）
-    auto_convert_interval = 30
-    try:
-        config = SystemConfig.objects.get(key="auto_convert_interval")
-        auto_convert_interval = int(config.value)
-    except SystemConfig.DoesNotExist:
-        pass
-    # 讀取自動同步製令間隔（預設 30 分鐘）
-    auto_sync_companyorder_interval = 30
-    try:
-        config = SystemConfig.objects.get(key="auto_sync_companyorder_interval")
-        auto_sync_companyorder_interval = int(config.value)
-    except SystemConfig.DoesNotExist:
-        pass
-
-    # 讀取不分攤關鍵字設定（預設：只計算最後一天,不分攤,不分配）
-    no_distribute_keywords = "只計算最後一天,不分攤,不分配"
-    try:
-        config = SystemConfig.objects.get(key="no_distribute_keywords")
-        no_distribute_keywords = config.value
-    except SystemConfig.DoesNotExist:
-        pass
-
-    # 管理員可設定自動轉換工單間隔與自動同步製令間隔
-    if request.method == "POST" and (
-        request.user.is_staff or request.user.is_superuser
-    ):
-        if "no_distribute_keywords" in request.POST:
-            new_no_distribute_keywords = request.POST.get("no_distribute_keywords")
-            if new_no_distribute_keywords:
-                old_value = no_distribute_keywords
-                SystemConfig.objects.update_or_create(
-                    key="no_distribute_keywords",
-                    defaults={"value": new_no_distribute_keywords},
-                )
-                workorder_logger.info(
-                    f"管理員 {request.user} 變更不分攤關鍵字設定，原值：{old_value}，新值：{new_no_distribute_keywords}。IP: {request.META.get('REMOTE_ADDR')}"
-                )
-            return redirect(request.path)
-        else:
-            # 原本的自動轉換/同步間隔設定
-            new_convert_interval = request.POST.get("auto_convert_interval")
-            new_sync_interval = request.POST.get("auto_sync_companyorder_interval")
-            interval_changed = False
-            
-            if (
-                new_convert_interval
-                and new_convert_interval.isdigit()
-                and int(new_convert_interval) > 0
-            ):
-                old_value = auto_convert_interval
-                SystemConfig.objects.update_or_create(
-                    key="auto_convert_interval",
-                    defaults={"value": new_convert_interval},
-                )
-                workorder_logger.info(
-                    f"管理員 {request.user} 變更自動轉換工單間隔，原值：{old_value} 分鐘，新值：{new_convert_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
-                )
-                auto_convert_interval = int(new_convert_interval)
-                interval_changed = True
-                
-            if (
-                new_sync_interval
-                and new_sync_interval.isdigit()
-                and int(new_sync_interval) > 0
-            ):
-                old_value = auto_sync_companyorder_interval
-                SystemConfig.objects.update_or_create(
-                    key="auto_sync_companyorder_interval",
-                    defaults={"value": new_sync_interval},
-                )
-                workorder_logger.info(
-                    f"管理員 {request.user} 變更自動同步製令間隔，原值：{old_value} 分鐘，新值：{new_sync_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
-                )
-                auto_sync_companyorder_interval = int(new_sync_interval)
-                interval_changed = True
-            
-            # 如果間隔設定有變更，重新設定定時任務
-            if interval_changed:
-                try:
-                    from django.core.management import call_command
-                    call_command("setup_workorder_tasks")
-                    workorder_logger.info(
-                        f"管理員 {request.user} 重新設定定時任務成功。IP: {request.META.get('REMOTE_ADDR')}"
-                    )
-                    messages.success(request, "間隔設定已更新，定時任務已重新設定！")
-                except Exception as e:
-                    workorder_logger.error(
-                        f"重新設定定時任務失敗：{str(e)}。IP: {request.META.get('REMOTE_ADDR')}"
-                    )
-                    messages.warning(request, f"間隔設定已更新，但重新設定定時任務失敗：{str(e)}")
-    # POST 處理完後，重新查詢最新關鍵字設定
-    try:
-        config = SystemConfig.objects.get(key="no_distribute_keywords")
-        no_distribute_keywords = config.value
-    except SystemConfig.DoesNotExist:
-        no_distribute_keywords = "只計算最後一天,不分攤,不分配"
-
-    # 查詢本地 CompanyOrder 表
-    workorders = CompanyOrder.objects.all()
-
-    # 搜尋條件
-    if search:
-        workorders = workorders.filter(
-            models.Q(company_code__icontains=search)
-            | models.Q(mkordno__icontains=search)
-            | models.Q(product_id__icontains=search)
-        )
-
-    # 排序條件
-    if sort == "est_stock_out_date_asc":
-        workorders = workorders.order_by("est_stock_out_date")
-    elif sort == "est_stock_out_date_desc":
-        workorders = workorders.order_by("-est_stock_out_date")
-    else:
-        workorders = workorders.order_by("-sync_time")
-
-    # 計算統計數據
-    total_orders = workorders.count()
-    converted_orders = workorders.filter(is_converted=True).count()
-    unconverted_orders = workorders.filter(is_converted=False).count()
-
-    # 轉換成字典格式，保持與原本模板的相容性
-    workorders_list = []
-    for order in workorders:
-        # 格式化公司代號，確保是兩位數格式（例如：2 -> 02）
-        formatted_company_code = order.company_code
-        if formatted_company_code and formatted_company_code.isdigit():
-            formatted_company_code = formatted_company_code.zfill(2)
-        
-        workorder_dict = {
-            "MKOrdNO": f"{formatted_company_code}_{order.mkordno}",
-            "ProductID": order.product_id,
-            "ProdtQty": order.prodt_qty,
-            "EstTakeMatDate": order.est_take_mat_date,
-            "EstStockOutDate": order.est_stock_out_date,
-            "is_converted": order.is_converted,
-            "conversion_status": "已轉換" if order.is_converted else "未轉換",
-        }
-        workorders_list.append(workorder_dict)
-
-    workorder_logger.info(
-        f"使用者 {request.user} 檢視公司製令單列表。IP: {request.META.get('REMOTE_ADDR')}"
-    )
-    return render(
-        request,
-        "workorder/dispatch/company_orders.html",
-        {
-            "workorders": workorders_list,
-            "companies": companies,
-            "auto_convert_interval": auto_convert_interval,
-            "auto_sync_companyorder_interval": auto_sync_companyorder_interval,
-            "no_distribute_keywords": no_distribute_keywords,
-            "total_orders": total_orders,
-            "converted_orders": converted_orders,
-            "unconverted_orders": unconverted_orders,
-        },
-    )
+# 公司製令單管理功能已移至 CompanyOrderListView 類別視圖
+# 此函數已廢棄，保留註解以說明功能遷移
 
 
 # 手動同步製令單
@@ -6743,3 +6575,101 @@ def get_workorder_info(request):
             'status': 'error',
             'message': str(e)
         })
+
+# 派工單管理視圖函數
+@login_required
+def dispatch_dashboard(request):
+    """派工單儀表板"""
+    from .workorder_dispatch.models import WorkOrderDispatch
+    
+    # 統計資料
+    total_dispatches = WorkOrderDispatch.objects.count()
+    pending_dispatches = WorkOrderDispatch.objects.filter(status='pending').count()
+    in_progress_dispatches = WorkOrderDispatch.objects.filter(status='in_progress').count()
+    completed_dispatches = WorkOrderDispatch.objects.filter(status='completed').count()
+    
+    context = {
+        'total_dispatches': total_dispatches,
+        'pending_dispatches': pending_dispatches,
+        'in_progress_dispatches': in_progress_dispatches,
+        'completed_dispatches': completed_dispatches,
+    }
+    
+    return render(request, 'workorder_dispatch/dispatch_dashboard.html', context)
+
+@login_required
+def dispatch_add(request):
+    """新增派工單"""
+    from .workorder_dispatch.models import WorkOrderDispatch
+    from .workorder_dispatch.forms import WorkOrderDispatchForm
+    
+    if request.method == 'POST':
+        form = WorkOrderDispatchForm(request.POST)
+        if form.is_valid():
+            form.instance.created_by = request.user.username
+            form.save()
+            messages.success(request, '派工單建立成功！')
+            return redirect('workorder:dispatch_list')
+    else:
+        form = WorkOrderDispatchForm()
+    
+    context = {
+        'form': form,
+        'title': '新增派工單',
+        'submit_text': '建立派工單'
+    }
+    return render(request, 'workorder_dispatch/dispatch_form.html', context)
+
+@login_required
+def dispatch_edit(request, pk):
+    """編輯派工單"""
+    from .workorder_dispatch.models import WorkOrderDispatch
+    from .workorder_dispatch.forms import WorkOrderDispatchForm
+    
+    dispatch = get_object_or_404(WorkOrderDispatch, pk=pk)
+    
+    if request.method == 'POST':
+        form = WorkOrderDispatchForm(request.POST, instance=dispatch)
+        if form.is_valid():
+            form.save()
+            messages.success(request, '派工單更新成功！')
+            return redirect('workorder:dispatch_list')
+    else:
+        form = WorkOrderDispatchForm(instance=dispatch)
+    
+    context = {
+        'form': form,
+        'dispatch': dispatch,
+        'title': '編輯派工單',
+        'submit_text': '更新派工單'
+    }
+    return render(request, 'workorder_dispatch/dispatch_form.html', context)
+
+@login_required
+def dispatch_detail(request, pk):
+    """派工單詳情"""
+    from .workorder_dispatch.models import WorkOrderDispatch
+    
+    dispatch = get_object_or_404(WorkOrderDispatch, pk=pk)
+    
+    context = {
+        'dispatch': dispatch
+    }
+    return render(request, 'workorder_dispatch/dispatch_detail.html', context)
+
+@login_required
+def dispatch_delete(request, pk):
+    """刪除派工單"""
+    from .workorder_dispatch.models import WorkOrderDispatch
+    
+    dispatch = get_object_or_404(WorkOrderDispatch, pk=pk)
+    
+    if request.method == 'POST':
+        dispatch.delete()
+        messages.success(request, '派工單刪除成功！')
+        return redirect('workorder:dispatch_list')
+    
+    context = {
+        'dispatch': dispatch
+    }
+    return render(request, 'workorder_dispatch/dispatch_confirm_delete.html', context)

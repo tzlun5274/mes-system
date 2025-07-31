@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}刪除派工單{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workorder_dispatch/css/dispatch.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h3 class="card-title">
+                        <i class="bi bi-exclamation-triangle"></i> 確認刪除派工單
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5><i class="bi bi-exclamation-triangle"></i> 警告</h5>
+                        <p>您即將刪除以下派工單，此操作無法復原：</p>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="border-bottom pb-2 mb-3">派工單資訊</h5>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="40%">派工單號：</th>
+                                    <td><strong>{{ object.id }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>工單號：</th>
+                                    <td>{{ object.work_order.order_number }}</td>
+                                </tr>
+                                <tr>
+                                    <th>作業員：</th>
+                                    <td>{{ object.operator|default:"未指定" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>工序：</th>
+                                    <td>{{ object.process }}</td>
+                                </tr>
+                                <tr>
+                                    <th>計劃數量：</th>
+                                    <td>{{ object.planned_quantity }}</td>
+                                </tr>
+                                <tr>
+                                    <th>狀態：</th>
+                                    <td>
+                                        {% if object.status == 'pending' %}
+                                            <span class="badge bg-warning">待處理</span>
+                                        {% elif object.status == 'dispatched' %}
+                                            <span class="badge bg-info">已派工</span>
+                                        {% elif object.status == 'in_production' %}
+                                            <span class="badge bg-primary">生產中</span>
+                                        {% elif object.status == 'completed' %}
+                                            <span class="badge bg-success">已完成</span>
+                                        {% elif object.status == 'cancelled' %}
+                                            <span class="badge bg-danger">已取消</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5 class="border-bottom pb-2 mb-3">時間資訊</h5>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="40%">建立時間：</th>
+                                    <td>{{ object.created_at|date:"Y-m-d H:i:s" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>更新時間：</th>
+                                    <td>{{ object.updated_at|date:"Y-m-d H:i:s" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>建立人員：</th>
+                                    <td>{{ object.created_by }}</td>
+                                </tr>
+                                <tr>
+                                    <th>派工日期：</th>
+                                    <td>{{ object.dispatch_date|default:"未設定" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    {% if object.notes %}
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">備註</h5>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    {{ object.notes|linebreaks }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="alert alert-danger mt-4">
+                        <h6><i class="bi bi-info-circle"></i> 刪除後果</h6>
+                        <ul class="mb-0">
+                            <li>此派工單將被永久刪除</li>
+                            <li>相關的生產記錄可能會受到影響</li>
+                            <li>此操作無法復原</li>
+                        </ul>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'workorder_dispatch:dispatch_detail' object.id %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> 取消
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> 確認刪除
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'workorder_dispatch/js/dispatch.js' %}"></script>
+{% endblock %} 

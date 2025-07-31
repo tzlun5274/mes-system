@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views_main as workorder_views
 from .views.workorder_views import (
     WorkOrderListView, WorkOrderDetailView, WorkOrderCreateView, 
@@ -24,10 +24,8 @@ urlpatterns = [
     path("detail/<int:pk>/", WorkOrderDetailView.as_view(), name="detail"),
     path("list/", WorkOrderListView.as_view(), name="list"),
     
-    # 公司製令單管理 - 使用原本的函數式視圖（功能更完整）
-    path("company/", workorder_views.company_orders, name="company_orders"),
-    # 新的類別視圖版本（備用）
-    path("company/list/", CompanyOrderListView.as_view(), name="company_orders_list"),
+    # 公司製令單管理 - 使用類別視圖
+    path("company/", CompanyOrderListView.as_view(), name="company_orders"),
     
     # API 路由
     path("api/company_order_info/", get_company_order_info, name="get_company_order_info"),
@@ -54,7 +52,13 @@ urlpatterns = [
     path("report/reject/<int:report_id>/", reject_report, name="reject_report"),
     
     # 保留原有函數式視圖的路由（向後相容）
+    # 派工單管理 - 直接定義路由
     path("dispatch/", workorder_views.dispatch_list, name="dispatch_list"),
+    path("dispatch/dashboard/", workorder_views.dispatch_dashboard, name="dispatch_dashboard"),
+    path("dispatch/add/", workorder_views.dispatch_add, name="dispatch_add"),
+    path("dispatch/edit/<int:pk>/", workorder_views.dispatch_edit, name="dispatch_edit"),
+    path("dispatch/detail/<int:pk>/", workorder_views.dispatch_detail, name="dispatch_detail"),
+    path("dispatch/delete/<int:pk>/", workorder_views.dispatch_delete, name="dispatch_delete"),
     path("completed/", workorder_views.completed_workorders, name="completed_workorders"),
     path("clear/", workorder_views.clear_data, name="clear_data"),
     path("clear_reports/", workorder_views.clear_all_production_reports, name="clear_all_production_reports"),

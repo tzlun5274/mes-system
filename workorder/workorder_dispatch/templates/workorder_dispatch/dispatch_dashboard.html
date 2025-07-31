@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}派工單儀表板{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workorder_dispatch/css/dispatch.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="bi bi-graph-up"></i> 派工單儀表板</h2>
+                <div>
+                    <a href="{% url 'workorder_dispatch:dispatch_list' %}" class="btn btn-primary me-2">
+                        <i class="bi bi-list-ul"></i> 派工單列表
+                    </a>
+                    <a href="{% url 'workorder_dispatch:dispatch_add' %}" class="btn btn-success">
+                        <i class="bi bi-plus-circle"></i> 新增派工單
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">{{ total_dispatches }}</h4>
+                            <p class="card-text">總派工單</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-clipboard-data fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">{{ pending_dispatches }}</h4>
+                            <p class="card-text">待處理</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-clock fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">{{ in_progress_dispatches }}</h4>
+                            <p class="card-text">進行中</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-play-circle fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">{{ completed_dispatches }}</h4>
+                            <p class="card-text">已完成</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-check-circle fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 時間統計 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">{{ today_dispatches }}</h4>
+                            <p class="card-text">今日派工單</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-calendar-day fs-1 text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">{{ week_dispatches }}</h4>
+                            <p class="card-text">本週派工單</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-calendar-week fs-1 text-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近派工單 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history"></i> 最近派工單
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_dispatches %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>派工單號</th>
+                                        <th>工單號</th>
+                                        <th>作業員</th>
+                                        <th>工序</th>
+                                        <th>計劃數量</th>
+                                        <th>狀態</th>
+                                        <th>建立時間</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for dispatch in recent_dispatches %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ dispatch.id }}</strong>
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'workorder:detail' dispatch.work_order.id %}" 
+                                               class="text-decoration-none">
+                                                {{ dispatch.work_order.order_number }}
+                                            </a>
+                                        </td>
+                                        <td>{{ dispatch.operator|default:"-" }}</td>
+                                        <td>{{ dispatch.process }}</td>
+                                        <td>{{ dispatch.planned_quantity|default:"-" }}</td>
+                                        <td>
+                                            {% if dispatch.status == 'pending' %}
+                                                <span class="badge bg-warning">待處理</span>
+                                            {% elif dispatch.status == 'dispatched' %}
+                                                <span class="badge bg-info">已派工</span>
+                                            {% elif dispatch.status == 'in_production' %}
+                                                <span class="badge bg-primary">生產中</span>
+                                            {% elif dispatch.status == 'completed' %}
+                                                <span class="badge bg-success">已完成</span>
+                                            {% elif dispatch.status == 'cancelled' %}
+                                                <span class="badge bg-danger">已取消</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ dispatch.created_at|date:"Y-m-d H:i" }}</td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{% url 'workorder_dispatch:dispatch_detail' dispatch.id %}" 
+                                                   class="btn btn-sm btn-outline-info" title="查看詳情">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                <a href="{% url 'workorder_dispatch:dispatch_edit' dispatch.id %}" 
+                                                   class="btn btn-sm btn-outline-primary" title="編輯">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-inbox fs-1 text-muted"></i>
+                            <h4 class="text-muted mt-3">目前沒有派工單</h4>
+                            <p class="text-muted">點擊上方「新增派工單」按鈕來建立第一個派工單</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'workorder_dispatch/js/dispatch.js' %}"></script>
+<script>
+$(document).ready(function() {
+    // 這裡可以添加圖表相關的 JavaScript 代碼
+    console.log('派工單儀表板已載入');
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}派工單詳情{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'workorder_dispatch/css/dispatch.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h3 class="card-title">
+                            <i class="bi bi-clipboard-data"></i> 派工單詳情
+                        </h3>
+                        <div>
+                            <a href="{% url 'workorder_dispatch:dispatch_edit' dispatch.id %}" class="btn btn-primary me-2">
+                                <i class="bi bi-pencil"></i> 編輯
+                            </a>
+                            <a href="{% url 'workorder_dispatch:dispatch_list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> 返回列表
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-info-circle"></i> 基本資訊
+                            </h5>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="30%">派工單號：</th>
+                                    <td><strong>{{ dispatch.id }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>工單號：</th>
+                                    <td>
+                                        <a href="{% url 'workorder:detail' dispatch.work_order.id %}" 
+                                           class="text-decoration-none">
+                                            {{ dispatch.work_order.order_number }}
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>產品編號：</th>
+                                    <td>{{ dispatch.work_order.product_code }}</td>
+                                </tr>
+                                <tr>
+                                    <th>作業員：</th>
+                                    <td>{{ dispatch.operator|default:"未指定" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>工序：</th>
+                                    <td>{{ dispatch.process }}</td>
+                                </tr>
+                                <tr>
+                                    <th>計劃數量：</th>
+                                    <td>{{ dispatch.planned_quantity }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-calendar-event"></i> 時間資訊
+                            </h5>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="30%">狀態：</th>
+                                    <td>
+                                        {% if dispatch.status == 'pending' %}
+                                            <span class="badge bg-warning">待處理</span>
+                                        {% elif dispatch.status == 'dispatched' %}
+                                            <span class="badge bg-info">已派工</span>
+                                        {% elif dispatch.status == 'in_production' %}
+                                            <span class="badge bg-primary">生產中</span>
+                                        {% elif dispatch.status == 'completed' %}
+                                            <span class="badge bg-success">已完成</span>
+                                        {% elif dispatch.status == 'cancelled' %}
+                                            <span class="badge bg-danger">已取消</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>派工日期：</th>
+                                    <td>{{ dispatch.dispatch_date|default:"未設定" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>計劃開始日期：</th>
+                                    <td>{{ dispatch.planned_start_date|default:"未設定" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>計劃完成日期：</th>
+                                    <td>{{ dispatch.planned_end_date|default:"未設定" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>建立時間：</th>
+                                    <td>{{ dispatch.created_at|date:"Y-m-d H:i:s" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>更新時間：</th>
+                                    <td>{{ dispatch.updated_at|date:"Y-m-d H:i:s" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>建立人員：</th>
+                                    <td>{{ dispatch.created_by }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    {% if dispatch.notes %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-chat-text"></i> 備註
+                            </h5>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    {{ dispatch.notes|linebreaks }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-tools"></i> 操作
+                            </h5>
+                            <div class="btn-group" role="group">
+                                <a href="{% url 'workorder_dispatch:dispatch_edit' dispatch.id %}" 
+                                   class="btn btn-primary">
+                                    <i class="bi bi-pencil"></i> 編輯派工單
+                                </a>
+                                <a href="{% url 'workorder_dispatch:dispatch_delete' dispatch.id %}" 
+                                   class="btn btn-danger"
+                                   onclick="return confirm('確定要刪除這個派工單嗎？此操作無法復原。')">
+                                    <i class="bi bi-trash"></i> 刪除派工單
+                                </a>
+                                <a href="{% url 'workorder:detail' dispatch.work_order.id %}" 
+                                   class="btn btn-info">
+                                    <i class="bi bi-eye"></i> 查看工單詳情
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'workorder_dispatch/js/dispatch.js' %}"></script>
+{% endblock %} 
