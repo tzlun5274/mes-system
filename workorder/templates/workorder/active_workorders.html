@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}生產中工單詳情{% endblock %}
+
+{% block extra_head %}
+<style>
+    .workorder-card {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .workorder-card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    .workorder-header {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 8px 8px 0 0;
+    }
+    
+    .workorder-body {
+        padding: 20px;
+        background: white;
+    }
+    
+    .process-item {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 10px;
+        background: #f8f9fa;
+    }
+    
+    .process-item.completed {
+        background: #d4edda;
+        border-color: #c3e6cb;
+    }
+    
+    .process-item.in_progress {
+        background: #fff3cd;
+        border-color: #ffeaa7;
+    }
+    
+    .process-item.pending {
+        background: #f8f9fa;
+        border-color: #dee2e6;
+    }
+    
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: bold;
+    }
+    
+    .status-in_progress {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-completed {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-pending {
+        background-color: #e2e3e5;
+        color: #383d41;
+    }
+    
+    .stats-card {
+        text-align: center;
+        padding: 20px;
+        border-radius: 8px;
+        color: white;
+        margin-bottom: 20px;
+    }
+    
+    .stats-card.active {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    }
+    
+    .stats-card.pending {
+        background: linear-gradient(135deg, #ffc107 0%, #ff8f00 100%);
+    }
+    
+    .stats-card.completed {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    }
+    
+    .stats-number {
+        font-size: 2.5em;
+        font-weight: bold;
+    }
+    
+    /* 工單列表卡片樣式 */
+    .workorder-list-card {
+        transition: all 0.3s ease;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .workorder-list-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    .workorder-list-card .card-header {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .workorder-list-card .card-footer {
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    .workorder-list-card .btn-primary {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        border: none;
+        transition: all 0.3s ease;
+    }
+    
+    .workorder-list-card .btn-primary:hover {
+        background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+        transform: translateY(-1px);
+    }
+        margin-bottom: 5px;
+    }
+    
+    .stats-label {
+        font-size: 0.9em;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-clipboard-list text-primary"></i>
+            生產中工單詳情
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                <li class="breadcrumb-item active">生產中工單</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card active">
+                <div class="stats-number">{{ total_active }}</div>
+                <div class="stats-label">生產中工單</div>
+                <small>基於已核准報工</small>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card pending">
+                <div class="stats-number">{{ total_pending }}</div>
+                <div class="stats-label">待生產工單</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card completed">
+                <div class="stats-number">{{ total_completed }}</div>
+                <div class="stats-label">已完成工單</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
+                <div class="stats-number">{{ today_operator_count|add:today_smt_count }}</div>
+                <div class="stats-label">今日已核准報工</div>
+                <small>{{ today|date:"m/d" }}</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報工統計詳情 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-user-clock"></i> 今日作業員報工
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="text-primary">{{ today_operator_count }}</h3>
+                    <small class="text-muted">筆已核准記錄</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-cogs"></i> 今日SMT報工
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="text-success">{{ today_smt_count }}</h3>
+                    <small class="text-muted">筆已核准記錄</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工單列表 -->
+    {% if page_obj %}
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-clipboard-list"></i> 生產中工單列表
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>工單號碼</th>
+                                <th>公司名稱</th>
+                                <th>產品編號</th>
+                                <th>數量</th>
+                                <th>建立時間</th>
+                                <th>狀態</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for workorder in page_obj %}
+                            <tr>
+                                <td>
+                                    <strong>{{ workorder.order_number }}</strong>
+                                </td>
+                                <td>{{ workorder.company_name|default:"未知公司" }}</td>
+                                <td>{{ workorder.product_code|truncatechars:30 }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ workorder.quantity }}</span>
+                                </td>
+                                <td>{{ workorder.created_at|date:"m/d H:i" }}</td>
+                                <td>
+                                    <span class="badge bg-warning">生產中</span>
+                                    <small class="text-muted d-block">基於已核准報工</small>
+                                </td>
+                                <td>
+                                    <a href="{% url 'workorder:detail' workorder.id %}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-eye"></i> 查看詳情
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分頁 -->
+        {% if page_obj.has_other_pages %}
+        <nav aria-label="分頁導航" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一頁</a>
+                </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                </li>
+                {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">下一頁</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-clipboard-check fa-3x text-success mb-3"></i>
+            <h5>目前沒有生產中的工單</h5>
+            <p class="text-muted">所有工單都已完成或尚未開始生產</p>
+            <a href="{% url 'workorder:dispatch_list' %}" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> 返回派工單管理
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 

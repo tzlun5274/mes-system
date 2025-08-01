@@ -155,7 +155,7 @@ class SupervisorStatisticsService:
         data_stats = {
             'total_operator_reports': OperatorSupplementReport.objects.count(),
             'total_smt_reports': SMTProductionReport.objects.count(),
-            'total_supervisor_reports': SupervisorProductionReport.objects.count(),
+            'total_supervisor_reports': 0,  # 主管不應該有報工記錄
             'old_reports_30d': OperatorSupplementReport.objects.filter(work_date__lt=today - timedelta(days=30)).count(),
             'old_reports_90d': OperatorSupplementReport.objects.filter(work_date__lt=today - timedelta(days=90)).count(),
         }
@@ -256,26 +256,7 @@ class SupervisorApprovalService:
                 'remarks': report.remarks,
             })
         
-        # 主管待審核記錄
-        supervisor_pending = SupervisorProductionReport.objects.select_related(
-            'workorder', 'process'
-        ).filter(approval_status='pending').order_by('-work_date', '-start_time')
-        
-        for report in supervisor_pending:
-            pending_reports.append({
-                'report_id': report.id,
-                'report_type': '主管報工',
-                'work_date': report.work_date,
-                'operator_name': report.operator_name if report.operator_name else '-',
-                'workorder_number': report.workorder.order_number if report.workorder else '-',
-                'process_name': report.process_name if report.process_name else '-',
-                'work_quantity': report.work_quantity,
-                'defect_quantity': report.defect_quantity,
-                'start_time': report.start_time,
-                'end_time': report.end_time,
-                'abnormal_notes': report.abnormal_notes,
-                'remarks': report.remarks,
-            })
+        # 移除主管待審核記錄 - 主管不應該有報工記錄
         
         # 按時間排序
         pending_reports.sort(key=lambda x: (x['work_date'], x['start_time']), reverse=True)
@@ -329,23 +310,7 @@ class SupervisorAbnormalService:
                 'approval_status': report.approval_status,
             })
         
-        # 主管異常記錄
-        supervisor_abnormal_records = SupervisorProductionReport.objects.select_related(
-            'workorder'
-        ).filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
-        ).order_by('-work_date', '-start_time')[:limit//3]
-        
-        for report in supervisor_abnormal_records:
-            recent_abnormal_records.append({
-                'report_type': '主管報工',
-                'work_date': report.work_date,
-                'operator_name': report.operator_name if report.operator_name else '-',
-                'workorder_number': report.workorder.order_number if report.workorder else '-',
-                'process_name': report.process_name if report.process_name else '-',
-                'abnormal_notes': report.abnormal_notes,
-                'approval_status': report.approval_status,
-            })
+        # 移除主管異常記錄 - 主管不應該有報工記錄
         
         # 按時間排序
         recent_abnormal_records.sort(key=lambda x: x['work_date'], reverse=True)

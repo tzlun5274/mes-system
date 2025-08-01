@@ -275,34 +275,48 @@
         </div>
     </div>
 
+
+
     <!-- 異常處理統計 -->
     <div class="abnormal-section">
         <div class="section-title">
             <i class="fas fa-chart-pie mr-2"></i>異常處理統計
         </div>
         <div class="row">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="text-center">
                     <div class="h3 text-primary">{{ abnormal_stats.operator_abnormal }}</div>
                     <div class="text-muted">作業員異常</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="text-center">
                     <div class="h3 text-success">{{ abnormal_stats.smt_abnormal }}</div>
                     <div class="text-muted">SMT異常</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <div class="text-center">
+                    <div class="h3 text-info">{{ abnormal_stats.supplement_abnormal }}</div>
+                    <div class="text-muted">補登報工異常</div>
+                </div>
+            </div>
+            <div class="col-md-2">
                 <div class="text-center">
                     <div class="h3 text-warning">{{ abnormal_stats.pending }}</div>
                     <div class="text-muted">待處理</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="text-center">
-                    <div class="h3 text-info">{{ abnormal_stats.resolved }}</div>
+                    <div class="h3 text-success">{{ abnormal_stats.resolved }}</div>
                     <div class="text-muted">已解決</div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="text-center">
+                    <div class="h3 text-danger">{{ abnormal_stats.critical }}</div>
+                    <div class="text-muted">嚴重異常</div>
                 </div>
             </div>
         </div>
@@ -322,7 +336,9 @@ function viewDetail(type, id) {
 function resolveAbnormal(type, id) {
     if (confirm('確定要標記此異常為已解決嗎？')) {
         // 這裡可以實作標記解決的功能
-        alert(`標記${type === 'operator' ? '作業員' : 'SMT'}異常為已解決，ID: ${id}`);
+        let typeName = '作業員';
+        if (type === 'smt') typeName = 'SMT';
+        alert(`標記${typeName}異常為已解決，ID: ${id}`);
         location.reload();
     }
 }
@@ -332,7 +348,9 @@ function addNote(type, id) {
     const note = prompt('請輸入備註：');
     if (note) {
         // 這裡可以實作新增備註的功能
-        alert(`為${type === 'operator' ? '作業員' : 'SMT'}異常新增備註，ID: ${id}，備註: ${note}`);
+        let typeName = '作業員';
+        if (type === 'smt') typeName = 'SMT';
+        alert(`為${typeName}異常新增備註，ID: ${id}，備註: ${note}`);
     }
 }
 
@@ -366,7 +384,7 @@ function batchResolveAbnormal() {
         document.getElementById('batch-loading').remove();
         
         if (data.success) {
-            alert(`批次解決完成！\n已解決 ${data.resolved_count} 個異常\n作業員異常: ${data.operator_resolved} 個\nSMT異常: ${data.smt_resolved} 個`);
+            alert(`批次解決完成！\n已解決 ${data.resolved_count} 個異常\n作業員異常: ${data.operator_resolved} 個\nSMT異常: ${data.smt_resolved} 個\n補登報工異常: ${data.supplement_resolved} 個`);
             location.reload();
         } else {
             alert('批次解決失敗：' + data.error);

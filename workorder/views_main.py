@@ -81,9 +81,51 @@ workorder_logger.setLevel(logging.INFO)
 def index(request):
     deprecated_warning('index')
     workorders = WorkOrder.objects.all().order_by("-created_at")
+    
+    # 基於報工記錄計算生產中工單數量
+    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+    from datetime import date, timedelta
+    from django.db.models import Q
+    
+    today = date.today()
+    
+    # 今日有已核准報工的工單
+    today_operator_reports = OperatorSupplementReport.objects.filter(
+        work_date=today,
+        approval_status='approved'
+    ).values_list('workorder_id', flat=True).distinct()
+    
+    today_smt_reports = SMTProductionReport.objects.filter(
+        work_date=today,
+        approval_status='approved'
+    ).values_list('workorder_id', flat=True).distinct()
+    
+    today_active_workorder_ids = list(today_operator_reports) + list(today_smt_reports)
+    
+    # 最近3天有已核准報工的工單
+    recent_date = today - timedelta(days=3)
+    recent_operator_reports = OperatorSupplementReport.objects.filter(
+        work_date__gte=recent_date,
+        approval_status='approved'
+    ).values_list('workorder_id', flat=True).distinct()
+    
+    recent_smt_reports = SMTProductionReport.objects.filter(
+        work_date__gte=recent_date,
+        approval_status='approved'
+    ).values_list('workorder_id', flat=True).distinct()
+    
+    recent_active_workorder_ids = list(recent_operator_reports) + list(recent_smt_reports)
+    
+    # 計算生產中工單數量（基於報工記錄）
+    active_workorders_count = WorkOrder.objects.filter(
+        Q(id__in=today_active_workorder_ids) | 
+        Q(id__in=recent_active_workorder_ids)
+    ).distinct().count()
+    
     context = {
         "workorders": workorders,
         "is_debug": settings.DEBUG,  # 傳遞是否為測試環境
+        "active_workorders_count": active_workorders_count,
     }
     return render(request, "workorder/workorder/workorder_list.html", context)
 
@@ -1143,514 +1185,12 @@ def get_processes_only(request):
     return JsonResponse({"success": True, "processes": process_list})
 
 
-def completed_workorders(request):
-    """
-    完工工單列表頁面：顯示所有狀態為 completed 的工單
-    支援查詢、檢視、匯出功能，並支援排序功能
-    """
-    # 取得所有完工工單
-    completed_workorders = WorkOrder.objects.filter(status="completed")
-    
-    # 支援搜尋功能
-    search_query = request.GET.get("search", "")
-    if search_query:
-        completed_workorders = completed_workorders.filter(
-            Q(order_number__icontains=search_query)
-            | Q(product_code__icontains=search_query)
-            | Q(company_code__icontains=search_query)
-        )
-
-    # 支援排序功能
-    sort_by = request.GET.get("sort", "-updated_at")  # 預設按更新時間倒序
-    sort_direction = request.GET.get("direction", "desc")  # 預設倒序
-    
-    # 驗證排序欄位，防止 SQL 注入
-    allowed_sort_fields = {
-        'order_number': 'order_number',
-        'product_code': 'product_code', 
-        'quantity': 'quantity',
-        'created_at': 'created_at',
-        'updated_at': 'updated_at'
-    }
-    
-    if sort_by in allowed_sort_fields:
-        field = allowed_sort_fields[sort_by]
-        if sort_direction == "asc":
-            completed_workorders = completed_workorders.order_by(field)
-        else:
-            completed_workorders = completed_workorders.order_by(f"-{field}")
-    else:
-        # 如果排序欄位無效，使用預設排序
-        completed_workorders = completed_workorders.order_by("-updated_at")
-
-    # 分頁功能
-    from django.core.paginator import Paginator
-
-    paginator = Paginator(completed_workorders, 20)  # 每頁顯示20筆
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-
-    context = {
-        "completed_orders": page_obj,
-        "search_query": search_query,
-        "total_count": completed_workorders.count(),
-        "current_sort": sort_by,
-        "current_direction": sort_direction,
-    }
-
-    return render(request, "workorder/dispatch/completed_workorders.html", context)
-
-
-def completed_workorders_process_stats(request):
-    """
-    完工工單工序統計頁面：顯示所有完工工單的工序統計資訊
-    支援按工序、時間範圍等條件篩選
-    """
-    from django.db.models import Count, Sum, Avg, Q
-    from datetime import datetime, timedelta
-
-    # 取得所有完工工單的工序統計
-    process_stats = WorkOrderProcess.objects.filter(
-        workorder__status="completed"
-    ).values(
-        'process_name'
-    ).annotate(
-        total_workorders=Count('workorder', distinct=True),
-        total_planned_quantity=Sum('planned_quantity'),
-        total_completed_quantity=Sum('completed_quantity'),
-        avg_planned_quantity=Avg('planned_quantity'),
-        avg_completed_quantity=Avg('completed_quantity'),
-    ).order_by('-total_workorders')
-    
-    # 手動計算完成率，避免除零錯誤
-    for stat in process_stats:
-        if stat['avg_planned_quantity'] and stat['avg_planned_quantity'] > 0:
-            stat['avg_completion_rate'] = (stat['avg_completed_quantity'] / stat['avg_planned_quantity']) * 100
-        else:
-            stat['avg_completion_rate'] = 0
-        
-        # 添加作業員和設備資訊（暫時設為空列表）
-        stat['operators'] = []
-        stat['equipments'] = []
-    
-    # 支援搜尋功能
-    search_query = request.GET.get("search", "")
-    if search_query:
-        process_stats = process_stats.filter(
-            Q(process_name__icontains=search_query)
-        )
-    
-    # 支援時間範圍篩選
-    date_from = request.GET.get("date_from", "")
-    date_to = request.GET.get("date_to", "")
-    
-    if date_from or date_to:
-        date_filter = Q()
-        if date_from:
-            date_filter &= Q(workorder__updated_at__date__gte=date_from)
-        if date_to:
-            date_filter &= Q(workorder__updated_at__date__lte=date_to)
-        process_stats = process_stats.filter(date_filter)
-    
-    # 支援排序功能
-    sort_by = request.GET.get("sort", "-total_workorders")  # 預設按工單數量倒序
-    sort_direction = request.GET.get("direction", "desc")  # 預設倒序
-    
-    # 驗證排序欄位
-    allowed_sort_fields = {
-        'process_name': 'process_name',
-        'total_workorders': 'total_workorders',
-        'total_planned_quantity': 'total_planned_quantity',
-        'total_completed_quantity': 'total_completed_quantity',
-        'avg_completion_rate': 'avg_completion_rate',
-        'avg_planned_quantity': 'avg_planned_quantity',
-        'avg_completed_quantity': 'avg_completed_quantity',
-    }
-    
-    if sort_by in allowed_sort_fields:
-        field = allowed_sort_fields[sort_by]
-        if sort_direction == "asc":
-            process_stats = process_stats.order_by(field)
-        else:
-            process_stats = process_stats.order_by(f"-{field}")
-    else:
-        # 如果排序欄位無效，使用預設排序
-        process_stats = process_stats.order_by("-total_workorders")
-    
-    # 分頁功能
-    from django.core.paginator import Paginator
-    
-    paginator = Paginator(process_stats, 20)  # 每頁顯示20筆
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-    
-    # 計算總統計
-    total_processes = process_stats.count()
-    total_workorders = sum(item['total_workorders'] for item in process_stats)
-    total_quantity = sum(item['total_completed_quantity'] or 0 for item in process_stats)
-    
-    # 計算平均效率
-    if total_processes > 0:
-        completion_rates = []
-        for item in process_stats:
-            if item['avg_planned_quantity'] and item['avg_planned_quantity'] > 0:
-                rate = (item['avg_completed_quantity'] / item['avg_planned_quantity']) * 100
-            else:
-                rate = 0
-            completion_rates.append(rate)
-        avg_efficiency = sum(completion_rates) / len(completion_rates)
-    else:
-        avg_efficiency = 0
-    
-    context = {
-        "process_stats": page_obj,
-        "total_processes": total_processes,
-        "total_workorders": total_workorders,
-        "total_quantity": total_quantity,
-        "avg_efficiency": round(avg_efficiency, 1),
-        "search_query": search_query,
-        "date_from": date_from,
-        "date_to": date_to,
-        "current_sort": sort_by,
-        "current_direction": sort_direction,
-    }
-    
-    return render(request, "workorder/dispatch/completed_workorders_process_stats.html", context)
-
-
-def import_historical_workorders(request):
-    """
-    匯入歷史派工單頁面：允許用戶匯入歷史的派工單資料
-    支援 Excel 和 CSV 格式，以公司代號和工單號碼作為唯一性檢查
-    """
-    if not (request.user.is_staff or request.user.is_superuser):
-        messages.error(request, "只有管理員可以執行此操作")
-        return redirect("workorder:completed_workorders")
-
-    if request.method == "POST":
-        try:
-            # 檢查是否有上傳檔案
-            if "file" not in request.FILES:
-                messages.error(request, "請選擇要匯入的檔案")
-                return redirect("workorder:import_historical_workorders")
-
-            uploaded_file = request.FILES["file"]
-            
-            # 檢查檔案格式
-            file_name = uploaded_file.name.lower()
-            if not (file_name.endswith('.xlsx') or file_name.endswith('.csv')):
-                messages.error(request, "只支援 Excel (.xlsx) 和 CSV 格式的檔案")
-                return redirect("workorder:import_historical_workorders")
-
-            # 讀取檔案內容
-            import pandas as pd
-            import io
-            
-            if file_name.endswith('.xlsx'):
-                df = pd.read_excel(uploaded_file)
-            else:
-                df = pd.read_csv(uploaded_file, parse_dates=False)
-
-            # 檢查必要欄位
-            required_columns = ['公司代號', '工單號碼', '產品編號', '數量']
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            
-            if missing_columns:
-                messages.error(request, f"檔案缺少必要欄位：{', '.join(missing_columns)}")
-                return redirect("workorder:import_historical_workorders")
-
-            # 開始匯入處理
-            success_count = 0
-            skip_count = 0
-            error_count = 0
-            error_messages = []
-            skip_details = []  # 記錄跳過的詳細資訊
-
-            for index, row in df.iterrows():
-                try:
-                    company_code = str(row['公司代號']).strip()
-                    order_number = str(row['工單號碼']).strip()
-                    product_code = str(row['產品編號']).strip()
-                    quantity = int(row['數量'])
-
-                    # 檢查公司代號和工單號碼的唯一性（包括所有狀態的工單）
-                    existing_workorder = WorkOrder.objects.filter(
-                        company_code=company_code,
-                        order_number=order_number
-                    ).first()
-
-                    if existing_workorder:
-                        skip_count += 1
-                        skip_detail = f"公司代號 {company_code}，工單號碼 {order_number}，現有狀態：{existing_workorder.status}"
-                        skip_details.append(skip_detail)
-                        workorder_logger.warning(f"跳過重複工單：{skip_detail}")
-                        continue
-
-                    # 建立新的完工工單
-                    workorder = WorkOrder.objects.create(
-                        company_code=company_code,
-                        order_number=order_number,
-                        product_code=product_code,
-                        quantity=quantity,
-                        status="completed",  # 直接設為完工狀態
-                        created_at=timezone.now(),
-                        updated_at=timezone.now(),
-                    )
-
-                    success_count += 1
-
-                except Exception as e:
-                    error_count += 1
-                    error_messages.append(f"第 {index + 1} 行：{str(e)}")
-
-            # 顯示匯入結果
-            if success_count > 0:
-                messages.success(
-                    request, 
-                    f"匯入完成！成功匯入 {success_count} 筆歷史派工單"
-                )
-            
-            if skip_count > 0:
-                messages.warning(
-                    request, 
-                    f"跳過 {skip_count} 筆重複資料（公司代號和工單號碼已存在於任何狀態的工單中）"
-                )
-            
-            if error_count > 0:
-                messages.error(
-                    request, 
-                    f"匯入失敗 {error_count} 筆資料，請檢查檔案格式"
-                )
-                # 記錄詳細錯誤訊息
-                workorder_logger.error(f"匯入歷史派工單錯誤：{error_messages}")
-            
-            # 記錄跳過的詳細資訊
-            if skip_details:
-                workorder_logger.info(f"匯入歷史派工單跳過詳情：{skip_details}")
-
-            return redirect("workorder:completed_workorders")
-
-        except Exception as e:
-            messages.error(request, f"匯入失敗：{str(e)}")
-            workorder_logger.error(f"匯入歷史派工單失敗：{str(e)}")
-            return redirect("workorder:import_historical_workorders")
-
-    # GET 請求顯示匯入頁面
-    return render(request, "workorder/dispatch/import_historical_workorders.html")
-
-
-def download_historical_workorder_template(request):
-    """
-    下載歷史派工單匯入範本
-    """
-    if not (request.user.is_staff or request.user.is_superuser):
-        messages.error(request, "只有管理員可以執行此操作")
-        return redirect("workorder:completed_workorders")
-
-    try:
-        import pandas as pd
-        import io
-        from django.http import HttpResponse
-        
-        # 建立範本資料
-        template_data = {
-            '公司代號': ['10', '20', '30'],
-            '工單號碼': ['WO-2024-001', 'WO-2024-002', 'WO-2024-003'],
-            '產品編號': ['PFP-001', 'PFP-002', 'PFP-003'],
-            '數量': [100, 200, 300],
-        }
-        
-        df = pd.DataFrame(template_data)
-        
-        # 建立 Excel 檔案
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='歷史派工單範本', index=False)
-        
-        output.seek(0)
-        
-        # 回傳檔案
-        response = HttpResponse(
-            output.read(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = 'attachment; filename="歷史派工單匯入範本.xlsx"'
-        
-        return response
-
-    except Exception as e:
-        messages.error(request, f"下載範本失敗：{str(e)}")
-        return redirect("workorder:import_historical_workorders")
-
-
-def export_completed_workorders(request):
-    """
-    匯出完工工單資料
-    支援 Excel 和 CSV 格式，可根據搜尋條件和日期範圍篩選
-    """
-    if not (request.user.is_staff or request.user.is_superuser):
-        messages.error(request, "只有管理員可以執行此操作")
-        return redirect("workorder:completed_workorders")
-
-    try:
-        # 取得匯出格式
-        export_format = request.GET.get('format', 'excel').lower()
-        if export_format not in ['excel', 'csv']:
-            export_format = 'excel'
-
-        # 取得篩選條件
-        search_query = request.GET.get('search', '')
-        date_from = request.GET.get('date_from', '')
-        date_to = request.GET.get('date_to', '')
-
-        # 查詢完工工單
-        queryset = WorkOrder.objects.filter(status="completed")
-
-        # 應用搜尋篩選
-        if search_query:
-            queryset = queryset.filter(
-                Q(order_number__icontains=search_query) |
-                Q(company_code__icontains=search_query) |
-                Q(product_code__icontains=search_query)
-            )
-
-        # 應用日期篩選
-        if date_from:
-            queryset = queryset.filter(created_at__date__gte=date_from)
-        if date_to:
-            queryset = queryset.filter(created_at__date__lte=date_to)
-
-        # 排序
-        queryset = queryset.order_by('-created_at')
-
-        # 準備匯出資料
-        data = []
-        for workorder in queryset:
-            data.append({
-                '工單編號': workorder.order_number,
-                '公司代號': workorder.company_code,
-                '產品編號': workorder.product_code,
-                '數量': workorder.quantity,
-                '狀態': workorder.get_status_display(),
-                '建立時間': workorder.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                '更新時間': workorder.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
-            })
-
-        if export_format == 'excel':
-            # 匯出 Excel
-            import pandas as pd
-            from io import BytesIO
-            from django.http import HttpResponse
-
-            df = pd.DataFrame(data)
-            output = BytesIO()
-            
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, sheet_name='完工工單', index=False)
-            
-            output.seek(0)
-            
-            response = HttpResponse(
-                output.read(),
-                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            )
-            response['Content-Disposition'] = f'attachment; filename="完工工單_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
-            
-        else:
-            # 匯出 CSV
-            import csv
-            from django.http import HttpResponse
-
-            response = HttpResponse(content_type='text/csv; charset=utf-8')
-            response['Content-Disposition'] = f'attachment; filename="完工工單_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv"'
-            
-            # 寫入 BOM 以支援中文
-            response.write('\ufeff')
-            
-            writer = csv.DictWriter(response, fieldnames=data[0].keys() if data else [])
-            writer.writeheader()
-            writer.writerows(data)
-
-        return response
-
-    except Exception as e:
-        messages.error(request, f"匯出失敗：{str(e)}")
-        return redirect("workorder:completed_workorders")
-
-
-def batch_delete_completed_workorders(request):
-    """
-    批量刪除完工工單
-    只有管理員可以執行此操作
-    """
-    if not (request.user.is_staff or request.user.is_superuser):
-        messages.error(request, "只有管理員可以執行此操作")
-        return redirect("workorder:completed_workorders")
-
-    if request.method == "POST":
-        try:
-            # 取得要刪除的工單 ID 列表
-            workorder_ids = request.POST.getlist('workorder_ids')
-            
-            if not workorder_ids:
-                messages.warning(request, "請選擇要刪除的工單")
-                return redirect("workorder:completed_workorders")
-
-            # 刪除選中的完工工單
-            deleted_count = WorkOrder.objects.filter(
-                id__in=workorder_ids,
-                status="completed"
-            ).delete()[0]
-
-            messages.success(request, f"成功刪除 {deleted_count} 個完工工單")
-            return redirect("workorder:completed_workorders")
-
-        except Exception as e:
-            messages.error(request, f"批量刪除失敗：{str(e)}")
-            return redirect("workorder:completed_workorders")
-
-    # GET 請求重定向到完工工單列表
-    return redirect("workorder:completed_workorders")
-
-
-def clear_completed_workorders(request):
-    """
-    清除完工工單確認頁面：確認是否要刪除所有完工工單
-    只有管理員可以執行此操作
-    """
-    if not (request.user.is_staff or request.user.is_superuser):
-        messages.error(request, "只有管理員可以執行此操作")
-        return redirect("workorder:completed_workorders")
-
-    if request.method == "POST":
-        try:
-            # 取得要刪除的完工工單數量
-            completed_count = WorkOrder.objects.filter(status="completed").count()
-
-            # 刪除所有完工工單
-            WorkOrder.objects.filter(status="completed").delete()
-
-            messages.success(
-                request, f"成功清除所有完工工單！共刪除 {completed_count} 個工單"
-            )
-            return redirect("workorder:index")
-
-        except Exception as e:
-            messages.error(request, f"清除完工工單失敗：{str(e)}")
-            return redirect("workorder:completed_workorders")
-
-    # GET 請求顯示確認頁面
-    completed_count = WorkOrder.objects.filter(status="completed").count()
-    context = {
-        "completed_count": completed_count,
-    }
-
-    return render(request, "workorder/clear_completed_confirm.html", context)
+# 完工工單相關函數已移除
 
 
 def clear_data(request):
     """
-    清除數據頁面：清除派工單、完工工單、公司製令單等數據
+    清除數據頁面：清除派工單、公司製令單等數據
     只有管理員可以執行此操作，需要確認頁面
     """
     if not (request.user.is_staff or request.user.is_superuser):
@@ -1693,268 +1233,6 @@ def clear_data(request):
     }
 
     return render(request, "workorder/clear_data_confirm.html", context)
-
-
-def check_workorder_completion(workorder):
-    """
-    檢查工單是否真正完工
-    簡化邏輯：出貨包裝報工數量 ≥ 工單生產數量 = 完工
-    """
-    from workorder.models import WorkOrderProcess
-    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
-    
-    # 取得該工單的所有工序
-    processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by('step_order')
-    
-    if not processes.exists():
-        # 如果沒有工序，檢查是否有其他完工依據
-        # 例如：手動標記完工、歷史匯入等
-        return True, "工單無工序設定，但已手動標記完工"
-    
-    # 檢查是否有出貨包裝工序
-    packaging_processes = processes.filter(process_name__icontains='出貨包裝').order_by('step_order')
-    has_packaging = packaging_processes.exists()
-    
-    # 取得所有出貨包裝的實際報工記錄（只計算 work_quantity，不考慮 defect_quantity）
-    packaging_reports = []
-    
-    # 從作業員補登報工記錄中查找出貨包裝
-    operator_packaging = OperatorSupplementReport.objects.filter(
-        workorder=workorder,
-        process__name__icontains='出貨包裝'
-    )
-    for report in operator_packaging:
-        packaging_reports.append({
-            'source': '作業員補登',
-            'process': report.process.name,
-            'quantity': report.work_quantity,  # 只計算合格品數量
-            'defect_quantity': report.defect_quantity,  # 不良品數量（僅供顯示）
-            'date': report.work_date,
-            'operator': report.operator.name if report.operator else '未知'
-        })
-    
-    # 主管不報工，移除主管報工相關邏輯
-    
-    # 從SMT生產報工記錄中查找出貨包裝（如果有）
-    smt_packaging = SMTProductionReport.objects.filter(
-        workorder=workorder,
-        process__name__icontains='出貨包裝'
-    )
-    for report in smt_packaging:
-        packaging_reports.append({
-            'source': 'SMT報工',
-            'process': report.process.name,
-            'quantity': report.work_quantity,  # 只計算合格品數量
-            'defect_quantity': report.defect_quantity,  # 不良品數量（僅供顯示）
-            'date': report.work_date,
-            'equipment': report.equipment.name if report.equipment else '未知'
-        })
-    
-    # 計算出貨包裝的總報工數量（只計算合格品）
-    total_packaging_quantity = sum(report['quantity'] for report in packaging_reports)
-    
-    # 簡化的完工判斷邏輯
-    if has_packaging:
-        if packaging_reports:
-            # 有出貨包裝報工記錄
-            if total_packaging_quantity >= workorder.quantity:
-                return True, f"出貨包裝報工數量達標（{total_packaging_quantity}/{workorder.quantity}）"
-            else:
-                return False, f"出貨包裝報工數量不足（{total_packaging_quantity}/{workorder.quantity}）"
-        else:
-            # 有出貨包裝工序但沒有報工記錄
-            return False, "有出貨包裝工序但無報工記錄"
-    
-    # 如果沒有出貨包裝工序，檢查其他工序的完成數量
-    # 取得所有工序的實際報工記錄（只計算合格品）
-    all_reports_quantity = 0
-    
-    # 作業員補登報工
-    operator_reports = OperatorSupplementReport.objects.filter(workorder=workorder)
-    all_reports_quantity += sum(report.work_quantity for report in operator_reports)
-    
-    # 主管不報工，移除主管報工相關邏輯
-    
-    # SMT生產報工
-    smt_reports = SMTProductionReport.objects.filter(workorder=workorder)
-    all_reports_quantity += sum(report.work_quantity for report in smt_reports)
-    
-    if all_reports_quantity >= workorder.quantity:
-        return True, f"總報工數量達標（{all_reports_quantity}/{workorder.quantity}）"
-    
-    # 如果沒有任何報工記錄，但工單被標記為完工，可能是歷史匯入
-    if all_reports_quantity == 0 and not packaging_reports:
-        return True, "歷史匯入的完工工單"
-    
-    return False, f"報工數量不足（{all_reports_quantity}/{workorder.quantity}）"
-
-
-def analyze_packaging_processes(workorder):
-    """
-    分析工單的出貨包裝工序情況
-    基於實際報工記錄分析
-    """
-    from workorder.models import WorkOrderProcess
-    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
-    
-    processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by('step_order')
-    packaging_processes = processes.filter(process_name__icontains='出貨包裝').order_by('step_order')
-    
-    # 取得實際的出貨包裝報工記錄
-    packaging_reports = []
-    
-    # 從作業員補登報工記錄中查找出貨包裝
-    operator_packaging = OperatorSupplementReport.objects.filter(
-        workorder=workorder,
-        process__name__icontains='出貨包裝'
-    )
-    for report in operator_packaging:
-        packaging_reports.append({
-            'source': '作業員補登',
-            'process': report.process.name,
-            'quantity': report.work_quantity,
-            'defect_quantity': report.defect_quantity,
-            'date': report.work_date,
-            'operator': report.operator.name if report.operator else '未知',
-            'is_completed': report.is_completed
-        })
-    
-    # 主管不報工，移除主管報工相關邏輯
-    
-    # 從SMT生產報工記錄中查找出貨包裝
-    smt_packaging = SMTProductionReport.objects.filter(
-        workorder=workorder,
-        process__name__icontains='出貨包裝'
-    )
-    for report in smt_packaging:
-        packaging_reports.append({
-            'source': 'SMT報工',
-            'process': report.process.name,
-            'quantity': report.work_quantity,
-            'defect_quantity': report.defect_quantity,
-            'date': report.work_date,
-            'equipment': report.equipment.name if report.equipment else '未知',
-            'is_completed': report.is_completed
-        })
-    
-    # 計算總報工數量
-    total_packaging_quantity = sum(report['quantity'] for report in packaging_reports)
-    completed_reports = [r for r in packaging_reports if r['is_completed']]
-    
-    analysis = {
-        'total_processes': processes.count(),
-        'packaging_processes': [],
-        'packaging_count': packaging_processes.count(),
-        'packaging_reports': packaging_reports,
-        'total_packaging_quantity': total_packaging_quantity,
-        'completed_reports_count': len(completed_reports),
-        'analysis_summary': ''
-    }
-    
-    # 生成分析摘要
-    if packaging_reports:
-        if len(packaging_reports) == 1:
-            report = packaging_reports[0]
-            analysis['analysis_summary'] = f"出貨包裝報工：{report['source']}，數量{report['quantity']}，{'已完工' if report['is_completed'] else '未完工'}"
-        else:
-            analysis['analysis_summary'] = f"多筆出貨包裝報工（共{len(packaging_reports)}筆），總數量{total_packaging_quantity}，完工記錄{len(completed_reports)}筆"
-    else:
-        if packaging_processes.exists():
-            analysis['analysis_summary'] = f"有{packaging_processes.count()}個出貨包裝工序，但無報工記錄"
-        else:
-            analysis['analysis_summary'] = "無出貨包裝工序"
-    
-    return analysis
-
-
-def fix_incorrect_completed_workorders():
-    """
-    修正錯誤的完工工單
-    將不符合完工條件的工單狀態改回正確狀態
-    """
-    from workorder.models import WorkOrder
-    
-    # 取得所有完工狀態的工單
-    completed_workorders = WorkOrder.objects.filter(status='completed')
-    
-    fixed_count = 0
-    for workorder in completed_workorders:
-        is_completed, message = check_workorder_completion(workorder)
-        
-        if not is_completed:
-            # 根據工序狀態決定正確的狀態
-            processes = workorder.processes.all()
-            if processes.exists():
-                # 檢查是否有正在進行的工序
-                in_progress = processes.filter(status='in_progress').exists()
-                if in_progress:
-                    workorder.status = 'in_progress'
-                else:
-                    # 檢查是否有任何工序已完成
-                    completed = processes.filter(status='completed').exists()
-                    if completed:
-                        workorder.status = 'in_progress'  # 有工序完成，但未達完工標準
-                    else:
-                        workorder.status = 'pending'
-            else:
-                # 沒有工序設定，可能是歷史匯入，保持完工狀態
-                print(f"工單 {workorder.order_number} 無工序設定，保持完工狀態：{message}")
-                continue
-            
-            workorder.save()
-            fixed_count += 1
-            print(f"工單 {workorder.order_number} 狀態已修正為 {workorder.status}：{message}")
-    
-    return fixed_count
-
-
-def fix_completed_workorders_page(request):
-    """
-    修正完工工單狀態管理頁面
-    檢查並修正錯誤的完工工單狀態
-    """
-    if not (request.user.is_staff or request.user.is_superuser):
-        messages.error(request, "只有管理員可以執行此操作")
-        return redirect("workorder:completed_workorders")
-    
-    from workorder.models import WorkOrder, WorkOrderProcess
-    
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        
-        if action == 'check':
-            # 檢查所有完工工單
-            completed_workorders = WorkOrder.objects.filter(status='completed')
-            incorrect_workorders = []
-            
-            for workorder in completed_workorders:
-                is_completed, message = check_workorder_completion(workorder)
-                if not is_completed:
-                    # 分析出貨包裝工序
-                    packaging_analysis = analyze_packaging_processes(workorder)
-                    incorrect_workorders.append({
-                        'workorder': workorder,
-                        'reason': message,
-                        'processes': workorder.processes.all(),
-                        'packaging_analysis': packaging_analysis
-                    })
-            
-            context = {
-                'incorrect_workorders': incorrect_workorders,
-                'total_checked': completed_workorders.count(),
-                'incorrect_count': len(incorrect_workorders)
-            }
-            
-            return render(request, "workorder/dispatch/fix_completed_workorders.html", context)
-        
-        elif action == 'fix':
-            # 修正錯誤的完工工單
-            fixed_count = fix_incorrect_completed_workorders()
-            messages.success(request, f"已修正 {fixed_count} 個錯誤的完工工單狀態")
-            return redirect("workorder:completed_workorders")
-    
-    # GET 請求顯示檢查頁面
-    return render(request, "workorder/dispatch/fix_completed_workorders.html")
 
 
 def start_production(request, pk):
@@ -5174,6 +4452,17 @@ def operator_supplement_report_approve(request, report_id):
         if report.can_approve(request.user):
             report.approve(request.user, request.POST.get('remarks', ''))
             
+            # 核准成功後，同步到生產中工單詳情資料表
+            try:
+                from workorder.services import ProductionReportSyncService
+                if hasattr(report, 'workorder') and report.workorder:
+                    ProductionReportSyncService.sync_specific_workorder(report.workorder.id)
+            except Exception as sync_error:
+                # 同步失敗不影響核准流程，只記錄錯誤
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"同步報工記錄到生產詳情失敗: {str(sync_error)}")
+            
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({'success': True, 'message': '作業員報工記錄審核通過！'})
             
@@ -6299,3 +5588,97 @@ def dispatch_delete(request, pk):
         'dispatch': dispatch
     }
     return render(request, 'workorder_dispatch/dispatch_confirm_delete.html', context)
+
+
+@login_required
+def active_workorders(request):
+    """
+    生產中工單詳情視圖
+    顯示所有正在生產中的工單詳細資訊（基於工單狀態和報工記錄）
+    """
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+    from erp_integration.models import CompanyConfig
+    from datetime import date, timedelta
+    
+    # 獲取今天的日期
+    today = date.today()
+    
+    # 主要方法：基於已核准的報工記錄判斷生產中工單
+    # 只有當作業員或SMT有補登報工且主管已核准的工單，才算真正在生產中
+    
+    # 獲取所有有已核准報工記錄的工單ID
+    approved_operator_reports = OperatorSupplementReport.objects.filter(
+        approval_status='approved'  # 主管已核准
+    ).values_list('workorder_id', flat=True).distinct()
+    
+    approved_smt_reports = SMTProductionReport.objects.filter(
+        approval_status='approved'  # 主管已核准
+    ).values_list('workorder_id', flat=True).distinct()
+    
+    # 合併所有有已核准報工的工單ID
+    active_workorder_ids = list(approved_operator_reports) + list(approved_smt_reports)
+    
+    # 獲取生產中的工單（基於已核准的報工記錄，但排除已完工的工單）
+    active_workorders = WorkOrder.objects.filter(
+        id__in=active_workorder_ids
+    ).exclude(
+        status='completed'  # 排除已完工的工單
+    ).select_related(
+        'production_record'
+    ).prefetch_related(
+        'processes'
+    ).order_by('-created_at').distinct()
+    
+    # 輔助統計：今日已核准報工記錄
+    today_operator_reports = OperatorSupplementReport.objects.filter(
+        work_date=today,
+        approval_status='approved'
+    ).values_list('workorder_id', flat=True).distinct()
+    
+    today_smt_reports = SMTProductionReport.objects.filter(
+        work_date=today,
+        approval_status='approved'
+    ).values_list('workorder_id', flat=True).distinct()
+    
+    today_active_workorder_ids = list(today_operator_reports) + list(today_smt_reports)
+    
+    # 獲取公司配置資訊，用於顯示公司名稱
+    company_configs = {config.company_code: config.company_name for config in CompanyConfig.objects.all()}
+    
+    # 為每個工單添加公司名稱
+    for workorder in active_workorders:
+        workorder.company_name = company_configs.get(workorder.company_code, workorder.company_code or '未知公司')
+    
+    # 獲取統計數據
+    total_active = active_workorders.count()
+    total_pending = WorkOrder.objects.filter(status='pending').count()
+    total_completed = WorkOrder.objects.filter(status='completed').count()
+    
+    # 今日已核准報工統計
+    today_operator_count = OperatorSupplementReport.objects.filter(
+        work_date=today,
+        approval_status='approved'
+    ).count()
+    today_smt_count = SMTProductionReport.objects.filter(
+        work_date=today,
+        approval_status='approved'
+    ).count()
+    
+    # 分頁
+    paginator = Paginator(active_workorders, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'total_active': total_active,
+        'total_pending': total_pending,
+        'total_completed': total_completed,
+        'today_operator_count': today_operator_count,
+        'today_smt_count': today_smt_count,
+        'today': today,
+    }
+    
+    return render(request, 'workorder/active_workorders.html', context)

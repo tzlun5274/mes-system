@@ -12,7 +12,7 @@ from datetime import datetime
 from .workorder_erp.models import PrdMKOrdMain, PrdMkOrdMats, CompanyOrder, SystemConfig
 
 # 導入已完工工單子模組的模型
-from .workorder_completed.models import WorkOrderCompleted, WorkOrderCompletedProcess
+# from .workorder_completed.models import CompletedWorkOrder, CompletedWorkOrderProcess  # 已移除
 
 # 導入報工管理子模組的模型
 from .workorder_reporting.models import SMTProductionReport, OperatorSupplementReport

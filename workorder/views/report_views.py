@@ -451,6 +451,18 @@ def approve_report(request, report_id):
         
         if report.can_approve(request.user):
             report.approve(request.user, request.POST.get('remarks', ''))
+            
+            # 核准成功後，同步到生產中工單詳情資料表
+            try:
+                from workorder.services import ProductionReportSyncService
+                if hasattr(report, 'workorder') and report.workorder:
+                    ProductionReportSyncService.sync_specific_workorder(report.workorder.id)
+            except Exception as sync_error:
+                # 同步失敗不影響核准流程，只記錄錯誤
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"同步報工記錄到生產詳情失敗: {str(sync_error)}")
+            
             messages.success(request, '報工記錄核准成功！')
         else:
             messages.error(request, '您沒有權限核准此報工記錄！')

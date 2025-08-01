@@ -21,22 +21,6 @@
             </div>
             <div class="col-md-3">
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-success text-white">
-                        <h4 class="mb-0">完工工單</h4>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text">
-                            只顯示狀態為「完工」的工單。
-                            <br>
-                            可查詢、檢視、匯出。
-                        </p>
-                        <a href="{% url 'workorder:completed_workorders' %}"
-                           class="btn btn-info">進入完工工單</a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card shadow-sm mb-4">
                     <div class="card-header bg-info text-white">
                         <h4 class="mb-0">公司製令單</h4>
                     </div>
@@ -66,6 +50,44 @@
                         <a href="{% url 'workorder:report_index' %}" class="btn btn-warning">
                             <i class="fas fa-tools"></i> 進入報工管理
                         </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-clipboard-list"></i> 生產中工單
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            檢視生產中的工單內容明細，包含進度追蹤。
+                            <br>
+                            可查看詳情、監控狀態。
+                        </p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="{% url 'workorder:active_workorders' %}" class="btn btn-info">
+                                <i class="fas fa-eye"></i> 查看詳情
+                            </a>
+                            <span class="badge bg-success fs-6">{{ active_workorders_count|default:0 }}</span>
+                        </div>
+                        <small class="text-muted d-block mt-2">進行中工單</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">完工工單</h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            只顯示狀態為「完工」的工單。
+                            <br>
+                            可查詢、檢視、匯出。
+                        </p>
+                        <button class="btn btn-info" disabled>功能開發中</button>
                     </div>
                 </div>
             </div>

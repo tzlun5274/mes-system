@@ -61,7 +61,7 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'workorder'
 
     def get_context_data(self, **kwargs):
-        """添加上下文資料，包括工序統計"""
+        """添加上下文資料，包括工序統計和所有已核准的報工記錄"""
         context = super().get_context_data(**kwargs)
         workorder = self.get_object()
         
@@ -73,6 +73,96 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         
         context['completed_processes_count'] = completed_processes_count
         context['in_progress_processes_count'] = in_progress_processes_count
+        
+        # 獲取所有已核准的報工記錄
+        from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
+        
+        # 作業員補登報工記錄（已核准）
+        operator_reports = OperatorSupplementReport.objects.filter(
+            workorder=workorder,
+            approval_status='approved'
+        ).order_by('-report_date', '-start_time')
+        
+        # SMT生產報工記錄（已核准）
+        smt_reports = SMTProductionReport.objects.filter(
+            workorder=workorder,
+            approval_status='approved'
+        ).order_by('-work_date', '-start_time')
+        
+        # 主管報工記錄（已核准）
+        supervisor_reports = SupervisorProductionReport.objects.filter(
+            workorder=workorder,
+            approval_status='approved'
+        ).order_by('-report_date', '-start_time')
+        
+        # 合併所有報工記錄並按時間排序
+        all_reports = []
+        
+        # 添加作業員報工記錄
+        for report in operator_reports:
+            all_reports.append({
+                'type': 'operator',
+                'report_date': report.report_date,
+                'process_name': report.process,
+                'operator': report.operator.username if report.operator else '-',
+                'equipment': report.equipment.name if report.equipment else '-',
+                'work_quantity': report.quantity or 0,
+                'defect_quantity': report.defect_quantity or 0,
+                'report_source': '作業員補登報工',
+                'report_time': report.start_time,
+                'start_time': report.start_time,
+                'end_time': report.end_time,
+                'remarks': report.remarks,
+                'abnormal_notes': report.abnormal_notes,
+                'approved_by': report.approved_by,
+                'approved_at': report.approved_at,
+            })
+        
+        # 添加SMT報工記錄
+        for report in smt_reports:
+            all_reports.append({
+                'type': 'smt',
+                'report_date': report.work_date,
+                'process_name': report.process_name,
+                'operator': '-',
+                'equipment': report.equipment.name if report.equipment else '-',
+                'work_quantity': report.work_quantity or 0,
+                'defect_quantity': report.defect_quantity or 0,
+                'report_source': 'SMT報工',
+                'report_time': report.start_time,
+                'start_time': report.start_time,
+                'end_time': report.end_time,
+                'remarks': report.remarks,
+                'abnormal_notes': report.abnormal_notes,
+                'approved_by': report.approved_by,
+                'approved_at': report.approved_at,
+            })
+        
+        # 添加主管報工記錄
+        for report in supervisor_reports:
+            all_reports.append({
+                'type': 'supervisor',
+                'report_date': report.report_date,
+                'process_name': report.process_name,
+                'operator': report.operator.username if report.operator else '-',
+                'equipment': report.equipment.name if report.equipment else '-',
+                'work_quantity': report.work_quantity or 0,
+                'defect_quantity': report.defect_quantity or 0,
+                'report_source': '主管報工',
+                'report_time': report.report_time,
+                'start_time': report.start_time,
+                'end_time': report.end_time,
+                'remarks': report.remarks,
+                'abnormal_notes': report.abnormal_notes,
+                'approved_by': report.approved_by,
+                'approved_at': report.approved_at,
+            })
+        
+        # 按報工時間排序（最新的在前）
+        all_reports.sort(key=lambda x: x['report_time'] if x['report_time'] else x['report_date'], reverse=True)
+        
+        context['all_production_reports'] = all_reports
+        context['total_reports_count'] = len(all_reports)
         
         return context
 

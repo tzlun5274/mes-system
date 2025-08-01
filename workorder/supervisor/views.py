@@ -21,7 +21,9 @@ from workorder.models import (
     WorkOrder,
     WorkOrderProcess
 )
-from workorder.workorder_reporting.models import SupervisorProductionReport
+
+# 主管功能不需要主管報工模型，主管只負責審核和管理
+# from workorder.workorder_reporting.models import SupervisorProductionReport
 
 # 導入主管功能服務層
 from .services import SupervisorStatisticsService, SupervisorApprovalService, SupervisorAbnormalService
@@ -61,7 +63,7 @@ def get_supervisor_statistics():
     data_stats = {
         'total_operator_reports': OperatorSupplementReport.objects.count(),
         'total_smt_reports': SMTProductionReport.objects.count(),
-        'total_supervisor_reports': SupervisorProductionReport.objects.count(),
+        'total_supplement_reports': 0,  # 補登報工記錄數量
         'old_reports_30d': OperatorSupplementReport.objects.filter(work_date__lt=today - timedelta(days=30)).count(),
         'old_reports_90d': OperatorSupplementReport.objects.filter(work_date__lt=today - timedelta(days=90)).count(),
     }
@@ -161,23 +163,7 @@ def supervisor_functions(request):
             'approval_status': report.approval_status,
         })
     
-    # 主管異常記錄 (Supervisor Abnormal Records)
-    supervisor_abnormal_records = SupervisorProductionReport.objects.select_related(
-        'workorder'
-    ).filter(
-        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
-    ).order_by('-work_date', '-start_time')[:5]
-    
-    for report in supervisor_abnormal_records:
-        recent_abnormal_records.append({
-            'report_type': '主管報工',
-            'work_date': report.work_date,
-            'operator_name': report.operator_name if report.operator_name else '-',
-            'workorder_number': report.workorder.order_number if report.workorder else '-',
-            'process_name': report.process_name if report.process_name else '-',
-            'abnormal_notes': report.abnormal_notes,
-            'approval_status': report.approval_status,
-        })
+    # 移除主管異常記錄 - 主管不應該有報工記錄
     
     # 按時間排序 (Sort by Date)
     recent_abnormal_records.sort(key=lambda x: x['work_date'], reverse=True)
@@ -238,21 +224,7 @@ def supervisor_report_index(request):
             'status': '已審核'
         })
     
-    # 最近已審核的主管報工
-    recent_approved_supervisor = SupervisorProductionReport.objects.filter(
-        approval_status='approved'
-    ).select_related('workorder').order_by('-approved_at')[:5]
-    
-    for report in recent_approved_supervisor:
-        recent_reviews.append({
-            'type': '主管報工',
-            'workorder': report.workorder.order_number if report.workorder else '-',
-            'process': report.process_name if report.process_name else '-',
-            'quantity': report.work_quantity,
-            'reviewer': report.approved_by,
-            'time': report.approved_at,
-            'status': '已審核'
-        })
+    # 移除主管報工審核記錄 - 主管不應該有報工記錄
     
     # 最近被拒絕的報工
     recent_rejected = []
@@ -329,13 +301,8 @@ def report_detail(request, report_id):
             report = SMTProductionReport.objects.get(id=report_id)
             report_type = 'SMT報工'
         except SMTProductionReport.DoesNotExist:
-            # 嘗試從主管報工中查找
-            try:
-                from workorder.workorder_reporting.models import SupervisorProductionReport
-                report = SupervisorProductionReport.objects.get(id=report_id)
-                report_type = '主管報工'
-            except SupervisorProductionReport.DoesNotExist:
-                raise Http404("報工記錄不存在")
+            # 移除主管報工查找 - 主管不應該有報工記錄
+            raise Http404("報工記錄不存在")
     
     context = {
         'report': report,
@@ -360,6 +327,17 @@ def approve_report(request, report_id):
         report.approved_by = request.user.username
         report.approved_at = timezone.now()
         report.save()
+        
+        # 核准成功後，同步到生產中工單詳情資料表
+        try:
+            from workorder.services import ProductionReportSyncService
+            if hasattr(report, 'workorder') and report.workorder:
+                ProductionReportSyncService.sync_specific_workorder(report.workorder.id)
+        except Exception as sync_error:
+            # 同步失敗不影響核准流程，只記錄錯誤
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"同步報工記錄到生產詳情失敗: {str(sync_error)}")
         
         messages.success(request, f'報工記錄 {report.id} 已審核通過')
         return redirect('workorder:supervisor:pending_approval_list')
@@ -404,6 +382,17 @@ def approve_smt_report(request, report_id):
         report.approved_at = timezone.now()
         report.save()
         
+        # 核准成功後，同步到生產中工單詳情資料表
+        try:
+            from workorder.services import ProductionReportSyncService
+            if hasattr(report, 'workorder') and report.workorder:
+                ProductionReportSyncService.sync_specific_workorder(report.workorder.id)
+        except Exception as sync_error:
+            # 同步失敗不影響核准流程，只記錄錯誤
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"同步SMT報工記錄到生產詳情失敗: {str(sync_error)}")
+        
         messages.success(request, f'SMT報工記錄 {report.id} 已審核通過')
         return redirect('workorder:supervisor:pending_approval_list')
     
@@ -431,45 +420,7 @@ def reject_smt_report(request, report_id):
     return redirect('workorder:supervisor:pending_approval_list')
 
 
-@login_required
-def approve_supervisor_report(request, report_id):
-    """
-    核准主管報工記錄視圖 (Approve Supervisor Report View)
-    處理主管報工記錄的核准操作
-    """
-    if request.method == 'POST':
-        from workorder.workorder_reporting.models import SupervisorProductionReport
-        report = get_object_or_404(SupervisorProductionReport, id=report_id)
-        report.approval_status = 'approved'
-        report.approved_by = request.user.username
-        report.approved_at = timezone.now()
-        report.save()
-        
-        messages.success(request, f'主管報工記錄 {report.id} 已審核通過')
-        return redirect('workorder:supervisor:pending_approval_list')
-    
-    return redirect('workorder:supervisor:pending_approval_list')
-
-
-@login_required
-def reject_supervisor_report(request, report_id):
-    """
-    駁回主管報工記錄視圖 (Reject Supervisor Report View)
-    處理主管報工記錄的駁回操作
-    """
-    if request.method == 'POST':
-        from workorder.workorder_reporting.models import SupervisorProductionReport
-        report = get_object_or_404(SupervisorProductionReport, id=report_id)
-        report.approval_status = 'rejected'
-        report.rejected_by = request.user.username
-        report.rejected_at = timezone.now()
-        report.rejection_reason = request.POST.get('rejection_reason', '')
-        report.save()
-        
-        messages.warning(request, f'主管報工記錄 {report.id} 已被拒絕')
-        return redirect('workorder:supervisor:pending_approval_list')
-    
-    return redirect('workorder:supervisor:pending_approval_list')
+# 移除主管報工核准和駁回功能 - 主管不應該有報工記錄
 
 
 @login_required
@@ -481,6 +432,7 @@ def batch_approve_reports(request):
     if request.method == 'POST':
         report_ids = request.POST.getlist('report_ids')
         approved_count = 0
+        synced_workorders = set()  # 記錄需要同步的工單ID
         
         for report_id in report_ids:
             try:
@@ -492,6 +444,10 @@ def batch_approve_reports(request):
                     report.approved_at = timezone.now()
                     report.save()
                     approved_count += 1
+                    
+                    # 記錄需要同步的工單
+                    if hasattr(report, 'workorder') and report.workorder:
+                        synced_workorders.add(report.workorder.id)
                     continue
                 except OperatorSupplementReport.DoesNotExist:
                     pass
@@ -505,27 +461,33 @@ def batch_approve_reports(request):
                     report.approved_at = timezone.now()
                     report.save()
                     approved_count += 1
+                    
+                    # 記錄需要同步的工單
+                    if hasattr(report, 'workorder') and report.workorder:
+                        synced_workorders.add(report.workorder.id)
                     continue
                 except SMTProductionReport.DoesNotExist:
                     pass
                 
-                # 嘗試從主管報工中查找
-                try:
-                    from workorder.workorder_reporting.models import SupervisorProductionReport
-                    report = SupervisorProductionReport.objects.get(id=report_id)
-                    report.approval_status = 'approved'
-                    report.approved_by = request.user.username
-                    report.approved_at = timezone.now()
-                    report.save()
-                    approved_count += 1
-                    continue
-                except SupervisorProductionReport.DoesNotExist:
-                    pass
+                # 移除主管報工批量核准 - 主管不應該有報工記錄
                 
             except Exception as e:
-                continue
+                messages.error(request, f'核准報工記錄 {report_id} 失敗: {str(e)}')
         
-        messages.success(request, f'成功審核 {approved_count} 筆報工記錄')
+        # 批量同步所有相關工單的報工記錄到生產詳情資料表
+        if synced_workorders:
+            try:
+                from workorder.services import ProductionReportSyncService
+                for workorder_id in synced_workorders:
+                    ProductionReportSyncService.sync_specific_workorder(workorder_id)
+            except Exception as sync_error:
+                # 同步失敗不影響核准流程，只記錄錯誤
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"批量同步報工記錄到生產詳情失敗: {str(sync_error)}")
+        
+        messages.success(request, f'成功核准 {approved_count} 筆報工記錄')
+        return redirect('workorder:supervisor:pending_approval_list')
     
     return redirect('workorder:supervisor:pending_approval_list')
 
@@ -633,16 +595,13 @@ def abnormal_management(request):
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
     ).order_by('-work_date', '-start_time')
     
-    supervisor_abnormal = SupervisorProductionReport.objects.select_related(
-        'workorder'
-    ).filter(
-        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
-    ).order_by('-work_date', '-start_time')
+    # 主管功能處理作業員和SMT的補登報工異常
+    # 這裡可以添加其他類型的異常處理，如補登報工異常等
     
     # 計算異常統計數據
     total_operator_abnormal = operator_abnormal.count()
     total_smt_abnormal = smt_abnormal.count()
-    total_supervisor_abnormal = supervisor_abnormal.count()
+    total_supplement_abnormal = 0  # 補登報工異常數量
     
     # 計算嚴重異常（包含關鍵字的異常）
     critical_keywords = ['嚴重', '緊急', '停機', '故障', '錯誤']
@@ -662,39 +621,40 @@ def abnormal_management(request):
         Q(abnormal_notes__icontains='錯誤')
     ).count()
     
-    critical_supervisor = supervisor_abnormal.filter(
-        Q(abnormal_notes__icontains='嚴重') | 
-        Q(abnormal_notes__icontains='緊急') | 
-        Q(abnormal_notes__icontains='停機') | 
-        Q(abnormal_notes__icontains='故障') | 
-        Q(abnormal_notes__icontains='錯誤')
-    ).count()
+    # critical_supplement = supplement_abnormal.filter(
+    #     Q(abnormal_notes__icontains='嚴重') | 
+    #     Q(abnormal_notes__icontains='緊急') | 
+    #     Q(abnormal_notes__icontains='停機') | 
+    #     Q(abnormal_notes__icontains='故障') | 
+    #     Q(abnormal_notes__icontains='錯誤')
+    # ).count()
+    critical_supplement = 0  # 補登報工嚴重異常數量
     
     # 計算待處理和已解決的異常
     pending_operator = operator_abnormal.filter(approval_status='pending').count()
     pending_smt = smt_abnormal.filter(approval_status='pending').count()
-    pending_supervisor = supervisor_abnormal.filter(approval_status='pending').count()
+    pending_supplement = 0  # 補登報工待處理異常數量
     
     resolved_operator = operator_abnormal.filter(approval_status='approved').count()
     resolved_smt = smt_abnormal.filter(approval_status='approved').count()
-    resolved_supervisor = supervisor_abnormal.filter(approval_status='approved').count()
+    resolved_supplement = 0  # 補登報工已解決異常數量
     
     # 彙總統計
     abnormal_stats = {
-        'total_abnormal': total_operator_abnormal + total_smt_abnormal + total_supervisor_abnormal,
-        'critical': critical_operator + critical_smt + critical_supervisor,
-        'pending': pending_operator + pending_smt + pending_supervisor,
-        'resolved': resolved_operator + resolved_smt + resolved_supervisor,
+        'total_abnormal': total_operator_abnormal + total_smt_abnormal + total_supplement_abnormal,
+        'critical': critical_operator + critical_smt + critical_supplement,
+        'pending': pending_operator + pending_smt + pending_supplement,
+        'resolved': resolved_operator + resolved_smt + resolved_supplement,
         'operator_abnormal': total_operator_abnormal,
         'smt_abnormal': total_smt_abnormal,
-        'supervisor_abnormal': total_supervisor_abnormal,
+        'supplement_abnormal': total_supplement_abnormal,
     }
     
     context = {
         **context_data,
         'operator_abnormal': operator_abnormal,
         'smt_abnormal': smt_abnormal,
-        'supervisor_abnormal': supervisor_abnormal,
+        'supplement_abnormal': [],  # 補登報工異常記錄
         'abnormal_stats': abnormal_stats,
     }
     
@@ -724,12 +684,9 @@ def batch_resolve_abnormal(request):
                 Q(approval_status='pending')
             )
             
-            supervisor_pending = SupervisorProductionReport.objects.filter(
-                Q(abnormal_notes__isnull=False) & 
-                ~Q(abnormal_notes='') & 
-                ~Q(abnormal_notes='nan') &
-                Q(approval_status='pending')
-            )
+            # supplement_pending = 補登報工異常查詢
+            # 這裡可以添加補登報工異常的處理邏輯
+            supplement_pending = []  # 補登報工異常
             
             # 批次更新狀態
             operator_resolved = operator_pending.update(
@@ -744,20 +701,21 @@ def batch_resolve_abnormal(request):
                 approved_at=timezone.now()
             )
             
-            supervisor_resolved = supervisor_pending.update(
-                approval_status='approved',
-                approved_by=request.user.username,
-                approved_at=timezone.now()
-            )
+            # supplement_resolved = supplement_pending.update(
+            #     approval_status='approved',
+            #     approved_by=request.user.username,
+            #     approved_at=timezone.now()
+            # )
+            supplement_resolved = 0  # 補登報工異常解決數量
             
-            total_resolved = operator_resolved + smt_resolved + supervisor_resolved
+            total_resolved = operator_resolved + smt_resolved + supplement_resolved
             
             return JsonResponse({
                 'success': True,
                 'resolved_count': total_resolved,
                 'operator_resolved': operator_resolved,
                 'smt_resolved': smt_resolved,
-                'supervisor_resolved': supervisor_resolved
+                'supplement_resolved': supplement_resolved
             })
             
         except Exception as e:
@@ -865,8 +823,11 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
         report = get_object_or_404(OperatorSupplementReport, id=abnormal_id)
     elif abnormal_type == 'smt':
         report = get_object_or_404(SMTProductionReport, id=abnormal_id)
-    elif abnormal_type == 'supervisor':
-        report = get_object_or_404(SupervisorProductionReport, id=abnormal_id)
+    elif abnormal_type == 'supplement':
+        # 補登報工異常詳情
+        # 這裡可以添加補登報工異常的處理邏輯
+        messages.error(request, '補登報工異常功能正在開發中')
+        return redirect('workorder:supervisor:abnormal_management')
     else:
         messages.error(request, '無效的異常類型')
         return redirect('workorder:supervisor:abnormal_management')
@@ -876,4 +837,17 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
         'abnormal_type': abnormal_type,
     }
     
-    return render(request, 'supervisor/abnormal_detail.html', context) 
+    # 根據異常類型選擇對應的模板
+    if abnormal_type == 'operator':
+        template_name = 'supervisor/abnormal_detail_operator.html'
+    elif abnormal_type == 'smt':
+        template_name = 'supervisor/abnormal_detail_smt.html'
+    elif abnormal_type == 'supplement':
+        # 補登報工異常詳情模板
+        # 這裡可以添加補登報工異常的處理邏輯
+        messages.error(request, '補登報工異常功能正在開發中')
+        return redirect('workorder:supervisor:abnormal_management')
+    else:
+        template_name = 'supervisor/abnormal_detail_operator.html'  # 預設使用作業員模板
+    
+    return render(request, template_name, context) 

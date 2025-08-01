@@ -14,7 +14,7 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'workorder:completed_workorders' %}">完工工單列表</a></li>
+                    <li class="breadcrumb-item"><a href="#" onclick="alert('完工工單功能開發中')">完工工單列表</a></li>
                     <li class="breadcrumb-item active">匯入歷史派工單</li>
                 </ol>
             </nav>
@@ -89,7 +89,7 @@
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-upload"></i> 開始匯入
                             </button>
-                            <a href="{% url 'workorder:completed_workorders' %}" class="btn btn-secondary">
+                            <a href="#" onclick="alert('完工工單功能開發中')" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left"></i> 返回完工工單列表
                             </a>
                         </div>

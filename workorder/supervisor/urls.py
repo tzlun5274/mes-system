@@ -19,8 +19,7 @@ urlpatterns = [
     path('reject_report/<int:report_id>/', views.reject_report, name='reject_report'),
     path('approve_smt_report/<int:report_id>/', views.approve_smt_report, name='approve_smt_report'),
     path('reject_smt_report/<int:report_id>/', views.reject_smt_report, name='reject_smt_report'),
-    path('approve_supervisor_report/<int:report_id>/', views.approve_supervisor_report, name='approve_supervisor_report'),
-    path('reject_supervisor_report/<int:report_id>/', views.reject_supervisor_report, name='reject_supervisor_report'),
+    # 移除主管報工核准和駁回路由 - 主管不應該有報工記錄
     path('batch_approve_reports/', views.batch_approve_reports, name='batch_approve_reports'),
     path('batch_delete_reports/', views.batch_delete_reports, name='batch_delete_reports'),
     

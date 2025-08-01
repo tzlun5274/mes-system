@@ -25,6 +25,7 @@ urlpatterns = [
     path("delete/<int:pk>/", WorkOrderDeleteView.as_view(), name="delete"),
     path("detail/<int:pk>/", WorkOrderDetailView.as_view(), name="detail"),
     path("list/", WorkOrderListView.as_view(), name="list"),
+    path("active/", workorder_views.active_workorders, name="active_workorders"),
     
     # 公司製令單管理 - 使用類別視圖
     path("company/", CompanyOrderListView.as_view(), name="company_orders"),
@@ -61,10 +62,10 @@ urlpatterns = [
     path("dispatch/edit/<int:pk>/", workorder_views.dispatch_edit, name="dispatch_edit"),
     path("dispatch/detail/<int:pk>/", workorder_views.dispatch_detail, name="dispatch_detail"),
     path("dispatch/delete/<int:pk>/", workorder_views.dispatch_delete, name="dispatch_delete"),
-    path("completed/", workorder_views.completed_workorders, name="completed_workorders"),
+    # 完工工單子模組路由 - 已移除
     path("clear/", workorder_views.clear_data, name="clear_data"),
     path("clear_reports/", workorder_views.clear_all_production_reports, name="clear_all_production_reports"),
-    path("clear_completed/", workorder_views.clear_completed_workorders, name="clear_completed_workorders"),
+    # 完工工單相關路由已移除
     path("process/<int:workorder_id>/", workorder_views.workorder_process_detail, name="workorder_process_detail"),
     path("start_production/<int:pk>/", workorder_views.start_production, name="start_production"),
     path("stop_production/<int:pk>/", workorder_views.stop_production, name="stop_production"),
@@ -73,12 +74,9 @@ urlpatterns = [
     path("manual_sync/", workorder_views.manual_sync_orders, name="manual_sync_orders"),
     path("manual_convert/", workorder_views.manual_convert_orders, name="manual_convert_orders"),
     path("selective_revert/", workorder_views.selective_revert_orders, name="selective_revert_orders"),
-    path("import_historical/", workorder_views.import_historical_workorders, name="import_historical_workorders"),
-    path("download_template/", workorder_views.download_historical_workorder_template, name="download_historical_workorder_template"),
-    path("export_completed/", workorder_views.export_completed_workorders, name="export_completed_workorders"),
-    path("batch_delete_completed/", workorder_views.batch_delete_completed_workorders, name="batch_delete_completed_workorders"),
-    path("completed_process_stats/", workorder_views.completed_workorders_process_stats, name="completed_workorders_process_stats"),
-    path("fix_completed/", workorder_views.fix_completed_workorders_page, name="fix_completed_workorders"),
+    # path("import_historical/", workorder_views.import_historical_workorders, name="import_historical_workorders"),  # 已移除
+    # path("download_template/", workorder_views.download_historical_workorder_template, name="download_historical_workorder_template"),  # 已移除
+    # 完工工單相關路由已移除
     
     # 報工管理功能（已遷移到類別視圖，保留向後相容路由）
     # path("report/operator/", workorder_views.operator_report_index, name="operator_report_index"),  # 已重複，使用類別視圖

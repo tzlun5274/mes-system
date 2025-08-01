@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     "workorder.supervisor",
     "workorder.workorder_dispatch",
     "workorder.workorder_erp",
-    "workorder.workorder_completed",
+            # "workorder.workorder_completed",  # 已移除
     "workorder.workorder_reporting",
     "kanban.apps.KanbanConfig",
     "erp_integration.apps.ErpIntegrationConfig",
