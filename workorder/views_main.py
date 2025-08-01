@@ -80,7 +80,7 @@ workorder_logger.setLevel(logging.INFO)
 # 工單列表 (已棄用 - 請使用 WorkOrderListView)
 def index(request):
     deprecated_warning('index')
-    workorders = WorkOrder.objects.all().order_by("-created_at")
+    workorders = WorkOrder.objects.all().order_by("created_at")
     
     # 基於報工記錄計算生產中工單數量
     from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
@@ -148,7 +148,7 @@ def detail(request, pk):
 # 工單列表視圖 (已棄用 - 請使用 WorkOrderListView)
 def list_view(request):
     deprecated_warning('list_view')
-    workorders = WorkOrder.objects.all().order_by("-created_at")
+    workorders = WorkOrder.objects.all().order_by("created_at")
     
     # 搜尋功能
     search = request.GET.get('search', '')
@@ -389,7 +389,7 @@ def dispatch_list(request):
     from process.models import ProductProcessRoute
 
     # 只顯示待生產和生產中的工單，不顯示已完成工單
-    all_orders = WorkOrder.objects.filter(status__in=["pending", "in_progress"]).order_by("-created_at")
+    all_orders = WorkOrder.objects.filter(status__in=["pending", "in_progress"]).order_by("created_at")
     
     # 按狀態分組
     pending_orders = [order for order in all_orders if order.status == "pending"]
@@ -5629,7 +5629,7 @@ def active_workorders(request):
         'production_record'
     ).prefetch_related(
         'processes'
-    ).order_by('-created_at').distinct()
+    ).order_by('created_at').distinct()
     
     # 輔助統計：今日已核准報工記錄
     today_operator_reports = OperatorSupplementReport.objects.filter(

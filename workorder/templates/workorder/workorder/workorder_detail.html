@@ -349,6 +349,78 @@
         margin-bottom: 20px;
         font-size: 0.9rem;
     }
+    
+    /* 分頁樣式 */
+    .nav-tabs {
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .nav-tabs .nav-link {
+        border: none;
+        color: #6c757d;
+        font-weight: 500;
+        padding: 12px 20px;
+        border-radius: 0;
+        transition: all 0.3s ease;
+    }
+    
+    .nav-tabs .nav-link:hover {
+        border: none;
+        color: #007bff;
+        background-color: #f8f9fa;
+    }
+    
+    .nav-tabs .nav-link.active {
+        border: none;
+        color: #007bff;
+        background-color: white;
+        border-bottom: 3px solid #007bff;
+    }
+    
+    /* 統計卡片樣式 */
+    .stats-summary .card {
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease;
+    }
+    
+    .stats-summary .card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .stats-summary .card-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+    
+    .stats-summary .card-text {
+        font-size: 0.9rem;
+        color: #6c757d;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* 統計表格樣式 */
+    .stats-table th {
+        background-color: #f8f9fa;
+        color: #495057;
+        border: 1px solid #dee2e6;
+        font-weight: 600;
+        padding: 12px;
+        font-size: 0.9rem;
+    }
+    
+    .stats-table td {
+        padding: 12px;
+        vertical-align: middle;
+        border: 1px solid #dee2e6;
+    }
+    
+    .stats-table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
 </style>
 {% endblock %}
 
@@ -576,14 +648,227 @@
     </div>
 
     <!-- 報工記錄 -->
-    {% if workorder.production_record %}
+    {% if all_production_reports %}
     <div class="process-section">
         <h4>
             <i class="fas fa-clipboard-check text-primary me-2"></i>
             報工記錄
         </h4>
         
-        {% if workorder.production_record.production_details.exists %}
+        <!-- 分頁導航 -->
+        <ul class="nav nav-tabs mb-3" id="reportTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="detail-tab" data-bs-toggle="tab" data-bs-target="#detail" type="button" role="tab" aria-controls="detail" aria-selected="true">
+                    <i class="fas fa-list me-1"></i>明細
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab" aria-controls="stats" aria-selected="false">
+                    <i class="fas fa-chart-bar me-1"></i>統計
+                </button>
+            </li>
+        </ul>
+        
+        <!-- 分頁內容 -->
+        <div class="tab-content" id="reportTabsContent">
+            <!-- 明細分頁 -->
+            <div class="tab-pane fade show active" id="detail" role="tabpanel" aria-labelledby="detail-tab">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>報工日期</th>
+                                <th>工序名稱</th>
+                                <th>作業員</th>
+                                <th>設備</th>
+                                <th>合格品</th>
+                                <th>不良品</th>
+                                <th>工作時數</th>
+                                <th>加班時數</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for report in all_production_reports %}
+                            <tr>
+                                <td>{{ report.report_date|date:"Y-m-d" }}</td>
+                                <td>{{ report.process_name }}</td>
+                                <td>{{ report.operator }}</td>
+                                <td>{{ report.equipment }}</td>
+                                <td>
+                                    <span class="badge bg-success">{{ report.work_quantity }}</span>
+                                </td>
+                                <td>
+                                    {% if report.defect_quantity > 0 %}
+                                    <span class="badge bg-danger">{{ report.defect_quantity }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">0</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if report.work_hours > 0 %}
+                                    <span class="badge bg-primary">{{ report.work_hours|floatformat:1 }}h</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if report.overtime_hours > 0 %}
+                                    <span class="badge bg-warning">{{ report.overtime_hours|floatformat:1 }}h</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-dark">
+                            <tr>
+                                <td colspan="6" class="text-end fw-bold">
+                                    <strong>總計：</strong>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary fs-6">{{ production_total_stats.total_work_hours|floatformat:1 }}h</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-warning fs-6">{{ production_total_stats.total_overtime_hours|floatformat:1 }}h</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="6" class="text-end fw-bold">
+                                    <strong>全部總時數：</strong>
+                                </td>
+                                <td colspan="2" class="text-center">
+                                    <span class="badge bg-success fs-6">{{ production_total_stats.total_all_hours|floatformat:1 }}h</span>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 統計分頁 -->
+            <div class="tab-pane fade" id="stats" role="tabpanel" aria-labelledby="stats-tab">
+                <!-- 總計統計 -->
+                <div class="row mb-4 stats-summary">
+                    <div class="col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-primary">{{ production_total_stats.total_good_quantity }}</h5>
+                                <p class="card-text">總合格品</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-danger">{{ production_total_stats.total_defect_quantity }}</h5>
+                                <p class="card-text">總不良品</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-info">{{ production_total_stats.total_report_count }}</h5>
+                                <p class="card-text">報工次數</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-success">{{ production_total_stats.unique_operators|length }}</h5>
+                                <p class="card-text">參與作業員</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-primary">{{ production_total_stats.total_work_hours|floatformat:1 }}h</h5>
+                                <p class="card-text">總工作時數</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title text-warning">{{ production_total_stats.total_overtime_hours|floatformat:1 }}h</h5>
+                                <p class="card-text">總加班時數</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 按工序統計表格 -->
+                <div class="table-responsive">
+                    <table class="table table-hover stats-table">
+                        <thead>
+                            <tr>
+                                <th>工序名稱</th>
+                                <th>合格品總數</th>
+                                <th>不良品總數</th>
+                                <th>報工次數</th>
+                                <th>工作時數</th>
+                                <th>參與作業員</th>
+                                <th>使用設備</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for process_name, stats in production_stats_by_process.items %}
+                            <tr>
+                                <td>
+                                    <strong>{{ stats.process_name }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">{{ stats.total_good_quantity }}</span>
+                                </td>
+                                <td>
+                                    {% if stats.total_defect_quantity > 0 %}
+                                    <span class="badge bg-danger">{{ stats.total_defect_quantity }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">0</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ stats.report_count }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ stats.total_work_hours|floatformat:1 }}h</span>
+                                </td>
+                                <td>
+                                    {% if stats.operators %}
+                                        {% for operator in stats.operators %}
+                                        <span class="badge bg-primary me-1">{{ operator }}</span>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if stats.equipment %}
+                                        {% for equipment in stats.equipment %}
+                                        <span class="badge bg-secondary me-1">{{ equipment }}</span>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% elif workorder.production_record and workorder.production_record.production_details.exists %}
+    <div class="process-section">
+        <h4>
+            <i class="fas fa-clipboard-check text-primary me-2"></i>
+            報工記錄
+        </h4>
+        
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead>
@@ -624,13 +909,19 @@
                 </tbody>
             </table>
         </div>
-        {% else %}
+    </div>
+    {% else %}
+    <div class="process-section">
+        <h4>
+            <i class="fas fa-clipboard-check text-primary me-2"></i>
+            報工記錄
+        </h4>
+        
         <div class="empty-state">
             <i class="fas fa-clipboard-list"></i>
             <h5>尚無報工記錄</h5>
             <p>此工單目前還沒有任何報工記錄</p>
         </div>
-        {% endif %}
     </div>
     {% endif %}
 </div>

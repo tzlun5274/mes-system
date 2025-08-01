@@ -160,30 +160,17 @@
 
     <!-- 統計卡片 -->
     <div class="row mb-4">
-        <div class="col-md-3">
+        <div class="col-md-6">
             <div class="stats-card active">
                 <div class="stats-number">{{ total_active }}</div>
                 <div class="stats-label">生產中工單</div>
                 <small>基於已核准報工</small>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-6">
             <div class="stats-card pending">
                 <div class="stats-number">{{ total_pending }}</div>
                 <div class="stats-label">待生產工單</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stats-card completed">
-                <div class="stats-number">{{ total_completed }}</div>
-                <div class="stats-label">已完成工單</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stats-card" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
-                <div class="stats-number">{{ today_operator_count|add:today_smt_count }}</div>
-                <div class="stats-label">今日已核准報工</div>
-                <small>{{ today|date:"m/d" }}</small>
             </div>
         </div>
     </div>

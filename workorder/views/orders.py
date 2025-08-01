@@ -34,7 +34,7 @@ def orders(request):
         if product_id:
             queryset = queryset.filter(product_id__icontains=product_id)
         order_by = request.GET.get("order_by", "pre_in_date")
-        order_dir = request.GET.get("order_dir", "desc")
+        order_dir = request.GET.get("order_dir", "asc")
         if order_by not in ["pre_in_date", "qty_remain"]:
             order_by = "pre_in_date"
         if order_dir == "asc":
@@ -62,7 +62,7 @@ def order_list(request):
     """
     訂單主檔列表頁面，顯示所有訂單主檔資料。
     """
-    workorders = OrderMain.objects.all().order_by("-id")  # type: ignore
+    workorders = OrderMain.objects.all().order_by("id")  # type: ignore
     return render(
         request, "workorder/workorder_main_list.html", {"workorders": workorders}
     )
