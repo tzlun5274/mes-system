@@ -162,5 +162,7 @@ urlpatterns = [
     path("get_smt_workorders_by_equipment/", workorder_views.get_smt_workorders_by_equipment, name="get_smt_workorders_by_equipment"),
     path("get_workorders_by_product/", workorder_views.get_workorders_by_product, name="get_workorders_by_product"),
     path("get_workorder_details/", workorder_views.get_workorder_details, name="get_workorder_details"),
+    path("get_product_by_workorder/", workorder_views.get_product_by_workorder, name="get_product_by_workorder"),
+    path("get_product_codes_for_autocomplete/", workorder_views.get_product_codes_for_autocomplete, name="get_product_codes_for_autocomplete"),
     path("get_workorder_info/", workorder_views.get_workorder_info, name="get_workorder_info"),
 ]

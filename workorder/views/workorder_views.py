@@ -60,6 +60,22 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
     template_name = 'workorder/workorder/workorder_detail.html'
     context_object_name = 'workorder'
 
+    def get_context_data(self, **kwargs):
+        """添加上下文資料，包括工序統計"""
+        context = super().get_context_data(**kwargs)
+        workorder = self.get_object()
+        
+        # 計算已完成工序數量
+        completed_processes_count = workorder.processes.filter(status='completed').count()
+        
+        # 計算進行中工序數量
+        in_progress_processes_count = workorder.processes.filter(status='in_progress').count()
+        
+        context['completed_processes_count'] = completed_processes_count
+        context['in_progress_processes_count'] = in_progress_processes_count
+        
+        return context
+
 
 class WorkOrderCreateView(LoginRequiredMixin, CreateView):
     """

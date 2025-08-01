@@ -224,7 +224,7 @@
                                 <select class="form-control" id="operator" name="operator">
                                     <option value="">全部作業員</option>
                                     {% for operator in operator_list %}
-                                    <option value="{{ operator.id }}" {% if selected_operator == operator.id %}selected{% endif %}>
+                                    <option value="{{ operator.id }}" {% if selected_operator|stringformat:'s' == operator.id|stringformat:'s' %}selected{% endif %}>
                                         {{ operator.name }}
                                     </option>
                                     {% endfor %}
@@ -243,7 +243,7 @@
                                 <select class="form-control" id="process" name="process">
                                     <option value="">全部工序</option>
                                     {% for process in process_list %}
-                                    <option value="{{ process.id }}" {% if selected_process == process.id %}selected{% endif %}>
+                                    <option value="{{ process.id }}" {% if selected_process|stringformat:'s' == process.id|stringformat:'s' %}selected{% endif %}>
                                         {{ process.name }}
                                     </option>
                                     {% endfor %}

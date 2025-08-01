@@ -32,17 +32,18 @@ class ProductionReportBaseForm(forms.ModelForm):
     )
     
     # 產品編號欄位
-    product_id = forms.CharField(
-        max_length=100,
+    product_id = forms.ChoiceField(
+        choices=[],
         label="產品編號",
-        widget=forms.TextInput(
+        widget=forms.Select(
             attrs={
                 "class": "form-control",
-                "placeholder": "請輸入產品編號",
+                "id": "product_id_select",
+                "placeholder": "請選擇產品編號",
             }
         ),
         required=True,
-        help_text="請輸入產品編號",
+        help_text="請選擇產品編號，將自動帶出相關工單號碼",
     )
     
     # 工序欄位
@@ -1104,7 +1105,7 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
         help_texts = {
             "operator": "請選擇進行補登報工的作業員",
             "workorder": "請選擇工單號碼，或透過產品編號自動帶出",
-            "product_id": "請輸入產品編號",
+            "product_id": "請選擇產品編號，將自動帶出相關工單號碼",
             "process": "請選擇此次補登的工序（排除SMT相關工序）",
             "equipment": "請選擇此次補登的設備（排除SMT相關設備）",
             "work_date": "請選擇報工日期",
@@ -1137,15 +1138,47 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
         equipments = Equipment.objects.all().exclude(name__icontains="SMT").order_by("name")
         self.fields["equipment"].queryset = equipments
 
-        # 設定工單查詢集
+        # 設定工單查詢集（直接從工單表取得）
         from .models import WorkOrder
-        workorders = WorkOrder.objects.exclude(status="completed").order_by("-created_at")
+        workorders = WorkOrder.objects.exclude(
+            order_number__icontains="RD樣品"
+        ).exclude(
+            order_number__icontains="RD-樣品"
+        ).exclude(
+            order_number__icontains="RD樣本"
+        ).exclude(
+            status="completed"
+        ).order_by("-created_at")
         self.fields["workorder"].queryset = workorders
+
+        # 載入產品編號選項
+        product_choices = self.get_product_choices()
+        self.fields["product_id"].choices = product_choices
 
         # 設定預設日期為今天（只在新增時）
         if not self.instance.pk:
             from datetime import date
             self.fields["work_date"].initial = date.today()
+
+    def get_product_choices(self):
+        """獲取產品編號選項（直接從工單表取得）"""
+        from .models import WorkOrder
+        # 直接從工單表中獲取所有產品編號
+        products = WorkOrder.objects.exclude(
+            order_number__icontains="RD樣品"
+        ).exclude(
+            order_number__icontains="RD-樣品"
+        ).exclude(
+            order_number__icontains="RD樣本"
+        ).exclude(
+            status="completed"
+        ).values_list('product_code', flat=True).distinct().order_by('product_code')
+        
+        choices = [('', '請選擇產品編號')]  # 預設選項
+        for product in products:
+            if product:  # 確保產品編號不為空
+                choices.append((product, product))
+        return choices
 
     # 工單預設生產數量（唯讀）
     planned_quantity = forms.IntegerField(
@@ -1895,7 +1928,7 @@ class SupervisorProductionReportForm(forms.ModelForm):
     )
 
     class Meta:
-        model = SupervisorProductionReport
+        model = SupervisorProductionReport  # 使用正確的模型
         fields = [
             "supervisor",
             "workorder",

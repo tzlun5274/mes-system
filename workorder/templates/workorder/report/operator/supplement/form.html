@@ -746,14 +746,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 取得DOM元素
-    const productInput = document.getElementById('{{ form.product_id.id_for_label }}');
     const workorderSelect = document.getElementById('{{ form.workorder.id_for_label }}');
     const plannedQuantityInput = document.getElementById('{{ form.planned_quantity.id_for_label }}');
 
     
     // 除錯：檢查元素是否存在
     console.log('DOM元素檢查:');
-    console.log('productInput:', productInput);
+    console.log('productSelect:', document.getElementById('product_id_select'));
     console.log('workorderSelect:', workorderSelect);
     console.log('plannedQuantityInput:', plannedQuantityInput);
     
@@ -814,18 +813,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+
+
     // 產品編號選擇事件（自動帶出工單）
-    if (productInput) {
+    const productSelect = document.getElementById('product_id_select');
+    if (productSelect) {
         // 檢查初始值，如果產品編號已經有值，自動載入工單
-        if (productInput.value) {
-            console.log('產品編號已有初始值:', productInput.value);
-            loadWorkordersByProduct(productInput.value);
+        if (productSelect.value) {
+            console.log('產品編號已有初始值:', productSelect.value);
+            loadWorkordersByProduct(productSelect.value);
         }
         
-        productInput.addEventListener('change', function() {
+        productSelect.addEventListener('change', function() {
             const productCode = this.value;
-            console.log('產品編號變更:', productCode);
-            loadWorkordersByProduct(productCode);
+            console.log('產品編號選擇變更:', productCode);
+            
+            if (productCode) {
+                // 載入該產品編號相關的工單
+                loadWorkordersByProduct(productCode);
+            } else {
+                // 清空工單選項
+                if (workorderSelect) {
+                    workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                }
+                // 清空工單預設生產數量
+                if (plannedQuantityInput) {
+                    plannedQuantityInput.value = '';
+                }
+            }
         });
     }
     
@@ -837,7 +852,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (workorderId) {
                 // 載入工單詳細資訊
-                fetch(`{% url 'workorder:get_workorder_details' %}?workorder_id=${workorderId}`, {
+                fetch(`{% url 'workorder:get_product_by_workorder' %}?workorder_id=${workorderId}`, {
                     method: 'GET',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
@@ -845,29 +860,29 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                 })
                     .then(response => {
-                        console.log('工單詳情API回應狀態:', response.status);
+                        console.log('產品資訊API回應狀態:', response.status);
                         if (!response.ok) {
                             throw new Error(`HTTP error! status: ${response.status}`);
                         }
                         return response.json();
                     })
                     .then(data => {
-                        console.log('工單詳情API回應:', data);
+                        console.log('產品資訊API回應:', data);
                         if (data.status === 'success') {
-                            const workorder = data.workorder;
+                            const product = data.product;
                             
                             // 更新工單預設生產數量
                             if (plannedQuantityInput) {
-                                plannedQuantityInput.value = workorder.quantity || '';
+                                plannedQuantityInput.value = product.quantity || '';
                                 // 觸發 change 事件以確保表單驗證
                                 plannedQuantityInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                console.log('更新工單預設生產數量:', workorder.quantity);
+                                console.log('更新工單預設生產數量:', product.quantity);
                             }
                             
                             // 自動填入產品編號
-                            if (productInput && workorder.product_code) {
-                                productInput.value = workorder.product_code;
-                                console.log('更新產品編號:', workorder.product_code);
+                            if (productSelect && product.product_code) {
+                                productSelect.value = product.product_code;
+                                console.log('更新產品編號:', product.product_code);
                             }
                             
                             // 自動帶入工單日期

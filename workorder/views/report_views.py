@@ -71,27 +71,27 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
         
         # 篩選條件
         operator_id = self.request.GET.get('operator')
-        if operator_id:
+        if operator_id and operator_id != '':
             queryset = queryset.filter(operator_id=operator_id)
         
         workorder_number = self.request.GET.get('workorder')
-        if workorder_number:
+        if workorder_number and workorder_number != '':
             queryset = queryset.filter(workorder__order_number__icontains=workorder_number)
         
         process_id = self.request.GET.get('process')
-        if process_id:
+        if process_id and process_id != '':
             queryset = queryset.filter(process_id=process_id)
         
         status = self.request.GET.get('status')
-        if status:
+        if status and status != '':
             queryset = queryset.filter(approval_status=status)
         
         date_from = self.request.GET.get('date_from')
-        if date_from:
+        if date_from and date_from != '':
             queryset = queryset.filter(work_date__gte=date_from)
         
         date_to = self.request.GET.get('date_to')
-        if date_to:
+        if date_to and date_to != '':
             queryset = queryset.filter(work_date__lte=date_to)
         
         # 搜尋功能
@@ -114,12 +114,11 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
         operator_list = Operator.objects.all().order_by('name')
         process_list = ProcessName.objects.all().order_by('name')
         
-        # 統計資料
-        queryset = self.get_queryset()
-        total_reports = queryset.count()
-        pending_reports = queryset.filter(approval_status='pending').count()
-        approved_reports = queryset.filter(approval_status='approved').count()
-        rejected_reports = queryset.filter(approval_status='rejected').count()
+        # 統計資料（基於全部資料，不受篩選影響）
+        total_reports = OperatorSupplementReport.objects.count()
+        pending_reports = OperatorSupplementReport.objects.filter(approval_status='pending').count()
+        approved_reports = OperatorSupplementReport.objects.filter(approval_status='approved').count()
+        rejected_reports = OperatorSupplementReport.objects.filter(approval_status='rejected').count()
         
         # 添加額外的上下文數據
         context.update({

@@ -91,8 +91,15 @@ def index(request):
 def detail(request, pk):
     deprecated_warning('detail')
     workorder = get_object_or_404(WorkOrder, pk=pk)
+    
+    # 計算統計數據
+    completed_processes_count = workorder.processes.filter(status='completed').count()
+    in_progress_processes_count = workorder.processes.filter(status='in_progress').count()
+    
     context = {
         "workorder": workorder,
+        "completed_processes_count": completed_processes_count,
+        "in_progress_processes_count": in_progress_processes_count,
     }
     return render(request, "workorder/workorder/workorder_detail.html", context)
 
@@ -4860,9 +4867,7 @@ def operator_on_site_report(request):
     from equip.models import Equipment
     equipment_list = Equipment.objects.all()  # 獲取所有設備，因為 Equipment 模型沒有 is_active 欄位
     
-    # 獲取當前時間
-    from django.utils import timezone
-    current_time = timezone.now()
+
     
     # 獲取統計資料
     from workorder.models import OperatorSupplementReport
@@ -4883,7 +4888,6 @@ def operator_on_site_report(request):
         'title': '作業員現場報工',
         'operator_list': operator_list,
         'equipment_list': equipment_list,
-        'current_time': current_time,
         'working_operators': working_operators,
         'today_reports': today_reports,
         'active_workorders': active_workorders,
@@ -6196,7 +6200,7 @@ def get_smt_workorders_by_equipment(request):
 @require_GET
 @login_required
 def get_workorders_by_product(request):
-    """API：根據產品取得工單（從派工單取得）"""
+    """API：根據產品編號取得相關工單（直接從工單表取得）"""
     try:
         product_code = request.GET.get('product_id') or request.GET.get('product_code')
         if not product_code:
@@ -6205,20 +6209,9 @@ def get_workorders_by_product(request):
                 'message': '請提供產品編號'
             })
         
-        # 從派工單中取得指定產品編號的工單號碼
-        from .models import WorkOrderDispatch
-        
-        dispatch_queryset = WorkOrderDispatch.objects.filter(
-            product_code__icontains=product_code,
-            status__in=["dispatched", "in_production"]  # 只選擇已派工或生產中的派工單
-        )
-        
-        # 取得派工單中的工單號碼列表
-        order_numbers = dispatch_queryset.values_list('order_number', flat=True)
-        
-        # 根據派工單的工單號碼查詢工單
+        # 直接從工單表中查詢指定產品編號的工單
         workorders = WorkOrder.objects.filter(
-            order_number__in=order_numbers
+            product_code__icontains=product_code
         ).exclude(
             order_number__icontains="RD樣品"
         ).exclude(
@@ -6227,7 +6220,7 @@ def get_workorders_by_product(request):
             order_number__icontains="RD樣本"
         ).exclude(
             status="completed"
-        )
+        ).order_by('-created_at')  # 按建立時間倒序排列
         
         data = []
         for workorder in workorders:
@@ -6294,12 +6287,88 @@ def get_workorder_details(request):
     except WorkOrder.DoesNotExist:
         return JsonResponse({
             'status': 'error',
-            'message': '找不到指定的工單'
+            'message': '工單不存在'
         })
     except Exception as e:
         return JsonResponse({
             'status': 'error',
-            'message': f'載入失敗:{str(e)}'
+            'message': str(e)
+        })
+
+
+@require_GET
+@login_required
+def get_product_by_workorder(request):
+    """API：根據工單號碼取得產品編號（相向自動帶出）"""
+    try:
+        workorder_id = request.GET.get('workorder_id')
+        if not workorder_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': '請提供工單ID'
+            })
+        
+        workorder = WorkOrder.objects.get(id=workorder_id)
+        
+        data = {
+            'product_code': workorder.product_code,
+            'quantity': workorder.quantity,
+            'company_code': workorder.company_code,
+            'order_number': workorder.order_number,
+        }
+        
+        return JsonResponse({
+            'status': 'success',
+            'product': data
+        })
+        
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': '工單不存在'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        })
+
+
+@require_GET
+@login_required
+def get_product_codes_for_autocomplete(request):
+    """API：獲取產品編號列表用於自動完成"""
+    try:
+        # 從工單中獲取所有產品編號
+        product_codes = WorkOrder.objects.exclude(
+            status="completed"
+        ).exclude(
+            product_code__isnull=True
+        ).exclude(
+            product_code=""
+        ).values_list('product_code', flat=True).distinct().order_by('product_code')
+        
+        # 從派工單中獲取產品編號
+        from .models import WorkOrderDispatch
+        dispatch_product_codes = WorkOrderDispatch.objects.exclude(
+            product_code__isnull=True
+        ).exclude(
+            product_code=""
+        ).values_list('product_code', flat=True).distinct().order_by('product_code')
+        
+        # 合併並去重
+        all_product_codes = list(set(list(product_codes) + list(dispatch_product_codes)))
+        all_product_codes.sort()
+        
+        return JsonResponse({
+            'status': 'success',
+            'product_codes': all_product_codes
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
         })
 
 @require_GET

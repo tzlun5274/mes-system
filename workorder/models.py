@@ -234,10 +234,10 @@ class WorkOrderProcess(models.Model):
 
     @property
     def completion_rate(self):
-        """完成率"""
+        """完成率（數值）"""
         if self.planned_quantity > 0:
-            return f"{(self.completed_quantity / self.planned_quantity * 100):.1f}%"
-        return "0%"
+            return (self.completed_quantity / self.planned_quantity * 100)
+        return 0.0
 
     @property
     def remaining_quantity(self):
