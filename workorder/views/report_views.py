@@ -13,10 +13,10 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.contrib.auth.decorators import login_required
 
-from ..models import (
+from ..workorder_reporting.models import (
     OperatorSupplementReport, 
     SMTProductionReport, 
     SupervisorProductionReport
@@ -46,7 +46,7 @@ class ReportIndexView(LoginRequiredMixin, ListView):
         
         from datetime import date
         from django.db.models import Q
-        from ..models import OperatorSupplementReport, SMTProductionReport
+        from ..workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
         
         today = date.today()
         month_start = today.replace(day=1)
@@ -238,25 +238,6 @@ class OperatorSupplementReportDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'report'
 
 
-class OperatorSupplementReportDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
-    """
-    作業員補登報工刪除視圖
-    用於刪除作業員補登報工記錄，僅限管理員使用
-    """
-    model = OperatorSupplementReport
-    template_name = 'workorder/report/operator/supplement/delete_confirm.html'
-    success_url = reverse_lazy('workorder:operator_supplement_report_index')
-
-    def test_func(self):
-        """檢查用戶是否有刪除權限"""
-        return self.request.user.is_staff or self.request.user.is_superuser
-
-    def delete(self, request, *args, **kwargs):
-        """刪除成功時的處理"""
-        messages.success(request, '作業員補登報工記錄刪除成功！')
-        return super().delete(request, *args, **kwargs)
-
-
 class SMTProductionReportListView(LoginRequiredMixin, ListView):
     """
     SMT生產報工列表視圖
@@ -351,11 +332,71 @@ class SMTProductionReportDeleteView(LoginRequiredMixin, UserPassesTestMixin, Del
 
     def test_func(self):
         """檢查用戶是否有刪除權限"""
-        return self.request.user.is_staff or self.request.user.is_superuser
+        try:
+            # 獲取要刪除的對象
+            obj = self.get_object()
+            # 檢查用戶權限
+            return self.request.user.is_staff or self.request.user.is_superuser
+        except SMTProductionReport.DoesNotExist:
+            # 記錄不存在，返回 False 讓 handle_no_permission 處理
+            return False
 
     def delete(self, request, *args, **kwargs):
         """刪除成功時的處理"""
-        messages.success(request, 'SMT生產報工記錄刪除成功！')
+        try:
+            obj = self.get_object()
+            # 執行刪除
+            obj.delete()
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'message': 'SMT生產報工記錄刪除成功！'})
+            
+            messages.success(request, 'SMT生產報工記錄刪除成功！')
+            return redirect('workorder:smt_supplement_report_index')
+        except SMTProductionReport.DoesNotExist:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'message': '找不到指定的SMT報工記錄！該記錄可能已被刪除或不存在。'})
+            messages.error(request, '找不到指定的SMT報工記錄！該記錄可能已被刪除或不存在。')
+            return redirect('workorder:smt_supplement_report_index')
+        except Exception as e:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'message': f'刪除失敗：{str(e)}'})
+            messages.error(request, f'刪除失敗：{str(e)}')
+            return redirect('workorder:smt_supplement_report_index')
+
+    def handle_no_permission(self):
+        """處理權限不足的情況"""
+        # 檢查是否是因為記錄不存在
+        try:
+            self.get_object()
+            # 如果記錄存在，則是權限問題
+            messages.error(self.request, '您沒有權限執行此操作！')
+        except SMTProductionReport.DoesNotExist:
+            # 記錄不存在
+            messages.error(self.request, '找不到指定的SMT報工記錄！該記錄可能已被刪除或不存在。')
+        
+        return redirect('workorder:smt_supplement_report_index')
+
+
+class OperatorSupplementReportDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    """
+    作業員補登報工刪除視圖
+    僅允許建立者本人或超級用戶刪除
+    """
+    model = OperatorSupplementReport
+    template_name = 'workorder/report/operator/supplement/delete_confirm.html'
+    success_url = reverse_lazy('workorder:operator_supplement_report_index')
+
+    def test_func(self):
+        obj = self.get_object()
+        return self.request.user.is_superuser or obj.created_by == self.request.user.username
+
+    def handle_no_permission(self):
+        messages.error(self.request, '您沒有權限刪除此補登報工記錄！')
+        return redirect('workorder:operator_supplement_report_index')
+
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, '作業員補登報工記錄刪除成功！')
         return super().delete(request, *args, **kwargs)
 
 

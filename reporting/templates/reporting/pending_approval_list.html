@@ -1,0 +1,507 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}待審核報工列表{% endblock %}
+
+{% block extra_head %}
+<style>
+    .pending-approval-container {
+        padding: 20px;
+    }
+    
+    .pending-approval-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .pending-approval-table {
+        margin-top: 20px;
+    }
+    
+    .pending-approval-table th {
+        background-color: #ffc107 !important;
+        color: #212529 !important;
+        border-top: none;
+        font-weight: 600;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+    }
+    
+    .status-pending {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .type-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+    }
+    
+    .type-supervisor {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .type-operator {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .type-smt {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .stats-card {
+        text-align: center;
+        padding: 15px;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        margin-bottom: 20px;
+    }
+    
+    .stats-number {
+        font-size: 2em;
+        font-weight: bold;
+        color: #007bff;
+    }
+    
+    .stats-label {
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-clock text-warning"></i> 待審核報工列表
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor_report_index' %}">主管審核</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">待審核列表</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number text-primary">{{ total_pending }}</div>
+                <div class="stats-label">總待審核</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number text-info">{{ supervisor_count }}</div>
+                                    <div class="stats-label">主管審核</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number text-success">{{ operator_count }}</div>
+                <div class="stats-label">作業員報工</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number text-danger">{{ smt_count }}</div>
+                <div class="stats-label">SMT報工</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 待審核記錄列表 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card pending-approval-card">
+                <div class="card-header bg-warning text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list"></i> 待審核報工記錄
+                        </h5>
+                        {% if user.is_superuser %}
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-success btn-sm" onclick="batchApprove()">
+                                <i class="fas fa-check-double"></i> 批次審核
+                            </button>
+                            <a href="{% url 'reporting:batch_delete_pending_confirm' %}" class="btn btn-danger btn-sm">
+                                <i class="fas fa-trash-alt"></i> 批次刪除
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if all_pending %}
+                        <div class="table-responsive">
+                            <table class="table table-hover pending-approval-table">
+                                <thead>
+                                    <tr>
+                                        <th>報工類型</th>
+                                        <th>作業員/設備</th>
+                                        <th>工單號</th>
+                                        <th>工序</th>
+                                        <th>報工日期</th>
+                                        <th>工作時間</th>
+                                        <th>報工數量</th>
+                                        <th>不良品</th>
+                                        <th>備註</th>
+                                        <th>建立時間</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in all_pending %}
+                                    <tr>
+                                        <td>
+                                            <span class="type-badge type-{{ report.report_type }}">
+                                                {{ report.type }}
+                                            </span>
+                                        </td>
+                                        <td>{{ report.operator }}</td>
+                                        <td>{{ report.workorder }}</td>
+                                        <td>{{ report.process }}</td>
+                                        <td>{{ report.work_date|date:"Y-m-d" }}</td>
+                                        <td>
+                                            {{ report.start_time|time:"H:i" }} - {{ report.end_time|time:"H:i" }}
+                                        </td>
+                                        <td>{{ report.quantity }}</td>
+                                        <td>{{ report.defect_quantity }}</td>
+                                        <td>
+                                            {% if report.remarks %}
+                                                <span class="text-muted" title="{{ report.remarks }}">
+                                                    {{ report.remarks|truncatechars:20 }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ report.created_at|date:"m-d H:i" }}</td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="#" class="btn btn-sm btn-success" 
+                                                   onclick="approveReport('{{ report.report_type }}', {{ report.id }})">
+                                                    <i class="fas fa-check"></i> 審核
+                                                </a>
+                                                <a href="#" class="btn btn-sm btn-danger" 
+                                                   onclick="rejectReport('{{ report.report_type }}', {{ report.id }})">
+                                                    <i class="fas fa-times"></i> 駁回
+                                                </a>
+                                                <a href="#" class="btn btn-sm btn-info" 
+                                                   onclick="viewDetail('{{ report.report_type }}', {{ report.id }})">
+                                                    <i class="fas fa-eye"></i> 詳情
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle text-success" style="font-size: 3em;"></i>
+                            <h4 class="mt-3 text-muted">目前沒有待審核的報工記錄</h4>
+                            <p class="text-muted">所有報工記錄都已經審核完成</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 審核確認對話框 -->
+<div class="modal fade" id="approveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">確認審核</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>確定要審核通過這筆報工記錄嗎？</p>
+                <div class="form-group">
+                    <label for="approval_remarks">審核備註（可選）：</label>
+                    <textarea class="form-control" id="approval_remarks" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-success" onclick="confirmApprove()">確認審核</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 駁回確認對話框 -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">確認駁回</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>確定要駁回這筆報工記錄嗎？</p>
+                <div class="form-group">
+                    <label for="rejection_reason">駁回原因：</label>
+                    <textarea class="form-control" id="rejection_reason" rows="3" required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" onclick="confirmReject()">確認駁回</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentReportType = '';
+let currentReportId = 0;
+
+// 獲取CSRF token
+function getCSRFToken() {
+    const name = 'csrftoken';
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function approveReport(reportType, reportId) {
+            // 審核報告
+    currentReportType = reportType;
+    currentReportId = reportId;
+    document.getElementById('approval_remarks').value = '';
+    var modalElement = document.getElementById('approveModal');
+    if (modalElement && typeof bootstrap !== 'undefined') {
+        var modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    } else {
+        console.error('Modal 元素或 Bootstrap 未找到');
+        alert('系統錯誤：無法開啟審核對話框');
+    }
+}
+
+function rejectReport(reportType, reportId) {
+            // 駁回報告
+    currentReportType = reportType;
+    currentReportId = reportId;
+    document.getElementById('rejection_reason').value = '';
+    var modalElement = document.getElementById('rejectModal');
+    if (modalElement && typeof bootstrap !== 'undefined') {
+        var modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    } else {
+        console.error('Modal 元素或 Bootstrap 未找到');
+        alert('系統錯誤：無法開啟駁回對話框');
+    }
+}
+
+function viewDetail(reportType, reportId) {
+    let url = '';
+    switch(reportType) {
+        case 'supervisor':
+            url = `/workorder/report/supervisor/production/detail/${reportId}/`;
+            break;
+        case 'operator':
+            url = `/workorder/report/operator/supplement/detail/${reportId}/`;
+            break;
+        case 'smt':
+            url = `/workorder/report/smt/supplement/detail/${reportId}/`;
+            break;
+    }
+    if (url) {
+        window.open(url, '_blank');
+    }
+}
+
+function batchApprove() {
+    // 批次審核功能
+    if (!confirm('確定要批次審核所有待審核的報工記錄嗎？\n\n此操作將一次性審核所有待審核記錄，無法撤銷。')) {
+        return;
+    }
+    
+    // 顯示載入中提示
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
+    button.disabled = true;
+    
+    // 發送批次審核請求
+    fetch('/workorder/batch_approve_pending/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: new URLSearchParams({
+            'csrfmiddlewaretoken': getCSRFToken()
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`批次審核完成！\n成功審核 ${data.approved_count} 筆記錄`);
+            location.reload();
+        } else {
+            console.error('批次審核失敗：' + data.message);
+            alert('批次審核失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('批次審核失敗：', error);
+        alert('批次審核失敗，請稍後再試');
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+function confirmApprove() {
+            // 確認審核
+    const remarks = document.getElementById('approval_remarks').value;
+    let url = '';
+    
+    switch(currentReportType) {
+        case 'supervisor':
+            url = `/workorder/report/supervisor/production/approve-ajax/${currentReportId}/`;
+            break;
+        case 'operator':
+            url = `/workorder/report/operator/supplement/approve/${currentReportId}/`;
+            break;
+        case 'smt':
+            url = `/workorder/report/smt/supplement/approve/${currentReportId}/`;
+            break;
+    }
+    
+            // 準備請求資料
+    
+    if (url) {
+        const formData = new URLSearchParams();
+        formData.append('remarks', remarks);
+        formData.append('csrfmiddlewaretoken', getCSRFToken());
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                console.error('審核失敗：' + data.message);
+                alert('審核失敗：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('審核失敗：', error);
+            alert('審核失敗，請稍後再試');
+        });
+    }
+    
+    var modalElement = document.getElementById('approveModal');
+    if (modalElement && typeof bootstrap !== 'undefined') {
+        var modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+            modal.hide();
+        }
+    }
+}
+
+function confirmReject() {
+    const reason = document.getElementById('rejection_reason').value;
+    if (!reason.trim()) {
+        alert('請填寫駁回原因');
+        return;
+    }
+    
+    let url = '';
+    switch(currentReportType) {
+        case 'supervisor':
+            url = `/workorder/report/supervisor/production/reject-ajax/${currentReportId}/`;
+            break;
+        case 'operator':
+            url = `/workorder/report/operator/supplement/reject/${currentReportId}/`;
+            break;
+        case 'smt':
+            url = `/workorder/report/smt/supplement/reject/${currentReportId}/`;
+            break;
+    }
+    
+    if (url) {
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: new URLSearchParams({
+                'reason': reason,
+                'csrfmiddlewaretoken': getCSRFToken()
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                console.error('駁回失敗：' + data.message);
+                alert('駁回失敗：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('駁回失敗：', error);
+            alert('駁回失敗，請稍後再試');
+        });
+    }
+    
+    var modalElement = document.getElementById('rejectModal');
+    if (modalElement && typeof bootstrap !== 'undefined') {
+        var modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+            modal.hide();
+        }
+    }
+}
+</script>
+{% endblock %} 

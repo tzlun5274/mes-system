@@ -1,0 +1,576 @@
+"""
+作業員報工資料匯入處理模組
+負責處理從 Excel/CSV 檔案匯入作業員報工資料的功能
+"""
+
+import pandas as pd
+import logging
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib import messages
+from django.shortcuts import redirect, render
+from django.utils import timezone
+from datetime import datetime, time
+from io import BytesIO
+
+from workorder.models import WorkOrder
+from workorder.workorder_reporting.models import OperatorSupplementReport
+from process.models import Operator, ProcessName
+from equip.models import Equipment
+from erp_integration.models import CompanyConfig
+
+logger = logging.getLogger(__name__)
+
+
+def import_user_required(user):
+    """
+    檢查用戶是否為超級用戶或具有匯入權限
+    """
+    return user.is_superuser or user.groups.filter(name="報表使用者").exists()
+
+
+@login_required
+@user_passes_test(import_user_required, login_url='/login/')
+def operator_report_import_page(request):
+    """
+    作業員報工資料匯入頁面
+    顯示匯入介面和欄位格式說明
+    """
+    return render(request, 'workorder/import/operator_report_import.html')
+
+
+@csrf_exempt
+@login_required
+@user_passes_test(import_user_required, login_url='/login/')
+def operator_report_import_file(request):
+    """
+    作業員報工資料檔案匯入處理
+    
+    支援的欄位格式：
+    作業員名稱	公司代號	報工日期	開始時間	結束時間	工單號	產品編號	工序名稱	設備名稱	報工數量	不良品數量	備註	異常紀錄
+    
+    必填欄位：作業員名稱、公司代號、報工日期、開始時間、結束時間、工單號、產品編號、工序名稱、報工數量
+    選填欄位：設備名稱、備註、異常紀錄
+    特殊處理：異常紀錄欄位有內容才會列入異常紀錄
+    """
+    
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'message': '只支援 POST 請求'
+        })
+    
+    try:
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return JsonResponse({
+                'success': False,
+                'message': '沒有選擇檔案'
+            })
+        
+        # 檢查檔案格式
+        file_name = uploaded_file.name.lower()
+        if not (file_name.endswith('.xlsx') or file_name.endswith('.csv')):
+            return JsonResponse({
+                'success': False,
+                'message': '只支援 Excel (.xlsx) 或 CSV 格式檔案'
+            })
+        
+        # 讀取檔案內容
+        try:
+            if file_name.endswith('.xlsx'):
+                df = pd.read_excel(uploaded_file)
+            else:
+                df = pd.read_csv(uploaded_file, encoding='utf-8')
+        except Exception as e:
+            logger.error(f"檔案讀取失敗: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'message': f'檔案讀取失敗: {str(e)}'
+            })
+        
+        # 檢查必要欄位
+        required_columns = [
+            '作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', 
+            '工單號', '產品編號', '工序名稱', '報工數量'
+        ]
+        
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return JsonResponse({
+                'success': False,
+                'message': f'缺少必要欄位：{", ".join(missing_columns)}'
+            })
+        
+        # 處理每一行資料
+        success_count = 0
+        error_count = 0
+        skip_count = 0
+        errors = []
+        skips = []
+        
+        for index, row in df.iterrows():
+            try:
+                # 1. 驗證並取得作業員
+                operator_name = str(row['作業員名稱']).strip()
+                if not operator_name:
+                    errors.append(f'第 {index+1} 行：作業員名稱為空')
+                    error_count += 1
+                    continue
+                
+                operator = Operator.objects.filter(name=operator_name).first()
+                if not operator:
+                    errors.append(f'第 {index+1} 行：找不到作業員 "{operator_name}"')
+                    error_count += 1
+                    continue
+                
+                # 2. 驗證並取得公司代號
+                company_code = str(row['公司代號']).strip()
+                if not company_code:
+                    errors.append(f'第 {index+1} 行：公司代號為空')
+                    error_count += 1
+                    continue
+                
+                # 確保公司代號是字串格式（處理 pandas 自動轉換數字的情況）
+                if company_code.isdigit():
+                    company_code = company_code.zfill(2)  # 確保是兩位數格式
+                
+                # 檢查公司是否存在
+                company = CompanyConfig.objects.filter(company_code=company_code).first()
+                if not company:
+                    errors.append(f'第 {index+1} 行：找不到公司代號 "{company_code}"')
+                    error_count += 1
+                    continue
+                
+                # 3. 驗證並解析報工日期
+                try:
+                    date_str = str(row['報工日期']).strip()
+                    # 支援多種日期格式：YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD
+                    if '/' in date_str:
+                        # 處理 YYYY/MM/DD 格式
+                        work_date = datetime.strptime(date_str, '%Y/%m/%d').date()
+                    elif '.' in date_str:
+                        # 處理 YYYY.MM.DD 格式
+                        work_date = datetime.strptime(date_str, '%Y.%m.%d').date()
+                    else:
+                        # 處理 YYYY-MM-DD 格式（預設）
+                        work_date = pd.to_datetime(date_str).date()
+                except Exception as e:
+                    errors.append(f'第 {index+1} 行：報工日期格式錯誤 "{row["報工日期"]}"，支援格式：YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD')
+                    error_count += 1
+                    continue
+                
+                # 4. 驗證並解析開始時間
+                try:
+                    start_time_str = str(row['開始時間']).strip()
+                    if 'days' in start_time_str:
+                        # 處理 Excel 時間格式 "0 days 08:30:00"
+                        time_part = start_time_str.split(' ')[-1]  # 取得 "08:30:00" 部分
+                        start_time = datetime.strptime(time_part, '%H:%M:%S').time()
+                    elif 'AM' in start_time_str or 'PM' in start_time_str:
+                        # 處理 12 小時制格式 "04:30:00 PM"
+                        start_time = pd.to_datetime(start_time_str).time()
+                    elif ':' in start_time_str:
+                        # 處理標準時間格式 "08:30:00" 或 "08:30"
+                        if start_time_str.count(':') == 2:
+                            start_time = datetime.strptime(start_time_str, '%H:%M:%S').time()
+                        else:
+                            start_time = datetime.strptime(start_time_str, '%H:%M').time()
+                    else:
+                        # 處理純數字格式 "0830"
+                        start_time = datetime.strptime(start_time_str.zfill(4), '%H%M').time()
+                except Exception as e:
+                    errors.append(f'第 {index+1} 行：開始時間格式錯誤 "{row["開始時間"]}"，支援格式：HH:MM:SS、HH:MM、HHMM、12小時制、Excel時間格式')
+                    error_count += 1
+                    continue
+                
+                # 5. 驗證並解析結束時間
+                try:
+                    end_time_str = str(row['結束時間']).strip()
+                    if 'days' in end_time_str:
+                        # 處理 Excel 時間格式 "0 days 17:30:00"
+                        time_part = end_time_str.split(' ')[-1]  # 取得 "17:30:00" 部分
+                        end_time = datetime.strptime(time_part, '%H:%M:%S').time()
+                    elif 'AM' in end_time_str or 'PM' in end_time_str:
+                        # 處理 12 小時制格式 "04:30:00 PM"
+                        end_time = pd.to_datetime(end_time_str).time()
+                    elif ':' in end_time_str:
+                        # 處理標準時間格式 "17:30:00" 或 "17:30"
+                        if end_time_str.count(':') == 2:
+                            end_time = datetime.strptime(end_time_str, '%H:%M:%S').time()
+                        else:
+                            end_time = datetime.strptime(end_time_str, '%H:%M').time()
+                    else:
+                        # 處理純數字格式 "1730"
+                        end_time = datetime.strptime(end_time_str.zfill(4), '%H%M').time()
+                except Exception as e:
+                    errors.append(f'第 {index+1} 行：結束時間格式錯誤 "{row["結束時間"]}"，支援格式：HH:MM:SS、HH:MM、HHMM、12小時制、Excel時間格式')
+                    error_count += 1
+                    continue
+                
+                # 6. 驗證並取得工單
+                workorder_number = str(row['工單號']).strip()
+                if not workorder_number:
+                    errors.append(f'第 {index+1} 行：工單號為空')
+                    error_count += 1
+                    continue
+                
+                workorder = WorkOrder.objects.filter(
+                    company_code=company_code,
+                    order_number=workorder_number
+                ).first()
+                if not workorder:
+                    errors.append(f'第 {index+1} 行：找不到工單 "{workorder_number}" (公司代號: {company_code})')
+                    error_count += 1
+                    continue
+                
+                # 7. 驗證產品編號
+                product_code = str(row['產品編號']).strip()
+                if not product_code:
+                    errors.append(f'第 {index+1} 行：產品編號為空')
+                    error_count += 1
+                    continue
+                
+                # 8. 驗證並取得工序
+                process_name = str(row['工序名稱']).strip()
+                if not process_name:
+                    errors.append(f'第 {index+1} 行：工序名稱為空')
+                    error_count += 1
+                    continue
+                
+                process = ProcessName.objects.filter(name=process_name).first()
+                if not process:
+                    errors.append(f'第 {index+1} 行：找不到工序 "{process_name}"')
+                    error_count += 1
+                    continue
+                
+                # 9. 驗證報工數量
+                try:
+                    work_quantity = int(row['報工數量'])
+                    if work_quantity < 0:
+                        errors.append(f'第 {index+1} 行：報工數量不能為負數')
+                        error_count += 1
+                        continue
+                except (ValueError, TypeError):
+                    errors.append(f'第 {index+1} 行：報工數量格式錯誤 "{row["報工數量"]}"')
+                    error_count += 1
+                    continue
+                
+                # 10. 處理不良品數量（選填）
+                defect_quantity = 0
+                if '不良品數量' in df.columns and pd.notna(row['不良品數量']):
+                    try:
+                        defect_quantity = int(row['不良品數量'])
+                        if defect_quantity < 0:
+                            errors.append(f'第 {index+1} 行：不良品數量不能為負數')
+                            error_count += 1
+                            continue
+                    except (ValueError, TypeError):
+                        errors.append(f'第 {index+1} 行：不良品數量格式錯誤 "{row["不良品數量"]}"')
+                        error_count += 1
+                        continue
+                
+                # 11. 處理設備名稱（選填）
+                equipment = None
+                if '設備名稱' in df.columns and pd.notna(row['設備名稱']):
+                    equipment_name = str(row['設備名稱']).strip()
+                    if equipment_name:
+                        equipment = Equipment.objects.filter(name=equipment_name).first()
+                        if not equipment:
+                            skips.append(f'第 {index+1} 行：找不到設備 "{equipment_name}"，將跳過設備資訊')
+                
+                # 12. 處理備註（選填）
+                remarks = ""
+                if '備註' in df.columns and pd.notna(row['備註']):
+                    remarks = str(row['備註']).strip()
+                
+                # 13. 處理異常紀錄（選填）
+                abnormal_notes = ""
+                if '異常紀錄' in df.columns and pd.notna(row['異常紀錄']):
+                    abnormal_notes = str(row['異常紀錄']).strip()
+                
+                # 14. 檢查是否已存在相同記錄（避免重複匯入）
+                existing_report = OperatorSupplementReport.objects.filter(
+                    operator=operator,
+                    workorder=workorder,
+                    process=process,
+                    work_date=work_date,
+                    start_time=start_time,
+                    end_time=end_time
+                ).first()
+                
+                if existing_report:
+                    skips.append(f'第 {index+1} 行：已存在相同記錄，跳過匯入')
+                    skip_count += 1
+                    continue
+                
+                # 15. 建立報工記錄
+                report = OperatorSupplementReport.objects.create(
+                    operator=operator,
+                    workorder=workorder,
+                    process=process,
+                    equipment=equipment,
+                    work_date=work_date,
+                    start_time=start_time,
+                    end_time=end_time,
+                    work_quantity=work_quantity,
+                    defect_quantity=defect_quantity,
+                    remarks=remarks,
+                    abnormal_notes=abnormal_notes,
+                    created_by=request.user.username
+                )
+                
+                # 16. 自動計算工時
+                report.calculate_work_hours()
+                report.save()
+                
+                success_count += 1
+                
+            except Exception as e:
+                logger.error(f"處理第 {index+1} 行時發生錯誤: {str(e)}")
+                errors.append(f'第 {index+1} 行：處理失敗 - {str(e)}')
+                error_count += 1
+        
+        # 準備回應訊息
+        result_message = f"匯入完成！成功：{success_count} 筆，錯誤：{error_count} 筆，跳過：{skip_count} 筆"
+        
+        if errors:
+            result_message += f"\n錯誤詳情：\n" + "\n".join(errors[:10])  # 只顯示前10個錯誤
+            if len(errors) > 10:
+                result_message += f"\n... 還有 {len(errors) - 10} 個錯誤"
+        
+        if skips:
+            result_message += f"\n跳過詳情：\n" + "\n".join(skips[:5])  # 只顯示前5個跳過
+            if len(skips) > 5:
+                result_message += f"\n... 還有 {len(skips) - 5} 個跳過"
+        
+        return JsonResponse({
+            'success': True,
+            'message': result_message,
+            'data': {
+                'success_count': success_count,
+                'error_count': error_count,
+                'skip_count': skip_count,
+                'total_processed': len(df)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"匯入處理發生未預期錯誤: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'匯入處理失敗: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(import_user_required, login_url='/login/')
+def download_import_template(request):
+    """
+    下載匯入範本檔案
+    提供標準的 Excel 範本，包含所有必要欄位和範例資料
+    """
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        
+        # 建立新的工作簿
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "作業員報工匯入範本"
+        
+        # 定義欄位標題
+        headers = [
+            '作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', 
+            '工單號', '產品編號', '工序名稱', '設備名稱', '報工數量', 
+            '不良品數量', '備註', '異常紀錄'
+        ]
+        
+        # 設定標題樣式
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        
+        # 寫入標題
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+        
+        # 範例資料
+        example_data = [
+            ['張小明', '01', '2025-01-15', '08:00', '12:00', 'WO-01-202501001', 'PROD-001', 'SMT', 'SMT-001', 100, 2, '正常生產', ''],
+            ['李小華', '01', '2025/01/15', '13:00', '17:00', 'WO-01-202501001', 'PROD-001', 'DIP', 'DIP-001', 95, 5, '設備調整', '設備故障30分鐘'],
+            ['王小美', '02', '2025.01.15', '08:00', '16:00', 'WO-02-202501002', 'PROD-002', '測試', '', 200, 0, '加班生產', ''],
+        ]
+        
+        # 寫入範例資料
+        for row, data in enumerate(example_data, 2):
+            for col, value in enumerate(data, 1):
+                ws.cell(row=row, column=col, value=value)
+        
+        # 設定欄寬
+        column_widths = [12, 10, 12, 10, 10, 15, 12, 10, 10, 10, 10, 15, 15]
+        for col, width in enumerate(column_widths, 1):
+            ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = width
+        
+        # 設定邊框
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        for row in ws.iter_rows(min_row=1, max_row=len(example_data)+1, min_col=1, max_col=len(headers)):
+            for cell in row:
+                cell.border = thin_border
+        
+        # 建立回應
+        from django.http import HttpResponse
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="作業員報工匯入範本.xlsx"'
+        
+        # 儲存到回應
+        wb.save(response)
+        return response
+        
+    except Exception as e:
+        logger.error(f"下載範本失敗: {str(e)}")
+        messages.error(request, f'下載範本失敗: {str(e)}')
+        return redirect('workorder:operator_report_import_page')
+
+
+@login_required
+@user_passes_test(import_user_required, login_url='/login/')
+def get_import_field_guide(request):
+    """
+    取得匯入欄位格式說明
+    提供 API 介面，返回詳細的欄位格式說明
+    """
+    field_guide = {
+        'title': '作業員報工資料匯入欄位格式說明',
+        'description': '此格式用於匯入作業員的報工資料，支援 Excel 和 CSV 格式',
+        'fields': [
+            {
+                'name': '作業員名稱',
+                'required': True,
+                'type': '文字',
+                'description': '作業員的姓名，必須在系統中已存在',
+                'example': '張小明',
+                'validation': '不能為空，必須對應到系統中的作業員'
+            },
+            {
+                'name': '公司代號',
+                'required': True,
+                'type': '文字',
+                'description': '公司代號，用於識別不同公司的工單',
+                'example': '01',
+                'validation': '不能為空，必須對應到系統中的公司設定'
+            },
+            {
+                'name': '報工日期',
+                'required': True,
+                'type': '日期',
+                'description': '報工的日期',
+                'example': '2025-01-15',
+                'validation': '格式：YYYY-MM-DD'
+            },
+            {
+                'name': '開始時間',
+                'required': True,
+                'type': '時間',
+                'description': '報工開始時間',
+                'example': '08:00 或 0800',
+                'validation': '24小時制，支援 HH:MM 或 HHMM 格式'
+            },
+            {
+                'name': '結束時間',
+                'required': True,
+                'type': '時間',
+                'description': '報工結束時間',
+                'example': '12:00 或 1200',
+                'validation': '24小時制，支援 HH:MM 或 HHMM 格式'
+            },
+            {
+                'name': '工單號',
+                'required': True,
+                'type': '文字',
+                'description': '工單號碼',
+                'example': 'WO-01-202501001',
+                'validation': '不能為空，必須對應到系統中的工單'
+            },
+            {
+                'name': '產品編號',
+                'required': True,
+                'type': '文字',
+                'description': '產品編號',
+                'example': 'PROD-001',
+                'validation': '不能為空'
+            },
+            {
+                'name': '工序名稱',
+                'required': True,
+                'type': '文字',
+                'description': '工序名稱',
+                'example': 'SMT、DIP、測試',
+                'validation': '不能為空，必須對應到系統中的工序'
+            },
+            {
+                'name': '設備名稱',
+                'required': False,
+                'type': '文字',
+                'description': '使用的設備名稱（選填）',
+                'example': 'SMT-001',
+                'validation': '可為空，如果填寫必須對應到系統中的設備'
+            },
+            {
+                'name': '報工數量',
+                'required': True,
+                'type': '整數',
+                'description': '合格品數量',
+                'example': '100',
+                'validation': '必須為非負整數'
+            },
+            {
+                'name': '不良品數量',
+                'required': False,
+                'type': '整數',
+                'description': '不良品數量（選填）',
+                'example': '2',
+                'validation': '可為空，如果填寫必須為非負整數'
+            },
+            {
+                'name': '備註',
+                'required': False,
+                'type': '文字',
+                'description': '備註說明（選填）',
+                'example': '正常生產',
+                'validation': '可為空，純文字描述'
+            },
+            {
+                'name': '異常紀錄',
+                'required': False,
+                'type': '文字',
+                'description': '異常情況記錄（選填）',
+                'example': '設備故障30分鐘',
+                'validation': '可為空，有內容才會列入異常紀錄'
+            }
+        ],
+        'notes': [
+            '所有時間欄位支援 24 小時制格式',
+            '設備名稱和備註為選填欄位',
+            '異常紀錄欄位有內容才會列入異常紀錄',
+            '系統會自動檢查重複記錄並跳過',
+            '匯入後會自動計算工時和休息時間'
+        ]
+    }
+    
+    return JsonResponse({
+        'success': True,
+        'data': field_guide
+    }) 

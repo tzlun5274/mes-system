@@ -810,12 +810,27 @@ class OperatorSupplementReport(models.Model):
         只有建立記錄的用戶和超級主管可以刪除待核准和已駁回的記錄
         已核准的記錄只有超級主管可以刪除
         """
+        # 調試信息
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Checking delete permission for user: {user.username}")
+        logger.info(f"Record created_by: {self.created_by}, approval_status: {self.approval_status}")
+        logger.info(f"User is_superuser: {user.is_superuser}")
+        
         # 已核准的記錄只有超級主管可以刪除
         if self.approval_status == "approved":
+            logger.info("Record is approved, only superuser can delete")
             return user.is_superuser
 
         # 待核准和已駁回的記錄，只有建立者或超級主管可以刪除
-        return user.is_superuser or self.created_by == user.username
+        # 如果 created_by 是 "system"，則允許所有用戶刪除
+        if self.created_by == "system":
+            logger.info("Record created by system, allowing delete")
+            return True
+            
+        can_delete = user.is_superuser or self.created_by == user.username
+        logger.info(f"Final can_delete result: {can_delete}")
+        return can_delete
 
     def can_approve(self, user):
         """
@@ -1000,6 +1015,19 @@ class OperatorSupplementReport(models.Model):
 
     def get_completion_summary(self):
         """取得完工摘要資訊"""
+        # 處理workorder為None的情況（RD樣品模式）
+        if self.workorder is None:
+            return {
+                "is_completed": self.is_completed,
+                "auto_completed": self.auto_completed,
+                "completion_method": self.completion_method,
+                "completion_time": self.completion_time,
+                "cumulative_quantity": self.cumulative_quantity,
+                "cumulative_hours": self.cumulative_hours,
+                "planned_quantity": 0,  # RD樣品沒有預設數量
+                "completion_rate": 0,  # RD樣品不計算完工率
+            }
+        
         return {
             "is_completed": self.is_completed,
             "auto_completed": self.auto_completed,

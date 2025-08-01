@@ -367,10 +367,11 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     // 建立 FormData
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('action', 'import_file');
     formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
     
     // 發送請求
-    fetch('{% url "workorder:operator_supplement_batch_create" %}', {
+    fetch('{% url "workorder:operator_supplement_batch" %}', {
         method: 'POST',
         body: formData
     })

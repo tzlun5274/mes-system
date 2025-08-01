@@ -14,12 +14,68 @@
                     </h3>
                 </div>
                 <div class="card-body">
-                    <div class="text-center py-5">
-                        <div class="mb-4">
-                            <i class="fas fa-chart-line fa-5x text-muted"></i>
+                    <!-- 快速操作區域 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-bolt text-warning"></i> 快速操作
+                            </h5>
                         </div>
-                        <h4 class="text-muted mb-3">報表佔位用</h4>
-                        <p class="text-muted">此功能正在開發中，敬請期待...</p>
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'reporting:pending_approval_list' %}" class="btn btn-warning btn-block">
+                                <i class="fas fa-clock"></i><br>
+                                待審核清單<br>
+                                <small>查看待審核的報工記錄</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'reporting:approved_reports_list' %}" class="btn btn-success btn-block">
+                                <i class="fas fa-check-circle"></i><br>
+                                已核准清單<br>
+                                <small>查看已核准的報工記錄</small>
+                            </a>
+                        </div>
+                        {% if user.is_superuser %}
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'reporting:batch_delete_pending_confirm' %}" class="btn btn-danger btn-block">
+                                <i class="fas fa-trash-alt"></i><br>
+                                批次刪除待核准<br>
+                                <small>超級管理員專用</small>
+                            </a>
+                        </div>
+                        {% endif %}
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'workorder:supervisor_report_index' %}" class="btn btn-info btn-block">
+                                <i class="fas fa-tasks"></i><br>
+                                主管審核<br>
+                                <small>返回主管審核首頁</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'workorder:index' %}" class="btn btn-primary btn-block">
+                                <i class="fas fa-home"></i><br>
+                                工單管理<br>
+                                <small>返回工單管理首頁</small>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- 功能說明區域 -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <h5><i class="fas fa-info-circle"></i> 功能說明</h5>
+                                <p class="mb-2">報表管理系統提供以下功能：</p>
+                                <ul class="mb-0">
+                                    <li><strong>待審核清單：</strong>查看所有待審核的作業員報工和SMT報工記錄</li>
+                                    <li><strong>已核准清單：</strong>查看所有已核准的報工記錄歷史</li>
+                                    <li><strong>主管審核：</strong>進行報工記錄的審核操作</li>
+                                    {% if user.is_superuser %}
+                                    <li><strong>批次刪除待核准：</strong>超級管理員專用功能，可批次刪除所有待核准的報工記錄</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

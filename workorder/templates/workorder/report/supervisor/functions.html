@@ -280,7 +280,7 @@
                                 {% if recent_abnormal %}
                                     {% for report in recent_abnormal %}
                                     <tr>
-                                        <td>{{ report.time|date:"Y-m-d H:i" }}</td>
+                                        <td>{{ report.time|date:"Y-m-d" }}</td>
                                         <td>
                                             <span class="badge badge-info">{{ report.type }}</span>
                                         </td>
@@ -303,11 +303,13 @@
                                         </td>
                                         <td>
                                             <div class="btn-group" role="group">
-                                                <button type="button" class="btn btn-sm btn-outline-info" title="查看詳情">
-                                                    <i class="fas fa-eye"></i>
+                                                <button type="button" class="btn btn-sm btn-outline-info" title="查看詳情" 
+                                                        onclick="viewAbnormalDetail('{{ report.type }}', '{{ report.workorder }}', '{{ report.operator }}')">
+                                                    <i class="fas fa-eye"></i> 查看
                                                 </button>
-                                                <button type="button" class="btn btn-sm btn-outline-warning" title="處理異常">
-                                                    <i class="fas fa-tools"></i>
+                                                <button type="button" class="btn btn-sm btn-outline-warning" title="處理異常"
+                                                        onclick="handleAbnormal('{{ report.type }}', '{{ report.workorder }}', '{{ report.operator }}')">
+                                                    <i class="fas fa-tools"></i> 處理
                                                 </button>
                                             </div>
                                         </td>
@@ -400,15 +402,26 @@
         }
     }
     
+    // 查看異常詳情
+    function viewAbnormalDetail(type, workorder, operator) {
+        showLoading();
+        // 根據類型導向不同的詳情頁面
+        if (type === '作業員報工') {
+            window.location.href = "{% url 'workorder:abnormal_management' %}";
+        } else if (type === 'SMT報工') {
+            window.location.href = "{% url 'workorder:abnormal_management' %}";
+        } else {
+            hideLoading();
+            alert('暫不支援此類型的詳情查看');
+        }
+    }
+    
     // 處理異常按鈕點擊事件
-    function handleAbnormal(reportId, type) {
+    function handleAbnormal(type, workorder, operator) {
         if (confirmAction('確定要處理此異常嗎？')) {
             showLoading();
-            // 這裡可以加入處理異常的AJAX請求
-            setTimeout(function() {
-                hideLoading();
-                alert('異常處理完成！');
-            }, 1000);
+            // 導向異常處理頁面
+            window.location.href = "{% url 'workorder:abnormal_management' %}";
         }
     }
 </script>

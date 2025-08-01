@@ -1,13 +1,11 @@
 from django import forms
 from django.db.models import Q
 from django.utils import timezone
-from .models import WorkOrder, CompanyOrder, WorkOrderProcess, SMTProductionReport
+from .models import WorkOrder, CompanyOrder, WorkOrderProcess, WorkOrderAssignment
+from .workorder_reporting.models import SMTProductionReport, OperatorSupplementReport, SupervisorProductionReport
 from process.models import Operator
 from equip.models import Equipment
-from .models import WorkOrderAssignment
 from datetime import datetime, date, timedelta
-from .models import SupervisorProductionReport
-from .models import OperatorSupplementReport
 from django.contrib.auth.models import User
 
 

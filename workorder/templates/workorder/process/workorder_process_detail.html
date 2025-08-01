@@ -601,7 +601,10 @@ function submitAssignment() {
     
     fetch(`/workorder/update_process_status/${processId}/`, {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
     })
     .then(response => {
         console.log('回應狀態:', response.status);
@@ -926,7 +929,10 @@ function submitQuantityUpdate() {
     
     fetch(`/workorder/update_process_status/${processId}/`, {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
     })
     .then(response => {
         if (!response.ok) {
@@ -956,7 +962,10 @@ function updateProcessStatus(processId, action) {
     
     fetch(`/workorder/update_process_status/${processId}/`, {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
     })
     .then(response => {
         if (!response.ok) {
@@ -1024,7 +1033,10 @@ function submitAddProcess() {
     
     fetch('{% url "workorder:add_process" workorder.id %}', {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
     })
     .then(response => response.json())
     .then(data => {
@@ -1079,7 +1091,10 @@ function submitEditProcess() {
     
     fetch(`{% url "workorder:edit_process" 0 %}`.replace('0', processId), {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
     })
     .then(response => response.json())
     .then(data => {
@@ -1107,7 +1122,10 @@ function deleteProcess(processId, processName) {
     
     fetch(`{% url "workorder:delete_process" 0 %}`.replace('0', processId), {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
     })
     .then(response => response.json())
     .then(data => {
@@ -1138,7 +1156,10 @@ function moveProcess(processId, direction, currentOrder) {
     
     fetch('{% url "workorder:move_process" %}', {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
     })
     .then(response => response.json())
     .then(data => {

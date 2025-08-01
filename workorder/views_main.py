@@ -1693,7 +1693,8 @@ def check_workorder_completion(workorder):
     檢查工單是否真正完工
     簡化邏輯：出貨包裝報工數量 ≥ 工單生產數量 = 完工
     """
-    from workorder.models import WorkOrderProcess, OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
+    from workorder.models import WorkOrderProcess
+    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
     
     # 取得該工單的所有工序
     processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by('step_order')
@@ -1722,7 +1723,7 @@ def check_workorder_completion(workorder):
             'quantity': report.work_quantity,  # 只計算合格品數量
             'defect_quantity': report.defect_quantity,  # 不良品數量（僅供顯示）
             'date': report.work_date,
-            'operator': report.operator.username if report.operator else '未知'
+            'operator': report.operator.name if report.operator else '未知'
         })
     
     # 從主管生產報工記錄中查找出貨包裝
@@ -1801,7 +1802,8 @@ def analyze_packaging_processes(workorder):
     分析工單的出貨包裝工序情況
     基於實際報工記錄分析
     """
-    from workorder.models import WorkOrderProcess, OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
+    from workorder.models import WorkOrderProcess
+    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
     
     processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by('step_order')
     packaging_processes = processes.filter(process_name__icontains='出貨包裝').order_by('step_order')
@@ -1821,7 +1823,7 @@ def analyze_packaging_processes(workorder):
             'quantity': report.work_quantity,
             'defect_quantity': report.defect_quantity,
             'date': report.work_date,
-            'operator': report.operator.username if report.operator else '未知',
+            'operator': report.operator.name if report.operator else '未知',
             'is_completed': report.is_completed
         })
     
@@ -2719,7 +2721,7 @@ def clear_all_production_reports(request):
     包括：作業員補登報工、SMT補登報工、SMT現場報工
     只有管理員可以執行此操作
     """
-    from .models import OperatorSupplementReport, SMTProductionReport
+    from .workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
     
     if not (request.user.is_staff or request.user.is_superuser):
         messages.error(request, "只有管理員可以執行此操作")
@@ -3385,7 +3387,7 @@ def batch_approve_pending(request):
     批次審核所有待審核報工記錄 API
     只有超級管理員可以使用此功能
     """
-    from .models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
+    from .workorder_reporting.models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
     
     # 檢查是否為超級管理員
     if not request.user.is_superuser:
@@ -3881,16 +3883,16 @@ def report_index(request):
     
     # 從補登報工記錄中取得真實統計資料
     # 作業員補登報工統計
-    operator_today = OperatorSupplementReport.objects.filter(created_at__date=today).count()
-    operator_month = OperatorSupplementReport.objects.filter(created_at__date__gte=month_start).count()
+    operator_today = OperatorSupplementReport.objects.filter(work_date=today).count()
+    operator_month = OperatorSupplementReport.objects.filter(work_date__gte=month_start).count()
     operator_pending = OperatorSupplementReport.objects.filter(approval_status='pending').count()
     operator_abnormal = OperatorSupplementReport.objects.filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
     ).count()
     
     # SMT補登報工統計
-    smt_today = SMTProductionReport.objects.filter(created_at__date=today).count()
-    smt_month = SMTProductionReport.objects.filter(created_at__date__gte=month_start).count()
+    smt_today = SMTProductionReport.objects.filter(work_date=today).count()
+    smt_month = SMTProductionReport.objects.filter(work_date__gte=month_start).count()
     smt_pending = SMTProductionReport.objects.filter(approval_status='pending').count()
     smt_abnormal = SMTProductionReport.objects.filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
@@ -3926,6 +3928,7 @@ def report_index(request):
     
     return render(request, 'workorder/report/index.html', context)
 
+@login_required
 def supervisor_report_index(request):
     """
     主管審核首頁 - 統計儀表板
@@ -3946,14 +3949,14 @@ def supervisor_report_index(request):
         'pending_smt': SMTProductionReport.objects.filter(approval_status='pending').count(),
         
         # 今日統計
-        'today_supervisor': SupervisorProductionReport.objects.filter(created_at__date=today).count(),
-        'today_operator': OperatorSupplementReport.objects.filter(created_at__date=today).count(),
-        'today_smt': SMTProductionReport.objects.filter(created_at__date=today).count(),
+        'today_supervisor': SupervisorProductionReport.objects.filter(work_date=today).count(),
+        'today_operator': OperatorSupplementReport.objects.filter(work_date=today).count(),
+        'today_smt': SMTProductionReport.objects.filter(work_date=today).count(),
         
         # 本月統計
-        'month_supervisor': SupervisorProductionReport.objects.filter(created_at__date__gte=month_start).count(),
-        'month_operator': OperatorSupplementReport.objects.filter(created_at__date__gte=month_start).count(),
-        'month_smt': SMTProductionReport.objects.filter(created_at__date__gte=month_start).count(),
+        'month_supervisor': SupervisorProductionReport.objects.filter(work_date__gte=month_start).count(),
+        'month_operator': OperatorSupplementReport.objects.filter(work_date__gte=month_start).count(),
+        'month_smt': SMTProductionReport.objects.filter(work_date__gte=month_start).count(),
         
         # 異常統計
         'abnormal_supervisor': SupervisorProductionReport.objects.filter(
@@ -4041,6 +4044,7 @@ def supervisor_report_index(request):
     
     return render(request, 'workorder/report/supervisor/index.html', context)
 
+@login_required
 def supervisor_functions(request):
     """
     主管功能首頁 - 主管專用功能
@@ -4062,13 +4066,13 @@ def supervisor_functions(request):
         'abnormal_reports': 0,
         
         # 各類型統計
-        'operator_reports_today': OperatorSupplementReport.objects.filter(created_at__date=today).count(),
-        'smt_reports_today': SMTProductionReport.objects.filter(created_at__date=today).count(),
-        'supervisor_reports_today': SupervisorProductionReport.objects.filter(created_at__date=today).count(),
+        'operator_reports_today': OperatorSupplementReport.objects.filter(work_date=today).count(),
+        'smt_reports_today': SMTProductionReport.objects.filter(work_date=today).count(),
+        'supervisor_reports_today': SupervisorProductionReport.objects.filter(work_date=today).count(),
         
-        'operator_reports_month': OperatorSupplementReport.objects.filter(created_at__date__gte=month_start).count(),
-        'smt_reports_month': SMTProductionReport.objects.filter(created_at__date__gte=month_start).count(),
-        'supervisor_reports_month': SupervisorProductionReport.objects.filter(created_at__date__gte=month_start).count(),
+        'operator_reports_month': OperatorSupplementReport.objects.filter(work_date__gte=month_start).count(),
+        'smt_reports_month': SMTProductionReport.objects.filter(work_date__gte=month_start).count(),
+        'supervisor_reports_month': SupervisorProductionReport.objects.filter(work_date__gte=month_start).count(),
         
         # 待審核統計
         'pending_operator': OperatorSupplementReport.objects.filter(approval_status='pending').count(),
@@ -4101,12 +4105,12 @@ def supervisor_functions(request):
         'operator', 'workorder', 'process'
     ).filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-    ).order_by('-created_at')[:5]
+    ).order_by('-work_date', '-start_time')[:5]
     
     for report in operator_abnormal:
         recent_abnormal.append({
             'type': '作業員報工',
-            'time': report.created_at,
+            'time': report.work_date,
             'operator': report.operator.name if report.operator else '-',
             'workorder': report.workorder.order_number if report.workorder else '-',
             'process': report.process.name if report.process else '-',
@@ -4119,12 +4123,12 @@ def supervisor_functions(request):
         'workorder'
     ).filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-    ).order_by('-created_at')[:5]
+    ).order_by('-work_date', '-start_time')[:5]
     
     for report in smt_abnormal:
         recent_abnormal.append({
             'type': 'SMT報工',
-            'time': report.created_at,
+            'time': report.work_date,
             'operator': report.equipment_name,
             'workorder': report.workorder.order_number if report.workorder else '-',
             'process': report.operation,
@@ -4137,12 +4141,12 @@ def supervisor_functions(request):
         'workorder', 'process'
     ).filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-    ).order_by('-created_at')[:5]
+    ).order_by('-work_date', '-start_time')[:5]
     
     for report in supervisor_abnormal:
         recent_abnormal.append({
             'type': '主管審核',
-            'time': report.created_at,
+            'time': report.work_date,
             'operator': report.supervisor,
             'workorder': report.workorder.order_number if report.workorder else '-',
             'process': report.process.name if report.process else '-',
@@ -4161,6 +4165,7 @@ def supervisor_functions(request):
     
     return render(request, 'workorder/report/supervisor/functions.html', context)
 
+@login_required
 def report_statistics(request):
     """
     報工統計分析頁面
@@ -4187,20 +4192,20 @@ def report_statistics(request):
     
     # 各類型統計
     operator_stats = {
-        'today': OperatorSupplementReport.objects.filter(created_at__date=today).count(),
-        'week': OperatorSupplementReport.objects.filter(created_at__date__gte=week_start).count(),
-        'month': OperatorSupplementReport.objects.filter(created_at__date__gte=month_start).count(),
-        'year': OperatorSupplementReport.objects.filter(created_at__year=today.year).count(),
+        'today': OperatorSupplementReport.objects.filter(work_date=today).count(),
+        'week': OperatorSupplementReport.objects.filter(work_date__gte=week_start).count(),
+        'month': OperatorSupplementReport.objects.filter(work_date__gte=month_start).count(),
+        'year': OperatorSupplementReport.objects.filter(work_date__year=today.year).count(),
         'pending': OperatorSupplementReport.objects.filter(approval_status='pending').count(),
         'approved': OperatorSupplementReport.objects.filter(approval_status='approved').count(),
         'rejected': OperatorSupplementReport.objects.filter(approval_status='rejected').count(),
     }
     
     smt_stats = {
-        'today': SMTProductionReport.objects.filter(created_at__date=today).count(),
-        'week': SMTProductionReport.objects.filter(created_at__date__gte=week_start).count(),
-        'month': SMTProductionReport.objects.filter(created_at__date__gte=month_start).count(),
-        'year': SMTProductionReport.objects.filter(created_at__year=today.year).count(),
+        'today': SMTProductionReport.objects.filter(work_date=today).count(),
+        'week': SMTProductionReport.objects.filter(work_date__gte=week_start).count(),
+        'month': SMTProductionReport.objects.filter(work_date__gte=month_start).count(),
+        'year': SMTProductionReport.objects.filter(work_date__year=today.year).count(),
         'pending': SMTProductionReport.objects.filter(approval_status='pending').count(),
         'approved': SMTProductionReport.objects.filter(approval_status='approved').count(),
         'rejected': SMTProductionReport.objects.filter(approval_status='rejected').count(),
@@ -4232,7 +4237,7 @@ def report_statistics(request):
     
     # 作業員報工統計
     operator_reports_30d = OperatorSupplementReport.objects.filter(
-        created_at__date__gte=thirty_days_ago
+        work_date__gte=thirty_days_ago
     ).aggregate(
         total_quantity=Sum('work_quantity'),
         avg_quantity=Avg('work_quantity')
@@ -4240,14 +4245,14 @@ def report_statistics(request):
     
     # 計算作業員總工作時數（使用Python計算）
     operator_reports_list = OperatorSupplementReport.objects.filter(
-        created_at__date__gte=thirty_days_ago
+        work_date__gte=thirty_days_ago
     )
     operator_total_hours = sum(report.work_hours for report in operator_reports_list)
     operator_avg_hours = operator_total_hours / len(operator_reports_list) if operator_reports_list else 0
     
     # SMT報工統計
     smt_reports_30d = SMTProductionReport.objects.filter(
-        created_at__date__gte=thirty_days_ago
+        work_date__gte=thirty_days_ago
     ).aggregate(
         total_quantity=Sum('work_quantity'),
         avg_quantity=Avg('work_quantity')
@@ -4255,7 +4260,7 @@ def report_statistics(request):
     
     # 計算SMT總工作時數（使用Python計算）
     smt_reports_list = SMTProductionReport.objects.filter(
-        created_at__date__gte=thirty_days_ago
+        work_date__gte=thirty_days_ago
     )
     smt_total_hours = sum(report.work_duration for report in smt_reports_list if report.work_duration)
     smt_avg_hours = smt_total_hours / len(smt_reports_list) if smt_reports_list else 0
@@ -4310,15 +4315,15 @@ def abnormal_management(request):
         'operator', 'workorder', 'process'
     ).filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & 
-        Q(created_at__gte=week_start)
-    ).order_by('-created_at')
+        Q(work_date__gte=week_start)
+    ).order_by('-work_date', '-start_time')
     
     smt_abnormal = SMTProductionReport.objects.select_related(
         'workorder'
     ).filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & 
-        Q(created_at__gte=week_start)
-    ).order_by('-created_at')
+        Q(work_date__gte=week_start)
+    ).order_by('-work_date', '-start_time')
     
     # 異常統計
     abnormal_stats = {
@@ -4395,7 +4400,7 @@ def batch_resolve_abnormal(request):
         # 作業員異常 - 標記為已解決（包含所有狀態的異常）
         operator_abnormal = OperatorSupplementReport.objects.filter(
             Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & 
-            Q(created_at__gte=week_start)
+            Q(work_date__gte=week_start)
         )
         
         # 批次更新作業員異常（只處理尚未解決的）
@@ -4413,7 +4418,7 @@ def batch_resolve_abnormal(request):
         # SMT異常 - 標記為已解決（包含所有狀態的異常）
         smt_abnormal = SMTProductionReport.objects.filter(
             Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & 
-            Q(created_at__gte=week_start)
+            Q(work_date__gte=week_start)
         )
         
         # 批次更新SMT異常（只處理尚未解決的）
@@ -4485,6 +4490,7 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
 
 
 
+@login_required
 def data_maintenance(request):
     """
     資料維護頁面
@@ -4501,14 +4507,14 @@ def data_maintenance(request):
         'total_operator_reports': OperatorSupplementReport.objects.count(),
         'total_smt_reports': SMTProductionReport.objects.count(),
         'old_reports_30d': OperatorSupplementReport.objects.filter(
-            created_at__lt=today - timedelta(days=30)
+            work_date__lt=today - timedelta(days=30)
         ).count() + SMTProductionReport.objects.filter(
-            created_at__lt=today - timedelta(days=30)
+            work_date__lt=today - timedelta(days=30)
         ).count(),
         'old_reports_90d': OperatorSupplementReport.objects.filter(
-            created_at__lt=today - timedelta(days=90)
+            work_date__lt=today - timedelta(days=90)
         ).count() + SMTProductionReport.objects.filter(
-            created_at__lt=today - timedelta(days=90)
+            work_date__lt=today - timedelta(days=90)
         ).count(),
         'duplicate_reports': 0,  # 將在下面實作重複檢查邏輯
         'orphaned_reports': 0,   # 將在下面實作孤立資料檢查邏輯
@@ -4613,14 +4619,14 @@ def execute_maintenance(request):
             
             # 清理作業員報工記錄
             old_operator_reports = OperatorSupplementReport.objects.filter(
-                created_at__lt=cutoff_date
+                work_date__lt=cutoff_date
             )
             operator_count = old_operator_reports.count()
             old_operator_reports.delete()
             
             # 清理SMT報工記錄
             old_smt_reports = SMTProductionReport.objects.filter(
-                created_at__lt=cutoff_date
+                work_date__lt=cutoff_date
             )
             smt_count = old_smt_reports.count()
             old_smt_reports.delete()
@@ -4653,7 +4659,7 @@ def execute_maintenance(request):
                     work_date=duplicate['work_date'],
                     start_time=duplicate['start_time'],
                     end_time=duplicate['end_time']
-                ).order_by('-created_at')
+                ).order_by('-work_date', '-start_time')
                 
                 # 刪除除最新記錄外的所有重複記錄
                 reports_to_delete = reports[1:]
@@ -4677,7 +4683,7 @@ def execute_maintenance(request):
                     work_date=duplicate['work_date'],
                     start_time=duplicate['start_time'],
                     end_time=duplicate['end_time']
-                ).order_by('-created_at')
+                ).order_by('-work_date', '-start_time')
                 
                 # 刪除除最新記錄外的所有重複記錄
                 reports_to_delete = reports[1:]
@@ -5075,155 +5081,20 @@ def submit_smt_report(request):
 # 作業員補登報工功能視圖函數
 # ============================================================================
 
-@login_required
-def operator_supplement_report_index(request):
-    """作業員補登報工記錄列表"""
-    from django.db.models import Q
-    from django.core.paginator import Paginator
-    from process.models import Operator
-    from process.models import ProcessName
-    from .workorder_reporting.models import OperatorSupplementReport
-    
-    reports = OperatorSupplementReport.objects.all().order_by('-work_date', '-created_at')
-    
-    # 篩選條件
-    operator_id = request.GET.get('operator')
-    if operator_id:
-        reports = reports.filter(operator_id=operator_id)
-    
-    workorder_number = request.GET.get('workorder')
-    if workorder_number:
-        reports = reports.filter(workorder__order_number__icontains=workorder_number)
-    
-    process_id = request.GET.get('process')
-    if process_id:
-        reports = reports.filter(process_id=process_id)
-    
-    status = request.GET.get('status')
-    if status:
-        reports = reports.filter(approval_status=status)
-    
-    date_from = request.GET.get('date_from')
-    if date_from:
-        reports = reports.filter(work_date__gte=date_from)
-    
-    date_to = request.GET.get('date_to')
-    if date_to:
-        reports = reports.filter(work_date__lte=date_to)
-    
-    # 搜尋功能
-    search = request.GET.get('search', '')
-    if search:
-        reports = reports.filter(
-            Q(operator__name__icontains=search) |
-            Q(workorder__order_number__icontains=search) |
-            Q(process__name__icontains=search)
-        )
-    
-    # 統計資料
-    total_reports = reports.count()
-    pending_reports = reports.filter(approval_status='pending').count()
-    approved_reports = reports.filter(approval_status='approved').count()
-    rejected_reports = reports.filter(approval_status='rejected').count()
-    
-    # 分頁
-    paginator = Paginator(reports, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    # 取得選項資料
-    operator_list = Operator.objects.all().order_by('name')
-    process_list = ProcessName.objects.all().order_by('name')
-    
-    context = {
-        'supplement_reports': page_obj,
-        'page_obj': page_obj,
-        'search': search,
-        'total_count': total_reports,
-        'pending_count': pending_reports,
-        'approved_count': approved_reports,
-        'rejected_count': rejected_reports,
-        'operator_list': operator_list,
-        'process_list': process_list,
-        'selected_operator': operator_id,
-        'selected_workorder': workorder_number,
-        'selected_process': process_id,
-        'selected_status': status,
-        'selected_date_from': date_from,
-        'selected_date_to': date_to,
-    }
-    return render(request, 'workorder/report/operator/supplement/index.html', context)
+# 此函數已被移除，請使用 OperatorSupplementReportListView 類別視圖
+# 位置：workorder/views/report_views.py
 
-@login_required
-def operator_supplement_report_create(request):
-    """新增作業員補登報工"""
-    if request.method == 'POST':
-        form = OperatorSupplementReportForm(request.POST)
-        if form.is_valid():
-            report = form.save(commit=False)
-            report.created_by = request.user.username
-            report.save()
-            messages.success(request, '作業員報工記錄新增成功！')
-            return redirect('workorder:operator_supplement_report_index')
-    else:
-        form = OperatorSupplementReportForm()
-    
-    context = {
-        'form': form,
-        'title': '新增作業員報工記錄',
-    }
-    return render(request, 'workorder/report/operator/supplement/form.html', context)
+# 此函數已被移除，請使用 OperatorSupplementReportCreateView 類別視圖
+# 位置：workorder/views/report_views.py
 
-@login_required
-def operator_supplement_report_edit(request, report_id):
-    """編輯作業員補登報工"""
-    try:
-        report = OperatorSupplementReport.objects.get(id=report_id)
-    except OperatorSupplementReport.DoesNotExist:
-        messages.error(request, '找不到指定的報工記錄！')
-        return redirect('workorder:operator_supplement_report_index')
-    
-    if request.method == 'POST':
-        form = OperatorSupplementReportForm(request.POST, instance=report)
-        if form.is_valid():
-            form.save()
-            messages.success(request, '作業員報工記錄更新成功！')
-            return redirect('workorder:operator_supplement_report_index')
-    else:
-        form = OperatorSupplementReportForm(instance=report)
-    
-    context = {
-        'form': form,
-        'report': report,
-        'title': '編輯作業員報工記錄',
-    }
-    return render(request, 'workorder/report/operator/supplement/form.html', context)
+# 此函數已被移除，請使用 OperatorSupplementReportUpdateView 類別視圖
+# 位置：workorder/views/report_views.py
 
-@login_required
-def operator_supplement_report_delete(request, report_id):
-    """刪除作業員補登報工"""
-    try:
-        report = OperatorSupplementReport.objects.get(id=report_id)
-        report.delete()
-        messages.success(request, '作業員報工記錄刪除成功！')
-    except OperatorSupplementReport.DoesNotExist:
-        messages.error(request, '找不到指定的報工記錄！')
-    
-    return redirect('workorder:operator_supplement_report_index')
+# 此函數已被移除，請使用 OperatorSupplementReportDeleteView 類別視圖
+# 位置：workorder/views/report_views.py
 
-@login_required
-def operator_supplement_report_detail(request, report_id):
-    """作業員補登報工詳情"""
-    try:
-        report = OperatorSupplementReport.objects.get(id=report_id)
-    except OperatorSupplementReport.DoesNotExist:
-        messages.error(request, '找不到指定的報工記錄！')
-        return redirect('workorder:operator_supplement_report_index')
-    
-    context = {
-        'report': report,
-    }
-    return render(request, 'workorder/report/operator/supplement/detail.html', context)
+# 此函數已被移除，請使用 OperatorSupplementReportDetailView 類別視圖
+# 位置：workorder/views/report_views.py
 
 @login_required
 def operator_on_site_report(request):
@@ -5285,102 +5156,20 @@ def operator_on_site_report(request):
 # SMT補登報工功能視圖函數
 # ============================================================================
 
-@login_required
-def smt_supplement_report_index(request):
-    """SMT補登報工記錄列表"""
-    reports = SMTProductionReport.objects.all().order_by('-work_date', '-created_at')
-    
-    # 搜尋功能
-    search = request.GET.get('search', '')
-    if search:
-        reports = reports.filter(
-            Q(equipment__name__icontains=search) |
-            Q(workorder__order_number__icontains=search) |
-            Q(product_id__icontains=search)
-        )
-    
-    # 分頁
-    paginator = Paginator(reports, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    context = {
-        'page_obj': page_obj,
-        'search': search,
-        'total_count': reports.count(),
-    }
-    return render(request, 'workorder/report/smt/supplement/index.html', context)
+# 此函數已被移除，請使用 SMTProductionReportListView 類別視圖
+# 位置：workorder/views/report_views.py
 
-@login_required
-def smt_supplement_report_create(request):
-    """新增SMT補登報工"""
-    if request.method == 'POST':
-        form = SMTSupplementReportForm(request.POST)
-        if form.is_valid():
-            report = form.save(commit=False)
-            report.created_by = request.user.username
-            report.save()
-            messages.success(request, 'SMT補登報工記錄新增成功！')
-            return redirect('workorder:smt_supplement_report_index')
-    else:
-        form = SMTSupplementReportForm()
-    
-    context = {
-        'form': form,
-        'title': '新增SMT補登報工記錄',
-    }
-    return render(request, 'workorder/report/smt/supplement/form.html', context)
+# 此函數已被移除，請使用 SMTProductionReportCreateView 類別視圖
+# 位置：workorder/views/report_views.py
 
-@login_required
-def smt_supplement_report_edit(request, report_id):
-    """編輯SMT補登報工"""
-    try:
-        report = SMTProductionReport.objects.get(id=report_id)
-    except SMTProductionReport.DoesNotExist:
-        messages.error(request, '找不到指定的SMT補登報工記錄！')
-        return redirect('workorder:smt_supplement_report_index')
-    
-    if request.method == 'POST':
-        form = SMTSupplementReportForm(request.POST, instance=report)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'SMT補登報工記錄更新成功！')
-            return redirect('workorder:smt_supplement_report_index')
-    else:
-        form = SMTSupplementReportForm(instance=report)
-    
-    context = {
-        'form': form,
-        'report': report,
-        'title': '編輯SMT補登報工記錄',
-    }
-    return render(request, 'workorder/report/smt/supplement/form.html', context)
+# 此函數已被移除，請使用 SMTProductionReportUpdateView 類別視圖
+# 位置：workorder/views/report_views.py
 
-@login_required
-def smt_supplement_report_delete(request, report_id):
-    """刪除SMT補登報工"""
-    try:
-        report = SMTProductionReport.objects.get(id=report_id)
-        report.delete()
-        messages.success(request, 'SMT補登報工記錄刪除成功！')
-    except SMTProductionReport.DoesNotExist:
-        messages.error(request, '找不到指定的SMT補登報工記錄！')
-    
-    return redirect('workorder:smt_supplement_report_index')
+# 此函數已被移除，請使用 SMTProductionReportDeleteView 類別視圖
+# 位置：workorder/views/report_views.py
 
-@login_required
-def smt_supplement_report_detail(request, report_id):
-    """SMT補登報工詳情"""
-    try:
-        supplement_report = SMTProductionReport.objects.get(id=report_id)
-    except SMTProductionReport.DoesNotExist:
-        messages.error(request, '找不到指定的SMT補登報工記錄！')
-        return redirect('workorder:smt_supplement_report_index')
-    
-    context = {
-        'supplement_report': supplement_report,
-    }
-    return render(request, 'workorder/report/smt/supplement/detail.html', context)
+# 此函數已被移除，請使用 SMTProductionReportDetailView 類別視圖
+# 位置：workorder/views/report_views.py
 
 # ============================================================================
 # 主管審核功能視圖函數
@@ -5476,12 +5265,12 @@ def api_get_operator_reports(request):
         for report in reports:
             data.append({
                 'id': report.id,
-                'operator': report.operator.username,
-                'workorder': report.workorder.order_number,
-                'process': report.process,
-                'quantity': report.quantity,
+                'operator': report.operator.name if report.operator else '',
+                'workorder': report.workorder.order_number if report.workorder else '',
+                'process': report.process.name if report.process else '',
+                'quantity': report.work_quantity or 0,
                 'work_date': report.work_date.isoformat(),
-                'is_approved': report.is_approved,
+                'approval_status': report.get_approval_status_display(),
                 'created_at': report.created_at.isoformat(),
             })
         
@@ -5583,12 +5372,12 @@ def export_operator_reports(request):
         
         # 填入資料
         for row, report in enumerate(reports, 2):
-            ws.cell(row=row, column=1, value=report.operator.username)
-            ws.cell(row=row, column=2, value=report.workorder.order_number)
-            ws.cell(row=row, column=3, value=report.process)
-            ws.cell(row=row, column=4, value=report.quantity)
+            ws.cell(row=row, column=1, value=report.operator.name if report.operator else '')
+            ws.cell(row=row, column=2, value=report.workorder.order_number if report.workorder else '')
+            ws.cell(row=row, column=3, value=report.process.name if report.process else '')
+            ws.cell(row=row, column=4, value=report.work_quantity or 0)
             ws.cell(row=row, column=5, value=report.work_date.strftime('%Y-%m-%d'))
-            ws.cell(row=row, column=6, value='已審核' if report.is_approved else '待審核')
+            ws.cell(row=row, column=6, value=report.get_approval_status_display())
             ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
         
         # 調整欄寬
@@ -5706,13 +5495,31 @@ def operator_supplement_report_approve(request, report_id):
     """審核作業員補登報工"""
     try:
         report = OperatorSupplementReport.objects.get(id=report_id)
-        report.is_approved = True
-        report.approved_by = request.user.username
-        report.approved_at = timezone.now()
-        report.save()
-        messages.success(request, '作業員報工記錄審核通過！')
+        
+        # 使用新的核准方法
+        if report.can_approve(request.user):
+            report.approve(request.user, request.POST.get('remarks', ''))
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'message': '作業員報工記錄審核通過！'})
+            
+            messages.success(request, '作業員報工記錄審核通過！')
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'message': '您沒有權限核准此報工記錄！'})
+            
+            messages.error(request, '您沒有權限核准此報工記錄！')
+            
     except OperatorSupplementReport.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': '找不到指定的報工記錄！'})
+        
         messages.error(request, '找不到指定的報工記錄！')
+    except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': f'核准失敗：{str(e)}'})
+        
+        messages.error(request, f'核准失敗：{str(e)}')
     
     return redirect('workorder:operator_supplement_report_index')
 
@@ -5721,13 +5528,31 @@ def operator_supplement_report_reject(request, report_id):
     """駁回作業員補登報工"""
     try:
         report = OperatorSupplementReport.objects.get(id=report_id)
-        report.is_approved = False
-        report.approved_by = request.user.username
-        report.approved_at = timezone.now()
-        report.save()
-        messages.success(request, '作業員報工記錄已駁回！')
+        
+        # 使用新的駁回方法
+        if report.can_approve(request.user):
+            report.reject(request.user, request.POST.get('reason', ''))
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'message': '作業員報工記錄已駁回！'})
+            
+            messages.success(request, '作業員報工記錄已駁回！')
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'message': '您沒有權限駁回此報工記錄！'})
+            
+            messages.error(request, '您沒有權限駁回此報工記錄！')
+            
     except OperatorSupplementReport.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': '找不到指定的報工記錄！'})
+        
         messages.error(request, '找不到指定的報工記錄！')
+    except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': f'駁回失敗：{str(e)}'})
+        
+        messages.error(request, f'駁回失敗：{str(e)}')
     
     return redirect('workorder:operator_supplement_report_index')
 
@@ -5770,6 +5595,12 @@ def operator_supplement_batch(request):
     """作業員補登報工批次處理"""
     if request.method == 'POST':
         action = request.POST.get('action')
+        
+        # 處理檔案匯入
+        if action == 'import_file':
+            return operator_supplement_import_file(request)
+        
+        # 處理批次操作
         report_ids = request.POST.getlist('report_ids')
         
         if not report_ids:
@@ -5781,14 +5612,14 @@ def operator_supplement_batch(request):
             
             if action == 'approve':
                 reports.update(
-                    is_approved=True,
+                    approval_status='approved',
                     approved_by=request.user.username,
                     approved_at=timezone.now()
                 )
                 messages.success(request, f'已審核 {len(reports)} 筆作業員報工記錄！')
             elif action == 'reject':
                 reports.update(
-                    is_approved=False,
+                    approval_status='rejected',
                     approved_by=request.user.username,
                     approved_at=timezone.now()
                 )
@@ -5802,8 +5633,197 @@ def operator_supplement_batch(request):
                 
         except Exception as e:
             messages.error(request, f'批次處理失敗：{str(e)}')
+        
+        return redirect('workorder:operator_supplement_report_index')
     
-    return redirect('workorder:operator_supplement_report_index')
+    # GET 請求：顯示批次匯入頁面
+    return render(request, 'workorder/report/operator/supplement/batch.html')
+
+def operator_supplement_import_file(request):
+    """作業員補登報工檔案匯入處理"""
+    from process.models import Operator, ProcessName
+    from workorder.models import WorkOrder
+    from workorder.workorder_reporting.models import OperatorSupplementReport
+    from datetime import datetime, time
+    
+    try:
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return JsonResponse({
+                'success': False,
+                'message': '沒有選擇檔案'
+            })
+        
+        # 檢查檔案格式
+        file_name = uploaded_file.name.lower()
+        if not (file_name.endswith('.xlsx') or file_name.endswith('.csv')):
+            return JsonResponse({
+                'success': False,
+                'message': '只支援 Excel (.xlsx) 或 CSV 格式檔案'
+            })
+        
+        # 讀取檔案內容
+        import pandas as pd
+        from io import BytesIO
+        
+        if file_name.endswith('.xlsx'):
+            df = pd.read_excel(uploaded_file)
+        else:
+            df = pd.read_csv(uploaded_file)
+        
+        # 檢查必要欄位 - 只支援新格式
+        required_columns = ['作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', '工單號', '產品編號', '工序名稱', '報工數量']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return JsonResponse({
+                'success': False,
+                'message': f'缺少必要欄位：{", ".join(missing_columns)}'
+            })
+        
+        # 處理每一行資料
+        success_count = 0
+        error_count = 0
+        errors = []
+        
+        for index, row in df.iterrows():
+            try:
+                # 新格式處理
+                operator_name = str(row['作業員名稱']).strip()
+                company_code = str(row['公司代號']).strip()
+                
+                # 確保公司代號是字串格式（處理 pandas 自動轉換數字的情況）
+                if company_code.isdigit():
+                    company_code = company_code.zfill(2)  # 確保是兩位數格式
+                
+                workorder_number = str(row['工單號']).strip()
+                process_name = str(row['工序名稱']).strip()
+                work_quantity = int(row['報工數量'])
+                
+                # 解析日期 - 支援多種格式
+                date_str = str(row['報工日期']).strip()
+                if '/' in date_str:
+                    work_date = datetime.strptime(date_str, '%Y/%m/%d').date()
+                elif '.' in date_str:
+                    work_date = datetime.strptime(date_str, '%Y.%m.%d').date()
+                else:
+                    work_date = pd.to_datetime(date_str).date()
+                
+                # 解析時間 - 支援所有 Excel 時間格式
+                start_time_str = str(row['開始時間']).strip()
+                try:
+                    if 'days' in start_time_str:
+                        # 處理 Excel 時間格式 "0 days 08:30:00"
+                        time_part = start_time_str.split(' ')[-1]  # 取得 "08:30:00" 部分
+                        start_time = datetime.strptime(time_part, '%H:%M:%S').time()
+                    elif 'AM' in start_time_str or 'PM' in start_time_str:
+                        # 處理 12 小時制格式 "04:30:00 PM"
+                        start_time = pd.to_datetime(start_time_str).time()
+                    elif ':' in start_time_str:
+                        # 處理標準時間格式 "08:30:00" 或 "08:30"
+                        if start_time_str.count(':') == 2:
+                            start_time = datetime.strptime(start_time_str, '%H:%M:%S').time()
+                        else:
+                            start_time = datetime.strptime(start_time_str, '%H:%M').time()
+                    else:
+                        # 處理純數字格式 "0830"
+                        start_time = datetime.strptime(start_time_str.zfill(4), '%H%M').time()
+                except Exception as e:
+                    errors.append(f'第 {index+1} 行：開始時間格式錯誤 "{start_time_str}"')
+                    error_count += 1
+                    continue
+                
+                end_time_str = str(row['結束時間']).strip()
+                try:
+                    if 'days' in end_time_str:
+                        # 處理 Excel 時間格式 "0 days 17:30:00"
+                        time_part = end_time_str.split(' ')[-1]  # 取得 "17:30:00" 部分
+                        end_time = datetime.strptime(time_part, '%H:%M:%S').time()
+                    elif 'AM' in end_time_str or 'PM' in end_time_str:
+                        # 處理 12 小時制格式 "04:30:00 PM"
+                        end_time = pd.to_datetime(end_time_str).time()
+                    elif ':' in end_time_str:
+                        # 處理標準時間格式 "17:30:00" 或 "17:30"
+                        if end_time_str.count(':') == 2:
+                            end_time = datetime.strptime(end_time_str, '%H:%M:%S').time()
+                        else:
+                            end_time = datetime.strptime(end_time_str, '%H:%M').time()
+                    else:
+                        # 處理純數字格式 "1730"
+                        end_time = datetime.strptime(end_time_str.zfill(4), '%H%M').time()
+                except Exception as e:
+                    errors.append(f'第 {index+1} 行：結束時間格式錯誤 "{end_time_str}"')
+                    error_count += 1
+                    continue
+                
+                # 處理選填欄位
+                defect_quantity = int(row.get('不良品數量', 0))
+                remarks = str(row.get('備註', ''))
+                abnormal_notes = str(row.get('異常紀錄', ''))
+                
+                # 根據公司代號查找工單
+                workorder = WorkOrder.objects.filter(
+                    company_code=company_code,
+                    order_number=workorder_number
+                ).first()
+                
+                # 驗證作業員
+                operator = Operator.objects.filter(name=operator_name).first()
+                if not operator:
+                    errors.append(f'第 {index+1} 行：找不到作業員 "{operator_name}"')
+                    error_count += 1
+                    continue
+                
+                # 驗證工單
+                if not workorder:
+                    errors.append(f'第 {index+1} 行：找不到工單 "{workorder_number}" (公司代號: {company_code})')
+                    error_count += 1
+                    continue
+                
+                # 驗證工序
+                process = ProcessName.objects.filter(name=process_name).first()
+                if not process:
+                    errors.append(f'第 {index+1} 行：找不到工序 "{process_name}"')
+                    error_count += 1
+                    continue
+                
+                # 建立報工記錄
+                report = OperatorSupplementReport.objects.create(
+                    operator=operator,
+                    workorder=workorder,
+                    process=process,
+                    work_date=work_date,
+                    start_time=start_time,
+                    end_time=end_time,
+                    work_quantity=work_quantity,
+                    defect_quantity=defect_quantity,
+                    remarks=remarks,
+                    abnormal_notes=abnormal_notes,
+                    created_by=request.user.username
+                )
+                
+                # 自動計算工時
+                report.calculate_work_hours()
+                report.save()
+                
+                success_count += 1
+                
+            except Exception as e:
+                errors.append(f'第 {index+1} 行：{str(e)}')
+                error_count += 1
+        
+        return JsonResponse({
+            'success': True,
+            'success_count': success_count,
+            'error_count': error_count,
+            'total_count': len(df),
+            'errors': errors[:10]  # 只回傳前10個錯誤
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'匯入失敗：{str(e)}'
+        })
 
 @login_required
 def smt_supplement_batch(request):
@@ -5821,14 +5841,14 @@ def smt_supplement_batch(request):
             
             if action == 'approve':
                 reports.update(
-                    is_approved=True,
+                    approval_status='approved',
                     approved_by=request.user.username,
                     approved_at=timezone.now()
                 )
                 messages.success(request, f'已審核 {len(reports)} 筆SMT報工記錄！')
             elif action == 'reject':
                 reports.update(
-                    is_approved=False,
+                    approval_status='rejected',
                     approved_by=request.user.username,
                     approved_at=timezone.now()
                 )
@@ -5842,8 +5862,11 @@ def smt_supplement_batch(request):
                 
         except Exception as e:
             messages.error(request, f'批次處理失敗：{str(e)}')
+        
+        return redirect('workorder:smt_supplement_report_index')
     
-    return redirect('workorder:smt_supplement_report_index')
+    # GET 請求：顯示批次匯入頁面
+    return render(request, 'workorder/report/smt/supplement/batch.html')
 
 # ============================================================================
 # 匯出功能視圖函數
@@ -5885,12 +5908,12 @@ def operator_supplement_export(request):
         
         # 填入資料
         for row, report in enumerate(reports, 2):
-            ws.cell(row=row, column=1, value=report.operator.username)
-            ws.cell(row=row, column=2, value=report.workorder.order_number)
-            ws.cell(row=row, column=3, value=report.process)
-            ws.cell(row=row, column=4, value=report.quantity)
+            ws.cell(row=row, column=1, value=report.operator.name if report.operator else '')
+            ws.cell(row=row, column=2, value=report.workorder.order_number if report.workorder else report.rd_workorder_number or '')
+            ws.cell(row=row, column=3, value=report.process.name if report.process else '')
+            ws.cell(row=row, column=4, value=report.work_quantity or 0)
             ws.cell(row=row, column=5, value=report.work_date.strftime('%Y-%m-%d'))
-            ws.cell(row=row, column=6, value='已審核' if report.is_approved else '待審核')
+            ws.cell(row=row, column=6, value=report.get_approval_status_display())
             ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
             ws.cell(row=row, column=8, value=report.approved_by or '')
             ws.cell(row=row, column=9, value=report.approved_at.strftime('%Y-%m-%d %H:%M:%S') if report.approved_at else '')
@@ -6023,17 +6046,18 @@ def operator_supplement_template(request):
         ws = wb.active
         ws.title = "作業員補登報工模板"
         
-        # 設定標題
-        headers = ['作業員', '工單號', '工序', '數量', '報工日期', '備註']
+        # 設定標題 - 使用新格式
+        headers = ['作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', '工單號', '產品編號', '工序名稱', '設備名稱', '報工數量', '不良品數量', '備註', '異常紀錄']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True)
             cell.alignment = Alignment(horizontal='center')
         
-        # 添加範例資料
+        # 添加範例資料 - 使用新格式
         example_data = [
-            ['張三', 'WO2024001', '組裝', 100, '2024-01-15', '正常生產'],
-            ['李四', 'WO2024002', '測試', 50, '2024-01-15', '品質檢查'],
+            ['張小明', '01', '2025-01-15', '08:00', '12:00', 'WO-01-202501001', 'PROD-001', 'SMT', 'SMT-001', 100, 2, '正常生產', ''],
+            ['李小華', '01', '2025/01/15', '13:00', '17:00', 'WO-01-202501001', 'PROD-001', 'DIP', 'DIP-001', 95, 5, '設備調整', '設備故障30分鐘'],
+            ['王小美', '02', '2025.01.15', '08:00', '16:00', 'WO-02-202501002', 'PROD-002', '測試', '', 200, 0, '加班生產', ''],
         ]
         
         for row, data in enumerate(example_data, 2):
@@ -6135,10 +6159,6 @@ def smt_supplement_template(request):
         messages.error(request, f'模板下載失敗：{str(e)}')
         return redirect('workorder:smt_supplement_report_index')
 
-# ============================================================================
-# API功能視圖函數
-# ============================================================================
-
 @require_POST
 @login_required
 def operator_supplement_batch_create(request):
@@ -6153,7 +6173,7 @@ def operator_supplement_batch_create(request):
         for report_data in reports_data:
             try:
                 # 驗證必要欄位
-                required_fields = ['operator_id', 'workorder_id', 'process', 'quantity', 'work_date']
+                required_fields = ['operator_id', 'workorder_id', 'process_id', 'work_quantity', 'work_date']
                 for field in required_fields:
                     if field not in report_data:
                         errors.append(f'缺少必要欄位：{field}')
@@ -6163,10 +6183,10 @@ def operator_supplement_batch_create(request):
                 report = OperatorSupplementReport.objects.create(
                     operator_id=report_data['operator_id'],
                     workorder_id=report_data['workorder_id'],
-                    process=report_data['process'],
-                    quantity=report_data['quantity'],
+                    process_id=report_data['process_id'],
+                    work_quantity=report_data['work_quantity'],
                     work_date=report_data['work_date'],
-                    notes=report_data.get('notes', ''),
+                    remarks=report_data.get('remarks', ''),
                     created_by=request.user.username if request.user.is_authenticated else 'system'
                 )
                 created_count += 1
