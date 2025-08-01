@@ -71,7 +71,7 @@
         <div class="col-lg-3 col-md-6 mb-3">
             <div class="card stats-card bg-warning text-white">
                 <div class="card-body text-center">
-                    <div class="stats-number">{{ stats.total_pending|default:0 }}</div>
+                    <div class="stats-number">{{ stats.pending_reports|default:0 }}</div>
                     <div class="stats-label">待審核報工</div>
                     <small>
                         主管: {{ stats.pending_supervisor|default:0 }} | 
@@ -86,12 +86,12 @@
         <div class="col-lg-3 col-md-6 mb-3">
             <div class="card stats-card bg-success text-white">
                 <div class="card-body text-center">
-                    <div class="stats-number">{{ stats.total_today|default:0 }}</div>
+                    <div class="stats-number">{{ stats.total_reports_today|default:0 }}</div>
                     <div class="stats-label">今日報工</div>
                     <small>
-                        主管: {{ stats.today_supervisor|default:0 }} | 
-                        作業員: {{ stats.today_operator|default:0 }} | 
-                        SMT: {{ stats.today_smt|default:0 }}
+                        主管: {{ stats.supervisor_reports_today|default:0 }} | 
+                        作業員: {{ stats.operator_reports_today|default:0 }} | 
+                        SMT: {{ stats.smt_reports_today|default:0 }}
                     </small>
                 </div>
             </div>
@@ -101,12 +101,12 @@
         <div class="col-lg-3 col-md-6 mb-3">
             <div class="card stats-card bg-info text-white">
                 <div class="card-body text-center">
-                    <div class="stats-number">{{ stats.total_month|default:0 }}</div>
+                    <div class="stats-number">{{ stats.total_reports_month|default:0 }}</div>
                     <div class="stats-label">本月報工</div>
                     <small>
-                        主管: {{ stats.month_supervisor|default:0 }} | 
-                        作業員: {{ stats.month_operator|default:0 }} | 
-                        SMT: {{ stats.month_smt|default:0 }}
+                        主管: {{ stats.supervisor_reports_month|default:0 }} | 
+                        作業員: {{ stats.operator_reports_month|default:0 }} | 
+                        SMT: {{ stats.smt_reports_month|default:0 }}
                     </small>
                 </div>
             </div>
@@ -116,7 +116,7 @@
         <div class="col-lg-3 col-md-6 mb-3">
             <div class="card stats-card bg-danger text-white">
                 <div class="card-body text-center">
-                    <div class="stats-number">{{ stats.total_abnormal|default:0 }}</div>
+                    <div class="stats-number">{{ stats.abnormal_reports|default:0 }}</div>
                     <div class="stats-label">異常記錄</div>
                     <small>
                         主管: {{ stats.abnormal_supervisor|default:0 }} | 
@@ -144,14 +144,14 @@
                             <a href="{% url 'workorder:supervisor:pending_approval_list' %}" class="btn btn-warning btn-block quick-action-btn">
                                 <i class="fas fa-clock"></i><br>
                                 待審核清單<br>
-                                <small>({{ stats.total_pending|default:0 }})</small>
+                                <small>({{ stats.pending_reports|default:0 }})</small>
                             </a>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <a href="{% url 'reporting:approved_reports_list' %}" class="btn btn-success btn-block quick-action-btn">
+                            <a href="{% url 'workorder:supervisor:pending_approval_list' %}" class="btn btn-success btn-block quick-action-btn">
                                 <i class="fas fa-check-circle"></i><br>
-                                已核准清單<br>
-                                <small>({{ stats.total_approved|default:0 }})</small>
+                                審核管理<br>
+                                <small>管理報工</small>
                             </a>
                         </div>
 

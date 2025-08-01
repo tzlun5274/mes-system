@@ -298,30 +298,18 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% for log in maintenance_logs %}
                     <tr>
-                        <td>2025-07-25 23:00:00</td>
-                        <td>自動備份</td>
-                        <td><span class="badge badge-success">成功</span></td>
-                        <td>備份檔案大小: 2.5 GB</td>
+                        <td>{{ log.timestamp }}</td>
+                        <td>{{ log.action }}</td>
+                        <td><span class="badge badge-{% if log.status == '成功' %}success{% elif log.status == '失敗' %}danger{% else %}info{% endif %}">{{ log.status }}</span></td>
+                        <td>{{ log.details }}</td>
                     </tr>
+                    {% empty %}
                     <tr>
-                        <td>2025-07-25 22:30:00</td>
-                        <td>資料庫優化</td>
-                        <td><span class="badge badge-success">成功</span></td>
-                        <td>優化完成，效能提升 15%</td>
+                        <td colspan="4" class="text-center text-muted">目前沒有維護日誌記錄</td>
                     </tr>
-                    <tr>
-                        <td>2025-07-25 22:00:00</td>
-                        <td>清理舊資料</td>
-                        <td><span class="badge badge-success">成功</span></td>
-                        <td>清理 30 天前資料，釋放空間 500 MB</td>
-                    </tr>
-                    <tr>
-                        <td>2025-07-25 21:30:00</td>
-                        <td>檢查重複資料</td>
-                        <td><span class="badge badge-info">完成</span></td>
-                        <td>發現 0 筆重複資料</td>
-                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>

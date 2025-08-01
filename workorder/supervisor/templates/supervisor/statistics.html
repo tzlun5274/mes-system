@@ -262,12 +262,26 @@
     </div>
 
     <!-- 詳細統計圖表 -->
-    <div class="analysis-section">
-        <div class="analysis-title">
-            <i class="fas fa-chart-line mr-2"></i>詳細統計圖表
+    <div class="row">
+        <div class="col-md-8">
+            <div class="analysis-section">
+                <div class="analysis-title">
+                    <i class="fas fa-chart-line mr-2"></i>報工趨勢分析
+                </div>
+                <div class="chart-container">
+                    <canvas id="reportChart"></canvas>
+                </div>
+            </div>
         </div>
-        <div class="chart-container">
-            <canvas id="reportChart"></canvas>
+        <div class="col-md-4">
+            <div class="analysis-section">
+                <div class="analysis-title">
+                    <i class="fas fa-chart-pie mr-2"></i>審核狀態分布
+                </div>
+                <div class="chart-container">
+                    <canvas id="approvalChart"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -316,19 +330,25 @@
 document.addEventListener('DOMContentLoaded', function() {
     // 建立統計圖表
     const ctx = document.getElementById('reportChart').getContext('2d');
+    
+    // 從Django模板獲取數據
+    const operatorTrendData = {{ operator_trend|safe }};
+    const smtTrendData = {{ smt_trend|safe }};
+    const approvalDistributionData = {{ approval_distribution|safe }};
+    
     const reportChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月'],
+            labels: operatorTrendData.map(item => item.date),
             datasets: [{
                 label: '作業員報工',
-                data: [12, 19, 3, 5, 2, 3, 7],
+                data: operatorTrendData.map(item => item.count),
                 borderColor: 'rgb(75, 192, 192)',
                 backgroundColor: 'rgba(75, 192, 192, 0.2)',
                 tension: 0.1
             }, {
                 label: 'SMT報工',
-                data: [8, 15, 7, 12, 9, 11, 14],
+                data: smtTrendData.map(item => item.count),
                 borderColor: 'rgb(255, 99, 132)',
                 backgroundColor: 'rgba(255, 99, 132, 0.2)',
                 tension: 0.1
@@ -346,6 +366,42 @@ document.addEventListener('DOMContentLoaded', function() {
             scales: {
                 y: {
                     beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    // 建立審核狀態分布圖表
+    const approvalCtx = document.getElementById('approvalChart').getContext('2d');
+    const approvalChart = new Chart(approvalCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['待審核', '已審核', '已駁回'],
+            datasets: [{
+                data: [
+                    approvalDistributionData.pending,
+                    approvalDistributionData.approved,
+                    approvalDistributionData.rejected
+                ],
+                backgroundColor: [
+                    'rgba(255, 193, 7, 0.8)',
+                    'rgba(40, 167, 69, 0.8)',
+                    'rgba(220, 53, 69, 0.8)'
+                ],
+                borderColor: [
+                    'rgba(255, 193, 7, 1)',
+                    'rgba(40, 167, 69, 1)',
+                    'rgba(220, 53, 69, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
                 }
             }
         }
