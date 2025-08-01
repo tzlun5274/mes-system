@@ -6,8 +6,10 @@
 # 導入主要的服務類別
 from .statistics_service import StatisticsService
 from .production_sync_service import ProductionReportSyncService
+from .completion_service import WorkOrderCompletionService
 
 __all__ = [
     'StatisticsService',
     'ProductionReportSyncService',
+    'WorkOrderCompletionService',
 ] 

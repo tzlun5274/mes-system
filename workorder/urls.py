@@ -14,6 +14,10 @@ from .views.report_views import (
     SMTProductionReportUpdateView, SMTProductionReportDetailView, SMTProductionReportDeleteView,
     approve_report, reject_report
 )
+from .views.completed_workorder_views import (
+    CompletedWorkOrderListView, CompletedWorkOrderDetailView,
+    transfer_workorder_to_completed, batch_transfer_completed_workorders
+)
 
 app_name = "workorder"
 
@@ -26,6 +30,12 @@ urlpatterns = [
     path("detail/<int:pk>/", WorkOrderDetailView.as_view(), name="detail"),
     path("list/", WorkOrderListView.as_view(), name="list"),
     path("active/", workorder_views.active_workorders, name="active_workorders"),
+    
+    # 已完工工單相關 URL
+    path('completed/', CompletedWorkOrderListView.as_view(), name='completed_workorder_list'),
+    path('completed/<int:pk>/', CompletedWorkOrderDetailView.as_view(), name='completed_workorder_detail'),
+    path('completed/transfer/<int:workorder_id>/', transfer_workorder_to_completed, name='transfer_workorder_to_completed'),
+    path('completed/batch-transfer/', batch_transfer_completed_workorders, name='batch_transfer_completed_workorders'),
     
     # 公司製令單管理 - 使用類別視圖
     path("company/", CompanyOrderListView.as_view(), name="company_orders"),
@@ -173,4 +183,10 @@ urlpatterns = [
     path("get_product_by_workorder/", workorder_views.get_product_by_workorder, name="get_product_by_workorder"),
     path("get_product_codes_for_autocomplete/", workorder_views.get_product_codes_for_autocomplete, name="get_product_codes_for_autocomplete"),
     path("get_workorder_info/", workorder_views.get_workorder_info, name="get_workorder_info"),
+
+    # 已完工工單相關 URL
+    # path('completed/', workorder_views.CompletedWorkOrderListView.as_view(), name='completed_workorder_list'), # This line is removed as per the edit hint
+    # path('completed/<int:pk>/', workorder_views.CompletedWorkOrderDetailView.as_view(), name='completed_workorder_detail'), # This line is removed as per the edit hint
+    # path('completed/transfer/<int:workorder_id>/', workorder_views.transfer_workorder_to_completed, name='transfer_workorder_to_completed'), # This line is removed as per the edit hint
+    # path('completed/batch-transfer/', workorder_views.batch_transfer_completed_workorders, name='batch_transfer_completed_workorders'), # This line is removed as per the edit hint
 ]

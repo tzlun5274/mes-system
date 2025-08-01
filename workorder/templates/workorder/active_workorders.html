@@ -81,6 +81,13 @@
         border-radius: 8px;
         color: white;
         margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
     }
     
     .stats-card.active {
@@ -98,6 +105,15 @@
     .stats-number {
         font-size: 2.5em;
         font-weight: bold;
+        margin-bottom: 5px;
+        display: block;
+    }
+    
+    .stats-label {
+        font-size: 0.9em;
+        opacity: 0.9;
+        margin-bottom: 5px;
+        display: block;
     }
     
     /* 工單列表卡片樣式 */
@@ -132,13 +148,6 @@
         background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
         transform: translateY(-1px);
     }
-        margin-bottom: 5px;
-    }
-    
-    .stats-label {
-        font-size: 0.9em;
-        opacity: 0.9;
-    }
 </style>
 {% endblock %}
 
@@ -162,14 +171,14 @@
     <div class="row mb-4">
         <div class="col-md-6">
             <div class="stats-card active">
-                <div class="stats-number">{{ total_active }}</div>
+                <div class="stats-number">{{ total_active|default:0 }}</div>
                 <div class="stats-label">生產中工單</div>
                 <small>基於已核准報工</small>
             </div>
         </div>
         <div class="col-md-6">
             <div class="stats-card pending">
-                <div class="stats-number">{{ total_pending }}</div>
+                <div class="stats-number">{{ total_pending|default:0 }}</div>
                 <div class="stats-label">待生產工單</div>
             </div>
         </div>
@@ -185,7 +194,7 @@
                     </h6>
                 </div>
                 <div class="card-body text-center">
-                    <h3 class="text-primary">{{ today_operator_count }}</h3>
+                    <h3 class="text-primary">{{ today_operator_count|default:0 }}</h3>
                     <small class="text-muted">筆已核准記錄</small>
                 </div>
             </div>
@@ -198,7 +207,7 @@
                     </h6>
                 </div>
                 <div class="card-body text-center">
-                    <h3 class="text-success">{{ today_smt_count }}</h3>
+                    <h3 class="text-success">{{ today_smt_count|default:0 }}</h3>
                     <small class="text-muted">筆已核准記錄</small>
                 </div>
             </div>
@@ -258,42 +267,47 @@
 
         <!-- 分頁 -->
         {% if page_obj.has_other_pages %}
-        <nav aria-label="分頁導航" class="mt-4">
-            <ul class="pagination justify-content-center">
-                {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一頁</a>
-                </li>
-                {% endif %}
+        <div class="d-flex justify-content-center mt-4">
+            <nav aria-label="工單分頁">
+                <ul class="pagination">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1">&laquo; 第一頁</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一頁</a>
+                        </li>
+                    {% endif %}
 
-                {% for num in page_obj.paginator.page_range %}
-                {% if page_obj.number == num %}
-                <li class="page-item active">
-                    <span class="page-link">{{ num }}</span>
-                </li>
-                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-                </li>
-                {% endif %}
-                {% endfor %}
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
 
-                {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">下一頁</a>
-                </li>
-                {% endif %}
-            </ul>
-        </nav>
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">下一頁</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">最後一頁 &raquo;</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
         {% endif %}
+
     {% else %}
-        <div class="text-center py-5">
-            <i class="fas fa-clipboard-check fa-3x text-success mb-3"></i>
-            <h5>目前沒有生產中的工單</h5>
-            <p class="text-muted">所有工單都已完成或尚未開始生產</p>
-            <a href="{% url 'workorder:dispatch_list' %}" class="btn btn-primary">
-                <i class="fas fa-arrow-left"></i> 返回派工單管理
-            </a>
+        <div class="alert alert-info text-center">
+            <i class="fas fa-info-circle"></i>
+            目前沒有生產中的工單
         </div>
     {% endif %}
 </div>

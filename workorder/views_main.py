@@ -82,45 +82,12 @@ def index(request):
     deprecated_warning('index')
     workorders = WorkOrder.objects.all().order_by("created_at")
     
-    # 基於報工記錄計算生產中工單數量
-    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
-    from datetime import date, timedelta
-    from django.db.models import Q
+    # 修正後的生產中工單數量計算邏輯
+    # 生產中工單 = 所有工單（不管狀態）
+    # 這是一個流動式的統計，反映整個工單資料表的狀態
     
-    today = date.today()
-    
-    # 今日有已核准報工的工單
-    today_operator_reports = OperatorSupplementReport.objects.filter(
-        work_date=today,
-        approval_status='approved'
-    ).values_list('workorder_id', flat=True).distinct()
-    
-    today_smt_reports = SMTProductionReport.objects.filter(
-        work_date=today,
-        approval_status='approved'
-    ).values_list('workorder_id', flat=True).distinct()
-    
-    today_active_workorder_ids = list(today_operator_reports) + list(today_smt_reports)
-    
-    # 最近3天有已核准報工的工單
-    recent_date = today - timedelta(days=3)
-    recent_operator_reports = OperatorSupplementReport.objects.filter(
-        work_date__gte=recent_date,
-        approval_status='approved'
-    ).values_list('workorder_id', flat=True).distinct()
-    
-    recent_smt_reports = SMTProductionReport.objects.filter(
-        work_date__gte=recent_date,
-        approval_status='approved'
-    ).values_list('workorder_id', flat=True).distinct()
-    
-    recent_active_workorder_ids = list(recent_operator_reports) + list(recent_smt_reports)
-    
-    # 計算生產中工單數量（基於報工記錄）
-    active_workorders_count = WorkOrder.objects.filter(
-        Q(id__in=today_active_workorder_ids) | 
-        Q(id__in=recent_active_workorder_ids)
-    ).distinct().count()
+    # 計算生產中工單數量（所有工單）
+    active_workorders_count = WorkOrder.objects.count()
     
     context = {
         "workorders": workorders,
@@ -5605,31 +5572,16 @@ def active_workorders(request):
     # 獲取今天的日期
     today = date.today()
     
-    # 主要方法：基於已核准的報工記錄判斷生產中工單
-    # 只有當作業員或SMT有補登報工且主管已核准的工單，才算真正在生產中
+    # 修正後的生產中工單判斷邏輯：
+    # 生產中工單 = 所有工單（不管狀態）
+    # 這是一個流動式的統計，反映整個工單資料表的狀態
     
-    # 獲取所有有已核准報工記錄的工單ID
-    approved_operator_reports = OperatorSupplementReport.objects.filter(
-        approval_status='approved'  # 主管已核准
-    ).values_list('workorder_id', flat=True).distinct()
-    
-    approved_smt_reports = SMTProductionReport.objects.filter(
-        approval_status='approved'  # 主管已核准
-    ).values_list('workorder_id', flat=True).distinct()
-    
-    # 合併所有有已核准報工的工單ID
-    active_workorder_ids = list(approved_operator_reports) + list(approved_smt_reports)
-    
-    # 獲取生產中的工單（基於已核准的報工記錄，但排除已完工的工單）
-    active_workorders = WorkOrder.objects.filter(
-        id__in=active_workorder_ids
-    ).exclude(
-        status='completed'  # 排除已完工的工單
-    ).select_related(
+    # 獲取所有工單（不管狀態）
+    active_workorders = WorkOrder.objects.select_related(
         'production_record'
     ).prefetch_related(
         'processes'
-    ).order_by('created_at').distinct()
+    ).order_by('created_at')
     
     # 輔助統計：今日已核准報工記錄
     today_operator_reports = OperatorSupplementReport.objects.filter(
@@ -5652,7 +5604,7 @@ def active_workorders(request):
         workorder.company_name = company_configs.get(workorder.company_code, workorder.company_code or '未知公司')
     
     # 獲取統計數據
-    total_active = active_workorders.count()
+    total_active = active_workorders.count()  # 所有工單
     total_pending = WorkOrder.objects.filter(status='pending').count()
     total_completed = WorkOrder.objects.filter(status='completed').count()
     

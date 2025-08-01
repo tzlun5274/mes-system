@@ -16,20 +16,35 @@
         border-radius: 10px;
         padding: 20px;
         margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
     }
+    
+    .stats-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    
     .stats-number {
-        font-size: 2rem;
+        font-size: 2.5em;
         font-weight: bold;
+        margin-bottom: 5px;
+        display: block;
     }
+    
     .stats-label {
-        font-size: 0.9rem;
+        font-size: 0.9em;
         opacity: 0.9;
+        margin-bottom: 5px;
+        display: block;
     }
+    
     .alert-urgent {
         background-color: #f8d7da;
         border-color: #f5c6cb;
         color: #721c24;
     }
+    
     .alert-overdue {
         background-color: #fff3cd;
         border-color: #ffeaa7;
@@ -48,25 +63,25 @@
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="stats-card">
-                <div class="stats-number">{{ order_summary.total_orders }}</div>
+                <div class="stats-number">{{ order_summary.total_orders|default:0 }}</div>
                 <div class="stats-label">總訂單數</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="stats-card">
-                <div class="stats-number">{{ order_summary.total_quantity|floatformat:0 }}</div>
+                <div class="stats-number">{{ order_summary.total_quantity|default:0|floatformat:0 }}</div>
                 <div class="stats-label">總訂購數量</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="stats-card">
-                <div class="stats-number">{{ order_summary.total_remain|floatformat:0 }}</div>
+                <div class="stats-number">{{ order_summary.total_remain|default:0|floatformat:0 }}</div>
                 <div class="stats-label">未交貨數量</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="stats-card">
-                <div class="stats-number">{{ order_summary.completion_rate|floatformat:1 }}%</div>
+                <div class="stats-number">{{ order_summary.completion_rate|default:0|floatformat:1 }}%</div>
                 <div class="stats-label">完成率</div>
             </div>
         </div>
@@ -98,172 +113,128 @@
         <div class="col-md-2">
             <label>公司</label>
             <select name="company" class="form-select">
-                <option value="">全部</option>
-                {% for c in company_choices %}
-                <option value="{{ c }}" {% if filters.company == c %}selected{% endif %}>{{ c }}</option>
+                <option value="">全部公司</option>
+                {% for company in companies %}
+                <option value="{{ company.company_code }}" {% if selected_company == company.company_code %}selected{% endif %}>
+                    {{ company.company_name }}
+                </option>
                 {% endfor %}
             </select>
         </div>
         <div class="col-md-2">
             <label>客戶</label>
-            <select name="customer" class="form-select">
-                <option value="">全部</option>
-                {% for c in customer_choices %}
-                <option value="{{ c }}" {% if filters.customer == c %}selected{% endif %}>{{ c }}</option>
-                {% endfor %}
-            </select>
+            <input type="text" name="customer" class="form-control" placeholder="客戶名稱" value="{{ selected_customer }}">
         </div>
         <div class="col-md-2">
             <label>訂單類型</label>
             <select name="order_type" class="form-select">
-                <option value="">全部</option>
-                <option value="國內" {% if filters.order_type == '國內' %}selected{% endif %}>國內</option>
-                <option value="國外" {% if filters.order_type == '國外' %}selected{% endif %}>國外</option>
+                <option value="">全部類型</option>
+                <option value="domestic" {% if selected_order_type == 'domestic' %}selected{% endif %}>國內訂單</option>
+                <option value="foreign" {% if selected_order_type == 'foreign' %}selected{% endif %}>國外訂單</option>
             </select>
         </div>
         <div class="col-md-2">
-            <label>交期(起)</label>
-            <input type="date" name="date_start" class="form-control" value="{{ filters.date_start }}">
+            <label>交期狀態</label>
+            <select name="delivery_status" class="form-select">
+                <option value="">全部狀態</option>
+                <option value="normal" {% if selected_delivery_status == 'normal' %}selected{% endif %}>正常</option>
+                <option value="urgent" {% if selected_delivery_status == 'urgent' %}selected{% endif %}>緊急</option>
+                <option value="overdue" {% if selected_delivery_status == 'overdue' %}selected{% endif %}>逾期</option>
+            </select>
         </div>
         <div class="col-md-2">
-            <label>交期(迄)</label>
-            <input type="date" name="date_end" class="form-control" value="{{ filters.date_end }}">
+            <label>開始日期</label>
+            <input type="date" name="start_date" class="form-control" value="{{ selected_start_date }}">
         </div>
-        <div class="col-md-2 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary w-100">查詢</button>
+        <div class="col-md-2">
+            <label>結束日期</label>
+            <input type="date" name="end_date" class="form-control" value="{{ selected_end_date }}">
+        </div>
+        <div class="col-12 mt-2">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-search"></i> 查詢
+            </button>
+            <a href="{% url 'scheduling:order_list' %}" class="btn btn-secondary">
+                <i class="fas fa-undo"></i> 重置
+            </a>
+            <button type="button" class="btn btn-success" onclick="exportToExcel()">
+                <i class="fas fa-file-excel"></i> 匯出Excel
+            </button>
         </div>
     </form>
     
-    <!-- 操作按鈕區塊 -->
-    <div class="mb-3">
-        <a href="?export=excel{{ export_querystring }}" class="btn btn-success">
-            <i class="fas fa-download"></i> 匯出Excel
-        </a>
-        <button id="updateOrdersBtn" class="btn btn-warning">
-            <i class="fas fa-sync"></i> 同步訂單
-        </button>
-        <span class="text-muted ms-2">共 {{ orders|length }} 筆訂單</span>
-    </div>
-    
-    <!-- 訂單列表區塊 -->
-    <div class="table-responsive">
-        <table class="table table-striped table-bordered">
-            <thead class="table-primary">
-                <tr>
-                    <th>公司</th>
-                    <th>客戶</th>
-                    <th>訂單編號</th>
-                    <th>訂單類型</th>
-                    <th>產品編號</th>
-                    <th>產品名稱</th>
-                    <th>訂購數量</th>
-                    <th>訂單日期</th>
-                    <th>
-                        <a href="?order_by={% if order_by == 'pre_in_date' %}-pre_in_date{% else %}pre_in_date{% endif %}{{ export_querystring }}" class="text-decoration-none">
-                            預交貨日
-                            {% if order_by == 'pre_in_date' %}
-                                <span style="font-size:1.2em;">▲</span>
-                            {% elif order_by == '-pre_in_date' %}
-                                <span style="font-size:1.2em;">▼</span>
-                            {% endif %}
-                        </a>
-                    </th>
-                    <th>未交貨數量</th>
-                    <th>狀態</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for order in orders %}
-                <tr>
-                    <td>{{ order.company_name }}</td>
-                    <td>{{ order.customer_short_name }}</td>
-                    <td>{{ order.bill_no }}</td>
-                    <td>
-                        <span class="badge {% if order.order_type == '國內' %}bg-primary{% else %}bg-success{% endif %}">
-                            {{ order.order_type }}
-                        </span>
-                    </td>
-                    <td>{{ order.product_id }}</td>
-                    <td>{{ order.product_name }}</td>
-                    <td>{{ order.quantity|floatformat:0 }}</td>
-                    <td>{{ order.bill_date }}</td>
-                    <td>
-                        {% if order.pre_in_date != 'N/A' %}
-                            <span class="{% if order.pre_in_date < today %}text-danger{% elif order.pre_in_date < week_later %}text-warning{% endif %}">
-                                {{ order.pre_in_date }}
-                            </span>
-                        {% else %}
-                            {{ order.pre_in_date }}
-                        {% endif %}
-                    </td>
-                    <td>{{ order.qty_remain|floatformat:0 }}</td>
-                    <td>
-                        {% if order.pre_in_date != 'N/A' %}
-                            {% if order.pre_in_date < today %}
-                                <span class="badge bg-danger">逾期</span>
-                            {% elif order.pre_in_date < week_later %}
-                                <span class="badge bg-warning">緊急</span>
-                            {% else %}
-                                <span class="badge bg-success">正常</span>
-                            {% endif %}
-                        {% else %}
-                            <span class="badge bg-secondary">未知</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="11" class="text-center text-muted">查無資料</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    
-    <!-- 說明區塊 -->
-    <div class="alert alert-info mt-3">
-        <b>說明：</b>
-        <ul class="mb-0">
-            <li>本頁資料來自ERP國內/國外訂單表，僅顯示未交貨的訂單</li>
-            <li>可依公司、客戶、交期等條件查詢，並可匯出Excel</li>
-            <li>紅色標示為逾期訂單，黃色標示為7天內到期訂單</li>
-            <li>點擊「同步訂單」可手動更新最新訂單資料</li>
-        </ul>
+    <!-- 訂單列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">訂單列表 (共 {{ orders|length }} 筆)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>公司</th>
+                            <th>訂單號</th>
+                            <th>客戶</th>
+                            <th>產品</th>
+                            <th>訂購數量</th>
+                            <th>已交數量</th>
+                            <th>未交數量</th>
+                            <th>交期</th>
+                            <th>狀態</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td>{{ order.company_name }}</td>
+                            <td>{{ order.order_number }}</td>
+                            <td>{{ order.customer_name }}</td>
+                            <td>{{ order.product_code }}</td>
+                            <td>{{ order.order_quantity|floatformat:0 }}</td>
+                            <td>{{ order.delivered_quantity|floatformat:0 }}</td>
+                            <td>{{ order.remaining_quantity|floatformat:0 }}</td>
+                            <td>{{ order.delivery_date|date:"Y-m-d" }}</td>
+                            <td>
+                                {% if order.is_overdue %}
+                                    <span class="badge bg-danger">逾期</span>
+                                {% elif order.is_urgent %}
+                                    <span class="badge bg-warning">緊急</span>
+                                {% else %}
+                                    <span class="badge bg-success">正常</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewOrderDetail('{{ order.order_number }}')">
+                                    <i class="fas fa-eye"></i> 查看
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="10" class="text-center text-muted">
+                                <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                                沒有找到符合條件的訂單
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // 同步訂單按鈕事件
-    document.getElementById('updateOrdersBtn').addEventListener('click', function() {
-        if (confirm('確定要同步訂單資料嗎？這將更新所有公司的訂單資訊。')) {
-            this.disabled = true;
-            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 同步中...';
-            
-            fetch('{% url "scheduling:update_orders" %}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': '{{ csrf_token }}',
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    alert('{% trans "訂單數據更新成功！" %}');
-                    location.reload();
-                } else {
-                    alert('{% trans "更新失敗：" %}' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('更新訂單數據失敗:', error);
-                alert('{% trans "更新訂單數據失敗，請檢查網絡連接或聯繫管理員。" %}');
-            })
-            .finally(() => {
-                this.disabled = false;
-                this.innerHTML = '<i class="fas fa-sync"></i> 同步訂單';
-            });
-        }
-    });
-});
+function exportToExcel() {
+    // 實作Excel匯出功能
+    alert('Excel匯出功能開發中...');
+}
+
+function viewOrderDetail(orderNumber) {
+    // 實作查看訂單詳情功能
+    alert('查看訂單詳情功能開發中... 訂單號：' + orderNumber);
+}
 </script>
 {% endblock %}

@@ -79,15 +79,19 @@
             <div class="col-md-3">
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-success text-white">
-                        <h4 class="mb-0">完工工單</h4>
+                        <h4 class="mb-0">
+                            <i class="fas fa-check-circle"></i> 已完工工單
+                        </h4>
                     </div>
                     <div class="card-body">
                         <p class="card-text">
-                            只顯示狀態為「完工」的工單。
+                            檢視已完工的工單歷史記錄，包含完整統計資料。
                             <br>
-                            可查詢、檢視、匯出。
+                            可查詢、檢視、分析。
                         </p>
-                        <button class="btn btn-info" disabled>功能開發中</button>
+                        <a href="{% url 'workorder:completed_workorder_list' %}" class="btn btn-success">
+                            <i class="fas fa-history"></i> 查看已完工工單
+                        </a>
                     </div>
                 </div>
             </div>

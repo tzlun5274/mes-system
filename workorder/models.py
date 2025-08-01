@@ -550,4 +550,174 @@ class WorkOrderProductionDetail(models.Model):
         return f"{self.workorder_production.workorder.order_number} - {self.process_name} - {self.report_date}"
 
 
+class CompletedWorkOrder(models.Model):
+    """
+    已完工工單模型
+    當工單狀態變更為 'completed' 時，資料會從 WorkOrder 轉移到此模型
+    """
+    # 原始工單資訊
+    original_workorder_id = models.IntegerField(verbose_name="原始工單ID", help_text="對應的原始工單ID")
+    order_number = models.CharField(max_length=100, unique=True, verbose_name="工單號")
+    product_code = models.CharField(max_length=100, verbose_name="產品編號")
+    company_code = models.CharField(max_length=10, verbose_name="公司代號")
+    
+    # 工單基本資訊
+    planned_quantity = models.IntegerField(verbose_name="計劃數量")
+    completed_quantity = models.IntegerField(default=0, verbose_name="完成數量")
+    status = models.CharField(max_length=20, default='completed', verbose_name="工單狀態")
+    
+    # 時間資訊
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    started_at = models.DateTimeField(null=True, blank=True, verbose_name="開始時間")
+    completed_at = models.DateTimeField(auto_now_add=True, verbose_name="完工時間")
+    
+    # 生產記錄資訊
+    production_record = models.ForeignKey(
+        'WorkOrderProduction', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        verbose_name="生產記錄"
+    )
+    
+    # 統計資訊
+    total_work_hours = models.FloatField(default=0.0, verbose_name="總工作時數")
+    total_overtime_hours = models.FloatField(default=0.0, verbose_name="總加班時數")
+    total_all_hours = models.FloatField(default=0.0, verbose_name="全部總時數")
+    total_good_quantity = models.IntegerField(default=0, verbose_name="總合格品")
+    total_defect_quantity = models.IntegerField(default=0, verbose_name="總不良品")
+    total_report_count = models.IntegerField(default=0, verbose_name="報工次數")
+    
+    # 參與人員和設備
+    unique_operators = models.JSONField(default=list, verbose_name="參與作業員")
+    unique_equipment = models.JSONField(default=list, verbose_name="使用設備")
+    
+    class Meta:
+        verbose_name = "已完工工單"
+        verbose_name_plural = "已完工工單"
+        db_table = 'workorder_completed_workorder'
+        ordering = ['-completed_at']
+        indexes = [
+            models.Index(fields=['order_number']),
+            models.Index(fields=['product_code']),
+            models.Index(fields=['company_code']),
+            models.Index(fields=['completed_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.order_number} - {self.product_code}"
+
+    def get_completion_rate(self):
+        """計算完工率"""
+        if self.planned_quantity > 0:
+            return (self.completed_quantity / self.planned_quantity) * 100
+        return 0.0
+
+    def get_completion_rate_display(self):
+        """取得完工率顯示文字"""
+        return f"{self.get_completion_rate():.1f}%"
+
+
+class CompletedWorkOrderProcess(models.Model):
+    """
+    已完工工單工序模型
+    儲存已完工工單的工序資訊
+    """
+    completed_workorder = models.ForeignKey(
+        CompletedWorkOrder, 
+        on_delete=models.CASCADE, 
+        related_name='processes',
+        verbose_name="已完工工單"
+    )
+    
+    # 工序資訊
+    process_name = models.CharField(max_length=100, verbose_name="工序名稱")
+    process_order = models.IntegerField(verbose_name="工序順序")
+    planned_quantity = models.IntegerField(verbose_name="計劃數量")
+    completed_quantity = models.IntegerField(default=0, verbose_name="完成數量")
+    status = models.CharField(max_length=20, default='completed', verbose_name="工序狀態")
+    
+    # 分配資訊
+    assigned_operator = models.CharField(max_length=100, null=True, blank=True, verbose_name="分配作業員")
+    assigned_equipment = models.CharField(max_length=100, null=True, blank=True, verbose_name="分配設備")
+    
+    # 統計資訊
+    total_work_hours = models.FloatField(default=0.0, verbose_name="工作時數")
+    total_good_quantity = models.IntegerField(default=0, verbose_name="合格品數量")
+    total_defect_quantity = models.IntegerField(default=0, verbose_name="不良品數量")
+    report_count = models.IntegerField(default=0, verbose_name="報工次數")
+    
+    # 參與人員和設備
+    operators = models.JSONField(default=list, verbose_name="參與作業員")
+    equipment = models.JSONField(default=list, verbose_name="使用設備")
+    
+    class Meta:
+        verbose_name = "已完工工單工序"
+        verbose_name_plural = "已完工工單工序"
+        db_table = 'workorder_completed_workorder_process'
+        ordering = ['process_order']
+
+    def __str__(self):
+        return f"{self.completed_workorder.order_number} - {self.process_name}"
+
+    def get_completion_rate(self):
+        """計算工序完工率"""
+        if self.planned_quantity > 0:
+            return (self.completed_quantity / self.planned_quantity) * 100
+        return 0.0
+
+
+class CompletedProductionReport(models.Model):
+    """
+    已完工生產報工記錄模型
+    儲存已完工工單的所有報工記錄
+    """
+    completed_workorder = models.ForeignKey(
+        CompletedWorkOrder, 
+        on_delete=models.CASCADE, 
+        related_name='production_reports',
+        verbose_name="已完工工單"
+    )
+    
+    # 報工基本資訊
+    report_date = models.DateField(verbose_name="報工日期")
+    process_name = models.CharField(max_length=100, verbose_name="工序名稱")
+    operator = models.CharField(max_length=100, verbose_name="作業員")
+    equipment = models.CharField(max_length=100, verbose_name="設備")
+    
+    # 數量資訊
+    work_quantity = models.IntegerField(default=0, verbose_name="合格品數量")
+    defect_quantity = models.IntegerField(default=0, verbose_name="不良品數量")
+    
+    # 時數資訊
+    work_hours = models.FloatField(default=0.0, verbose_name="工作時數")
+    overtime_hours = models.FloatField(default=0.0, verbose_name="加班時數")
+    
+    # 時間資訊
+    start_time = models.DateTimeField(null=True, blank=True, verbose_name="開始時間")
+    end_time = models.DateTimeField(null=True, blank=True, verbose_name="結束時間")
+    
+    # 報工來源
+    report_source = models.CharField(max_length=50, verbose_name="報工來源")
+    report_type = models.CharField(max_length=20, verbose_name="報工類型")  # operator, smt, supervisor
+    
+    # 其他資訊
+    remarks = models.TextField(null=True, blank=True, verbose_name="備註")
+    abnormal_notes = models.TextField(null=True, blank=True, verbose_name="異常紀錄")
+    
+    # 審核資訊
+    approval_status = models.CharField(max_length=20, default='approved', verbose_name="審核狀態")
+    approved_by = models.CharField(max_length=100, null=True, blank=True, verbose_name="審核者")
+    approved_at = models.DateTimeField(auto_now_add=True, verbose_name="審核時間")
+    
+    class Meta:
+        verbose_name = "已完工生產報工記錄"
+        verbose_name_plural = "已完工生產報工記錄"
+        db_table = 'workorder_completed_production_report'
+        ordering = ['report_date', 'start_time']
+
+    def __str__(self):
+        return f"{self.completed_workorder.order_number} - {self.process_name} - {self.report_date}"
+
+
 

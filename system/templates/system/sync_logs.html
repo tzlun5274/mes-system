@@ -39,17 +39,27 @@
         border-radius: 8px;
         padding: 1.5rem;
         margin-bottom: 1rem;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
     }
     
     .stats-number {
-        font-size: 2rem;
+        font-size: 2.5em;
         font-weight: bold;
-        margin-bottom: 0.5rem;
+        margin-bottom: 5px;
+        display: block;
     }
     
     .stats-label {
-        font-size: 0.9rem;
+        font-size: 0.9em;
         opacity: 0.9;
+        margin-bottom: 5px;
+        display: block;
     }
 </style>
 {% endblock %}
@@ -79,7 +89,7 @@
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="stats-card">
-                <div class="stats-number">{{ page_obj.paginator.count }}</div>
+                <div class="stats-number">{{ page_obj.paginator.count|default:0 }}</div>
                 <div class="stats-label">總記錄數</div>
             </div>
         </div>
@@ -105,186 +115,159 @@
 
     <!-- 篩選條件 -->
     <div class="log-filters">
-        <h5 class="mb-3">
-            <i class="fas fa-filter text-primary"></i>
-            篩選條件
-        </h5>
-        
         <form method="get" class="row g-3">
-            <div class="col-md-3">
-                <label for="sync_type" class="form-label">同步類型</label>
-                <select class="form-select" id="sync_type" name="sync_type">
-                    <option value="">全部類型</option>
-                    <option value="work_time" {% if sync_type == 'work_time' %}selected{% endif %}>工作報表</option>
-                    
-                    <option value="personnel" {% if sync_type == 'personnel' %}selected{% endif %}>人員績效報表</option>
-                    <option value="equipment" {% if sync_type == 'equipment' %}selected{% endif %}>設備效率報表</option>
-                    <option value="quality" {% if sync_type == 'quality' %}selected{% endif %}>品質分析報表</option>
-                    <option value="comprehensive" {% if sync_type == 'comprehensive' %}selected{% endif %}>綜合分析報表</option>
-                    <option value="all" {% if sync_type == 'all' %}selected{% endif %}>所有報表</option>
-                </select>
-            </div>
-            
-            <div class="col-md-3">
-                <label for="status" class="form-label">同步狀態</label>
-                <select class="form-select" id="status" name="status">
+            <div class="col-md-2">
+                <label for="status" class="form-label">狀態</label>
+                <select name="status" id="status" class="form-select">
                     <option value="">全部狀態</option>
-                    <option value="success" {% if status == 'success' %}selected{% endif %}>成功</option>
-                    <option value="failed" {% if status == 'failed' %}selected{% endif %}>失敗</option>
-                    <option value="partial" {% if status == 'partial' %}selected{% endif %}>部分成功</option>
+                    <option value="success" {% if filters.status == 'success' %}selected{% endif %}>成功</option>
+                    <option value="failed" {% if filters.status == 'failed' %}selected{% endif %}>失敗</option>
+                    <option value="partial" {% if filters.status == 'partial' %}selected{% endif %}>部分成功</option>
                 </select>
             </div>
-            
             <div class="col-md-2">
-                <label for="date_from" class="form-label">開始日期</label>
-                <input type="date" class="form-control" id="date_from" name="date_from" 
-                       value="{{ date_from }}">
+                <label for="report_type" class="form-label">報表類型</label>
+                <select name="report_type" id="report_type" class="form-select">
+                    <option value="">全部類型</option>
+                    <option value="operator" {% if filters.report_type == 'operator' %}selected{% endif %}>作業員報工</option>
+                    <option value="smt" {% if filters.report_type == 'smt' %}selected{% endif %}>SMT報工</option>
+                    <option value="supervisor" {% if filters.report_type == 'supervisor' %}selected{% endif %}>主管報工</option>
+                </select>
             </div>
-            
             <div class="col-md-2">
-                <label for="date_to" class="form-label">結束日期</label>
-                <input type="date" class="form-control" id="date_to" name="date_to" 
-                       value="{{ date_to }}">
+                <label for="start_date" class="form-label">開始日期</label>
+                <input type="date" name="start_date" id="start_date" class="form-control" value="{{ filters.start_date }}">
             </div>
-            
+            <div class="col-md-2">
+                <label for="end_date" class="form-label">結束日期</label>
+                <input type="date" name="end_date" id="end_date" class="form-control" value="{{ filters.end_date }}">
+            </div>
+            <div class="col-md-2">
+                <label for="company" class="form-label">公司</label>
+                <select name="company" id="company" class="form-select">
+                    <option value="">全部公司</option>
+                    {% for company in companies %}
+                    <option value="{{ company.company_code }}" {% if filters.company == company.company_code %}selected{% endif %}>
+                        {{ company.company_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
             <div class="col-md-2 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary me-2">
-                    <i class="fas fa-search"></i> 篩選
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-search"></i> 查詢
                 </button>
-                <a href="{% url 'system:sync_logs' %}" class="btn btn-outline-secondary">
-                    <i class="fas fa-times"></i> 清除
-                </a>
             </div>
         </form>
     </div>
 
-    <!-- 日誌列表 -->
+    <!-- 同步記錄表格 -->
     <div class="log-table">
-        {% if page_obj %}
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>同步類型</th>
-                            <th>期間</th>
-                            <th>狀態</th>
-                            <th>處理記錄</th>
-                            <th>開始時間</th>
-                            <th>執行時間</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for log in page_obj %}
-                        <tr>
-                            <td>
-                                <strong>{{ log.get_sync_type_display }}</strong>
-                            </td>
-                            <td>
-                                {{ log.period_start|date:"m/d" }} - {{ log.period_end|date:"m/d" }}
-                                <br><small class="text-muted">{{ log.period_start|date:"Y" }}</small>
-                            </td>
-                            <td>
-                                {% if log.status == 'success' %}
-                                    <span class="badge bg-success status-badge">
-                                        <i class="fas fa-check"></i> 成功
-                                    </span>
-                                {% elif log.status == 'failed' %}
-                                    <span class="badge bg-danger status-badge">
-                                        <i class="fas fa-times"></i> 失敗
-                                    </span>
-                                {% elif log.status == 'partial' %}
-                                    <span class="badge bg-warning status-badge">
-                                        <i class="fas fa-exclamation-triangle"></i> 部分成功
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="d-flex flex-column">
-                                    <span>處理：{{ log.records_processed }}</span>
-                                    <span>更新：{{ log.records_updated }}</span>
-                                    <span>新增：{{ log.records_created }}</span>
-                                </div>
-                            </td>
-                            <td>
-                                {{ log.started_at|date:"m/d H:i" }}
-                                <br><small class="text-muted">{{ log.started_at|date:"Y" }}</small>
-                            </td>
-                            <td>
-                                {% if log.duration_seconds %}
-                                    {{ log.duration_seconds }} 秒
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <a href="{% url 'system:sync_log_detail' log.id %}" 
-                                   class="btn btn-sm btn-outline-primary log-detail-link">
-                                    <i class="fas fa-eye"></i> 詳情
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- 分頁 -->
-            {% if page_obj.has_other_pages %}
-            <div class="d-flex justify-content-center p-3">
-                <nav aria-label="同步日誌分頁">
-                    <ul class="pagination mb-0">
-                        {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1{% if sync_type %}&sync_type={{ sync_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
-                                    <i class="fas fa-angle-double-left"></i>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if sync_type %}&sync_type={{ sync_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
-                                    <i class="fas fa-angle-left"></i>
-                                </a>
-                            </li>
-                        {% endif %}
-                        
-                        {% for num in page_obj.paginator.page_range %}
-                            {% if page_obj.number == num %}
-                                <li class="page-item active">
-                                    <span class="page-link">{{ num }}</span>
-                                </li>
-                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if sync_type %}&sync_type={{ sync_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">{{ num }}</a>
-                                </li>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>執行時間</th>
+                        <th>報表類型</th>
+                        <th>公司</th>
+                        <th>狀態</th>
+                        <th>處理記錄數</th>
+                        <th>執行時間</th>
+                        <th>錯誤訊息</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in page_obj %}
+                    <tr>
+                        <td>{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>
+                            <span class="badge bg-info">{{ log.get_report_type_display }}</span>
+                        </td>
+                        <td>{{ log.company_name|default:"-" }}</td>
+                        <td>
+                            {% if log.status == 'success' %}
+                                <span class="badge bg-success">成功</span>
+                            {% elif log.status == 'failed' %}
+                                <span class="badge bg-danger">失敗</span>
+                            {% elif log.status == 'partial' %}
+                                <span class="badge bg-warning">部分成功</span>
+                            {% else %}
+                                <span class="badge bg-secondary">未知</span>
                             {% endif %}
-                        {% endfor %}
-                        
-                        {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if sync_type %}&sync_type={{ sync_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
-                                    <i class="fas fa-angle-right"></i>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if sync_type %}&sync_type={{ sync_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
-                                    <i class="fas fa-angle-double-right"></i>
-                                </a>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            </div>
-            {% endif %}
-        {% else %}
-            <div class="text-center py-5">
-                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                <h5 class="text-muted">暫無同步日誌</h5>
-                <p class="text-muted">尚未執行任何報表同步作業</p>
-                <a href="{% url 'system:manual_sync_reports' %}" class="btn btn-primary">
-                    <i class="fas fa-sync-alt"></i> 執行首次同步
-                </a>
-            </div>
-        {% endif %}
+                        </td>
+                        <td>{{ log.records_processed|default:0 }}</td>
+                        <td>{{ log.execution_time|default:0 }}秒</td>
+                        <td>
+                            {% if log.error_message %}
+                                <span class="text-danger">{{ log.error_message|truncatechars:50 }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewLogDetail({{ log.id }})">
+                                <i class="fas fa-eye"></i> 詳情
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                            沒有找到符合條件的同步記錄
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
+
+    <!-- 分頁 -->
+    {% if page_obj.has_other_pages %}
+    <div class="d-flex justify-content-center mt-4">
+        <nav aria-label="同步記錄分頁">
+            <ul class="pagination">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo; 第一頁</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">上一頁</a>
+                    </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">下一頁</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">最後一頁 &raquo;</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
 </div>
+
+<script>
+function viewLogDetail(logId) {
+    // 實作查看日誌詳情功能
+    alert('查看日誌詳情功能開發中... 日誌ID：' + logId);
+}
+</script>
 {% endblock %} 

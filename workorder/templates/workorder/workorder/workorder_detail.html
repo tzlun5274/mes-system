@@ -439,16 +439,35 @@
                     {{ workorder.order_number }}
                 </div>
             </div>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item">
-                        <a href="{% url 'workorder:index' %}">
-                            <i class="fas fa-home me-1"></i>工單管理
-                        </a>
-                    </li>
-                    <li class="breadcrumb-item active">工單詳情</li>
-                </ol>
-            </nav>
+            <div class="d-flex align-items-center gap-3">
+                {% if workorder.status == 'completed' %}
+                <button type="button" class="btn btn-success" onclick="transferToCompleted()">
+                    <i class="fas fa-arrow-right me-1"></i>轉移到已完工
+                </button>
+                {% endif %}
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="{% url 'home' %}">
+                                <i class="fas fa-home me-1"></i>首頁
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a href="{% url 'workorder:index' %}">
+                                <i class="fas fa-clipboard-list me-1"></i>工單管理
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a href="{% url 'workorder:active_workorders' %}">
+                                <i class="fas fa-play-circle me-1"></i>生產中工單
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active">
+                            <i class="fas fa-eye me-1"></i>工單詳情
+                        </li>
+                    </ol>
+                </nav>
+            </div>
         </div>
     </div>
 
@@ -1064,6 +1083,34 @@ function deleteProcess(processId) {
                 location.reload();
             } else {
                 alert('刪除失敗：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('網路錯誤，請重試');
+        });
+    }
+}
+
+function transferToCompleted() {
+    if (confirm('確定要將此工單轉移到已完工模組嗎？轉移後將無法復原。')) {
+        const workorderId = {{ workorder.id }};
+        
+        fetch(`/workorder/completed/transfer/${workorderId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('工單成功轉移到已完工模組！');
+                // 跳轉到已完工工單詳情頁面
+                window.location.href = `/workorder/completed/${data.completed_workorder_id}/`;
+            } else {
+                alert('轉移失敗：' + data.error);
             }
         })
         .catch(error => {

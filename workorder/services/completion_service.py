@@ -1,17 +1,17 @@
 """
-工單服務模組
-提供工單相關的業務邏輯服務
+工單完工服務模組
+提供工單完工時的資料轉移和統計計算功能
 """
 
 import logging
 from datetime import datetime
 from django.db import transaction
 from django.utils import timezone
-from .models import (
+from ..models import (
     WorkOrder, WorkOrderProcess, CompletedWorkOrder, 
     CompletedWorkOrderProcess, CompletedProductionReport
 )
-from .workorder_reporting.models import (
+from ..workorder_reporting.models import (
     OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
 )
 
