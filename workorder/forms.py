@@ -419,6 +419,10 @@ class SMTSupplementReportForm(ProductionReportBaseForm):
             from datetime import date
             self.fields["work_date"].initial = date.today()
         
+        # 移除基礎表單中的 process 欄位，因為 SMT 表單使用 operation 欄位
+        if 'process' in self.fields:
+            del self.fields['process']
+        
         # 為 SMT 表單添加工序欄位（使用 CharField 但提供選項）
         from process.models import ProcessName
         processes = ProcessName.objects.filter(name__icontains="SMT").order_by("name")
