@@ -390,6 +390,29 @@ def batch_approve_reports(request):
 
 
 @login_required
+def batch_delete_reports(request):
+    """
+    批量刪除報工記錄視圖 (Batch Delete Reports View)
+    處理批量刪除報工記錄的操作
+    """
+    if request.method == 'POST':
+        report_ids = request.POST.getlist('report_ids')
+        deleted_count = 0
+        
+        for report_id in report_ids:
+            try:
+                report = OperatorSupplementReport.objects.get(id=report_id)
+                report.delete()
+                deleted_count += 1
+            except OperatorSupplementReport.DoesNotExist:
+                continue
+        
+        messages.success(request, f'成功刪除 {deleted_count} 筆報工記錄')
+    
+    return redirect('workorder:supervisor:pending_approval_list')
+
+
+@login_required
 def report_statistics(request):
     """
     報表統計分析視圖 (Report Statistics View)
@@ -475,14 +498,137 @@ def abnormal_management(request):
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
     ).order_by('-work_date', '-start_time')
     
+    # 計算異常統計數據
+    total_operator_abnormal = operator_abnormal.count()
+    total_smt_abnormal = smt_abnormal.count()
+    total_supervisor_abnormal = supervisor_abnormal.count()
+    
+    # 計算嚴重異常（包含關鍵字的異常）
+    critical_keywords = ['嚴重', '緊急', '停機', '故障', '錯誤']
+    critical_operator = operator_abnormal.filter(
+        Q(abnormal_notes__icontains='嚴重') | 
+        Q(abnormal_notes__icontains='緊急') | 
+        Q(abnormal_notes__icontains='停機') | 
+        Q(abnormal_notes__icontains='故障') | 
+        Q(abnormal_notes__icontains='錯誤')
+    ).count()
+    
+    critical_smt = smt_abnormal.filter(
+        Q(abnormal_notes__icontains='嚴重') | 
+        Q(abnormal_notes__icontains='緊急') | 
+        Q(abnormal_notes__icontains='停機') | 
+        Q(abnormal_notes__icontains='故障') | 
+        Q(abnormal_notes__icontains='錯誤')
+    ).count()
+    
+    critical_supervisor = supervisor_abnormal.filter(
+        Q(abnormal_notes__icontains='嚴重') | 
+        Q(abnormal_notes__icontains='緊急') | 
+        Q(abnormal_notes__icontains='停機') | 
+        Q(abnormal_notes__icontains='故障') | 
+        Q(abnormal_notes__icontains='錯誤')
+    ).count()
+    
+    # 計算待處理和已解決的異常
+    pending_operator = operator_abnormal.filter(approval_status='pending').count()
+    pending_smt = smt_abnormal.filter(approval_status='pending').count()
+    pending_supervisor = supervisor_abnormal.filter(approval_status='pending').count()
+    
+    resolved_operator = operator_abnormal.filter(approval_status='approved').count()
+    resolved_smt = smt_abnormal.filter(approval_status='approved').count()
+    resolved_supervisor = supervisor_abnormal.filter(approval_status='approved').count()
+    
+    # 彙總統計
+    abnormal_stats = {
+        'total_abnormal': total_operator_abnormal + total_smt_abnormal + total_supervisor_abnormal,
+        'critical': critical_operator + critical_smt + critical_supervisor,
+        'pending': pending_operator + pending_smt + pending_supervisor,
+        'resolved': resolved_operator + resolved_smt + resolved_supervisor,
+        'operator_abnormal': total_operator_abnormal,
+        'smt_abnormal': total_smt_abnormal,
+        'supervisor_abnormal': total_supervisor_abnormal,
+    }
+    
     context = {
         **context_data,
         'operator_abnormal': operator_abnormal,
         'smt_abnormal': smt_abnormal,
         'supervisor_abnormal': supervisor_abnormal,
+        'abnormal_stats': abnormal_stats,
     }
     
     return render(request, 'supervisor/abnormal.html', context)
+
+
+@login_required
+def batch_resolve_abnormal(request):
+    """
+    批次解決異常視圖 (Batch Resolve Abnormal View)
+    處理批次解決異常的操作
+    """
+    if request.method == 'POST':
+        try:
+            # 獲取所有待處理的異常記錄
+            operator_pending = OperatorSupplementReport.objects.filter(
+                Q(abnormal_notes__isnull=False) & 
+                ~Q(abnormal_notes='') & 
+                ~Q(abnormal_notes='nan') &
+                Q(approval_status='pending')
+            )
+            
+            smt_pending = SMTProductionReport.objects.filter(
+                Q(abnormal_notes__isnull=False) & 
+                ~Q(abnormal_notes='') & 
+                ~Q(abnormal_notes='nan') &
+                Q(approval_status='pending')
+            )
+            
+            supervisor_pending = SupervisorProductionReport.objects.filter(
+                Q(abnormal_notes__isnull=False) & 
+                ~Q(abnormal_notes='') & 
+                ~Q(abnormal_notes='nan') &
+                Q(approval_status='pending')
+            )
+            
+            # 批次更新狀態
+            operator_resolved = operator_pending.update(
+                approval_status='approved',
+                approved_by=request.user.username,
+                approved_at=timezone.now()
+            )
+            
+            smt_resolved = smt_pending.update(
+                approval_status='approved',
+                approved_by=request.user.username,
+                approved_at=timezone.now()
+            )
+            
+            supervisor_resolved = supervisor_pending.update(
+                approval_status='approved',
+                approved_by=request.user.username,
+                approved_at=timezone.now()
+            )
+            
+            total_resolved = operator_resolved + smt_resolved + supervisor_resolved
+            
+            return JsonResponse({
+                'success': True,
+                'resolved_count': total_resolved,
+                'operator_resolved': operator_resolved,
+                'smt_resolved': smt_resolved,
+                'supervisor_resolved': supervisor_resolved
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'error': '無效的請求方法'
+    })
 
 
 @login_required

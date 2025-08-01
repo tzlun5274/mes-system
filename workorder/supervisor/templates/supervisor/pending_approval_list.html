@@ -69,8 +69,11 @@
                     </button>
                 </div>
                 <div>
-                    <button type="submit" class="btn btn-success" onclick="return confirm('確定要批次審核選中的報工記錄嗎？')">
+                    <button type="submit" class="btn btn-success me-2" onclick="return confirm('確定要批次審核選中的報工記錄嗎？')">
                         <i class="fas fa-check"></i> 批次審核
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="batchDelete()">
+                        <i class="fas fa-trash"></i> 批次刪除
                     </button>
                 </div>
             </div>
@@ -298,6 +301,40 @@ function rejectReport(reportId) {
 function viewDetails(reportId) {
     // 這裡可以實作查看詳情的功能
     alert('查看詳情功能開發中...');
+}
+
+function batchDelete() {
+    const selectedReports = document.querySelectorAll('input[name="report_ids"]:checked');
+    
+    if (selectedReports.length === 0) {
+        alert('請先選擇要刪除的報工記錄');
+        return;
+    }
+    
+    if (confirm(`確定要刪除選中的 ${selectedReports.length} 筆報工記錄嗎？\n\n注意：此操作無法復原！`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = "{% url 'workorder:supervisor:batch_delete_reports' %}";
+        
+        // 添加 CSRF token
+        const csrfToken = document.createElement('input');
+        csrfToken.type = 'hidden';
+        csrfToken.name = 'csrfmiddlewaretoken';
+        csrfToken.value = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        form.appendChild(csrfToken);
+        
+        // 添加選中的報工記錄 ID
+        selectedReports.forEach(checkbox => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'report_ids';
+            input.value = checkbox.value;
+            form.appendChild(input);
+        });
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
 }
 
 // 監聽拒絕表單提交

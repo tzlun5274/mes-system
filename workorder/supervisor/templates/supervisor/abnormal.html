@@ -350,7 +350,7 @@ function batchResolveAbnormal() {
     document.body.appendChild(loadingDiv);
     
     // 發送AJAX請求
-    fetch('{% url "workorder:batch_resolve_abnormal" %}', {
+    fetch('{% url "workorder:supervisor:batch_resolve_abnormal" %}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

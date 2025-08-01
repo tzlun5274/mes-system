@@ -17,6 +17,7 @@ urlpatterns = [
     path('approve_report/<int:report_id>/', views.approve_report, name='approve_report'),
     path('reject_report/<int:report_id>/', views.reject_report, name='reject_report'),
     path('batch_approve_reports/', views.batch_approve_reports, name='batch_approve_reports'),
+    path('batch_delete_reports/', views.batch_delete_reports, name='batch_delete_reports'),
     
     # 統計分析 (Statistics Analysis)
     path('statistics/', views.report_statistics, name='report_statistics'),
@@ -24,6 +25,7 @@ urlpatterns = [
     # 異常處理 (Abnormal Management)
     path('abnormal/', views.abnormal_management, name='abnormal_management'),
     path('abnormal/<str:abnormal_type>/<int:abnormal_id>/', views.abnormal_detail, name='abnormal_detail'),
+    path('batch_resolve_abnormal/', views.batch_resolve_abnormal, name='batch_resolve_abnormal'),
     
     # 資料維護 (Data Maintenance)
     path('maintenance/', views.data_maintenance, name='data_maintenance'),
