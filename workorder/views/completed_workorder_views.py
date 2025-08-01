@@ -50,13 +50,9 @@ class CompletedWorkOrderListView(LoginRequiredMixin, ListView):
         """添加上下文資料"""
         context = super().get_context_data(**kwargs)
         
-        # 統計資料
+        # 統計資料 - 只保留已完工工單數量
         queryset = self.get_queryset()
         context['total_completed'] = queryset.count()
-        context['total_good_quantity'] = sum(w.total_good_quantity for w in queryset)
-        context['total_defect_quantity'] = sum(w.total_defect_quantity for w in queryset)
-        context['total_work_hours'] = sum(w.total_work_hours for w in queryset)
-        context['total_overtime_hours'] = sum(w.total_overtime_hours for w in queryset)
         
         return context
 
