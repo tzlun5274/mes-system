@@ -23,7 +23,7 @@ from ..workorder_reporting.models import (
 )
 from ..forms import (
     OperatorSupplementReportForm, 
-    SMTProductionReportForm, 
+    SMTSupplementReportForm, 
     SupervisorProductionReportForm
 )
 
@@ -207,20 +207,95 @@ class SMTProductionReportListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         """取得查詢集，支援搜尋功能"""
         queryset = super().get_queryset()
-        search = self.request.GET.get('search', '')
-        equipment = self.request.GET.get('equipment', '')
         
+        # 篩選條件
+        equipment_id = self.request.GET.get('equipment')
+        if equipment_id and equipment_id != '':
+            queryset = queryset.filter(equipment_id=equipment_id)
+        
+        workorder_number = self.request.GET.get('workorder')
+        if workorder_number and workorder_number != '':
+            queryset = queryset.filter(workorder__order_number__icontains=workorder_number)
+        
+        product_id = self.request.GET.get('product')
+        if product_id and product_id != '':
+            queryset = queryset.filter(product_id__icontains=product_id)
+        
+        status = self.request.GET.get('status')
+        if status and status != '':
+            queryset = queryset.filter(approval_status=status)
+        
+        date_from = self.request.GET.get('date_from')
+        if date_from and date_from != '':
+            queryset = queryset.filter(work_date__gte=date_from)
+        
+        date_to = self.request.GET.get('date_to')
+        if date_to and date_to != '':
+            queryset = queryset.filter(work_date__lte=date_to)
+        
+        # 搜尋功能
+        search = self.request.GET.get('search', '')
         if search:
             queryset = queryset.filter(
                 Q(workorder__order_number__icontains=search) |
                 Q(product_id__icontains=search) |
                 Q(equipment__name__icontains=search)
             )
-        
-        if equipment:
-            queryset = queryset.filter(equipment_id=equipment)
             
         return queryset
+
+    def get_context_data(self, **kwargs):
+        """提供模板所需的上下文數據"""
+        # 取得查詢集
+        queryset = self.get_queryset()
+        
+        # 分頁處理
+        page_size = self.get_paginate_by(queryset)
+        if page_size:
+            paginator, page, queryset, is_paginated = self.paginate_queryset(queryset, page_size)
+            context = {
+                'paginator': paginator,
+                'page_obj': page,
+                'is_paginated': is_paginated,
+                'object_list': queryset,
+                'reports': page,  # 使用 page 對象作為 reports
+            }
+        else:
+            context = {
+                'paginator': None,
+                'page_obj': None,
+                'is_paginated': False,
+                'object_list': queryset,
+                'reports': queryset,  # 使用 reports 作為上下文變數名
+            }
+        
+        # 取得選項資料
+        from equip.models import Equipment
+        equipment_list = Equipment.objects.filter(name__icontains="SMT").order_by('name')
+        
+        # 統計資料（基於全部資料，不受篩選影響）
+        total_reports = SMTProductionReport.objects.count()
+        pending_reports = SMTProductionReport.objects.filter(approval_status='pending').count()
+        approved_reports = SMTProductionReport.objects.filter(approval_status='approved').count()
+        rejected_reports = SMTProductionReport.objects.filter(approval_status='rejected').count()
+        
+        # 添加額外的上下文數據
+        context.update({
+            'search': self.request.GET.get('search', ''),
+            'total_count': total_reports,
+            'pending_count': pending_reports,
+            'approved_count': approved_reports,
+            'rejected_count': rejected_reports,
+            'equipment_list': equipment_list,
+            'selected_equipment': self.request.GET.get('equipment'),
+            'selected_workorder': self.request.GET.get('workorder'),
+            'selected_product': self.request.GET.get('product'),
+            'selected_status': self.request.GET.get('status'),
+            'selected_date_from': self.request.GET.get('date_from'),
+            'selected_date_to': self.request.GET.get('date_to'),
+        })
+        
+        return context
 
 
 class SMTProductionReportCreateView(LoginRequiredMixin, CreateView):
@@ -229,7 +304,7 @@ class SMTProductionReportCreateView(LoginRequiredMixin, CreateView):
     用於建立新的SMT生產報工記錄
     """
     model = SMTProductionReport
-    form_class = SMTProductionReportForm
+    form_class = SMTSupplementReportForm
     template_name = 'workorder/report/smt/supplement/form.html'
     success_url = reverse_lazy('workorder:smt_supplement_report_index')
 
@@ -251,7 +326,7 @@ class SMTProductionReportUpdateView(LoginRequiredMixin, UpdateView):
     用於編輯現有SMT生產報工記錄
     """
     model = SMTProductionReport
-    form_class = SMTProductionReportForm
+    form_class = SMTSupplementReportForm
     template_name = 'workorder/report/smt/supplement/form.html'
     success_url = reverse_lazy('workorder:smt_supplement_report_index')
 

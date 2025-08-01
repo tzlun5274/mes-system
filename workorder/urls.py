@@ -80,9 +80,9 @@ urlpatterns = [
     path("completed_process_stats/", workorder_views.completed_workorders_process_stats, name="completed_workorders_process_stats"),
     path("fix_completed/", workorder_views.fix_completed_workorders_page, name="fix_completed_workorders"),
     
-    # 報工管理功能（保留原有路由）
-    path("report/operator/", workorder_views.operator_report_index, name="operator_report_index"),
-    path("report/smt/", workorder_views.smt_report_index, name="smt_report_index"),
+    # 報工管理功能（已遷移到類別視圖，保留向後相容路由）
+    # path("report/operator/", workorder_views.operator_report_index, name="operator_report_index"),  # 已重複，使用類別視圖
+    # path("report/smt/", workorder_views.smt_report_index, name="smt_report_index"),  # 已重複，使用類別視圖
     path("report/operator/supplement/approve/<int:report_id>/", workorder_views.operator_supplement_report_approve, name="operator_supplement_report_approve"),
     path("report/operator/supplement/reject/<int:report_id>/", workorder_views.operator_supplement_report_reject, name="operator_supplement_report_reject"),
     path("report/operator/supplement/batch/", workorder_views.operator_supplement_batch, name="operator_supplement_batch"),

@@ -292,21 +292,21 @@ def get_daily_work_report_data(start_date, end_date):
     獲取日工作報表數據
     """
     reports = OperatorSupplementReport.objects.filter(
-        report_date__range=[start_date, end_date],
-        is_approved=True
-    ).select_related('operator', 'work_order')
+        work_date__range=[start_date, end_date],
+        approval_status="approved"
+    ).select_related('operator', 'workorder')
     
     data = []
     for report in reports:
         data.append([
-            report.operator.username,
-            report.report_date.strftime('%Y-%m-%d'),
-            report.work_order.work_order_no,
-            report.work_order.product_sn or '',
+            report.operator.name if report.operator else '',
+            report.work_date.strftime('%Y-%m-%d'),
+            report.workorder.order_number if report.workorder else '',
+            report.product_id or '',
             report.start_time.strftime('%H:%M') if report.start_time else '',
             report.end_time.strftime('%H:%M') if report.end_time else '',
-            report.process,
-            report.quantity or 0,
+            report.process.name if report.process else '',
+            report.work_quantity or 0,
             report.defect_quantity or 0,
         ])
     
@@ -318,17 +318,17 @@ def get_weekly_work_report_data(start_date, end_date):
     獲取週工作報表數據
     """
     reports = OperatorSupplementReport.objects.filter(
-        report_date__range=[start_date, end_date],
-        is_approved=True
-    ).values('operator__username').annotate(
-        total_quantity=Sum('quantity'),
+        work_date__range=[start_date, end_date],
+        approval_status="approved"
+    ).values('operator__name').annotate(
+        total_quantity=Sum('work_quantity'),
         total_defect_quantity=Sum('defect_quantity')
     )
     
     data = []
     for report in reports:
         data.append([
-            report['operator__username'],
+            report['operator__name'] or '',
             report['total_quantity'] or 0,
             report['total_defect_quantity'] or 0,
         ])
@@ -341,17 +341,17 @@ def get_monthly_work_report_data(start_date, end_date):
     獲取月工作報表數據
     """
     reports = OperatorSupplementReport.objects.filter(
-        report_date__range=[start_date, end_date],
-        is_approved=True
-    ).values('operator__username').annotate(
-        total_quantity=Sum('quantity'),
+        work_date__range=[start_date, end_date],
+        approval_status="approved"
+    ).values('operator__name').annotate(
+        total_quantity=Sum('work_quantity'),
         total_defect_quantity=Sum('defect_quantity')
     )
     
     data = []
     for report in reports:
         data.append([
-            report['operator__username'],
+            report['operator__name'] or '',
             report['total_quantity'] or 0,
             report['total_defect_quantity'] or 0,
         ])
@@ -364,8 +364,8 @@ def get_work_hour_operator_report_data(report_type, start_date, end_date):
     獲取作業員工時報表數據
     """
     reports = OperatorSupplementReport.objects.filter(
-        report_date__range=[start_date, end_date],
-        is_approved=True
+        work_date__range=[start_date, end_date],
+        approval_status="approved"
     ).select_related('operator')
     
     data = []
@@ -378,10 +378,10 @@ def get_work_hour_operator_report_data(report_type, start_date, end_date):
             hours = 0
         
         data.append([
-            report.operator.username,
-            report.report_date.strftime('%Y-%m-%d'),
+            report.operator.name if report.operator else '',
+            report.work_date.strftime('%Y-%m-%d'),
             round(hours, 2),
-            report.quantity or 0,
+            report.work_quantity or 0,
             report.defect_quantity or 0,
         ])
     
@@ -393,7 +393,7 @@ def get_work_hour_smt_report_data(report_type, start_date, end_date):
     獲取 SMT 設備工時報表數據
     """
     reports = SMTProductionReport.objects.filter(
-        report_date__range=[start_date, end_date]
+        work_date__range=[start_date, end_date]
     ).select_related('equipment')
     
     data = []
@@ -407,9 +407,9 @@ def get_work_hour_smt_report_data(report_type, start_date, end_date):
         
         data.append([
             report.equipment.name if report.equipment else '',
-            report.report_date.strftime('%Y-%m-%d'),
+            report.work_date.strftime('%Y-%m-%d'),
             round(hours, 2),
-            report.quantity or 0,
+            report.work_quantity or 0,
             report.defect_quantity or 0,
         ])
     
@@ -421,12 +421,11 @@ def get_operator_performance_report_data(start_date, end_date):
     獲取作業員績效報表數據
     """
     reports = OperatorSupplementReport.objects.filter(
-        report_date__range=[start_date, end_date],
-        is_approved=True
-    ).values('operator__username').annotate(
-        total_quantity=Sum('quantity'),
-        total_defect_quantity=Sum('defect_quantity'),
-        avg_efficiency=Avg('efficiency')
+        work_date__range=[start_date, end_date],
+        approval_status="approved"
+    ).values('operator__name').annotate(
+        total_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity')
     )
     
     data = []
@@ -441,11 +440,11 @@ def get_operator_performance_report_data(start_date, end_date):
             defect_rate = 0
         
         data.append([
-            report['operator__username'],
+            report['operator__name'] or '',
             total_quantity,
             total_defect_quantity,
             round(defect_rate, 2),
-            round(report['avg_efficiency'] or 0, 2),
+            0,  # 效率率暫時設為0，因為模型中没有efficiency欄位
         ])
     
     return data
@@ -456,11 +455,10 @@ def get_smt_equipment_report_data(start_date, end_date):
     獲取 SMT 設備效率報表數據
     """
     reports = SMTProductionReport.objects.filter(
-        report_date__range=[start_date, end_date]
+        work_date__range=[start_date, end_date]
     ).values('equipment__name').annotate(
-        total_quantity=Sum('quantity'),
-        total_defect_quantity=Sum('defect_quantity'),
-        avg_efficiency=Avg('efficiency')
+        total_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity')
     )
     
     data = []
@@ -479,7 +477,7 @@ def get_smt_equipment_report_data(start_date, end_date):
             total_quantity,
             total_defect_quantity,
             round(defect_rate, 2),
-            round(report['avg_efficiency'] or 0, 2),
+            0,  # 效率率暫時設為0，因為模型中没有efficiency欄位
         ])
     
     return data
@@ -490,19 +488,19 @@ def get_abnormal_report_data(start_date, end_date):
     獲取異常報工報表數據
     """
     reports = OperatorSupplementReport.objects.filter(
-        report_date__range=[start_date, end_date],
+        work_date__range=[start_date, end_date],
         abnormal_notes__isnull=False
-    ).exclude(abnormal_notes='').select_related('operator', 'work_order')
+    ).exclude(abnormal_notes='').select_related('operator', 'workorder', 'process')
     
     data = []
     for report in reports:
         data.append([
-            report.operator.username,
-            report.report_date.strftime('%Y-%m-%d'),
-            report.work_order.work_order_no,
-            report.process,
+            report.operator.name if report.operator else '',
+            report.work_date.strftime('%Y-%m-%d'),
+            report.workorder.order_number if report.workorder else '',
+            report.process.name if report.process else '',
             report.abnormal_notes,
-            report.quantity or 0,
+            report.work_quantity or 0,
             report.defect_quantity or 0,
         ])
     
@@ -514,12 +512,11 @@ def get_efficiency_analysis_report_data(start_date, end_date):
     獲取效率分析報表數據
     """
     reports = OperatorSupplementReport.objects.filter(
-        report_date__range=[start_date, end_date],
-        is_approved=True
-    ).values('operator__username', 'process').annotate(
-        total_quantity=Sum('quantity'),
-        total_defect_quantity=Sum('defect_quantity'),
-        avg_efficiency=Avg('efficiency')
+        work_date__range=[start_date, end_date],
+        approval_status="approved"
+    ).values('operator__name', 'process__name').annotate(
+        total_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity')
     )
     
     data = []
@@ -534,12 +531,12 @@ def get_efficiency_analysis_report_data(start_date, end_date):
             defect_rate = 0
         
         data.append([
-            report['operator__username'],
-            report['process'],
+            report['operator__name'] or '',
+            report['process__name'] or '',
             total_quantity,
             total_defect_quantity,
             round(defect_rate, 2),
-            round(report['avg_efficiency'] or 0, 2),
+            0,  # 效率率暫時設為0，因為模型中没有efficiency欄位
         ])
     
     return data

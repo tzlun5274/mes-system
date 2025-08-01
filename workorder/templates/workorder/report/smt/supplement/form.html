@@ -266,33 +266,33 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                         <!-- 產品編號 -->
                         <div class="form-field">
-                                        <label for="{{ form.product_id.id_for_label }}" class="form-label">
+                            <label for="{{ form.product_id.id_for_label }}" class="form-label">
                                 產品編號 <span class="required">*</span>
-                                        </label>
-                                        {{ form.product_id }}
-                                        {% if form.product_id.help_text %}
-                                            <div class="help-text">{{ form.product_id.help_text }}</div>
-                                        {% endif %}
-                                        {% if form.product_id.errors %}
-                                            <div class="error-text">{{ form.product_id.errors.0 }}</div>
-                                        {% endif %}
-                                    </div>
+                            </label>
+                            {{ form.product_id }}
+                            {% if form.product_id.help_text %}
+                                <div class="help-text">{{ form.product_id.help_text }}</div>
+                            {% endif %}
+                            {% if form.product_id.errors %}
+                                <div class="error-text">{{ form.product_id.errors.0 }}</div>
+                            {% endif %}
+                        </div>
 
                         <!-- 工單號碼 -->
                         <div class="form-field">
-                                        <label for="{{ form.workorder.id_for_label }}" class="form-label">
+                            <label for="{{ form.workorder.id_for_label }}" class="form-label">
                                 工單號碼 <span class="required">*</span>
-                                        </label>
-                                        {{ form.workorder }}
-                                        {% if form.workorder.help_text %}
-                                            <div class="help-text">{{ form.workorder.help_text }}</div>
-                                        {% endif %}
-                                        {% if form.workorder.errors %}
-                                            <div class="error-text">{{ form.workorder.errors.0 }}</div>
-                                        {% endif %}
-                                </div>
-                            </div>
+                            </label>
+                            {{ form.workorder }}
+                            {% if form.workorder.help_text %}
+                                <div class="help-text">{{ form.workorder.help_text }}</div>
+                            {% endif %}
+                            {% if form.workorder.errors %}
+                                <div class="error-text">{{ form.workorder.errors.0 }}</div>
+                            {% endif %}
                         </div>
+                    </div>
+                </div>
 
                         <!-- RD樣品模式欄位 -->
                 <div id="rd_sample_fields" class="form-block" style="display: none;">
@@ -332,17 +332,17 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
                         <!-- 工單預設生產數量 -->
                         <div class="form-field">
-                                        <label for="{{ form.planned_quantity.id_for_label }}" class="form-label">
-                                            工單預設生產數量
-                                        </label>
-                                        {{ form.planned_quantity }}
-                                        {% if form.planned_quantity.help_text %}
-                                            <div class="help-text">{{ form.planned_quantity.help_text }}</div>
-                                        {% endif %}
-                                        {% if form.planned_quantity.errors %}
-                                            <div class="error-text">{{ form.planned_quantity.errors.0 }}</div>
-                                        {% endif %}
-                                    </div>
+                            <label for="{{ form.planned_quantity.id_for_label }}" class="form-label">
+                                工單預設生產數量
+                            </label>
+                            {{ form.planned_quantity }}
+                            {% if form.planned_quantity.help_text %}
+                                <div class="help-text">{{ form.planned_quantity.help_text }}</div>
+                            {% endif %}
+                            {% if form.planned_quantity.errors %}
+                                <div class="error-text">{{ form.planned_quantity.errors.0 }}</div>
+                            {% endif %}
+                        </div>
 
                         <!-- 工序 -->
                         <div class="form-field">
@@ -717,72 +717,97 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 取得DOM元素
-    const productInput = document.getElementById('{{ form.product_id.id_for_label }}');
+    const productSelect = document.getElementById('{{ form.product_id.id_for_label }}');
     const workorderSelect = document.getElementById('{{ form.workorder.id_for_label }}');
     const plannedQuantityInput = document.getElementById('{{ form.planned_quantity.id_for_label }}');
     
     // 除錯：檢查元素是否存在
     console.log('DOM元素檢查:');
-    console.log('productInput:', productInput);
+    console.log('productSelect:', productSelect);
     console.log('workorderSelect:', workorderSelect);
     console.log('plannedQuantityInput:', plannedQuantityInput);
     
+    // 載入工單的函數
+    function loadWorkordersByProduct(productCode) {
+        console.log('載入產品編號相關工單:', productCode);
+        
+        if (productCode) {
+            // 呼叫API取得相關工單
+            fetch(`{% url 'workorder:get_workorders_by_product' %}?product_id=${encodeURIComponent(productCode)}`, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => {
+                    console.log('API回應狀態:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('API回應資料:', data);
+                    if (data.status === 'success' && data.workorders.length > 0) {
+                        // 更新工單下拉選單
+                        workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                        
+                        data.workorders.forEach(workorder => {
+                            const option = document.createElement('option');
+                            option.value = workorder.id;
+                            // 格式化公司代號，確保是兩位數格式（例如：2 -> 02）
+                            let formattedCompanyCode = workorder.company_code;
+                            if (formattedCompanyCode && /^\d+$/.test(formattedCompanyCode)) {
+                                formattedCompanyCode = formattedCompanyCode.padStart(2, '0');
+                            }
+                            option.textContent = `${formattedCompanyCode} - ${workorder.order_number}`;
+                            workorderSelect.appendChild(option);
+                        });
+                        
+                        // 如果只有一個工單，自動選擇
+                        if (data.workorders.length === 1) {
+                            workorderSelect.value = data.workorders[0].id;
+                            workorderSelect.dispatchEvent(new Event('change'));
+                        }
+                    } else {
+                        workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                        console.log('沒有找到相關工單');
+                    }
+                })
+                .catch(error => {
+                    console.error('API錯誤:', error);
+                    workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                });
+        } else {
+            workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+        }
+    }
+    
     // 產品編號選擇事件（自動帶出工單）
-    if (productInput) {
-        productInput.addEventListener('change', function() {
+    if (productSelect) {
+        // 檢查初始值，如果產品編號已經有值，自動載入工單
+        if (productSelect.value) {
+            console.log('產品編號已有初始值:', productSelect.value);
+            loadWorkordersByProduct(productSelect.value);
+        }
+        
+        productSelect.addEventListener('change', function() {
             const productCode = this.value;
-            console.log('產品編號變更:', productCode);
+            console.log('產品編號選擇變更:', productCode);
             
             if (productCode) {
-                // 呼叫API取得相關工單
-                fetch(`{% url 'workorder:get_workorders_by_product' %}?product_id=${encodeURIComponent(productCode)}`, {
-                    method: 'GET',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Content-Type': 'application/json',
-                    },
-                })
-                    .then(response => {
-                        console.log('API回應狀態:', response.status);
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('API回應資料:', data);
-                        if (data.status === 'success' && data.workorders && data.workorders.length > 0) {
-                            // 更新工單下拉選單
-                            workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                            
-                            data.workorders.forEach(workorder => {
-                                const option = document.createElement('option');
-                                option.value = workorder.id;
-                                // 格式化公司代號，確保是兩位數格式（例如：2 -> 02）
-                                let formattedCompanyCode = workorder.company_code;
-                                if (formattedCompanyCode && /^\d+$/.test(formattedCompanyCode)) {
-                                    formattedCompanyCode = formattedCompanyCode.padStart(2, '0');
-                                }
-                                option.textContent = `${formattedCompanyCode} - ${workorder.order_number}`;
-                                workorderSelect.appendChild(option);
-                            });
-                            
-                            // 如果只有一個工單，自動選擇
-                            if (data.workorders.length === 1) {
-                                workorderSelect.value = data.workorders[0].id;
-                                workorderSelect.dispatchEvent(new Event('change'));
-                            }
-                        } else {
-                            workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                            console.log('沒有找到相關工單');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('API錯誤:', error);
-                        workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                    });
+                // 載入該產品編號相關的工單
+                loadWorkordersByProduct(productCode);
             } else {
-                workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                // 清空工單選項
+                if (workorderSelect) {
+                    workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                }
+                // 清空工單預設生產數量
+                if (plannedQuantityInput) {
+                    plannedQuantityInput.value = '';
+                }
             }
         });
     }
@@ -823,8 +848,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                             
                             // 自動填入產品編號
-                            if (productInput && workorder.product_code) {
-                                productInput.value = workorder.product_code;
+                            if (productSelect && workorder.product_code) {
+                                productSelect.value = workorder.product_code;
                                 console.log('更新產品編號:', workorder.product_code);
                             }
                         } else {

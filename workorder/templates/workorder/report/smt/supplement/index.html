@@ -136,7 +136,7 @@
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:smt_report_index' %}">SMT報工</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:smt_supplement_report_index' %}">SMT報工</a></li>
                         <li class="breadcrumb-item active" aria-current="page">補登報工</li>
                     </ol>
                 </nav>
@@ -148,25 +148,25 @@
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="smt-stat-card">
-                <div class="smt-stat-number text-warning">{{ pending_reports|default:0 }}</div>
+                <div class="smt-stat-number text-warning">{{ pending_count|default:0 }}</div>
                 <div class="smt-stat-label">待核准</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="smt-stat-card">
-                <div class="smt-stat-number text-success">{{ approved_reports|default:0 }}</div>
+                <div class="smt-stat-number text-success">{{ approved_count|default:0 }}</div>
                 <div class="smt-stat-label">已核准</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="smt-stat-card">
-                <div class="smt-stat-number text-danger">{{ rejected_reports|default:0 }}</div>
+                <div class="smt-stat-number text-danger">{{ rejected_count|default:0 }}</div>
                 <div class="smt-stat-label">已駁回</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="smt-stat-card">
-                <div class="smt-stat-number text-info">{{ total_reports|default:0 }}</div>
+                <div class="smt-stat-number text-info">{{ total_count|default:0 }}</div>
                 <div class="smt-stat-label">總記錄數</div>
             </div>
         </div>
@@ -200,7 +200,7 @@
                             </a>
                         </div>
                         <div class="col-md-2">
-                            <a href="{% url 'reporting:smt_supplement_export' %}" class="btn btn-success btn-lg btn-block mb-2">
+                            <a href="{% url 'workorder:smt_supplement_export' %}" class="btn btn-success btn-lg btn-block mb-2">
                                 <i class="fas fa-download"></i> 匯出資料
                             </a>
                         </div>
@@ -228,7 +228,7 @@
                                 <select class="form-control" id="equipment" name="equipment">
                                     <option value="">全部設備</option>
                                     {% for equipment in equipment_list %}
-                                    <option value="{{ equipment.id }}" {% if selected_equipment == equipment.id %}selected{% endif %}>
+                                    <option value="{{ equipment.id }}" {% if selected_equipment|stringformat:'s' == equipment.id|stringformat:'s' %}selected{% endif %}>
                                         {{ equipment.name }}
                                     </option>
                                     {% endfor %}
@@ -313,8 +313,8 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% if page_obj %}
-                                    {% for report in page_obj %}
+                                {% if reports %}
+                                    {% for report in reports %}
                                     <tr>
                                         <td>{{ report.work_date|date:"Y-m-d" }} {{ report.start_time|time:"H:i" }}-{{ report.end_time|time:"H:i" }}</td>
                                         <td>
@@ -384,10 +384,10 @@
                     </div>
 
                     <!-- 分頁 -->
-                    {% if page_obj.has_other_pages %}
+                    {% if reports.has_other_pages %}
                     <nav aria-label="補登記錄分頁">
                         <ul class="pagination justify-content-center">
-                            {% if page_obj.has_previous %}
+                            {% if reports.has_previous %}
                                 <li class="page-item">
                                     <a class="page-link" href="?page=1{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if selected_workorder %}&workorder={{ selected_workorder }}{% endif %}{% if selected_product %}&product={{ selected_product }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" title="第一頁">
                                         <i class="fas fa-angle-double-left"></i>
@@ -395,34 +395,34 @@
                                     </a>
                                 </li>
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if selected_workorder %}&workorder={{ selected_workorder }}{% endif %}{% if selected_product %}&product={{ selected_product }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" title="上一頁">
+                                    <a class="page-link" href="?page={{ reports.previous_page_number }}{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if selected_workorder %}&workorder={{ selected_workorder }}{% endif %}{% if selected_product %}&product={{ selected_product }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" title="上一頁">
                                         <i class="fas fa-angle-left"></i>
                                         <span class="d-none d-sm-inline">上一頁</span>
                                     </a>
                                 </li>
                             {% endif %}
 
-                            {% for num in page_obj.paginator.page_range %}
-                                {% if page_obj.number == num %}
+                            {% for num in reports.paginator.page_range %}
+                                {% if reports.number == num %}
                                     <li class="page-item active">
                                         <span class="page-link">{{ num }}</span>
                                     </li>
-                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                {% elif num > reports.number|add:'-3' and num < reports.number|add:'3' %}
                                     <li class="page-item">
                                         <a class="page-link" href="?page={{ num }}{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if selected_workorder %}&workorder={{ selected_workorder }}{% endif %}{% if selected_product %}&product={{ selected_product }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}">{{ num }}</a>
                                     </li>
                                 {% endif %}
                             {% endfor %}
 
-                            {% if page_obj.has_next %}
+                            {% if reports.has_next %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if selected_workorder %}&workorder={{ selected_workorder }}{% endif %}{% if selected_product %}&product={{ selected_product }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" title="下一頁">
+                                    <a class="page-link" href="?page={{ reports.next_page_number }}{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if selected_workorder %}&workorder={{ selected_workorder }}{% endif %}{% if selected_product %}&product={{ selected_product }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" title="下一頁">
                                         <i class="fas fa-angle-right"></i>
                                         <span class="d-none d-sm-inline">下一頁</span>
                                     </a>
                                 </li>
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if selected_workorder %}&workorder={{ selected_workorder }}{% endif %}{% if selected_product %}&product={{ selected_product }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" title="最後一頁">
+                                    <a class="page-link" href="?page={{ reports.paginator.num_pages }}{% if selected_equipment %}&equipment={{ selected_equipment }}{% endif %}{% if selected_workorder %}&workorder={{ selected_workorder }}{% endif %}{% if selected_product %}&product={{ selected_product }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" title="最後一頁">
                                         <i class="fas fa-angle-double-right"></i>
                                         <span class="d-none d-sm-inline">最後一頁</span>
                                     </a>

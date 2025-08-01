@@ -21,7 +21,7 @@ from .models import (
 from .workorder_erp.models import PrdMKOrdMain, SystemConfig, CompanyOrder
 from .workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
 from .tasks import get_standard_processes
-from .forms import WorkOrderForm, OperatorSupplementReportForm, SMTProductionReportForm, OperatorOnSiteReportForm, SMTSupplementReportForm
+from .forms import WorkOrderForm, OperatorSupplementReportForm, OperatorOnSiteReportForm, SMTSupplementReportForm
 from django.contrib import messages
 
 from datetime import datetime, timedelta, date
@@ -2243,7 +2243,7 @@ def edit_my_supplement(request, supplement_id):
         messages.error(request, "您只能編輯自己的補登記錄")
         return redirect('workorder:user_supplement_index')
     
-    if supplement.is_approved:
+    if supplement.approval_status != "pending":
         messages.error(request, "已核准的記錄無法修改")
         return redirect('workorder:user_supplement_index')
     
@@ -2293,7 +2293,7 @@ def delete_my_supplement(request, supplement_id):
         messages.error(request, "您只能刪除自己的補登記錄")
         return redirect('workorder:user_supplement_index')
     
-    if supplement.is_approved:
+    if supplement.approval_status != "pending":
         messages.error(request, "已核准的記錄無法刪除")
         return redirect('workorder:user_supplement_index')
     
@@ -3276,10 +3276,10 @@ def batch_approve_supplements(request):
             # 核准該工單的所有待核准補登記錄
             supplements = QuickSupplementLog.objects.filter(
                 workorder_id=workorder_id,
-                is_approved=False
+                approval_status='pending'
             )
             supplements.update(
-                is_approved=True,
+                approval_status='approved',
                 approved_at=timezone.now(),
                 approved_by=request.user.username
             )
@@ -3376,7 +3376,7 @@ def quick_approve_workorder(request, workorder_id):
         # 核准該工單的所有待核准補登記錄
         supplements = QuickSupplementLog.objects.filter(
             workorder=workorder,
-            is_approved=False
+            approval_status='pending'
         )
         
         if not supplements.exists():
@@ -3386,7 +3386,7 @@ def quick_approve_workorder(request, workorder_id):
             })
         
         supplements.update(
-            is_approved=True,
+            approval_status='approved',
             approved_at=timezone.now(),
             approved_by=request.user.username
         )
@@ -3445,8 +3445,8 @@ def supplement_statistics(request):
         
         stats = supplements.aggregate(
             total_records=Count('id'),
-            pending_records=Count('id', filter=Q(is_approved=False)),
-            approved_records=Count('id', filter=Q(is_approved=True)),
+            pending_records=Count('id', filter=Q(approval_status='pending')),
+            approved_records=Count('id', filter=Q(approval_status='approved')),
             total_completed=Sum('completed_quantity'),
             total_defect=Sum('defect_qty'),
             total_workorders=Count('workorder', distinct=True)
@@ -4924,7 +4924,7 @@ def operator_on_site_report(request):
 def supervisor_approve_reports(request):
     """主管審核報工記錄"""
     pending_reports = OperatorSupplementReport.objects.filter(
-        is_approved=False
+        approval_status='pending'
             ).order_by('-work_date', '-created_at')
     
     # 搜尋功能
@@ -4952,7 +4952,7 @@ def approve_report(request, report_id):
     """審核單筆報工記錄"""
     try:
         report = OperatorSupplementReport.objects.get(id=report_id)
-        report.is_approved = True
+        report.approval_status = 'approved'
         report.approved_by = request.user.username
         report.approved_at = timezone.now()
         report.save()
@@ -4967,7 +4967,7 @@ def reject_report(request, report_id):
     """駁回單筆報工記錄"""
     try:
         report = OperatorSupplementReport.objects.get(id=report_id)
-        report.is_approved = False
+        report.approval_status = 'rejected'
         report.approved_by = request.user.username
         report.approved_at = timezone.now()
         report.save()
@@ -5306,7 +5306,7 @@ def smt_supplement_report_approve(request, report_id):
     """審核SMT補登報工"""
     try:
         report = SMTProductionReport.objects.get(id=report_id)
-        report.is_approved = True
+        report.approval_status = 'approved'
         report.approved_by = request.user.username
         report.approved_at = timezone.now()
         report.save()
@@ -5321,7 +5321,7 @@ def smt_supplement_report_reject(request, report_id):
     """駁回SMT補登報工"""
     try:
         report = SMTProductionReport.objects.get(id=report_id)
-        report.is_approved = False
+        report.approval_status = 'rejected'
         report.approved_by = request.user.username
         report.approved_at = timezone.now()
         report.save()
@@ -6008,12 +6008,12 @@ def supervisor_index(request):
     """主管功能首頁"""
     # 統計資料
     total_operator_reports = OperatorSupplementReport.objects.count()
-    pending_operator_reports = OperatorSupplementReport.objects.filter(is_approved=False).count()
-    approved_operator_reports = OperatorSupplementReport.objects.filter(is_approved=True).count()
+    pending_operator_reports = OperatorSupplementReport.objects.filter(approval_status="pending").count()
+    approved_operator_reports = OperatorSupplementReport.objects.filter(approval_status="approved").count()
     
     total_smt_reports = SMTProductionReport.objects.count()
-    pending_smt_reports = SMTProductionReport.objects.filter(is_approved=False).count()
-    approved_smt_reports = SMTProductionReport.objects.filter(is_approved=True).count()
+    pending_smt_reports = SMTProductionReport.objects.filter(approval_status="pending").count()
+    approved_smt_reports = SMTProductionReport.objects.filter(approval_status="approved").count()
     
     context = {
         'total_operator_reports': total_operator_reports,
