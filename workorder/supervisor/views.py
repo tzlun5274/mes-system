@@ -187,7 +187,7 @@ def supervisor_functions(request):
         'recent_abnormal_records': recent_abnormal_records,
     }
     
-    return render(request, 'supervisor/index.html', context)
+    return render(request, 'supervisor/functions.html', context)
 
 
 @login_required
@@ -294,9 +294,6 @@ def pending_approval_list(request):
     待審核清單視圖 (Pending Approval List View)
     顯示所有待審核的報工記錄
     """
-    """
-    待審核報工清單
-    """
     # 獲取所有待審核的報工記錄
     pending_reports = OperatorSupplementReport.objects.filter(
         approval_status='pending'
@@ -313,6 +310,21 @@ def pending_approval_list(request):
     }
     
     return render(request, 'supervisor/pending_approval_list.html', context)
+
+
+@login_required
+def report_detail(request, report_id):
+    """
+    報工記錄詳情視圖 (Report Detail View)
+    顯示單一報工記錄的詳細資訊
+    """
+    report = get_object_or_404(OperatorSupplementReport, id=report_id)
+    
+    context = {
+        'report': report,
+    }
+    
+    return render(request, 'supervisor/report_detail.html', context)
 
 
 @login_required

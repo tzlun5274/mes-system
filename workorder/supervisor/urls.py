@@ -14,6 +14,7 @@ urlpatterns = [
     # 審核管理 (Approval Management)
     path('reports/', views.supervisor_report_index, name='supervisor_report_index'),
     path('pending_approval_list/', views.pending_approval_list, name='pending_approval_list'),
+    path('report_detail/<int:report_id>/', views.report_detail, name='report_detail'),
     path('approve_report/<int:report_id>/', views.approve_report, name='approve_report'),
     path('reject_report/<int:report_id>/', views.reject_report, name='reject_report'),
     path('batch_approve_reports/', views.batch_approve_reports, name='batch_approve_reports'),

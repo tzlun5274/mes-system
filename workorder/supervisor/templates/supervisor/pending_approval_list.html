@@ -130,7 +130,7 @@
                             </td>
                             <td>{{ report.process.name|default:report.process_name|default:"-" }}</td>
                             <td>
-                                <span class="badge bg-success">{{ report.quantity|default:0 }}</span>
+                                <span class="badge bg-success">{{ report.work_quantity|default:0 }}</span>
                             </td>
                             <td>
                                 {% if report.defect_quantity %}
@@ -170,11 +170,12 @@
                                             title="拒絕">
                                         拒絕
                                     </button>
-                                    <button type="button" class="btn btn-info" 
-                                            onclick="viewDetails({{ report.id }})"
-                                            title="查看詳情">
+                                    <a href="{% url 'workorder:supervisor:report_detail' report.id %}" 
+                                       class="btn btn-info" 
+                                       title="查看詳情"
+                                       target="_blank">
                                         詳情
-                                    </button>
+                                    </a>
                                 </div>
                             </td>
                         </tr>
@@ -296,11 +297,6 @@ function rejectReport(reportId) {
     currentReportId = reportId;
     document.getElementById('reject-form').action = `{% url 'workorder:supervisor:reject_report' 0 %}`.replace('0', reportId);
     new bootstrap.Modal(document.getElementById('rejectModal')).show();
-}
-
-function viewDetails(reportId) {
-    // 這裡可以實作查看詳情的功能
-    alert('查看詳情功能開發中...');
 }
 
 function batchDelete() {
