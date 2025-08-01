@@ -3,6 +3,7 @@
 整合所有主管相關功能，包含審核管理、統計分析、異常處理、資料維護等
 """
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import Http404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
@@ -292,12 +293,11 @@ def supervisor_report_index(request):
 def pending_approval_list(request):
     """
     待審核清單視圖 (Pending Approval List View)
-    顯示所有待審核的報工記錄
+    顯示所有待審核的報工記錄（包含作業員報工、SMT報工、主管報工）
     """
-    # 獲取所有待審核的報工記錄
-    pending_reports = OperatorSupplementReport.objects.filter(
-        approval_status='pending'
-    ).select_related('operator', 'workorder', 'process').order_by('-work_date', '-start_time')
+    # 使用 SupervisorApprovalService 獲取所有待審核的報工記錄
+    from .services import SupervisorApprovalService
+    pending_reports = SupervisorApprovalService.get_pending_approval_reports()
     
     # 分頁
     paginator = Paginator(pending_reports, 20)
@@ -306,7 +306,7 @@ def pending_approval_list(request):
     
     context = {
         'page_obj': page_obj,
-        'total_pending': pending_reports.count(),
+        'total_pending': len(pending_reports),
     }
     
     return render(request, 'supervisor/pending_approval_list.html', context)
@@ -316,12 +316,30 @@ def pending_approval_list(request):
 def report_detail(request, report_id):
     """
     報工記錄詳情視圖 (Report Detail View)
-    顯示單一報工記錄的詳細資訊
+    顯示單一報工記錄的詳細資訊（支援作業員報工、SMT報工、主管報工）
     """
-    report = get_object_or_404(OperatorSupplementReport, id=report_id)
+    # 嘗試從作業員報工中查找
+    try:
+        report = OperatorSupplementReport.objects.get(id=report_id)
+        report_type = '作業員報工'
+    except OperatorSupplementReport.DoesNotExist:
+        # 嘗試從SMT報工中查找
+        try:
+            from workorder.workorder_reporting.models import SMTProductionReport
+            report = SMTProductionReport.objects.get(id=report_id)
+            report_type = 'SMT報工'
+        except SMTProductionReport.DoesNotExist:
+            # 嘗試從主管報工中查找
+            try:
+                from workorder.workorder_reporting.models import SupervisorProductionReport
+                report = SupervisorProductionReport.objects.get(id=report_id)
+                report_type = '主管報工'
+            except SupervisorProductionReport.DoesNotExist:
+                raise Http404("報工記錄不存在")
     
     context = {
         'report': report,
+        'report_type': report_type,
     }
     
     return render(request, 'supervisor/report_detail.html', context)
@@ -373,13 +391,92 @@ def reject_report(request, report_id):
 
 
 @login_required
+def approve_smt_report(request, report_id):
+    """
+    核准SMT報工記錄視圖 (Approve SMT Report View)
+    處理SMT報工記錄的核准操作
+    """
+    if request.method == 'POST':
+        from workorder.workorder_reporting.models import SMTProductionReport
+        report = get_object_or_404(SMTProductionReport, id=report_id)
+        report.approval_status = 'approved'
+        report.approved_by = request.user.username
+        report.approved_at = timezone.now()
+        report.save()
+        
+        messages.success(request, f'SMT報工記錄 {report.id} 已審核通過')
+        return redirect('workorder:supervisor:pending_approval_list')
+    
+    return redirect('workorder:supervisor:pending_approval_list')
+
+
+@login_required
+def reject_smt_report(request, report_id):
+    """
+    駁回SMT報工記錄視圖 (Reject SMT Report View)
+    處理SMT報工記錄的駁回操作
+    """
+    if request.method == 'POST':
+        from workorder.workorder_reporting.models import SMTProductionReport
+        report = get_object_or_404(SMTProductionReport, id=report_id)
+        report.approval_status = 'rejected'
+        report.rejected_by = request.user.username
+        report.rejected_at = timezone.now()
+        report.rejection_reason = request.POST.get('rejection_reason', '')
+        report.save()
+        
+        messages.warning(request, f'SMT報工記錄 {report.id} 已被拒絕')
+        return redirect('workorder:supervisor:pending_approval_list')
+    
+    return redirect('workorder:supervisor:pending_approval_list')
+
+
+@login_required
+def approve_supervisor_report(request, report_id):
+    """
+    核准主管報工記錄視圖 (Approve Supervisor Report View)
+    處理主管報工記錄的核准操作
+    """
+    if request.method == 'POST':
+        from workorder.workorder_reporting.models import SupervisorProductionReport
+        report = get_object_or_404(SupervisorProductionReport, id=report_id)
+        report.approval_status = 'approved'
+        report.approved_by = request.user.username
+        report.approved_at = timezone.now()
+        report.save()
+        
+        messages.success(request, f'主管報工記錄 {report.id} 已審核通過')
+        return redirect('workorder:supervisor:pending_approval_list')
+    
+    return redirect('workorder:supervisor:pending_approval_list')
+
+
+@login_required
+def reject_supervisor_report(request, report_id):
+    """
+    駁回主管報工記錄視圖 (Reject Supervisor Report View)
+    處理主管報工記錄的駁回操作
+    """
+    if request.method == 'POST':
+        from workorder.workorder_reporting.models import SupervisorProductionReport
+        report = get_object_or_404(SupervisorProductionReport, id=report_id)
+        report.approval_status = 'rejected'
+        report.rejected_by = request.user.username
+        report.rejected_at = timezone.now()
+        report.rejection_reason = request.POST.get('rejection_reason', '')
+        report.save()
+        
+        messages.warning(request, f'主管報工記錄 {report.id} 已被拒絕')
+        return redirect('workorder:supervisor:pending_approval_list')
+    
+    return redirect('workorder:supervisor:pending_approval_list')
+
+
+@login_required
 def batch_approve_reports(request):
     """
     批量核准報工記錄視圖 (Batch Approve Reports View)
-    處理批量核准報工記錄的操作
-    """
-    """
-    批次審核報工記錄
+    處理批量核准報工記錄的操作（支援作業員報工、SMT報工、主管報工）
     """
     if request.method == 'POST':
         report_ids = request.POST.getlist('report_ids')
@@ -387,13 +484,45 @@ def batch_approve_reports(request):
         
         for report_id in report_ids:
             try:
-                report = OperatorSupplementReport.objects.get(id=report_id)
-                report.approval_status = 'approved'
-                report.approved_by = request.user.username
-                report.approved_at = timezone.now()
-                report.save()
-                approved_count += 1
-            except OperatorSupplementReport.DoesNotExist:
+                # 嘗試從作業員報工中查找
+                try:
+                    report = OperatorSupplementReport.objects.get(id=report_id)
+                    report.approval_status = 'approved'
+                    report.approved_by = request.user.username
+                    report.approved_at = timezone.now()
+                    report.save()
+                    approved_count += 1
+                    continue
+                except OperatorSupplementReport.DoesNotExist:
+                    pass
+                
+                # 嘗試從SMT報工中查找
+                try:
+                    from workorder.workorder_reporting.models import SMTProductionReport
+                    report = SMTProductionReport.objects.get(id=report_id)
+                    report.approval_status = 'approved'
+                    report.approved_by = request.user.username
+                    report.approved_at = timezone.now()
+                    report.save()
+                    approved_count += 1
+                    continue
+                except SMTProductionReport.DoesNotExist:
+                    pass
+                
+                # 嘗試從主管報工中查找
+                try:
+                    from workorder.workorder_reporting.models import SupervisorProductionReport
+                    report = SupervisorProductionReport.objects.get(id=report_id)
+                    report.approval_status = 'approved'
+                    report.approved_by = request.user.username
+                    report.approved_at = timezone.now()
+                    report.save()
+                    approved_count += 1
+                    continue
+                except SupervisorProductionReport.DoesNotExist:
+                    pass
+                
+            except Exception as e:
                 continue
         
         messages.success(request, f'成功審核 {approved_count} 筆報工記錄')

@@ -113,22 +113,18 @@
                         {% for report in page_obj %}
                         <tr>
                             <td>
-                                <input type="checkbox" name="report_ids" value="{{ report.id }}" form="batch-form">
+                                <input type="checkbox" name="report_ids" value="{{ report.report_id }}" form="batch-form">
                             </td>
                             <td>
-                                <strong>{{ report.operator.name|default:report.operator_name|default:"-" }}</strong>
+                                <strong>{{ report.operator_name }}</strong>
+                                <br>
+                                <small class="badge bg-info">{{ report.report_type }}</small>
                             </td>
                             <td>{{ report.work_date|date:"Y-m-d" }}</td>
                             <td>
-                                {% if report.workorder %}
-                                <a href="{% url 'workorder:detail' report.workorder.id %}" target="_blank">
-                                    {{ report.workorder.order_number }}
-                                </a>
-                                {% else %}
-                                -
-                                {% endif %}
+                                <strong>{{ report.workorder_number }}</strong>
                             </td>
-                            <td>{{ report.process.name|default:report.process_name|default:"-" }}</td>
+                            <td>{{ report.process_name }}</td>
                             <td>
                                 <span class="badge bg-success">{{ report.work_quantity|default:0 }}</span>
                             </td>
@@ -155,22 +151,22 @@
                             </td>
                             <td>
                                 <small class="text-muted">
-                                    {{ report.created_at|date:"m-d H:i" }}
+                                    {{ report.work_date|date:"m-d" }}
                                 </small>
                             </td>
                             <td class="approval-actions">
                                 <div class="btn-group btn-group-sm" role="group">
                                     <button type="button" class="btn btn-success" 
-                                            onclick="approveReport({{ report.id }})"
+                                            onclick="approveReport('{{ report.report_type }}', {{ report.report_id }})"
                                             title="審核通過">
                                         通過
                                     </button>
                                     <button type="button" class="btn btn-danger" 
-                                            onclick="rejectReport({{ report.id }})"
+                                            onclick="rejectReport('{{ report.report_type }}', {{ report.report_id }})"
                                             title="拒絕">
                                         拒絕
                                     </button>
-                                    <a href="{% url 'workorder:supervisor:report_detail' report.id %}" 
+                                    <a href="{% url 'workorder:supervisor:report_detail' report.report_id %}" 
                                        class="btn btn-info" 
                                        title="查看詳情"
                                        target="_blank">
@@ -255,6 +251,7 @@
 {% block extra_js %}
 <script>
 let currentReportId = null;
+let currentReportType = null;
 
 function selectAll() {
     document.querySelectorAll('input[name="report_ids"]').forEach(checkbox => {
@@ -276,11 +273,22 @@ function toggleAll(checkbox) {
     });
 }
 
-function approveReport(reportId) {
+function approveReport(reportType, reportId) {
     if (confirm('確定要審核通過這筆報工記錄嗎？')) {
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = `{% url 'workorder:supervisor:approve_report' 0 %}`.replace('0', reportId);
+        
+        // 根據報工類型選擇不同的審核 URL
+        let actionUrl;
+        if (reportType === 'SMT報工') {
+            actionUrl = `{% url 'workorder:supervisor:approve_smt_report' 0 %}`.replace('0', reportId);
+        } else if (reportType === '主管報工') {
+            actionUrl = `{% url 'workorder:supervisor:approve_supervisor_report' 0 %}`.replace('0', reportId);
+        } else {
+            actionUrl = `{% url 'workorder:supervisor:approve_report' 0 %}`.replace('0', reportId);
+        }
+        
+        form.action = actionUrl;
         
         const csrfToken = document.createElement('input');
         csrfToken.type = 'hidden';
@@ -293,9 +301,21 @@ function approveReport(reportId) {
     }
 }
 
-function rejectReport(reportId) {
+function rejectReport(reportType, reportId) {
     currentReportId = reportId;
-    document.getElementById('reject-form').action = `{% url 'workorder:supervisor:reject_report' 0 %}`.replace('0', reportId);
+    currentReportType = reportType;
+    
+    // 根據報工類型選擇不同的拒絕 URL
+    let actionUrl;
+    if (reportType === 'SMT報工') {
+        actionUrl = `{% url 'workorder:supervisor:reject_smt_report' 0 %}`.replace('0', reportId);
+    } else if (reportType === '主管報工') {
+        actionUrl = `{% url 'workorder:supervisor:reject_supervisor_report' 0 %}`.replace('0', reportId);
+    } else {
+        actionUrl = `{% url 'workorder:supervisor:reject_report' 0 %}`.replace('0', reportId);
+    }
+    
+    document.getElementById('reject-form').action = actionUrl;
     new bootstrap.Modal(document.getElementById('rejectModal')).show();
 }
 

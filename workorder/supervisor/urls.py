@@ -17,6 +17,10 @@ urlpatterns = [
     path('report_detail/<int:report_id>/', views.report_detail, name='report_detail'),
     path('approve_report/<int:report_id>/', views.approve_report, name='approve_report'),
     path('reject_report/<int:report_id>/', views.reject_report, name='reject_report'),
+    path('approve_smt_report/<int:report_id>/', views.approve_smt_report, name='approve_smt_report'),
+    path('reject_smt_report/<int:report_id>/', views.reject_smt_report, name='reject_smt_report'),
+    path('approve_supervisor_report/<int:report_id>/', views.approve_supervisor_report, name='approve_supervisor_report'),
+    path('reject_supervisor_report/<int:report_id>/', views.reject_supervisor_report, name='reject_supervisor_report'),
     path('batch_approve_reports/', views.batch_approve_reports, name='batch_approve_reports'),
     path('batch_delete_reports/', views.batch_delete_reports, name='batch_delete_reports'),
     

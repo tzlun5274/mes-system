@@ -47,10 +47,17 @@ class StatisticsService:
     def _get_operator_statistics(today, month_start):
         """
         獲取作業員報工統計
+        使用 created_at（登記時間）進行統計，而不是 work_date（工作日期）
         """
+        from django.utils import timezone
+        from datetime import datetime
+        today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+        today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+        month_start_datetime = timezone.make_aware(datetime.combine(month_start, datetime.min.time()))
+        
         return {
-            'today': OperatorSupplementReport.objects.filter(work_date=today).count(),
-            'month': OperatorSupplementReport.objects.filter(work_date__gte=month_start).count(),
+            'today': OperatorSupplementReport.objects.filter(created_at__range=(today_start, today_end)).count(),
+            'month': OperatorSupplementReport.objects.filter(created_at__gte=month_start_datetime).count(),
             'pending': OperatorSupplementReport.objects.filter(approval_status='pending').count(),
             'abnormal': OperatorSupplementReport.objects.filter(
                 Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
@@ -62,10 +69,17 @@ class StatisticsService:
     def _get_smt_statistics(today, month_start):
         """
         獲取SMT報工統計
+        使用 created_at（登記時間）進行統計，而不是 work_date（工作日期）
         """
+        from django.utils import timezone
+        from datetime import datetime
+        today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+        today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
+        month_start_datetime = timezone.make_aware(datetime.combine(month_start, datetime.min.time()))
+        
         return {
-            'today': SMTProductionReport.objects.filter(work_date=today).count(),
-            'month': SMTProductionReport.objects.filter(work_date__gte=month_start).count(),
+            'today': SMTProductionReport.objects.filter(created_at__range=(today_start, today_end)).count(),
+            'month': SMTProductionReport.objects.filter(created_at__gte=month_start_datetime).count(),
             'pending': SMTProductionReport.objects.filter(approval_status='pending').count(),
             'abnormal': SMTProductionReport.objects.filter(
                 Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
