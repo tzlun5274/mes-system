@@ -9,6 +9,78 @@ from datetime import datetime, date, timedelta
 from django.contrib.auth.models import User
 
 
+class TimeInputWidget(forms.Widget):
+    """
+    自定義時間輸入元件
+    支援下拉式選單和手動輸入兩種方式
+    """
+    template_name = 'workorder/widgets/time_input.html'
+    
+    def __init__(self, attrs=None):
+        if attrs is None:
+            attrs = {}
+        # 設定預設屬性
+        default_attrs = {
+            'class': 'form-control time-input',
+            'type': 'text',
+            'placeholder': '請選擇或輸入時間 (HH:MM)',
+            'autocomplete': 'off',
+        }
+        default_attrs.update(attrs)
+        super().__init__(default_attrs)
+    
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        
+        # 生成時間選項（每30分鐘一個選項）
+        time_options = []
+        for hour in range(24):
+            for minute in [0, 30]:
+                time_str = f"{hour:02d}:{minute:02d}"
+                time_options.append(time_str)
+        
+        context['time_options'] = time_options
+        return context
+
+
+class TimeField(forms.CharField):
+    """
+    自定義時間欄位
+    支援下拉式選單和手動輸入兩種方式
+    """
+    widget = TimeInputWidget
+    
+    def __init__(self, *args, **kwargs):
+        # 設定預設屬性
+        kwargs.setdefault('max_length', 5)
+        kwargs.setdefault('help_text', '請選擇或輸入時間 (24小時制，格式：HH:MM)')
+        super().__init__(*args, **kwargs)
+    
+    def clean(self, value):
+        """驗證時間格式"""
+        value = super().clean(value)
+        if not value:
+            return value
+        
+        # 驗證時間格式 (HH:MM)
+        try:
+            if ':' not in value:
+                raise ValueError("時間格式錯誤")
+            
+            hour_str, minute_str = value.split(':')
+            hour = int(hour_str)
+            minute = int(minute_str)
+            
+            if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                raise ValueError("時間範圍錯誤")
+            
+            # 格式化為標準格式
+            return f"{hour:02d}:{minute:02d}"
+            
+        except (ValueError, TypeError):
+            raise forms.ValidationError("請輸入正確的時間格式 (HH:MM)，例如：08:30 或 16:45")
+
+
 class ProductionReportBaseForm(forms.ModelForm):
     """
     【規範】報工共用表單
@@ -89,31 +161,15 @@ class ProductionReportBaseForm(forms.ModelForm):
     )
     
     # 開始時間欄位（24小時制）
-    start_time = forms.CharField(
+    start_time = TimeField(
         label="開始時間",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "placeholder": "例如：16:00",
-                "autocomplete": "off",
-            }
-        ),
-        required=True,
-        help_text="請輸入實際開始時間 (24小時制)，例如 16:00",
+        help_text="請選擇或輸入實際開始時間 (24小時制)，例如 16:00",
     )
     
     # 結束時間欄位（24小時制）
-    end_time = forms.CharField(
+    end_time = TimeField(
         label="結束時間",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "placeholder": "例如：18:30",
-                "autocomplete": "off",
-            }
-        ),
-        required=True,
-        help_text="請輸入實際結束時間 (24小時制)，例如 18:30",
+        help_text="請選擇或輸入實際結束時間 (24小時制)，例如 18:30",
     )
     
     # 工作數量欄位
@@ -858,37 +914,15 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
     )
 
     # 開始時間（24小時制）
-    start_time = forms.CharField(
+    start_time = TimeField(
         label="開始時間",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "id": "start_time_input",
-                "placeholder": "請輸入實際開始時間 (24小時制)，例如 16:00",
-                "type": "text",
-                "autocomplete": "off",
-            }
-        ),
-        required=True,
-        initial="08:30",
-        help_text="請輸入實際開始時間 (24小時制)，例如 16:00",
+        help_text="請選擇或輸入實際開始時間 (24小時制)，例如 16:00",
     )
 
     # 結束時間（24小時制）
-    end_time = forms.CharField(
+    end_time = TimeField(
         label="結束時間",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "id": "end_time_input",
-                "placeholder": "請輸入實際結束時間 (24小時制)，例如 18:30",
-                "type": "text",
-                "autocomplete": "off",
-            }
-        ),
-        required=True,
-        initial="17:30",
-        help_text="請輸入實際結束時間 (24小時制)，例如 18:30",
+        help_text="請選擇或輸入實際結束時間 (24小時制)，例如 18:30",
     )
 
     # 工作數量
@@ -1374,36 +1408,14 @@ class OperatorSupplementBatchForm(forms.Form):
         help_text="請輸入每日的報工數量",
     )
 
-    start_time = forms.CharField(
+    start_time = TimeField(
         label="開始時間",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "type": "text",
-                "id": "batch_start_time_input",
-                "placeholder": "例如：08:00",
-                "readonly": "readonly",
-                "autocomplete": "off",
-            }
-        ),
-        required=True,
-        help_text="請輸入每日的開始時間 (24小時制)",
+        help_text="請選擇或輸入每日的開始時間 (24小時制)",
     )
 
-    end_time = forms.CharField(
+    end_time = TimeField(
         label="結束時間",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "type": "text",
-                "id": "batch_end_time_input",
-                "placeholder": "例如：17:00",
-                "readonly": "readonly",
-                "autocomplete": "off",
-            }
-        ),
-        required=True,
-        help_text="請輸入每日的結束時間 (24小時制)",
+        help_text="請選擇或輸入每日的結束時間 (24小時制)",
     )
 
     notes = forms.CharField(
@@ -1578,18 +1590,16 @@ class SupervisorProductionReportForm(forms.ModelForm):
                 },
                 format="%Y-%m-%d",
             ),
-            "start_time": forms.TimeInput(
+            "start_time": TimeInputWidget(
                 attrs={
                     "class": "form-control",
-                    "type": "text",
-                    "placeholder": "請輸入開始時間 (24小時制)",
+                    "placeholder": "請選擇或輸入開始時間 (24小時制)",
                 }
             ),
-            "end_time": forms.TimeInput(
+            "end_time": TimeInputWidget(
                 attrs={
                     "class": "form-control",
-                    "type": "text",
-                    "placeholder": "請輸入結束時間 (24小時制)",
+                    "placeholder": "請選擇或輸入結束時間 (24小時制)",
                 }
             ),
             "work_quantity": forms.NumberInput(
@@ -1862,28 +1872,14 @@ class SupervisorProductionReportBatchForm(forms.Form):
         ),
     )
 
-    start_time = forms.TimeField(
+    start_time = TimeField(
         label="開始時間",
-        help_text="請輸入每日的開始時間 (24小時制)",
-        widget=forms.TimeInput(
-            attrs={
-                "class": "form-control",
-                "type": "text",
-                "placeholder": "請輸入開始時間",
-            }
-        ),
+        help_text="請選擇或輸入每日的開始時間 (24小時制)",
     )
 
-    end_time = forms.TimeField(
+    end_time = TimeField(
         label="結束時間",
-        help_text="請輸入每日的結束時間 (24小時制)",
-        widget=forms.TimeInput(
-            attrs={
-                "class": "form-control",
-                "type": "text",
-                "placeholder": "請輸入結束時間",
-            }
-        ),
+        help_text="請選擇或輸入每日的結束時間 (24小時制)",
     )
 
     daily_work_quantity = forms.IntegerField(
@@ -2128,34 +2124,14 @@ class RDSampleSupplementReportForm(ProductionReportBaseForm):
         help_text="請選擇實際RD樣品報工日期",
     )
 
-    start_time = forms.CharField(
-        max_length=5,
+    start_time = TimeField(
         label="開始時間",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "type": "text",
-                "id": "start_time_input",
-                "placeholder": "請輸入實際開始時間，例如 16:00",
-            }
-        ),
-        required=True,
-        help_text="請輸入實際開始時間 (24小時制)，例如 16:00",
+        help_text="請選擇或輸入實際開始時間 (24小時制)，例如 16:00",
     )
 
-    end_time = forms.CharField(
-        max_length=5,
+    end_time = TimeField(
         label="結束時間",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "type": "text",
-                "id": "end_time_input",
-                "placeholder": "請輸入實際結束時間，例如 18:30",
-            }
-        ),
-        required=True,
-        help_text="請輸入實際結束時間 (24小時制)，例如 18:30",
+        help_text="請選擇或輸入實際結束時間 (24小時制)，例如 18:30",
     )
 
     # 數量資訊

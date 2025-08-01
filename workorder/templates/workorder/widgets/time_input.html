@@ -1,0 +1,121 @@
+{% comment %}
+時間輸入元件模板
+支援下拉式選單和手動輸入兩種方式
+{% endcomment %}
+
+<div class="time-input-container">
+    <div class="input-group">
+        <input type="text" 
+               name="{{ widget.name }}" 
+               value="{{ widget.value|default:'' }}"
+               class="{{ widget.attrs.class }}"
+               placeholder="{{ widget.attrs.placeholder }}"
+               autocomplete="off"
+               data-time-input="true">
+        
+        <button class="btn btn-outline-secondary dropdown-toggle" 
+                type="button" 
+                data-bs-toggle="dropdown" 
+                aria-expanded="false"
+                title="選擇時間">
+            <i class="fas fa-clock"></i>
+        </button>
+        
+        <ul class="dropdown-menu time-dropdown" style="max-height: 200px; overflow-y: auto;">
+            {% for time_option in time_options %}
+            <li>
+                <a class="dropdown-item time-option" 
+                   href="#" 
+                   data-time="{{ time_option }}">
+                    {{ time_option }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<style>
+.time-input-container {
+    position: relative;
+}
+
+.time-dropdown {
+    min-width: 100px;
+}
+
+.time-option {
+    cursor: pointer;
+    padding: 0.25rem 0.75rem;
+}
+
+.time-option:hover {
+    background-color: #f8f9fa;
+}
+
+.time-option.selected {
+    background-color: #0d6efd;
+    color: white;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 為所有時間輸入欄位添加事件監聽
+    document.querySelectorAll('[data-time-input="true"]').forEach(function(input) {
+        const container = input.closest('.time-input-container');
+        const dropdown = container.querySelector('.time-dropdown');
+        const options = dropdown.querySelectorAll('.time-option');
+        
+        // 點擊時間選項時設定值
+        options.forEach(function(option) {
+            option.addEventListener('click', function(e) {
+                e.preventDefault();
+                const timeValue = this.getAttribute('data-time');
+                input.value = timeValue;
+                
+                // 移除其他選項的選中狀態
+                options.forEach(opt => opt.classList.remove('selected'));
+                // 添加當前選項的選中狀態
+                this.classList.add('selected');
+                
+                // 觸發 change 事件
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        });
+        
+        // 手動輸入時驗證格式
+        input.addEventListener('input', function() {
+            const value = this.value;
+            
+            // 移除所有選項的選中狀態
+            options.forEach(opt => opt.classList.remove('selected'));
+            
+            // 如果輸入的值在選項中，標記為選中
+            options.forEach(function(option) {
+                if (option.getAttribute('data-time') === value) {
+                    option.classList.add('selected');
+                }
+            });
+        });
+        
+        // 失去焦點時格式化時間
+        input.addEventListener('blur', function() {
+            const value = this.value.trim();
+            if (value) {
+                // 嘗試格式化時間
+                const timeMatch = value.match(/^(\d{1,2}):?(\d{2})?$/);
+                if (timeMatch) {
+                    let hour = parseInt(timeMatch[1]);
+                    let minute = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+                    
+                    // 驗證範圍
+                    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+                        this.value = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                    }
+                }
+            }
+        });
+    });
+});
+</script> 

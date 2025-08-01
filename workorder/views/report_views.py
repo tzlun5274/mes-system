@@ -348,7 +348,7 @@ class SMTProductionReportDetailView(LoginRequiredMixin, DetailView):
     """
     model = SMTProductionReport
     template_name = 'workorder/report/smt/supplement/detail.html'
-    context_object_name = 'report'
+    context_object_name = 'supplement_report'
 
 
 class SMTProductionReportDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
@@ -358,6 +358,7 @@ class SMTProductionReportDeleteView(LoginRequiredMixin, UserPassesTestMixin, Del
     """
     model = SMTProductionReport
     template_name = 'workorder/report/smt/supplement/delete_confirm.html'
+    context_object_name = 'supplement_report'
     success_url = reverse_lazy('workorder:smt_supplement_report_index')
 
     def test_func(self):
@@ -415,6 +416,7 @@ class OperatorSupplementReportDeleteView(LoginRequiredMixin, UserPassesTestMixin
     """
     model = OperatorSupplementReport
     template_name = 'workorder/report/operator/supplement/delete_confirm.html'
+    context_object_name = 'supplement_report'
     success_url = reverse_lazy('workorder:operator_supplement_report_index')
 
     def test_func(self):
