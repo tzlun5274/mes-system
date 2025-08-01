@@ -1694,7 +1694,7 @@ def check_workorder_completion(workorder):
     簡化邏輯：出貨包裝報工數量 ≥ 工單生產數量 = 完工
     """
     from workorder.models import WorkOrderProcess
-    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
+    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
     
     # 取得該工單的所有工序
     processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by('step_order')
@@ -1726,20 +1726,7 @@ def check_workorder_completion(workorder):
             'operator': report.operator.name if report.operator else '未知'
         })
     
-    # 從主管生產報工記錄中查找出貨包裝
-    supervisor_packaging = SupervisorProductionReport.objects.filter(
-        workorder=workorder,
-        process__name__icontains='出貨包裝'
-    )
-    for report in supervisor_packaging:
-        packaging_reports.append({
-            'source': '主管報工',
-            'process': report.process.name,
-            'quantity': report.work_quantity,  # 只計算合格品數量
-            'defect_quantity': report.defect_quantity,  # 不良品數量（僅供顯示）
-            'date': report.work_date,
-            'operator': report.operator.name if report.operator else '未知'
-        })
+    # 主管不報工，移除主管報工相關邏輯
     
     # 從SMT生產報工記錄中查找出貨包裝（如果有）
     smt_packaging = SMTProductionReport.objects.filter(
@@ -1779,9 +1766,7 @@ def check_workorder_completion(workorder):
     operator_reports = OperatorSupplementReport.objects.filter(workorder=workorder)
     all_reports_quantity += sum(report.work_quantity for report in operator_reports)
     
-    # 主管生產報工
-    supervisor_reports = SupervisorProductionReport.objects.filter(workorder=workorder)
-    all_reports_quantity += sum(report.work_quantity for report in supervisor_reports)
+    # 主管不報工，移除主管報工相關邏輯
     
     # SMT生產報工
     smt_reports = SMTProductionReport.objects.filter(workorder=workorder)
@@ -1803,7 +1788,7 @@ def analyze_packaging_processes(workorder):
     基於實際報工記錄分析
     """
     from workorder.models import WorkOrderProcess
-    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
+    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
     
     processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by('step_order')
     packaging_processes = processes.filter(process_name__icontains='出貨包裝').order_by('step_order')
@@ -1827,21 +1812,7 @@ def analyze_packaging_processes(workorder):
             'is_completed': report.is_completed
         })
     
-    # 從主管生產報工記錄中查找出貨包裝
-    supervisor_packaging = SupervisorProductionReport.objects.filter(
-        workorder=workorder,
-        process__name__icontains='出貨包裝'
-    )
-    for report in supervisor_packaging:
-        packaging_reports.append({
-            'source': '主管報工',
-            'process': report.process.name,
-            'quantity': report.work_quantity,
-            'defect_quantity': report.defect_quantity,
-            'date': report.work_date,
-            'operator': report.operator.name if report.operator else '未知',
-            'is_completed': report.is_completed
-        })
+    # 主管不報工，移除主管報工相關邏輯
     
     # 從SMT生產報工記錄中查找出貨包裝
     smt_packaging = SMTProductionReport.objects.filter(
@@ -2365,67 +2336,7 @@ def pending_approval_list(request):
 def approved_reports_list(request):
     """已核准報工列表 - 已移至 reporting 模組"""
     from django.shortcuts import redirect
-    return redirect('reporting:approved_reports_list')
-    all_approved = []
-    
-    # 主管審核功能已刪除，跳過處理
-    
-    for report in operator_approved:
-        all_approved.append({
-            'type': '作業員報工',
-            'id': report.id,
-            'report_type': 'operator',
-            'operator': report.operator.name if report.operator else '-',
-            'workorder': report.workorder.order_number if report.workorder else '-',
-            'process': report.process.name if report.process else '-',
-            'quantity': report.work_quantity,
-            'defect_quantity': report.defect_quantity,
-            'work_date': report.work_date,
-            'start_time': report.start_time,
-            'end_time': report.end_time,
-            'approved_at': report.approved_at,
-            'approved_by': report.approved_by,
-            'remarks': report.remarks,
-        })
-    
-    for report in smt_approved:
-        all_approved.append({
-            'type': 'SMT報工',
-            'id': report.id,
-            'report_type': 'smt',
-            'operator': 'SMT設備',
-            'workorder': report.workorder.order_number if report.workorder else '-',
-            'process': report.operation,
-            'quantity': report.work_quantity,
-            'defect_quantity': getattr(report, 'defect_quantity', 0),
-            'work_date': report.work_date,
-            'start_time': report.start_time,
-            'end_time': report.end_time,
-            'approved_at': report.approved_at,
-            'approved_by': report.approved_by,
-            'remarks': getattr(report, 'remarks', ''),
-        })
-    
-    # 按核准時間排序
-    all_approved.sort(key=lambda x: x['approved_at'], reverse=True)
-    
-    # 統計資料
-    total_approved = len(all_approved)
-    supervisor_count = 0  # 主管審核功能已刪除
-    operator_count = len(operator_approved)
-    smt_count = len(smt_approved)
-
-    return render(
-        request,
-        "workorder/approved_reports_list.html",
-        {
-            "all_approved": all_approved,
-            "total_approved": total_approved,
-            "supervisor_count": supervisor_count,
-            "operator_count": operator_count,
-            "smt_count": smt_count,
-        },
-    )
+    return redirect('reporting:placeholder', function_name='approved_reports_list')
 
 
 @login_required
@@ -3387,7 +3298,7 @@ def batch_approve_pending(request):
     批次審核所有待審核報工記錄 API
     只有超級管理員可以使用此功能
     """
-    from .workorder_reporting.models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
+    from .workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
     
     # 檢查是否為超級管理員
     if not request.user.is_superuser:
@@ -3399,18 +3310,8 @@ def batch_approve_pending(request):
     try:
         approved_count = 0
         
-        # 批次審核主管生產報工記錄
-        supervisor_reports = SupervisorProductionReport.objects.filter(
-            approval_status='pending'
-        )
-        supervisor_count = supervisor_reports.count()
-        supervisor_reports.update(
-            approval_status='approved',
-            approved_by=request.user.username,
-            approved_at=timezone.now(),
-            approval_remarks='批次審核'
-        )
-        approved_count += supervisor_count
+        # 主管不報工，移除主管報工相關邏輯
+        supervisor_count = 0
         
         # 批次審核作業員補登報工記錄
         operator_reports = OperatorSupplementReport.objects.filter(
@@ -3870,61 +3771,15 @@ def report_index(request):
     """
     from django.contrib.auth.decorators import login_required
     from django.shortcuts import redirect
-    from datetime import date
-    from django.db.models import Q
-    from .models import OperatorSupplementReport, SMTProductionReport
+    from .services.statistics_service import StatisticsService
     
     # 檢查用戶權限
     if not request.user.is_authenticated:
         return redirect('login')
     
-    today = date.today()
-    month_start = today.replace(day=1)
-    
-    # 從補登報工記錄中取得真實統計資料
-    # 作業員補登報工統計
-    operator_today = OperatorSupplementReport.objects.filter(work_date=today).count()
-    operator_month = OperatorSupplementReport.objects.filter(work_date__gte=month_start).count()
-    operator_pending = OperatorSupplementReport.objects.filter(approval_status='pending').count()
-    operator_abnormal = OperatorSupplementReport.objects.filter(
-        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-    ).count()
-    
-    # SMT補登報工統計
-    smt_today = SMTProductionReport.objects.filter(work_date=today).count()
-    smt_month = SMTProductionReport.objects.filter(work_date__gte=month_start).count()
-    smt_pending = SMTProductionReport.objects.filter(approval_status='pending').count()
-    smt_abnormal = SMTProductionReport.objects.filter(
-        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-    ).count()
-    
-    # 計算總計
-    total_today = operator_today + smt_today
-    total_month = operator_month + smt_month
-    total_pending = operator_pending + smt_pending
-    total_abnormal = operator_abnormal + smt_abnormal
-    
-    context = {
-        'today_reports': total_today,
-        'month_reports': total_month,
-        'pending_reports': total_pending,
-        'abnormal_reports': total_abnormal,
-        'recent_reports': [],
-        'stats': {
-            'total_pending': total_pending,
-            'total_today': total_today,
-            'total_month': total_month,
-            'total_abnormal': total_abnormal,
-            'pending_operator': operator_pending,
-            'pending_smt': smt_pending,
-            'today_operator': operator_today,
-            'today_smt': smt_today,
-            'month_operator': operator_month,
-            'month_smt': smt_month,
-            'abnormal_operator': operator_abnormal,
-            'abnormal_smt': smt_abnormal,
-        }
-    }
+    # 使用統一的統計服務
+    context = StatisticsService.get_report_index_statistics()
+    context['recent_reports'] = []
     
     return render(request, 'workorder/report/index.html', context)
 
@@ -3934,72 +3789,13 @@ def supervisor_report_index(request):
     主管審核首頁 - 統計儀表板
     顯示所有報工類型的統計資訊和快速操作
     """
-    from datetime import date, timedelta
-    from django.db.models import Q
-    from .models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
+    from .services.statistics_service import StatisticsService
     
-    today = date.today()
-    month_start = today.replace(day=1)
-    
-    # 統計所有類型的報工資料
-    stats = {
-        # 待審核統計
-        'pending_supervisor': SupervisorProductionReport.objects.filter(approval_status='pending').count(),
-        'pending_operator': OperatorSupplementReport.objects.filter(approval_status='pending').count(),
-        'pending_smt': SMTProductionReport.objects.filter(approval_status='pending').count(),
-        
-        # 今日統計
-        'today_supervisor': SupervisorProductionReport.objects.filter(work_date=today).count(),
-        'today_operator': OperatorSupplementReport.objects.filter(work_date=today).count(),
-        'today_smt': SMTProductionReport.objects.filter(work_date=today).count(),
-        
-        # 本月統計
-        'month_supervisor': SupervisorProductionReport.objects.filter(work_date__gte=month_start).count(),
-        'month_operator': OperatorSupplementReport.objects.filter(work_date__gte=month_start).count(),
-        'month_smt': SMTProductionReport.objects.filter(work_date__gte=month_start).count(),
-        
-        # 異常統計
-        'abnormal_supervisor': SupervisorProductionReport.objects.filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-        ).count(),
-        'abnormal_operator': OperatorSupplementReport.objects.filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-        ).count(),
-        'abnormal_smt': SMTProductionReport.objects.filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-        ).count(),
-    }
-    
-    # 計算總計
-    stats['total_pending'] = stats['pending_supervisor'] + stats['pending_operator'] + stats['pending_smt']
-    stats['total_today'] = stats['today_supervisor'] + stats['today_operator'] + stats['today_smt']
-    stats['total_month'] = stats['month_supervisor'] + stats['month_operator'] + stats['month_smt']
-    stats['total_abnormal'] = stats['abnormal_supervisor'] + stats['abnormal_operator'] + stats['abnormal_smt']
-    
-    # 計算已核准統計
-    stats['approved_supervisor'] = SupervisorProductionReport.objects.filter(approval_status='approved').count()
-    stats['approved_operator'] = OperatorSupplementReport.objects.filter(approval_status='approved').count()
-    stats['approved_smt'] = SMTProductionReport.objects.filter(approval_status='approved').count()
-    stats['total_approved'] = stats['approved_supervisor'] + stats['approved_operator'] + stats['approved_smt']
+    # 使用統一的統計服務
+    stats = StatisticsService.get_supervisor_dashboard_statistics()
     
     # 取得最近審核記錄
     recent_reviews = []
-    
-    # 主管審核最近審核
-    supervisor_reviews = SupervisorProductionReport.objects.select_related(
-        'workorder', 'process'
-    ).filter(approval_status='approved').order_by('-approved_at')[:3]
-    
-    for review in supervisor_reviews:
-        recent_reviews.append({
-            'type': '主管審核',
-            'time': review.approved_at,
-            'operator': review.supervisor,
-            'workorder': review.workorder.order_number if review.workorder else '-',
-            'process': review.process.name if review.process else '-',
-            'quantity': review.work_quantity,
-            'reviewer': review.approved_by,
-        })
     
     # 作業員報工最近審核
     operator_reviews = OperatorSupplementReport.objects.select_related(
@@ -4050,52 +3846,38 @@ def supervisor_functions(request):
     主管功能首頁 - 主管專用功能
     包含報工統計、異常處理、系統設定等功能
     """
-    from datetime import date, timedelta
-    from django.db.models import Q, Count, Sum
-    from .models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
+    from .services.statistics_service import StatisticsService
     
-    today = date.today()
-    month_start = today.replace(day=1)
+    # 使用統一的統計服務
+    stats_data = StatisticsService.get_report_statistics()
     
-    # 統計資訊
+    # 格式化為主管功能頁面需要的格式
     stats = {
         # 報工統計
-        'total_reports_today': 0,
-        'total_reports_month': 0,
-        'pending_reports': 0,
-        'abnormal_reports': 0,
+        'total_reports_today': stats_data['total']['total_today'],
+        'total_reports_month': stats_data['total']['total_month'],
+        'pending_reports': stats_data['total']['total_pending'],
+        'abnormal_reports': stats_data['total']['total_abnormal'],
         
         # 各類型統計
-        'operator_reports_today': OperatorSupplementReport.objects.filter(work_date=today).count(),
-        'smt_reports_today': SMTProductionReport.objects.filter(work_date=today).count(),
-        'supervisor_reports_today': SupervisorProductionReport.objects.filter(work_date=today).count(),
+        'operator_reports_today': stats_data['operator']['today'],
+        'smt_reports_today': stats_data['smt']['today'],
+        'supervisor_reports_today': 0,  # 主管不報工
         
-        'operator_reports_month': OperatorSupplementReport.objects.filter(work_date__gte=month_start).count(),
-        'smt_reports_month': SMTProductionReport.objects.filter(work_date__gte=month_start).count(),
-        'supervisor_reports_month': SupervisorProductionReport.objects.filter(work_date__gte=month_start).count(),
+        'operator_reports_month': stats_data['operator']['month'],
+        'smt_reports_month': stats_data['smt']['month'],
+        'supervisor_reports_month': 0,  # 主管不報工
         
         # 待審核統計
-        'pending_operator': OperatorSupplementReport.objects.filter(approval_status='pending').count(),
-        'pending_smt': SMTProductionReport.objects.filter(approval_status='pending').count(),
-        'pending_supervisor': SupervisorProductionReport.objects.filter(approval_status='pending').count(),
+        'pending_operator': stats_data['operator']['pending'],
+        'pending_smt': stats_data['smt']['pending'],
+        'pending_supervisor': 0,  # 主管不報工
         
         # 異常統計
-        'abnormal_operator': OperatorSupplementReport.objects.filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
-        ).count(),
-        'abnormal_smt': SMTProductionReport.objects.filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
-        ).count(),
-        'abnormal_supervisor': SupervisorProductionReport.objects.filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
-        ).count(),
+        'abnormal_operator': stats_data['operator']['abnormal'],
+        'abnormal_smt': stats_data['smt']['abnormal'],
+        'abnormal_supervisor': 0,  # 主管不報工
     }
-    
-    # 計算總計
-    stats['total_reports_today'] = stats['operator_reports_today'] + stats['smt_reports_today'] + stats['supervisor_reports_today']
-    stats['total_reports_month'] = stats['operator_reports_month'] + stats['smt_reports_month'] + stats['supervisor_reports_month']
-    stats['pending_reports'] = stats['pending_operator'] + stats['pending_smt'] + stats['pending_supervisor']
-    stats['abnormal_reports'] = stats['abnormal_operator'] + stats['abnormal_smt'] + stats['abnormal_supervisor']
     
     # 取得最近異常記錄
     recent_abnormal = []
@@ -4137,22 +3919,7 @@ def supervisor_functions(request):
         })
     
     # 主管異常
-    supervisor_abnormal = SupervisorProductionReport.objects.select_related(
-        'workorder', 'process'
-    ).filter(
-        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-    ).order_by('-work_date', '-start_time')[:5]
-    
-    for report in supervisor_abnormal:
-        recent_abnormal.append({
-            'type': '主管審核',
-            'time': report.work_date,
-            'operator': report.supervisor,
-            'workorder': report.workorder.order_number if report.workorder else '-',
-            'process': report.process.name if report.process else '-',
-            'remarks': report.abnormal_notes,
-            'status': report.approval_status,
-        })
+    # 主管不報工，移除主管報工相關邏輯
     
     # 按時間排序
     recent_abnormal.sort(key=lambda x: x['time'], reverse=True)
@@ -4173,7 +3940,7 @@ def report_statistics(request):
     """
     from datetime import date, timedelta
     from django.db.models import Q, Count, Sum, Avg
-    from .models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
+    from .models import OperatorSupplementReport, SMTProductionReport
     
     today = date.today()
     month_start = today.replace(day=1)
@@ -4787,45 +4554,22 @@ def operator_report_index(request):
     作業員報工首頁視圖
     顯示作業員報工的主要功能卡片和統計資訊
     """
-    from datetime import date, timedelta
-    from django.db.models import Q
+    from .services.statistics_service import StatisticsService
     from .models import OperatorSupplementReport
     
-    today = date.today()
-    month_start = today.replace(day=1)
-    
-    # 計算真實的統計資料
-    today_reports = OperatorSupplementReport.objects.filter(
-        work_date=today
-    ).count()
-    
-    month_reports = OperatorSupplementReport.objects.filter(
-        work_date__gte=month_start,
-        work_date__lte=today
-    ).count()
-    
-    pending_reviews = OperatorSupplementReport.objects.filter(
-        approval_status='pending'
-    ).count()
-    
-    approved_reports = OperatorSupplementReport.objects.filter(
-        approval_status='approved'
-    ).count()
-    
-
+    # 使用統一的統計服務 - 僅作業員數據
+    context = StatisticsService.get_operator_only_statistics()
     
     # 取得最近報工記錄
     recent_reports = OperatorSupplementReport.objects.select_related(
         'operator', 'workorder', 'process'
     ).order_by('-created_at')[:10]
     
-    context = {
-        'today_reports': today_reports,
-        'month_reports': month_reports,
-        'pending_reviews': pending_reviews,
-        'approved_reports': approved_reports,
-        'recent_reports': recent_reports,
-    }
+    context['recent_reports'] = recent_reports
+    context['pending_reviews'] = context['pending_reports']  # 保持向後兼容
+    context['approved_reports'] = OperatorSupplementReport.objects.filter(
+        approval_status='approved'
+    ).count()
     
     return render(request, 'workorder/report/operator/index.html', context)
 
@@ -4834,11 +4578,12 @@ def smt_report_index(request):
     SMT報工首頁視圖
     顯示SMT報工的主要功能卡片和統計資訊
     """
-    from datetime import date
     from equip.models import Equipment
     from .models import SMTProductionReport
+    from .services.statistics_service import StatisticsService
     
-    today = date.today()
+    # 使用統一的統計服務 - 僅SMT數據
+    context = StatisticsService.get_smt_only_statistics()
     
     # 取得 SMT 設備列表
     equipment_list = Equipment.objects.filter(
@@ -4848,11 +4593,9 @@ def smt_report_index(request):
         models.Q(name__icontains='Place')
     ).order_by('name')
     
-    # 計算統計資料
+    # 計算設備相關統計
     running_equipment = equipment_list.filter(status='running').count()
-    today_output = SMTProductionReport.objects.filter(
-        work_date=today
-    ).aggregate(total=models.Sum('work_quantity'))['total'] or 0
+    abnormal_equipment = equipment_list.filter(status='maintenance').count()
     
     # 計算設備效率（運轉中設備的平均效率）
     if running_equipment > 0:
@@ -4860,21 +4603,19 @@ def smt_report_index(request):
     else:
         equipment_efficiency = 0
     
-    abnormal_equipment = equipment_list.filter(status='maintenance').count()
-    
     # 取得最近SMT報工記錄
     recent_reports = SMTProductionReport.objects.select_related(
         'workorder', 'equipment'
     ).order_by('-created_at')[:10]
     
-    context = {
+    # 添加設備相關統計到context
+    context.update({
         'running_equipment': running_equipment,
-        'today_output': today_output,
         'equipment_efficiency': equipment_efficiency,
         'abnormal_equipment': abnormal_equipment,
         'equipment_list': equipment_list,
         'recent_reports': recent_reports,
-    }
+    })
     
     return render(request, 'workorder/report/smt/index.html', context)
 

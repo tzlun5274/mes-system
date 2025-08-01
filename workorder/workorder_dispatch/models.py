@@ -22,9 +22,9 @@ class WorkOrderDispatch(models.Model):
 
     # 基本資訊（與資料庫結構一致）
     company_code = models.CharField(max_length=20, verbose_name="公司代號", null=True, blank=True)
-    order_number = models.CharField(max_length=100, verbose_name="工單號碼")
-    product_code = models.CharField(max_length=100, verbose_name="產品編號")
-    planned_quantity = models.PositiveIntegerField(verbose_name="計劃數量")
+    order_number = models.CharField(max_length=100, verbose_name="工單號碼", null=True, blank=True)
+    product_code = models.CharField(max_length=100, verbose_name="產品編號", null=True, blank=True)
+    planned_quantity = models.PositiveIntegerField(verbose_name="計劃數量", null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending", verbose_name="派工狀態")
     
     # 派工相關資訊

@@ -44,56 +44,12 @@ class ReportIndexView(LoginRequiredMixin, ListView):
         """提供模板所需的上下文數據"""
         context = super().get_context_data(**kwargs)
         
-        from datetime import date
-        from django.db.models import Q
-        from ..workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+        from ..services.statistics_service import StatisticsService
         
-        today = date.today()
-        month_start = today.replace(day=1)
+        # 使用統一的統計服務 - 顯示全部統計（作業員+SMT）
+        stats_data = StatisticsService.get_report_index_statistics()
         
-        # 從補登報工記錄中取得真實統計資料
-        # 作業員補登報工統計
-        operator_today = OperatorSupplementReport.objects.filter(created_at__date=today).count()
-        operator_month = OperatorSupplementReport.objects.filter(created_at__date__gte=month_start).count()
-        operator_pending = OperatorSupplementReport.objects.filter(approval_status='pending').count()
-        operator_abnormal = OperatorSupplementReport.objects.filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-        ).count()
-        
-        # SMT補登報工統計
-        smt_today = SMTProductionReport.objects.filter(created_at__date=today).count()
-        smt_month = SMTProductionReport.objects.filter(created_at__date__gte=month_start).count()
-        smt_pending = SMTProductionReport.objects.filter(approval_status='pending').count()
-        smt_abnormal = SMTProductionReport.objects.filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-        ).count()
-        
-        # 計算總計
-        total_today = operator_today + smt_today
-        total_month = operator_month + smt_month
-        total_pending = operator_pending + smt_pending
-        total_abnormal = operator_abnormal + smt_abnormal
-        
-        context.update({
-            'today_reports': total_today,
-            'month_reports': total_month,
-            'pending_reports': total_pending,
-            'abnormal_reports': total_abnormal,
-            'stats': {
-                'total_pending': total_pending,
-                'total_today': total_today,
-                'total_month': total_month,
-                'total_abnormal': total_abnormal,
-                'pending_operator': operator_pending,
-                'pending_smt': smt_pending,
-                'today_operator': operator_today,
-                'today_smt': smt_today,
-                'month_operator': operator_month,
-                'month_smt': smt_month,
-                'abnormal_operator': operator_abnormal,
-                'abnormal_smt': smt_abnormal,
-            }
-        })
+        context.update(stats_data)
         
         return context
 

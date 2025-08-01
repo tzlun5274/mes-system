@@ -2,7 +2,7 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}主管審核首頁 - MES系統{% endblock %}
+{% block title %}主管功能首頁 - MES系統{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -47,18 +47,20 @@
             <div class="d-flex justify-content-between align-items-center">
                 <h2 class="mb-0">
                     <i class="fas fa-chart-line text-primary"></i>
-                    主管審核首頁
+                    主管功能首頁
                 </h2>
-                <div class="btn-group">
-                    <a href="{% url 'workorder:supervisor:supervisor_functions' %}" class="btn btn-outline-primary">
-                        <i class="fas fa-cogs"></i> 功能設定
+                <div class="d-flex align-items-center">
+                    <a href="{% url 'workorder:report_index' %}" class="btn btn-outline-primary me-3">
+                        <i class="fas fa-arrow-left me-2"></i>返回報工管理
                     </a>
-                    <a href="{% url 'workorder:supervisor:report_statistics' %}" class="btn btn-outline-info">
-                        <i class="fas fa-chart-bar"></i> 統計報表
-                    </a>
-                    <a href="{% url 'workorder:supervisor:abnormal_management' %}" class="btn btn-outline-warning">
-                        <i class="fas fa-exclamation-triangle"></i> 異常處理
-                    </a>
+                    <div class="btn-group">
+                        <a href="{% url 'workorder:supervisor:report_statistics' %}" class="btn btn-outline-info">
+                            <i class="fas fa-chart-bar"></i> 統計報表
+                        </a>
+                        <a href="{% url 'workorder:supervisor:abnormal_management' %}" class="btn btn-outline-warning">
+                            <i class="fas fa-exclamation-triangle"></i> 異常處理
+                        </a>
+                    </div>
                 </div>
             </div>
             <hr>
@@ -148,7 +150,7 @@
                             </a>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <a href="{% url 'workorder:supervisor:pending_approval_list' %}" class="btn btn-success btn-block quick-action-btn">
+                            <a href="{% url 'workorder:supervisor:supervisor_report_index' %}" class="btn btn-success btn-block quick-action-btn">
                                 <i class="fas fa-check-circle"></i><br>
                                 審核管理<br>
                                 <small>管理報工</small>
@@ -166,7 +168,7 @@
                             <a href="{% url 'workorder:supervisor:abnormal_management' %}" class="btn btn-danger btn-block quick-action-btn">
                                 <i class="fas fa-exclamation-triangle"></i><br>
                                 異常處理<br>
-                                <small>({{ stats.total_abnormal|default:0 }})</small>
+                                <small>({{ stats.abnormal_reports|default:0 }})</small>
                             </a>
                         </div>
                     </div>

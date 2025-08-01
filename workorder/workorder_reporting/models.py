@@ -9,7 +9,7 @@ from django.utils import timezone
 
 class SMTProductionReport(models.Model):
     """
-    SMT 生產報工記錄模型
+    SMT 生產報工記錄模型 (SMT Production Report Model)
     SMT 設備為自動化運作，不需要作業員
     """
 
@@ -184,6 +184,19 @@ class SMTProductionReport(models.Model):
         blank=True, verbose_name="駁回原因", help_text="駁回時的原因說明"
     )
 
+    # 駁回相關欄位
+    rejected_by = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="駁回人員",
+        help_text="駁回此補登記錄的人員",
+    )
+
+    rejected_at = models.DateTimeField(
+        blank=True, null=True, verbose_name="駁回時間", help_text="此補登記錄的駁回時間"
+    )
+
     # 系統欄位
     created_by = models.CharField(
         max_length=100, verbose_name="建立人員", default="system"
@@ -324,8 +337,8 @@ class SMTProductionReport(models.Model):
         駁回補登記錄
         """
         self.approval_status = "rejected"
-        self.approved_by = user.username
-        self.approved_at = timezone.now()
+        self.rejected_by = user.username
+        self.rejected_at = timezone.now()
         self.rejection_reason = reason
         self.save()
 
@@ -387,7 +400,7 @@ class SMTProductionReport(models.Model):
 
 class OperatorSupplementReport(models.Model):
     """
-    作業員補登報工記錄模型
+    作業員補登報工記錄模型 (Operator Supplement Report Model)
     專為作業員的歷史報工記錄管理而設計，支援離線數據輸入、歷史數據修正和批量數據處理
     """
 
@@ -672,6 +685,19 @@ class OperatorSupplementReport(models.Model):
         blank=True, verbose_name="駁回原因", help_text="駁回時的原因說明"
     )
 
+    # 駁回相關欄位
+    rejected_by = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="駁回人員",
+        help_text="駁回此補登記錄的人員",
+    )
+
+    rejected_at = models.DateTimeField(
+        blank=True, null=True, verbose_name="駁回時間", help_text="此補登記錄的駁回時間"
+    )
+
     # 備註
     remarks = models.TextField(
         blank=True,
@@ -854,8 +880,8 @@ class OperatorSupplementReport(models.Model):
         駁回補登記錄
         """
         self.approval_status = "rejected"
-        self.approved_by = user.username
-        self.approved_at = timezone.now()
+        self.rejected_by = user.username
+        self.rejected_at = timezone.now()
         self.rejection_reason = reason
         self.save()
 
@@ -1046,7 +1072,7 @@ class OperatorSupplementReport(models.Model):
 
 class SupervisorProductionReport(models.Model):
     """
-    主管生產報工記錄模型
+    主管生產報工記錄模型 (Supervisor Production Report Model)
     專為主設計的報工記錄核准模組，結合了 SMT 補登報工和作業員補登報工的功能特點
     """
 
@@ -1260,6 +1286,19 @@ class SupervisorProductionReport(models.Model):
 
     rejection_reason = models.TextField(
         blank=True, verbose_name="駁回原因", help_text="駁回時的原因說明"
+    )
+
+    # 駁回相關欄位
+    rejected_by = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="駁回人員",
+        help_text="駁回此報工記錄的人員",
+    )
+
+    rejected_at = models.DateTimeField(
+        blank=True, null=True, verbose_name="駁回時間", help_text="此報工記錄的駁回時間"
     )
 
     # 備註
@@ -1479,8 +1518,8 @@ class SupervisorProductionReport(models.Model):
             raise PermissionError("您沒有權限進行核准")
 
         self.approval_status = "rejected"
-        self.approved_by = user.username
-        self.approved_at = timezone.now()
+        self.rejected_by = user.username
+        self.rejected_at = timezone.now()
         self.rejection_reason = reason
         self.save()
 

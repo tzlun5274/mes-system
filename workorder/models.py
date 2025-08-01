@@ -15,7 +15,7 @@ from .workorder_erp.models import PrdMKOrdMain, PrdMkOrdMats, CompanyOrder, Syst
 from .workorder_completed.models import WorkOrderCompleted, WorkOrderCompletedProcess
 
 # 導入報工管理子模組的模型
-from .workorder_reporting.models import SMTProductionReport, OperatorSupplementReport, SupervisorProductionReport
+from .workorder_reporting.models import SMTProductionReport, OperatorSupplementReport
 
 
 class WorkOrder(models.Model):
@@ -465,7 +465,9 @@ class WorkOrderProduction(models.Model):
         WorkOrder,
         on_delete=models.CASCADE,
         verbose_name="工單",
-        related_name="production_record"
+        related_name="production_record",
+        null=True,
+        blank=True
     )
     
     # 生產狀態

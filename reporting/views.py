@@ -56,7 +56,12 @@ class ReportingIndexView(LoginRequiredMixin, TemplateView):
         return context
 
 
-
+@login_required
+def pending_approval_list(request):
+    """
+    待審核報工清單 - 重定向到工單模組的主管功能
+    """
+    return redirect('workorder:supervisor:pending_approval_list')
 
 
 @login_required

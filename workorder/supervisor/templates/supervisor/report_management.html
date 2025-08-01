@@ -1,0 +1,367 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}審核管理{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .stat-card {
+        text-align: center;
+        padding: 20px;
+        border-radius: 8px;
+        color: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .stat-card.pending {
+        background: linear-gradient(135deg, #ffc107 0%, #ff8f00 100%);
+    }
+    
+    .stat-card.approved {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    }
+    
+    .stat-card.rejected {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    }
+    
+    .stat-card.total {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    }
+    
+    .stat-number {
+        font-size: 2.5em;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        font-size: 0.9em;
+        opacity: 0.9;
+    }
+    
+    .quick-actions {
+        margin-bottom: 20px;
+    }
+    
+    .quick-action-btn {
+        display: block;
+        padding: 15px;
+        text-align: center;
+        border-radius: 8px;
+        text-decoration: none;
+        color: white;
+        transition: all 0.3s ease;
+        margin-bottom: 10px;
+    }
+    
+    .quick-action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        text-decoration: none;
+        color: white;
+    }
+    
+    .btn-pending {
+        background: linear-gradient(135deg, #ffc107 0%, #ff8f00 100%);
+    }
+    
+    .btn-approved {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    }
+    
+    .btn-rejected {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    }
+    
+    .btn-batch {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a2d91 100%);
+    }
+    
+    .review-item {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        background: white;
+        transition: all 0.3s ease;
+    }
+    
+    .review-item:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .review-item.approved {
+        border-left: 4px solid #28a745;
+    }
+    
+    .review-item.rejected {
+        border-left: 4px solid #dc3545;
+    }
+    
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: bold;
+    }
+    
+    .status-approved {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-rejected {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .section-title {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin-bottom: 15px;
+        color: #495057;
+        border-bottom: 2px solid #e9ecef;
+        padding-bottom: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-user-check text-primary"></i>
+                    審核管理
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor:supervisor_functions' %}">主管功能</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">審核管理</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 審核統計 -->
+    <div class="stats-grid">
+        <div class="stat-card pending">
+            <div class="stat-number">{{ stats.pending_reports|default:0 }}</div>
+            <div class="stat-label">待審核報工</div>
+        </div>
+        <div class="stat-card approved">
+            <div class="stat-number">{{ stats.approved_operator|default:0|add:stats.approved_smt|default:0|add:stats.approved_supervisor|default:0 }}</div>
+            <div class="stat-label">已審核報工</div>
+        </div>
+        <div class="stat-card rejected">
+            <div class="stat-number">{{ stats.rejected_operator|default:0|add:stats.rejected_smt|default:0|add:stats.rejected_supervisor|default:0 }}</div>
+            <div class="stat-label">已拒絕報工</div>
+        </div>
+        <div class="stat-card total">
+            <div class="stat-number">{{ stats.total_reports_today|default:0 }}</div>
+            <div class="stat-label">今日報工總數</div>
+        </div>
+    </div>
+
+    <!-- 快速操作 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt text-warning"></i>
+                        快速操作
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'workorder:supervisor:pending_approval_list' %}" class="btn quick-action-btn btn-pending">
+                                <i class="fas fa-clock fa-2x mb-2"></i><br>
+                                待審核清單<br>
+                                <small>({{ stats.pending_reports|default:0 }})</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'workorder:supervisor:batch_approve_reports' %}" class="btn quick-action-btn btn-batch">
+                                <i class="fas fa-tasks fa-2x mb-2"></i><br>
+                                批次審核<br>
+                                <small>批量處理</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'workorder:supervisor:report_statistics' %}" class="btn quick-action-btn btn-approved">
+                                <i class="fas fa-chart-bar fa-2x mb-2"></i><br>
+                                審核統計<br>
+                                <small>數據分析</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'workorder:supervisor:abnormal_management' %}" class="btn quick-action-btn btn-rejected">
+                                <i class="fas fa-exclamation-triangle fa-2x mb-2"></i><br>
+                                異常處理<br>
+                                <small>({{ stats.abnormal_reports|default:0 }})</small>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 最近審核記錄 -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history text-info"></i>
+                        最近審核記錄
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_reviews %}
+                        {% for review in recent_reviews %}
+                        <div class="review-item approved">
+                            <div class="row align-items-center">
+                                <div class="col-md-2">
+                                    <span class="status-badge status-approved">{{ review.status }}</span>
+                                    <br>
+                                    <small class="text-muted">{{ review.type }}</small>
+                                </div>
+                                <div class="col-md-2">
+                                    <strong>工單:</strong><br>
+                                    <span class="text-primary">{{ review.workorder }}</span>
+                                </div>
+                                <div class="col-md-2">
+                                    <strong>工序:</strong><br>
+                                    <span>{{ review.process }}</span>
+                                </div>
+                                <div class="col-md-2">
+                                    <strong>數量:</strong><br>
+                                    <span class="text-success">{{ review.quantity|default:0 }}</span>
+                                </div>
+                                <div class="col-md-2">
+                                    <strong>審核者:</strong><br>
+                                    <span>{{ review.reviewer|default:'-' }}</span>
+                                </div>
+                                <div class="col-md-2">
+                                    <strong>時間:</strong><br>
+                                    <small class="text-muted">{{ review.time|date:"m/d H:i" }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <p>目前沒有審核記錄</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 最近拒絕記錄 -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-times-circle text-danger"></i>
+                        最近拒絕記錄
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_rejected %}
+                        {% for review in recent_rejected %}
+                        <div class="review-item rejected">
+                            <div class="mb-2">
+                                <span class="status-badge status-rejected">{{ review.status }}</span>
+                                <small class="text-muted float-right">{{ review.time|date:"m/d H:i" }}</small>
+                            </div>
+                            <div class="mb-1">
+                                <strong>{{ review.type }}</strong> - {{ review.workorder }}
+                            </div>
+                            <div class="mb-1">
+                                <small class="text-muted">工序: {{ review.process }}</small>
+                            </div>
+                            <div class="mb-1">
+                                <small class="text-muted">數量: {{ review.quantity|default:0 }}</small>
+                            </div>
+                            <div class="mb-1">
+                                <small class="text-muted">拒絕者: {{ review.reviewer|default:'-' }}</small>
+                            </div>
+                            {% if review.reason %}
+                            <div class="mt-2">
+                                <small class="text-danger">
+                                    <strong>拒絕原因:</strong> {{ review.reason|truncatechars:50 }}
+                                </small>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-check-circle fa-2x mb-3 text-success"></i>
+                            <p>目前沒有拒絕記錄</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 自動刷新頁面數據（每5分鐘）
+    setInterval(function() {
+        location.reload();
+    }, 300000);
+    
+    // 統計卡片點擊事件
+    const statsCards = document.querySelectorAll('.stat-card');
+    statsCards.forEach(function(card) {
+        card.addEventListener('click', function() {
+            const cardType = this.querySelector('.stat-label').textContent;
+            
+            if (cardType.includes('待審核')) {
+                window.location.href = "{% url 'workorder:supervisor:pending_approval_list' %}";
+            } else if (cardType.includes('已審核')) {
+                // 可以導向審核統計頁面
+                window.location.href = "{% url 'workorder:supervisor:report_statistics' %}";
+            } else if (cardType.includes('已拒絕')) {
+                // 可以導向異常處理頁面
+                window.location.href = "{% url 'workorder:supervisor:abnormal_management' %}";
+            }
+        });
+    });
+    
+    // 添加卡片懸停效果
+    statsCards.forEach(function(card) {
+        card.style.cursor = 'pointer';
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px)';
+            this.style.transition = 'transform 0.3s ease';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+});
+</script>
+{% endblock %} 

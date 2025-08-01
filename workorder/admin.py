@@ -9,7 +9,7 @@ from .models import (
 )
 
 # 導入子模組的模型
-from .workorder_reporting.models import SMTProductionReport, OperatorSupplementReport, SupervisorProductionReport
+from .workorder_reporting.models import SMTProductionReport, OperatorSupplementReport
 from django.utils import timezone
 
 
