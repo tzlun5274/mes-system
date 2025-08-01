@@ -2357,9 +2357,9 @@ def edit_supplement_mobile(request):
 
 
 def pending_approval_list(request):
-    """待審核報工列表 - 已移至 reporting 模組"""
+    """待審核報工列表 - 已移至主管功能模組"""
     from django.shortcuts import redirect
-    return redirect('reporting:pending_approval_list')
+    return redirect('workorder:supervisor:pending_approval_list')
 
 
 def approved_reports_list(request):
@@ -4081,13 +4081,13 @@ def supervisor_functions(request):
         
         # 異常統計
         'abnormal_operator': OperatorSupplementReport.objects.filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
+            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
         ).count(),
         'abnormal_smt': SMTProductionReport.objects.filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
+            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
         ).count(),
         'abnormal_supervisor': SupervisorProductionReport.objects.filter(
-            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
+            Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
         ).count(),
     }
     

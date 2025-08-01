@@ -2,27 +2,39 @@
 報表模組視圖
 """
 
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import TemplateView
-from django.contrib import messages
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+import csv
+import io
 import logging
+from datetime import datetime, timedelta, date
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.views.generic import TemplateView, ListView
+from django.http import HttpResponse, JsonResponse
+from django.contrib import messages
+from django.urls import reverse
+from django.db.models import Q, Sum, Count, Avg
+from django.utils import timezone
+from django.core.paginator import Paginator
+from django.template.loader import render_to_string
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
 
-# 設定日誌
+from workorder.models import (
+    WorkOrder, OperatorSupplementReport, SMTProductionReport
+)
+from equip.models import Equipment
+from django.contrib.auth.models import User
+
 logger = logging.getLogger(__name__)
 
 
-def superuser_required(user):
+def reporting_user_required(user):
     """
-    檢查用戶是否為超級管理員
-    只有超級管理員才能執行批次刪除操作
+    檢查用戶是否為超級用戶或屬於「報表使用者」群組。
     """
-    return user.is_superuser
+    return user.is_superuser or user.groups.filter(name="報表使用者").exists()
 
 
 class ReportingIndexView(LoginRequiredMixin, TemplateView):
@@ -31,489 +43,559 @@ class ReportingIndexView(LoginRequiredMixin, TemplateView):
     """
     template_name = 'reporting/index.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # 獲取基本統計數據
+        context['total_workorders'] = WorkOrder.objects.count()
+        context['active_workorders'] = WorkOrder.objects.filter(status='active').count()
+        context['completed_workorders'] = WorkOrder.objects.filter(status='completed').count()
+        context['total_operators'] = User.objects.filter(is_active=True).count()
+        context['total_equipment'] = Equipment.objects.count()
+        
+        return context
 
-@login_required
-def pending_approval_list(request):
-    """
-    待審核報工列表視圖
-    顯示所有待審核的作業員報工和SMT報工記錄
-    """
-    # 取得待審核的作業員報工記錄
-    operator_pending = OperatorSupplementReport.objects.filter(
-        approval_status='pending'
-    ).select_related('operator', 'workorder', 'process').order_by('-created_at')
-    
-    # 取得待審核的SMT報工記錄
-    smt_pending = SMTProductionReport.objects.filter(
-        approval_status='pending'
-    ).select_related('workorder', 'equipment').order_by('-created_at')
-    
-    # 合併所有待審核記錄
-    all_pending = []
-    
-    for report in operator_pending:
-        all_pending.append({
-            'type': '作業員報工',
-            'id': report.id,
-            'report_type': 'operator',
-            'operator': report.operator.name if report.operator else '-',
-            'workorder': report.workorder.order_number if report.workorder else '-',
-            'process': report.process.name if report.process else '-',
-            'quantity': report.work_quantity,
-            'defect_quantity': report.defect_quantity,
-            'work_date': report.work_date,
-            'start_time': report.start_time,
-            'end_time': report.end_time,
-            'created_at': report.created_at,
-            'created_by': report.created_by,
-            'remarks': report.remarks,
-        })
-    
-    for report in smt_pending:
-        all_pending.append({
-            'type': 'SMT報工',
-            'id': report.id,
-            'report_type': 'smt',
-            'operator': 'SMT設備',
-            'workorder': report.workorder.order_number if report.workorder else '-',
-            'process': report.operation,
-            'quantity': report.work_quantity,
-            'defect_quantity': getattr(report, 'defect_quantity', 0),
-            'work_date': report.work_date,
-            'start_time': report.start_time,
-            'end_time': report.end_time,
-            'created_at': report.created_at,
-            'created_by': report.created_by,
-            'remarks': getattr(report, 'remarks', ''),
-        })
-    
-    # 按建立時間排序
-    all_pending.sort(key=lambda x: x['created_at'], reverse=True)
-    
-    # 統計資料
-    total_pending = len(all_pending)
-    operator_count = len(operator_pending)
-    smt_count = len(smt_pending)
 
-    return render(
-        request,
-        "reporting/pending_approval_list.html",
-        {
-            "all_pending": all_pending,
-            "total_pending": total_pending,
-            "operator_count": operator_count,
-            "smt_count": smt_count,
-        },
-    )
+
 
 
 @login_required
-def approved_reports_list(request):
+@user_passes_test(reporting_user_required, login_url='/login/')
+def report_export(request):
     """
-    已核准報工列表視圖
-    顯示所有已核准的作業員報工和SMT報工記錄
+    報表匯出功能
     """
-    # 取得已核准的作業員報工記錄
-    operator_approved = OperatorSupplementReport.objects.filter(
-        approval_status='approved'
-    ).select_related('operator', 'workorder', 'process').order_by('-approved_at')
-    
-    # 取得已核准的SMT報工記錄
-    smt_approved = SMTProductionReport.objects.filter(
-        approval_status='approved'
-    ).select_related('workorder', 'equipment').order_by('-approved_at')
-    
-    # 合併所有已核准記錄
-    all_approved = []
-    
-    for report in operator_approved:
-        all_approved.append({
-            'type': '作業員報工',
-            'id': report.id,
-            'report_type': 'operator',
-            'operator': report.operator.name if report.operator else '-',
-            'workorder': report.workorder.order_number if report.workorder else '-',
-            'process': report.process.name if report.process else '-',
-            'quantity': report.work_quantity,
-            'defect_quantity': report.defect_quantity,
-            'work_date': report.work_date,
-            'start_time': report.start_time,
-            'end_time': report.end_time,
-            'approved_at': report.approved_at,
-            'approved_by': report.approved_by,
-            'remarks': report.remarks,
-        })
-    
-    for report in smt_approved:
-        all_approved.append({
-            'type': 'SMT報工',
-            'id': report.id,
-            'report_type': 'smt',
-            'operator': 'SMT設備',
-            'workorder': report.workorder.order_number if report.workorder else '-',
-            'process': report.operation,
-            'quantity': report.work_quantity,
-            'defect_quantity': getattr(report, 'defect_quantity', 0),
-            'work_date': report.work_date,
-            'start_time': report.start_time,
-            'end_time': report.end_time,
-            'approved_at': report.approved_at,
-            'approved_by': report.approved_by,
-            'remarks': getattr(report, 'remarks', ''),
-        })
-    
-    # 按核准時間排序
-    all_approved.sort(key=lambda x: x['approved_at'], reverse=True)
-    
-    # 統計資料
-    total_approved = len(all_approved)
-    operator_count = len(operator_approved)
-    smt_count = len(smt_approved)
-
-    return render(
-        request,
-        "reporting/approved_reports_list.html",
-        {
-            "all_approved": all_approved,
-            "total_approved": total_approved,
-            "operator_count": operator_count,
-            "smt_count": smt_count,
-        },
-    )
-
-
-@login_required
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-def batch_delete_pending_confirm(request):
-    """
-    批次刪除待核准報工記錄確認頁面
-    只有超級管理員可以訪問
-    """
-    # 取得待刪除的記錄統計
-    operator_pending_count = OperatorSupplementReport.objects.filter(
-        approval_status='pending'
-    ).count()
-    
-    smt_pending_count = SMTProductionReport.objects.filter(
-        approval_status='pending'
-    ).count()
-    
-    total_pending_count = operator_pending_count + smt_pending_count
+    if request.method == 'POST':
+        report_type = request.POST.get('report_type')
+        export_format = request.POST.get('export_format')
+        date_range = request.POST.get('date_range')
+        start_date = request.POST.get('start_date')
+        end_date = request.POST.get('end_date')
+        
+        # 處理日期範圍
+        if date_range == 'custom':
+            if start_date and end_date:
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+            else:
+                messages.error(request, '請選擇自訂日期範圍')
+                return redirect('reporting:report_export')
+        else:
+            start_date, end_date = get_date_range(date_range)
+        
+        # 根據報表類型和格式匯出
+        if export_format == 'excel':
+            return export_to_excel(report_type, start_date, end_date)
+        elif export_format == 'csv':
+            return export_to_csv(report_type, start_date, end_date)
+        elif export_format == 'pdf':
+            return export_to_pdf(report_type, start_date, end_date)
     
     context = {
-        'operator_pending_count': operator_pending_count,
-        'smt_pending_count': smt_pending_count,
-        'total_pending_count': total_pending_count,
+        'report_types': get_report_types(),
+        'date_ranges': get_date_ranges(),
     }
     
-    return render(request, 'reporting/batch_delete_pending_confirm.html', context)
+    return render(request, 'reporting/report_export.html', context)
 
 
-@login_required
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-@require_POST
-def batch_delete_pending_reports(request):
+def get_date_range(date_range):
     """
-    批次刪除待核准報工記錄
-    只有超級管理員可以執行此操作
+    根據日期範圍類型獲取開始和結束日期
     """
-    try:
-        # 記錄操作開始
-        logger.warning(
-            f"超級管理員 {request.user.username} 開始執行批次刪除待核准報工記錄"
-        )
-        
-        # 取得刪除前的統計資料
-        operator_pending = OperatorSupplementReport.objects.filter(
-            approval_status='pending'
-        )
-        smt_pending = SMTProductionReport.objects.filter(
-            approval_status='pending'
-        )
-        
-        operator_pending_count = operator_pending.count()
-        smt_pending_count = smt_pending.count()
-        total_before = operator_pending_count + smt_pending_count
-        
-        logger.info(f"找到待刪除記錄：作業員報工 {operator_pending_count} 筆，SMT報工 {smt_pending_count} 筆")
-        
-        if total_before == 0:
-            messages.warning(request, "目前沒有待核准的報工記錄")
-            return redirect('reporting:pending_approval_list')
-        
-        # 記錄詳細資訊
-        for report in operator_pending[:5]:  # 只記錄前5筆作為範例
-            logger.info(f"待刪除作業員報工：ID={report.id}, 作業員={report.operator}, 工單={report.workorder}, 日期={report.work_date}")
-        
-        # 執行批次刪除 - 使用更安全的方式
-        operator_deleted = 0
-        smt_deleted = 0
-        
-        # 方法1：嘗試正常刪除
-        try:
-            # 逐筆刪除作業員報工記錄，避免外鍵約束問題
-            for report in operator_pending:
-                try:
-                    report_id = report.id
-                    report.delete()
-                    operator_deleted += 1
-                    logger.info(f"成功刪除作業員報工記錄 ID: {report_id}")
-                except Exception as e:
-                    logger.error(f"刪除作業員報工記錄 ID: {report.id} 失敗：{str(e)}")
-            
-            # 逐筆刪除SMT報工記錄
-            for report in smt_pending:
-                try:
-                    report_id = report.id
-                    report.delete()
-                    smt_deleted += 1
-                    logger.info(f"成功刪除SMT報工記錄 ID: {report_id}")
-                except Exception as e:
-                    logger.error(f"刪除SMT報工記錄 ID: {report.id} 失敗：{str(e)}")
-        except Exception as e:
-            logger.error(f"正常刪除失敗，嘗試使用原始SQL刪除：{str(e)}")
-            
-            # 方法2：使用原始SQL強制刪除
-            from django.db import connection
-            
-            try:
-                with connection.cursor() as cursor:
-                    # 強制刪除作業員報工記錄
-                    cursor.execute("""
-                        DELETE FROM workorder_operator_supplement_report 
-                        WHERE approval_status = 'pending'
-                    """)
-                    operator_deleted = cursor.rowcount
-                    logger.info(f"使用SQL成功刪除作業員報工記錄：{operator_deleted} 筆")
-                    
-                    # 強制刪除SMT報工記錄
-                    cursor.execute("""
-                        DELETE FROM workorder_smt_production_report 
-                        WHERE approval_status = 'pending'
-                    """)
-                    smt_deleted = cursor.rowcount
-                    logger.info(f"使用SQL成功刪除SMT報工記錄：{smt_deleted} 筆")
-                    
-            except Exception as sql_error:
-                logger.error(f"SQL刪除也失敗：{str(sql_error)}")
-                messages.error(request, f"批次刪除失敗：{str(sql_error)}")
-                return redirect('reporting:pending_approval_list')
-        
-        total_deleted = operator_deleted + smt_deleted
-        
-        # 記錄操作完成
-        logger.warning(
-            f"超級管理員 {request.user.username} 完成批次刪除待核准報工記錄："
-            f"作業員報工 {operator_deleted} 筆，SMT報工 {smt_deleted} 筆，"
-            f"總計 {total_deleted} 筆"
-        )
-        
-        if total_deleted > 0:
-            messages.success(
-                request, 
-                f"成功批次刪除待核准報工記錄！\n"
-                f"作業員報工：{operator_deleted} 筆\n"
-                f"SMT報工：{smt_deleted} 筆\n"
-                f"總計：{total_deleted} 筆"
-            )
+    today = date.today()
+    
+    if date_range == 'today':
+        return today, today
+    elif date_range == 'yesterday':
+        yesterday = today - timedelta(days=1)
+        return yesterday, yesterday
+    elif date_range == 'this_week':
+        start = today - timedelta(days=today.weekday())
+        end = start + timedelta(days=6)
+        return start, end
+    elif date_range == 'last_week':
+        start = today - timedelta(days=today.weekday() + 7)
+        end = start + timedelta(days=6)
+        return start, end
+    elif date_range == 'this_month':
+        start = today.replace(day=1)
+        if today.month == 12:
+            end = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
         else:
-            messages.warning(request, "沒有成功刪除任何記錄，可能是因為外鍵約束或其他限制")
-        
-        return redirect('reporting:pending_approval_list')
-        
-    except Exception as e:
-        # 記錄錯誤
-        logger.error(
-            f"超級管理員 {request.user.username} 批次刪除待核准報工記錄失敗：{str(e)}"
-        )
-        
-        messages.error(request, f"批次刪除失敗：{str(e)}")
-        return redirect('reporting:pending_approval_list')
+            end = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+        return start, end
+    elif date_range == 'last_month':
+        if today.month == 1:
+            start = today.replace(year=today.year - 1, month=12, day=1)
+        else:
+            start = today.replace(month=today.month - 1, day=1)
+        end = today.replace(day=1) - timedelta(days=1)
+        return start, end
+    
+    return today, today
 
 
-@login_required
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-@require_POST
-def batch_delete_selected_pending(request):
+def get_report_types():
     """
-    批次刪除選定的待核准報工記錄
-    只有超級管理員可以執行此操作
+    獲取報表類型選項
     """
-    try:
-        # 取得要刪除的記錄 ID 列表
-        operator_ids = request.POST.getlist('operator_report_ids')
-        smt_ids = request.POST.getlist('smt_report_ids')
-        
-        if not operator_ids and not smt_ids:
-            messages.warning(request, "請選擇要刪除的報工記錄")
-            return redirect('reporting:pending_approval_list')
-        
-        # 記錄操作開始
-        logger.warning(
-            f"超級管理員 {request.user.username} 開始執行批次刪除選定待核准報工記錄："
-            f"作業員報工 {len(operator_ids)} 筆，SMT報工 {len(smt_ids)} 筆"
-        )
-        
-        # 執行批次刪除
-        operator_deleted = 0
-        smt_deleted = 0
-        
-        if operator_ids:
-            operator_deleted = OperatorSupplementReport.objects.filter(
-                id__in=operator_ids,
-                approval_status='pending'
-            ).delete()[0]
-        
-        if smt_ids:
-            smt_deleted = SMTProductionReport.objects.filter(
-                id__in=smt_ids,
-                approval_status='pending'
-            ).delete()[0]
-        
-        total_deleted = operator_deleted + smt_deleted
-        
-        # 記錄操作完成
-        logger.warning(
-            f"超級管理員 {request.user.username} 成功批次刪除選定待核准報工記錄："
-            f"作業員報工 {operator_deleted} 筆，SMT報工 {smt_deleted} 筆，"
-            f"總計 {total_deleted} 筆"
-        )
-        
-        messages.success(
-            request, 
-            f"成功批次刪除選定的待核准報工記錄！\n"
-            f"作業員報工：{operator_deleted} 筆\n"
-            f"SMT報工：{smt_deleted} 筆\n"
-            f"總計：{total_deleted} 筆"
-        )
-        
-        return redirect('reporting:pending_approval_list')
-        
-    except Exception as e:
-        # 記錄錯誤
-        logger.error(
-            f"超級管理員 {request.user.username} 批次刪除選定待核准報工記錄失敗：{str(e)}"
-        )
-        
-        messages.error(request, f"批次刪除失敗：{str(e)}")
-        return redirect('reporting:pending_approval_list')
+    return [
+        ('daily_work', '日工作報表'),
+        ('weekly_work', '週工作報表'),
+        ('monthly_work', '月工作報表'),
+        ('daily_work_hour_operator', '日工時報表 (作業員)'),
+        ('weekly_work_hour_operator', '週工時報表 (作業員)'),
+        ('monthly_work_hour_operator', '月工時報表 (作業員)'),
+        ('daily_work_hour_smt', '日工時報表 (SMT設備)'),
+        ('weekly_work_hour_smt', '週工時報表 (SMT設備)'),
+        ('monthly_work_hour_smt', '月工時報表 (SMT設備)'),
+        ('operator_performance', '作業員績效報表'),
+        ('smt_equipment', 'SMT設備效率報表'),
+        ('abnormal_report', '異常報工報表'),
+        ('efficiency_analysis', '效率分析報表'),
+    ]
 
 
-@login_required
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-def get_pending_reports_count(request):
+def get_date_ranges():
     """
-    API：取得待核准報工記錄數量
-    只有超級管理員可以訪問
+    獲取日期範圍選項
     """
-    try:
-        operator_count = OperatorSupplementReport.objects.filter(
-            approval_status='pending'
-        ).count()
-        
-        smt_count = SMTProductionReport.objects.filter(
-            approval_status='pending'
-        ).count()
-        
-        total_count = operator_count + smt_count
-        
-        return JsonResponse({
-            'success': True,
-            'operator_count': operator_count,
-            'smt_count': smt_count,
-            'total_count': total_count,
-        })
-        
-    except Exception as e:
-        logger.error(f"取得待核准報工記錄數量失敗：{str(e)}")
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        })
+    return [
+        ('today', '今日'),
+        ('yesterday', '昨日'),
+        ('this_week', '本週'),
+        ('last_week', '上週'),
+        ('this_month', '本月'),
+        ('last_month', '上月'),
+        ('custom', '自訂範圍'),
+    ]
 
 
-@login_required
-@user_passes_test(superuser_required, login_url='/accounts/login/')
-@require_POST
-def force_delete_all_reports(request):
+def export_to_excel(report_type, start_date, end_date):
     """
-    強制刪除所有報工記錄（超級管理員專用）
-    此功能會刪除所有狀態的報工記錄，包括已核准和已駁回的記錄
+    匯出 Excel 報表
     """
-    try:
-        # 記錄操作開始
-        logger.warning(
-            f"超級管理員 {request.user.username} 開始執行強制刪除所有報工記錄"
-        )
-        
-        # 取得所有記錄的統計資料
-        operator_all = OperatorSupplementReport.objects.all()
-        smt_all = SMTProductionReport.objects.all()
-        
-        operator_total = operator_all.count()
-        smt_total = smt_all.count()
-        total_before = operator_total + smt_total
-        
-        logger.info(f"找到所有記錄：作業員報工 {operator_total} 筆，SMT報工 {smt_total} 筆")
-        
-        if total_before == 0:
-            messages.warning(request, "目前沒有任何報工記錄")
-            return redirect('reporting:pending_approval_list')
-        
-        # 使用原始SQL強制刪除所有記錄
-        from django.db import connection
-        
-        try:
-            with connection.cursor() as cursor:
-                # 強制刪除所有作業員報工記錄
-                cursor.execute("DELETE FROM workorder_operator_supplement_report")
-                operator_deleted = cursor.rowcount
-                logger.info(f"使用SQL成功刪除所有作業員報工記錄：{operator_deleted} 筆")
-                
-                # 強制刪除所有SMT報工記錄
-                cursor.execute("DELETE FROM workorder_smt_production_report")
-                smt_deleted = cursor.rowcount
-                logger.info(f"使用SQL成功刪除所有SMT報工記錄：{smt_deleted} 筆")
-                
-        except Exception as sql_error:
-            logger.error(f"SQL刪除失敗：{str(sql_error)}")
-            messages.error(request, f"強制刪除失敗：{str(sql_error)}")
-            return redirect('reporting:pending_approval_list')
-        
-        total_deleted = operator_deleted + smt_deleted
-        
-        # 記錄操作完成
-        logger.warning(
-            f"超級管理員 {request.user.username} 完成強制刪除所有報工記錄："
-            f"作業員報工 {operator_deleted} 筆，SMT報工 {smt_deleted} 筆，"
-            f"總計 {total_deleted} 筆"
-        )
-        
-        messages.success(
-            request, 
-            f"成功強制刪除所有報工記錄！\n"
-            f"作業員報工：{operator_deleted} 筆\n"
-            f"SMT報工：{smt_deleted} 筆\n"
-            f"總計：{total_deleted} 筆\n\n"
-            f"⚠️ 警告：此操作已永久刪除所有報工記錄，無法復原！"
-        )
-        
-        return redirect('reporting:pending_approval_list')
-        
-    except Exception as e:
-        # 記錄錯誤
-        logger.error(
-            f"超級管理員 {request.user.username} 強制刪除所有報工記錄失敗：{str(e)}"
-        )
-        
-        messages.error(request, f"強制刪除失敗：{str(e)}")
-        return redirect('reporting:pending_approval_list')
+    # 獲取報表數據
+    data = get_report_data(report_type, start_date, end_date)
+    
+    # 創建 Excel 工作簿
+    wb = Workbook()
+    ws = wb.active
+    ws.title = get_report_title(report_type)
+    
+    # 設定標題樣式
+    title_font = Font(bold=True, size=14)
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # 寫入標題
+    ws['A1'] = f'{get_report_title(report_type)} ({start_date} ~ {end_date})'
+    ws['A1'].font = title_font
+    ws.merge_cells('A1:H1')
+    
+    # 寫入表頭
+    headers = get_report_headers(report_type)
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=3, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = border
+    
+    # 寫入數據
+    for row, row_data in enumerate(data, 4):
+        for col, value in enumerate(row_data, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.border = border
+    
+    # 調整欄寬
+    for col in range(1, len(headers) + 1):
+        ws.column_dimensions[get_column_letter(col)].width = 15
+    
+    # 創建回應
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{get_report_filename(report_type, start_date, end_date)}.xlsx"'
+    
+    wb.save(response)
+    return response
 
 
-@login_required
+def export_to_csv(report_type, start_date, end_date):
+    """
+    匯出 CSV 報表
+    """
+    # 獲取報表數據
+    data = get_report_data(report_type, start_date, end_date)
+    headers = get_report_headers(report_type)
+    
+    # 創建 CSV 回應
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{get_report_filename(report_type, start_date, end_date)}.csv"'
+    
+    # 寫入 CSV 數據
+    writer = csv.writer(response)
+    writer.writerow(headers)
+    writer.writerows(data)
+    
+    return response
+
+
+def export_to_pdf(report_type, start_date, end_date):
+    """
+    匯出 PDF 報表 (暫時重定向到 Excel)
+    """
+    # 暫時重定向到 Excel 匯出
+    return export_to_excel(report_type, start_date, end_date)
+
+
+def get_report_data(report_type, start_date, end_date):
+    """
+    根據報表類型獲取數據
+    """
+    if report_type == 'daily_work':
+        return get_daily_work_report_data(start_date, end_date)
+    elif report_type == 'weekly_work':
+        return get_weekly_work_report_data(start_date, end_date)
+    elif report_type == 'monthly_work':
+        return get_monthly_work_report_data(start_date, end_date)
+    elif 'work_hour_operator' in report_type:
+        return get_work_hour_operator_report_data(report_type, start_date, end_date)
+    elif 'work_hour_smt' in report_type:
+        return get_work_hour_smt_report_data(report_type, start_date, end_date)
+    elif report_type == 'operator_performance':
+        return get_operator_performance_report_data(start_date, end_date)
+    elif report_type == 'smt_equipment':
+        return get_smt_equipment_report_data(start_date, end_date)
+    elif report_type == 'abnormal_report':
+        return get_abnormal_report_data(start_date, end_date)
+    elif report_type == 'efficiency_analysis':
+        return get_efficiency_analysis_report_data(start_date, end_date)
+    
+    return []
+
+
+def get_daily_work_report_data(start_date, end_date):
+    """
+    獲取日工作報表數據
+    """
+    reports = OperatorSupplementReport.objects.filter(
+        report_date__range=[start_date, end_date],
+        is_approved=True
+    ).select_related('operator', 'work_order')
+    
+    data = []
+    for report in reports:
+        data.append([
+            report.operator.username,
+            report.report_date.strftime('%Y-%m-%d'),
+            report.work_order.work_order_no,
+            report.work_order.product_sn or '',
+            report.start_time.strftime('%H:%M') if report.start_time else '',
+            report.end_time.strftime('%H:%M') if report.end_time else '',
+            report.process,
+            report.quantity or 0,
+            report.defect_quantity or 0,
+        ])
+    
+    return data
+
+
+def get_weekly_work_report_data(start_date, end_date):
+    """
+    獲取週工作報表數據
+    """
+    reports = OperatorSupplementReport.objects.filter(
+        report_date__range=[start_date, end_date],
+        is_approved=True
+    ).values('operator__username').annotate(
+        total_quantity=Sum('quantity'),
+        total_defect_quantity=Sum('defect_quantity')
+    )
+    
+    data = []
+    for report in reports:
+        data.append([
+            report['operator__username'],
+            report['total_quantity'] or 0,
+            report['total_defect_quantity'] or 0,
+        ])
+    
+    return data
+
+
+def get_monthly_work_report_data(start_date, end_date):
+    """
+    獲取月工作報表數據
+    """
+    reports = OperatorSupplementReport.objects.filter(
+        report_date__range=[start_date, end_date],
+        is_approved=True
+    ).values('operator__username').annotate(
+        total_quantity=Sum('quantity'),
+        total_defect_quantity=Sum('defect_quantity')
+    )
+    
+    data = []
+    for report in reports:
+        data.append([
+            report['operator__username'],
+            report['total_quantity'] or 0,
+            report['total_defect_quantity'] or 0,
+        ])
+    
+    return data
+
+
+def get_work_hour_operator_report_data(report_type, start_date, end_date):
+    """
+    獲取作業員工時報表數據
+    """
+    reports = OperatorSupplementReport.objects.filter(
+        report_date__range=[start_date, end_date],
+        is_approved=True
+    ).select_related('operator')
+    
+    data = []
+    for report in reports:
+        # 計算工時
+        if report.start_time and report.end_time:
+            duration = report.end_time - report.start_time
+            hours = duration.total_seconds() / 3600
+        else:
+            hours = 0
+        
+        data.append([
+            report.operator.username,
+            report.report_date.strftime('%Y-%m-%d'),
+            round(hours, 2),
+            report.quantity or 0,
+            report.defect_quantity or 0,
+        ])
+    
+    return data
+
+
+def get_work_hour_smt_report_data(report_type, start_date, end_date):
+    """
+    獲取 SMT 設備工時報表數據
+    """
+    reports = SMTProductionReport.objects.filter(
+        report_date__range=[start_date, end_date]
+    ).select_related('equipment')
+    
+    data = []
+    for report in reports:
+        # 計算運行時間
+        if report.start_time and report.end_time:
+            duration = report.end_time - report.start_time
+            hours = duration.total_seconds() / 3600
+        else:
+            hours = 0
+        
+        data.append([
+            report.equipment.name if report.equipment else '',
+            report.report_date.strftime('%Y-%m-%d'),
+            round(hours, 2),
+            report.quantity or 0,
+            report.defect_quantity or 0,
+        ])
+    
+    return data
+
+
+def get_operator_performance_report_data(start_date, end_date):
+    """
+    獲取作業員績效報表數據
+    """
+    reports = OperatorSupplementReport.objects.filter(
+        report_date__range=[start_date, end_date],
+        is_approved=True
+    ).values('operator__username').annotate(
+        total_quantity=Sum('quantity'),
+        total_defect_quantity=Sum('defect_quantity'),
+        avg_efficiency=Avg('efficiency')
+    )
+    
+    data = []
+    for report in reports:
+        total_quantity = report['total_quantity'] or 0
+        total_defect_quantity = report['total_defect_quantity'] or 0
+        total_output = total_quantity + total_defect_quantity
+        
+        if total_output > 0:
+            defect_rate = (total_defect_quantity / total_output) * 100
+        else:
+            defect_rate = 0
+        
+        data.append([
+            report['operator__username'],
+            total_quantity,
+            total_defect_quantity,
+            round(defect_rate, 2),
+            round(report['avg_efficiency'] or 0, 2),
+        ])
+    
+    return data
+
+
+def get_smt_equipment_report_data(start_date, end_date):
+    """
+    獲取 SMT 設備效率報表數據
+    """
+    reports = SMTProductionReport.objects.filter(
+        report_date__range=[start_date, end_date]
+    ).values('equipment__name').annotate(
+        total_quantity=Sum('quantity'),
+        total_defect_quantity=Sum('defect_quantity'),
+        avg_efficiency=Avg('efficiency')
+    )
+    
+    data = []
+    for report in reports:
+        total_quantity = report['total_quantity'] or 0
+        total_defect_quantity = report['total_defect_quantity'] or 0
+        total_output = total_quantity + total_defect_quantity
+        
+        if total_output > 0:
+            defect_rate = (total_defect_quantity / total_output) * 100
+        else:
+            defect_rate = 0
+        
+        data.append([
+            report['equipment__name'] or '',
+            total_quantity,
+            total_defect_quantity,
+            round(defect_rate, 2),
+            round(report['avg_efficiency'] or 0, 2),
+        ])
+    
+    return data
+
+
+def get_abnormal_report_data(start_date, end_date):
+    """
+    獲取異常報工報表數據
+    """
+    reports = OperatorSupplementReport.objects.filter(
+        report_date__range=[start_date, end_date],
+        abnormal_notes__isnull=False
+    ).exclude(abnormal_notes='').select_related('operator', 'work_order')
+    
+    data = []
+    for report in reports:
+        data.append([
+            report.operator.username,
+            report.report_date.strftime('%Y-%m-%d'),
+            report.work_order.work_order_no,
+            report.process,
+            report.abnormal_notes,
+            report.quantity or 0,
+            report.defect_quantity or 0,
+        ])
+    
+    return data
+
+
+def get_efficiency_analysis_report_data(start_date, end_date):
+    """
+    獲取效率分析報表數據
+    """
+    reports = OperatorSupplementReport.objects.filter(
+        report_date__range=[start_date, end_date],
+        is_approved=True
+    ).values('operator__username', 'process').annotate(
+        total_quantity=Sum('quantity'),
+        total_defect_quantity=Sum('defect_quantity'),
+        avg_efficiency=Avg('efficiency')
+    )
+    
+    data = []
+    for report in reports:
+        total_quantity = report['total_quantity'] or 0
+        total_defect_quantity = report['total_defect_quantity'] or 0
+        total_output = total_quantity + total_defect_quantity
+        
+        if total_output > 0:
+            defect_rate = (total_defect_quantity / total_output) * 100
+        else:
+            defect_rate = 0
+        
+        data.append([
+            report['operator__username'],
+            report['process'],
+            total_quantity,
+            total_defect_quantity,
+            round(defect_rate, 2),
+            round(report['avg_efficiency'] or 0, 2),
+        ])
+    
+    return data
+
+
+def get_report_title(report_type):
+    """
+    獲取報表標題
+    """
+    titles = {
+        'daily_work': '日工作報表',
+        'weekly_work': '週工作報表',
+        'monthly_work': '月工作報表',
+        'daily_work_hour_operator': '日工時報表 (作業員)',
+        'weekly_work_hour_operator': '週工時報表 (作業員)',
+        'monthly_work_hour_operator': '月工時報表 (作業員)',
+        'daily_work_hour_smt': '日工時報表 (SMT設備)',
+        'weekly_work_hour_smt': '週工時報表 (SMT設備)',
+        'monthly_work_hour_smt': '月工時報表 (SMT設備)',
+        'operator_performance': '作業員績效報表',
+        'smt_equipment': 'SMT設備效率報表',
+        'abnormal_report': '異常報工報表',
+        'efficiency_analysis': '效率分析報表',
+    }
+    return titles.get(report_type, '未知報表')
+
+
+def get_report_headers(report_type):
+    """
+    獲取報表表頭
+    """
+    headers = {
+        'daily_work': ['作業員', '報工日期', '工單號', '產品編號', '開始時間', '結束時間', '工序', '工作數量', '不良品數量'],
+        'weekly_work': ['作業員', '週工作數量', '週不良品數量'],
+        'monthly_work': ['作業員', '月工作數量', '月不良品數量'],
+        'daily_work_hour_operator': ['作業員', '報工日期', '工時(小時)', '良品數量', '不良品數量'],
+        'weekly_work_hour_operator': ['作業員', '週工時(小時)', '週良品數量', '週不良品數量'],
+        'monthly_work_hour_operator': ['作業員', '月工時(小時)', '月良品數量', '月不良品數量'],
+        'daily_work_hour_smt': ['設備', '報工日期', '運行時間(小時)', '良品數量', '不良品數量'],
+        'weekly_work_hour_smt': ['設備', '週運行時間(小時)', '週良品數量', '週不良品數量'],
+        'monthly_work_hour_smt': ['設備', '月運行時間(小時)', '月良品數量', '月不良品數量'],
+        'operator_performance': ['作業員', '良品數量', '不良品數量', '不良率(%)', '平均效率(%)'],
+        'smt_equipment': ['設備', '良品數量', '不良品數量', '不良率(%)', '平均效率(%)'],
+        'abnormal_report': ['作業員', '報工日期', '工單號', '工序', '異常紀錄', '良品數量', '不良品數量'],
+        'efficiency_analysis': ['作業員', '工序', '良品數量', '不良品數量', '不良率(%)', '平均效率(%)'],
+    }
+    return headers.get(report_type, [])
+
+
+def get_report_filename(report_type, start_date, end_date):
+    """
+    獲取報表檔案名稱
+    """
+    title = get_report_title(report_type)
+    return f"{title}_{start_date}_{end_date}"
+
+
 def placeholder_view(request, function_name=None):
     """
     通用佔位符視圖
+    用於所有未實現的功能
     """
     return render(request, 'reporting/placeholder.html', {
         'function_name': function_name or '未知功能'

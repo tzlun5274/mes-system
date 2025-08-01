@@ -1,6 +1,7 @@
 from django.urls import path, include
 from . import views_main as workorder_views
 from . import views_import as import_views
+from .supervisor import views as supervisor_views
 from .views.workorder_views import (
     WorkOrderListView, WorkOrderDetailView, WorkOrderCreateView, 
     WorkOrderUpdateView, WorkOrderDeleteView, CompanyOrderListView,
@@ -95,9 +96,9 @@ urlpatterns = [
     path("report/operator/on_site/", workorder_views.operator_on_site_report, name="operator_on_site_report"),
     path("report/smt/on_site/", workorder_views.smt_on_site_report, name="smt_on_site_report"),
     path("report/supervisor/", workorder_views.supervisor_index, name="supervisor_index"),
-    path("report/supervisor/functions/", workorder_views.supervisor_functions, name="supervisor_functions"),
-    path("report/supervisor/reports/", workorder_views.supervisor_report_index, name="supervisor_report_index"),
-    path("report/statistics/", workorder_views.report_statistics, name="report_statistics"),
+    
+    # 主管功能子模組路由
+    path("supervisor/", include('workorder.supervisor.urls')),
     path("report/approved/", workorder_views.approved_reports_list, name="approved_reports_list"),
     
     # 作業員報工資料匯入功能
@@ -121,13 +122,14 @@ urlpatterns = [
     path("process/status/update/<int:process_id>/", workorder_views.update_process_status, name="update_process_status"),
     path("test_report/", workorder_views.test_report_page, name="test_report_page"),
     path("supervisor_report/", workorder_views.supervisor_report_index, name="supervisor_report_index"),
-    path("supervisor_functions/", workorder_views.supervisor_functions, name="supervisor_functions"),
-    path("report_statistics/", workorder_views.report_statistics, name="report_statistics"),
-    path("abnormal_management/", workorder_views.abnormal_management, name="abnormal_management"),
+    # 這些功能已遷移到主管功能子模組，保留向後相容的路由
+    path("supervisor_functions/", supervisor_views.supervisor_functions, name="supervisor_functions"),
+    path("report_statistics/", supervisor_views.report_statistics, name="report_statistics"),
+    path("abnormal_management/", supervisor_views.abnormal_management, name="abnormal_management"),
     path("batch_resolve_abnormal/", workorder_views.batch_resolve_abnormal, name="batch_resolve_abnormal"),
-    path("abnormal_detail/<str:abnormal_type>/<int:abnormal_id>/", workorder_views.abnormal_detail, name="abnormal_detail"),
-    path("data_maintenance/", workorder_views.data_maintenance, name="data_maintenance"),
-    path("execute_maintenance/", workorder_views.execute_maintenance, name="execute_maintenance"),
+    path("abnormal_detail/<str:abnormal_type>/<int:abnormal_id>/", supervisor_views.abnormal_detail, name="abnormal_detail"),
+    path("data_maintenance/", supervisor_views.data_maintenance, name="data_maintenance"),
+    path("execute_maintenance/", supervisor_views.execute_maintenance, name="execute_maintenance"),
     path("submit_smt_report/", workorder_views.submit_smt_report, name="submit_smt_report"),
     path("user_supplement_form/<int:workorder_id>/", workorder_views.user_supplement_form, name="user_supplement_form"),
     path("edit_my_supplement/<int:supplement_id>/", workorder_views.edit_my_supplement, name="edit_my_supplement"),

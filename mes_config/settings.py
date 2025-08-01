@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "quality",
     "system",
     "workorder",
+    "workorder.supervisor",
     "workorder.workorder_dispatch",
     "workorder.workorder_erp",
     "workorder.workorder_completed",

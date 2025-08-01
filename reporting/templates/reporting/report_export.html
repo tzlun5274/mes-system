@@ -1,0 +1,332 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}報表匯出 - 報表管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    .report-card {
+        transition: transform 0.2s;
+    }
+    .report-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .format-option {
+        cursor: pointer;
+    }
+    .format-option:hover {
+        background-color: #f8f9fa;
+    }
+    .date-range-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-file-export text-primary"></i>
+            報表匯出
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}">報表管理</a></li>
+                <li class="breadcrumb-item active">報表匯出</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- 說明卡片 -->
+    <div class="alert alert-info" role="alert">
+        <h5 class="alert-heading">
+            <i class="fas fa-info-circle"></i>
+            報表匯出說明
+        </h5>
+        <p class="mb-0">
+            選擇您需要的報表類型、匯出格式和日期範圍，系統將自動生成並下載報表檔案。
+            支援 Excel、CSV 和 PDF 格式（PDF 格式暫時使用 Excel 格式）。
+        </p>
+    </div>
+
+    <form method="post" id="report-form">
+        {% csrf_token %}
+        
+        <!-- 報表類型選擇 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar"></i>
+                    選擇報表類型
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for value, label in report_types %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card report-card h-100">
+                            <div class="card-body">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="report_type" 
+                                           id="report_{{ value }}" value="{{ value }}" required>
+                                    <label class="form-check-label" for="report_{{ value }}">
+                                        <strong>{{ label }}</strong>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 匯出格式選擇 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-file-alt"></i>
+                    選擇匯出格式
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="card format-option h-100" onclick="selectFormat('excel')">
+                            <div class="card-body text-center">
+                                <i class="fas fa-file-excel fa-3x text-success mb-2"></i>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="export_format" 
+                                           id="format_excel" value="excel" checked required>
+                                    <label class="form-check-label" for="format_excel">
+                                        <strong>Excel (.xlsx)</strong>
+                                    </label>
+                                </div>
+                                <small class="text-muted">支援格式化和圖表</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card format-option h-100" onclick="selectFormat('csv')">
+                            <div class="card-body text-center">
+                                <i class="fas fa-file-csv fa-3x text-info mb-2"></i>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="export_format" 
+                                           id="format_csv" value="csv" required>
+                                    <label class="form-check-label" for="format_csv">
+                                        <strong>CSV (.csv)</strong>
+                                    </label>
+                                </div>
+                                <small class="text-muted">純文字格式，通用性強</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card format-option h-100" onclick="selectFormat('pdf')">
+                            <div class="card-body text-center">
+                                <i class="fas fa-file-pdf fa-3x text-danger mb-2"></i>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="export_format" 
+                                           id="format_pdf" value="pdf" required>
+                                    <label class="form-check-label" for="format_pdf">
+                                        <strong>PDF (.pdf)</strong>
+                                    </label>
+                                </div>
+                                <small class="text-muted">開發中，暫時使用 Excel 格式</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 日期範圍選擇 -->
+        <div class="date-range-section">
+            <h5 class="mb-3">
+                <i class="fas fa-calendar-alt"></i>
+                選擇日期範圍
+            </h5>
+            
+            <!-- 預設日期範圍 -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">快速選擇</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for value, label in date_ranges %}
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="date_range" 
+                                   id="range_{{ value }}" value="{{ value }}" 
+                                   {% if value == 'today' %}checked{% endif %} required>
+                            <label class="form-check-label" for="range_{{ value }}">
+                                {{ label }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 自訂日期範圍 -->
+            <div class="row" id="custom-date-section" style="display: none;">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="start_date" class="form-label">開始日期</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="end_date" class="form-label">結束日期</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 匯出按鈕 -->
+        <div class="text-center">
+            <button type="submit" class="btn btn-primary btn-lg" id="export-btn">
+                <i class="fas fa-download"></i>
+                匯出報表
+            </button>
+        </div>
+    </form>
+
+    <!-- 報表類型說明 -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-question-circle"></i>
+                        報表類型說明
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>工作報表</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>日工作報表：</strong>顯示每日作業員的報工明細</li>
+                                <li><strong>週工作報表：</strong>按週匯總作業員的工作數量</li>
+                                <li><strong>月工作報表：</strong>按月匯總作業員的工作數量</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>工時報表</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>作業員工時報表：</strong>計算作業員的正常工時和加班時數</li>
+                                <li><strong>SMT設備工時報表：</strong>計算設備的運行時間和停機時間</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <h6>績效報表</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>作業員績效報表：</strong>分析作業員的生產效率和品質</li>
+                                <li><strong>SMT設備效率報表：</strong>分析設備的運行效率和產出</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>分析報表</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>異常報工報表：</strong>統計有異常紀錄的報工情況</li>
+                                <li><strong>效率分析報表：</strong>綜合分析生產效率和品質指標</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 選擇匯出格式
+function selectFormat(format) {
+    document.querySelectorAll('input[name="export_format"]').forEach(radio => {
+        radio.checked = false;
+    });
+    document.getElementById('format_' + format).checked = true;
+}
+
+// 監聽日期範圍選擇
+document.querySelectorAll('input[name="date_range"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const customSection = document.getElementById('custom-date-section');
+        if (this.value === 'custom') {
+            customSection.style.display = 'block';
+            document.getElementById('start_date').required = true;
+            document.getElementById('end_date').required = true;
+        } else {
+            customSection.style.display = 'none';
+            document.getElementById('start_date').required = false;
+            document.getElementById('end_date').required = false;
+        }
+    });
+});
+
+// 表單提交驗證
+document.getElementById('report-form').addEventListener('submit', function(e) {
+    const reportType = document.querySelector('input[name="report_type"]:checked');
+    const exportFormat = document.querySelector('input[name="export_format"]:checked');
+    const dateRange = document.querySelector('input[name="date_range"]:checked');
+    
+    if (!reportType) {
+        e.preventDefault();
+        alert('請選擇報表類型');
+        return false;
+    }
+    
+    if (!exportFormat) {
+        e.preventDefault();
+        alert('請選擇匯出格式');
+        return false;
+    }
+    
+    if (!dateRange) {
+        e.preventDefault();
+        alert('請選擇日期範圍');
+        return false;
+    }
+    
+    if (dateRange.value === 'custom') {
+        const startDate = document.getElementById('start_date').value;
+        const endDate = document.getElementById('end_date').value;
+        
+        if (!startDate || !endDate) {
+            e.preventDefault();
+            alert('請選擇自訂日期範圍的開始和結束日期');
+            return false;
+        }
+        
+        if (startDate > endDate) {
+            e.preventDefault();
+            alert('開始日期不能晚於結束日期');
+            return false;
+        }
+    }
+    
+    // 顯示載入提示
+    const exportBtn = document.getElementById('export-btn');
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在生成報表...';
+    exportBtn.disabled = true;
+});
+
+// 設定今天的日期作為預設值
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('start_date').value = today;
+    document.getElementById('end_date').value = today;
+});
+</script>
+{% endblock %} 

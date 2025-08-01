@@ -50,13 +50,13 @@
                     主管審核首頁
                 </h2>
                 <div class="btn-group">
-                    <a href="{% url 'workorder:supervisor_functions' %}" class="btn btn-outline-primary">
+                    <a href="{% url 'workorder:supervisor:supervisor_functions' %}" class="btn btn-outline-primary">
                         <i class="fas fa-cogs"></i> 功能設定
                     </a>
-                    <a href="{% url 'workorder:report_statistics' %}" class="btn btn-outline-info">
+                    <a href="{% url 'workorder:supervisor:report_statistics' %}" class="btn btn-outline-info">
                         <i class="fas fa-chart-bar"></i> 統計報表
                     </a>
-                    <a href="{% url 'workorder:abnormal_management' %}" class="btn btn-outline-warning">
+                    <a href="{% url 'workorder:supervisor:abnormal_management' %}" class="btn btn-outline-warning">
                         <i class="fas fa-exclamation-triangle"></i> 異常處理
                     </a>
                 </div>
@@ -156,14 +156,14 @@
                         </div>
 
                         <div class="col-md-3 mb-2">
-                            <a href="{% url 'workorder:report_statistics' %}" class="btn btn-info btn-block quick-action-btn">
+                            <a href="{% url 'workorder:supervisor:report_statistics' %}" class="btn btn-info btn-block quick-action-btn">
                                 <i class="fas fa-chart-bar"></i><br>
                                 統計報表<br>
                                 <small>數據分析</small>
                             </a>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <a href="{% url 'workorder:abnormal_management' %}" class="btn btn-danger btn-block quick-action-btn">
+                            <a href="{% url 'workorder:supervisor:abnormal_management' %}" class="btn btn-danger btn-block quick-action-btn">
                                 <i class="fas fa-exclamation-triangle"></i><br>
                                 異常處理<br>
                                 <small>({{ stats.total_abnormal|default:0 }})</small>
@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (cardType.includes('待審核')) {
                 window.location.href = "{% url 'workorder:supervisor:pending_approval_list' %}";
             } else if (cardType.includes('異常')) {
-                window.location.href = "{% url 'workorder:abnormal_management' %}";
+                window.location.href = "{% url 'workorder:supervisor:abnormal_management' %}";
             }
         });
         
