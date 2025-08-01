@@ -37,14 +37,14 @@ class EquipmentForm(forms.ModelForm):
         if not name:
             raise ValidationError("請輸入設備名稱！")
 
-        # 檢查名稱是否已存在（排除當前編輯的設備）
+        # 檢查名稱是否已存在（排除當前編輯的設備，不區分大小寫）
         instance = getattr(self, "instance", None)
         if instance and instance.pk:
-            if Equipment.objects.filter(name=name).exclude(pk=instance.pk).exists():
-                raise ValidationError(f"設備名稱 '{name}' 已存在，請選擇其他名稱！")
+            if Equipment.objects.filter(name__iexact=name).exclude(pk=instance.pk).exists():
+                raise ValidationError(f"設備名稱 '{name}' 已存在（不區分大小寫），請選擇其他名稱！")
         else:
-            if Equipment.objects.filter(name=name).exists():
-                raise ValidationError(f"設備名稱 '{name}' 已存在，請選擇其他名稱！")
+            if Equipment.objects.filter(name__iexact=name).exists():
+                raise ValidationError(f"設備名稱 '{name}' 已存在（不區分大小寫），請選擇其他名稱！")
 
         return name
 

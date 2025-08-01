@@ -1,0 +1,670 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}SMT設備報工資料匯入{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* 麵包屑樣式 */
+    .breadcrumb {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 12px 20px;
+        margin-bottom: 20px;
+    }
+    
+    .breadcrumb-item a {
+        color: #007bff;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.3s ease;
+    }
+    
+    .breadcrumb-item a:hover {
+        color: #0056b3;
+        text-decoration: underline;
+    }
+    
+    .breadcrumb-item.active {
+        color: #6c757d;
+        font-weight: 600;
+    }
+    
+    .breadcrumb-item + .breadcrumb-item::before {
+        content: ">";
+        color: #6c757d;
+        margin: 0 8px;
+    }
+    
+    .import-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .import-section {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        padding: 20px;
+    }
+    
+    .section-title {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .field-guide-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    
+    .field-guide-table th,
+    .field-guide-table td {
+        border: 1px solid #ddd;
+        padding: 8px 12px;
+        text-align: left;
+    }
+    
+    .field-guide-table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
+    
+    .required-field {
+        color: #e74c3c;
+        font-weight: bold;
+    }
+    
+    .optional-field {
+        color: #7f8c8d;
+    }
+    
+    .upload-area {
+        border: 2px dashed #3498db;
+        border-radius: 8px;
+        padding: 40px;
+        text-align: center;
+        background-color: #f8f9fa;
+        transition: all 0.3s ease;
+    }
+    
+    .upload-area:hover {
+        border-color: #2980b9;
+        background-color: #ecf0f1;
+    }
+    
+    .upload-area.dragover {
+        border-color: #27ae60;
+        background-color: #d5f4e6;
+    }
+    
+    .file-input {
+        display: none;
+    }
+    
+    .btn-upload {
+        background-color: #3498db;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s ease;
+    }
+    
+    .btn-upload:hover {
+        background-color: #2980b9;
+    }
+    
+    .btn-download {
+        background-color: #27ae60;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        text-decoration: none;
+        display: inline-block;
+        margin-right: 10px;
+        transition: background-color 0.3s ease;
+    }
+    
+    .btn-download:hover {
+        background-color: #229954;
+        color: white;
+        text-decoration: none;
+    }
+    
+    .btn-export {
+        background-color: #f39c12;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        text-decoration: none;
+        display: inline-block;
+        margin-right: 10px;
+        transition: background-color 0.3s ease;
+    }
+    
+    .btn-export:hover {
+        background-color: #e67e22;
+        color: white;
+        text-decoration: none;
+    }
+    
+    .progress-container {
+        display: none;
+        margin-top: 20px;
+    }
+    
+    .progress-bar {
+        width: 100%;
+        height: 20px;
+        background-color: #ecf0f1;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background-color: #3498db;
+        width: 0%;
+        transition: width 0.3s ease;
+    }
+    
+    .result-message {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 5px;
+        display: none;
+    }
+    
+    .result-success {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+    
+    .result-error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+    
+    .notes-list {
+        background-color: #f8f9fa;
+        border-left: 4px solid #3498db;
+        padding: 15px;
+        margin-top: 15px;
+    }
+    
+    .notes-list ul {
+        margin: 0;
+        padding-left: 20px;
+    }
+    
+    .notes-list li {
+        margin-bottom: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="import-container">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'home_page' %}">
+                    <i class="fas fa-home"></i> 首頁
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:index' %}">
+                    <i class="fas fa-clipboard-list"></i> 工單管理
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:report_index' %}">
+                    <i class="fas fa-chart-bar"></i> 報工管理
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-upload"></i> SMT設備報工資料匯入
+            </li>
+        </ol>
+    </nav>
+    
+    <h1 class="section-title">SMT設備報工資料匯入</h1>
+    
+    <!-- 匯入功能區 -->
+    <div class="import-section">
+        <h2 class="section-title">檔案匯入</h2>
+        
+        <div class="upload-area" id="uploadArea">
+            <div class="mb-3">
+                <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                <h4>選擇檔案或拖拽檔案到此處</h4>
+                <p class="text-muted">支援 Excel (.xlsx) 和 CSV 格式</p>
+            </div>
+            
+            <input type="file" id="fileInput" class="file-input" accept=".xlsx,.csv">
+            <button type="button" class="btn-upload" onclick="document.getElementById('fileInput').click()">
+                <i class="fas fa-folder-open"></i> 選擇檔案
+            </button>
+            <button type="button" class="btn btn-success" id="importBtn" onclick="startImport()" style="display: none; margin-left: 10px;">
+                <i class="fas fa-upload"></i> 開始匯入
+            </button>
+            
+            <div class="mt-3">
+                <a href="{% url 'workorder:download_smt_import_template' %}" class="btn-download">
+                    <i class="fas fa-download"></i> 下載匯入範本
+                </a>
+                <a href="{% url 'workorder:smt_report_export' %}" class="btn-export">
+                    <i class="fas fa-file-export"></i> 匯出SMT報工記錄
+                </a>
+                <button type="button" class="btn btn-info" onclick="showFieldGuide()">
+                    <i class="fas fa-info-circle"></i> 查看欄位說明
+                </button>
+            </div>
+        </div>
+        
+        <!-- 進度條 -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p class="text-center mt-2" id="progressText">處理中...</p>
+        </div>
+        
+        <!-- 結果訊息 -->
+        <div class="result-message" id="resultMessage"></div>
+    </div>
+    
+    <!-- 欄位格式說明 -->
+    <div class="import-section" id="fieldGuideSection" style="display: none;">
+        <h2 class="section-title">欄位格式說明</h2>
+        
+        <div class="table-responsive">
+            <table class="field-guide-table">
+                <thead>
+                    <tr>
+                        <th>欄位名稱</th>
+                        <th>必填</th>
+                        <th>資料類型</th>
+                        <th>說明</th>
+                        <th>範例</th>
+                        <th>驗證規則</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="required-field">設備名稱</td>
+                        <td><span class="badge bg-danger">必填</span></td>
+                        <td>文字</td>
+                        <td>SMT設備的名稱，必須在系統中已存在</td>
+                        <td>SMT-001</td>
+                        <td>不能為空，必須對應到系統中的設備</td>
+                    </tr>
+                    <tr>
+                        <td class="required-field">公司代號</td>
+                        <td><span class="badge bg-danger">必填</span></td>
+                        <td>文字</td>
+                        <td>公司代號，用於識別不同公司的工單</td>
+                        <td>01</td>
+                        <td>不能為空，必須對應到系統中的公司設定</td>
+                    </tr>
+                    <tr>
+                        <td class="required-field">報工日期</td>
+                        <td><span class="badge bg-danger">必填</span></td>
+                        <td>日期</td>
+                        <td>報工的日期</td>
+                        <td>2025-01-15</td>
+                        <td>格式：YYYY-MM-DD</td>
+                    </tr>
+                    <tr>
+                        <td class="required-field">開始時間</td>
+                        <td><span class="badge bg-danger">必填</span></td>
+                        <td>時間</td>
+                        <td>報工開始時間</td>
+                        <td>08:00 或 0800</td>
+                        <td>24小時制，支援 HH:MM 或 HHMM 格式</td>
+                    </tr>
+                    <tr>
+                        <td class="required-field">結束時間</td>
+                        <td><span class="badge bg-danger">必填</span></td>
+                        <td>時間</td>
+                        <td>報工結束時間</td>
+                        <td>12:00 或 1200</td>
+                        <td>24小時制，支援 HH:MM 或 HHMM 格式</td>
+                    </tr>
+                    <tr>
+                        <td class="required-field">工單號</td>
+                        <td><span class="badge bg-danger">必填</span></td>
+                        <td>文字</td>
+                        <td>工單號碼</td>
+                        <td>WO-01-202501001</td>
+                        <td>不能為空，必須對應到系統中的工單</td>
+                    </tr>
+                    <tr>
+                        <td class="required-field">產品編號</td>
+                        <td><span class="badge bg-danger">必填</span></td>
+                        <td>文字</td>
+                        <td>產品編號</td>
+                        <td>PROD-001</td>
+                        <td>不能為空</td>
+                    </tr>
+                    <tr>
+                        <td class="required-field">工序名稱</td>
+                        <td><span class="badge bg-danger">必填</span></td>
+                        <td>文字</td>
+                        <td>工序名稱</td>
+                        <td>SMT</td>
+                        <td>不能為空，通常為SMT相關工序</td>
+                    </tr>
+                    <tr>
+                        <td class="optional-field">空白佔位用</td>
+                        <td><span class="badge bg-secondary">選填</span></td>
+                        <td>文字</td>
+                        <td>空白欄位，用於格式對齊</td>
+                        <td></td>
+                        <td>可為空</td>
+                    </tr>
+                    <tr>
+                        <td class="required-field">報工數量</td>
+                        <td><span class="badge bg-danger">必填</span></td>
+                        <td>整數</td>
+                        <td>合格品數量</td>
+                        <td>100</td>
+                        <td>必須為非負整數</td>
+                    </tr>
+                    <tr>
+                        <td class="optional-field">不良品數量</td>
+                        <td><span class="badge bg-secondary">選填</span></td>
+                        <td>整數</td>
+                        <td>不良品數量</td>
+                        <td>2</td>
+                        <td>可為空，如果填寫必須為非負整數</td>
+                    </tr>
+                    <tr>
+                        <td class="optional-field">備註</td>
+                        <td><span class="badge bg-secondary">選填</span></td>
+                        <td>文字</td>
+                        <td>備註說明</td>
+                        <td>正常生產</td>
+                        <td>可為空，純文字描述</td>
+                    </tr>
+                    <tr>
+                        <td class="optional-field">異常紀錄</td>
+                        <td><span class="badge bg-secondary">選填</span></td>
+                        <td>文字</td>
+                        <td>異常情況記錄</td>
+                        <td>設備故障30分鐘</td>
+                        <td>可為空，有內容才會列入異常紀錄</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="notes-list">
+            <h5><i class="fas fa-info-circle"></i> 重要注意事項：</h5>
+            <ul>
+                <li>所有時間欄位支援 24 小時制格式</li>
+                <li>空白佔位用欄位為格式對齊用途，可留空</li>
+                <li>異常紀錄欄位有內容才會列入異常紀錄</li>
+                <li>系統會自動檢查重複記錄並跳過</li>
+                <li>匯入後會自動計算工時（SMT中午不休息，16:30後算加班）</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const resultMessage = document.getElementById('resultMessage');
+    
+    // 檔案選擇處理
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            // 檢查檔案格式
+            const allowedTypes = ['.xlsx', '.csv'];
+            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            
+            if (!allowedTypes.includes(fileExtension)) {
+                showResult('只支援 Excel (.xlsx) 和 CSV 格式檔案', 'error');
+                return;
+            }
+            
+            // 顯示選中的檔案名稱和匯入按鈕
+            const fileName = file.name;
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInfo = document.createElement('div');
+            fileInfo.className = 'alert alert-info mt-3';
+            fileInfo.innerHTML = `
+                <i class="fas fa-file"></i> 已選擇檔案：${fileName}
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="clearFileSelection()">
+                    <i class="fas fa-times"></i> 重新選擇
+                </button>
+            `;
+            
+            // 移除之前的檔案資訊
+            const existingFileInfo = uploadArea.querySelector('.alert-info');
+            if (existingFileInfo) {
+                existingFileInfo.remove();
+            }
+            
+            uploadArea.appendChild(fileInfo);
+            
+            // 顯示匯入按鈕
+            document.getElementById('importBtn').style.display = 'inline-block';
+            
+            // 儲存選中的檔案
+            window.selectedFile = file;
+        }
+    });
+    
+    // 拖拽功能
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            const file = files[0];
+            
+            // 檢查檔案格式
+            const allowedTypes = ['.xlsx', '.csv'];
+            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            
+            if (!allowedTypes.includes(fileExtension)) {
+                showResult('只支援 Excel (.xlsx) 和 CSV 格式檔案', 'error');
+                return;
+            }
+            
+            // 顯示選中的檔案名稱和匯入按鈕
+            const fileName = file.name;
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInfo = document.createElement('div');
+            fileInfo.className = 'alert alert-info mt-3';
+            fileInfo.innerHTML = `
+                <i class="fas fa-file"></i> 已選擇檔案：${fileName}
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="clearFileSelection()">
+                    <i class="fas fa-times"></i> 重新選擇
+                </button>
+            `;
+            
+            // 移除之前的檔案資訊
+            const existingFileInfo = uploadArea.querySelector('.alert-info');
+            if (existingFileInfo) {
+                existingFileInfo.remove();
+            }
+            
+            uploadArea.appendChild(fileInfo);
+            
+            // 顯示匯入按鈕
+            document.getElementById('importBtn').style.display = 'inline-block';
+            
+            // 儲存選中的檔案
+            window.selectedFile = file;
+        }
+    });
+    
+    // 檔案上傳處理
+    function handleFileUpload(file) {
+        // 檢查檔案格式
+        const allowedTypes = ['.xlsx', '.csv'];
+        const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+        
+        if (!allowedTypes.includes(fileExtension)) {
+            showResult('只支援 Excel (.xlsx) 和 CSV 格式檔案', 'error');
+            return;
+        }
+        
+        // 顯示進度條
+        progressContainer.style.display = 'block';
+        resultMessage.style.display = 'none';
+        
+        // 模擬進度
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
+            progressFill.style.width = progress + '%';
+            progressText.textContent = `處理中... ${Math.round(progress)}%`;
+        }, 200);
+        
+        // 準備表單資料
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // 發送請求
+        fetch('{% url "workorder:smt_report_import_file" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            clearInterval(progressInterval);
+            progressFill.style.width = '100%';
+            progressText.textContent = '完成！';
+            
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+                showResult(data.message, data.success ? 'success' : 'error');
+            }, 1000);
+        })
+        .catch(error => {
+            clearInterval(progressInterval);
+            progressContainer.style.display = 'none';
+            showResult('匯入失敗：' + error.message, 'error');
+        });
+    }
+    
+    // 顯示結果訊息
+    function showResult(message, type) {
+        resultMessage.textContent = message;
+        resultMessage.className = 'result-message result-' + type;
+        resultMessage.style.display = 'block';
+        
+        // 自動隱藏成功訊息
+        if (type === 'success') {
+            setTimeout(() => {
+                resultMessage.style.display = 'none';
+            }, 10000);
+        }
+    }
+    
+    // 取得 CSRF Token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // 開始匯入
+    window.startImport = function() {
+        if (!window.selectedFile) {
+            showResult('請先選擇檔案', 'error');
+            return;
+        }
+        
+        handleFileUpload(window.selectedFile);
+    };
+    
+    // 清除檔案選擇
+    window.clearFileSelection = function() {
+        // 清除檔案輸入
+        document.getElementById('fileInput').value = '';
+        
+        // 移除檔案資訊顯示
+        const existingFileInfo = document.querySelector('.alert-info');
+        if (existingFileInfo) {
+            existingFileInfo.remove();
+        }
+        
+        // 隱藏匯入按鈕
+        document.getElementById('importBtn').style.display = 'none';
+        
+        // 清除選中的檔案
+        window.selectedFile = null;
+        
+        // 隱藏結果訊息
+        document.getElementById('resultMessage').style.display = 'none';
+    };
+    
+    // 顯示/隱藏欄位說明
+    window.showFieldGuide = function() {
+        const fieldGuideSection = document.getElementById('fieldGuideSection');
+        if (fieldGuideSection.style.display === 'none') {
+            fieldGuideSection.style.display = 'block';
+            fieldGuideSection.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            fieldGuideSection.style.display = 'none';
+        }
+    };
+});
+
+
+</script>
+{% endblock %} 

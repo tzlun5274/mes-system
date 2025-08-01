@@ -91,8 +91,8 @@ urlpatterns = [
     path("report/smt/supplement/approve/<int:report_id>/", workorder_views.smt_supplement_report_approve, name="smt_supplement_report_approve"),
     path("report/smt/supplement/reject/<int:report_id>/", workorder_views.smt_supplement_report_reject, name="smt_supplement_report_reject"),
     path("report/smt/supplement/batch/", workorder_views.smt_supplement_batch, name="smt_supplement_batch"),
-    path("report/smt/supplement/export/", workorder_views.smt_supplement_export, name="smt_supplement_export"),
-    path("report/smt/supplement/template/", workorder_views.smt_supplement_template, name="smt_supplement_template"),
+
+
     path("report/operator/on_site/", workorder_views.operator_on_site_report, name="operator_on_site_report"),
     path("report/smt/on_site/", workorder_views.smt_on_site_report, name="smt_on_site_report"),
     path("report/supervisor/", workorder_views.supervisor_index, name="supervisor_index"),
@@ -106,6 +106,16 @@ urlpatterns = [
     path("import/operator_report/file/", import_views.operator_report_import_file, name="operator_report_import_file"),
     path("import/operator_report/template/", import_views.download_import_template, name="download_import_template"),
     path("import/operator_report/field_guide/", import_views.get_import_field_guide, name="get_import_field_guide"),
+    
+    # SMT設備報工資料匯入功能
+    path("import/smt_report/", import_views.smt_report_import_page, name="smt_report_import_page"),
+    path("import/smt_report/file/", import_views.smt_report_import_file, name="smt_report_import_file"),
+    path("import/smt_report/template/", import_views.download_smt_import_template, name="download_smt_import_template"),
+    path("import/smt_report/field_guide/", import_views.get_smt_import_field_guide, name="get_smt_import_field_guide"),
+    path("import/smt_report/export/", import_views.smt_report_export, name="smt_report_export"),
+    
+
+
     path("process/create/<int:workorder_id>/", workorder_views.create_workorder_processes, name="create_workorder_processes"),
     path("process/logs/<int:process_id>/", workorder_views.process_logs, name="process_logs"),
     path("process/move/", workorder_views.move_process, name="move_process"),
@@ -152,7 +162,7 @@ urlpatterns = [
     path("api_get_operator_reports/", workorder_views.api_get_operator_reports, name="api_get_operator_reports"),
     path("api_get_smt_reports/", workorder_views.api_get_smt_reports, name="api_get_smt_reports"),
     path("export_operator_reports/", workorder_views.export_operator_reports, name="export_operator_reports"),
-    path("export_smt_reports/", workorder_views.export_smt_reports, name="export_smt_reports"),
+
     path("operator_supplement_batch_create/", workorder_views.operator_supplement_batch_create, name="operator_supplement_batch_create"),
     path("smt_supplement_batch_create/", workorder_views.smt_supplement_batch_create, name="smt_supplement_batch_create"),
     path("supervisor_index/", workorder_views.supervisor_index, name="supervisor_index"),

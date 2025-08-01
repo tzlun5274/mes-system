@@ -5158,78 +5158,7 @@ def export_operator_reports(request):
         messages.error(request, f'匯出失敗：{str(e)}')
         return redirect('workorder:operator_supplement_report_index')
 
-@login_required
-def export_smt_reports(request):
-    """匯出SMT報工記錄"""
-    try:
-        reports = SMTProductionReport.objects.all().order_by('-work_date')
-        
-        # 篩選條件
-        date_from = request.GET.get('date_from')
-        if date_from:
-            reports = reports.filter(work_date__gte=date_from)
-        
-        date_to = request.GET.get('date_to')
-        if date_to:
-            reports = reports.filter(work_date__lte=date_to)
-        
-        # 建立Excel檔案
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, Alignment
-        
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "SMT報工記錄"
-        
-        # 設定標題
-        headers = ['設備', '工單號', '產品編號', '良品數量', '不良品數量', '報工日期', '建立時間']
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col, value=header)
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
-        
-        # 填入資料
-        for row, report in enumerate(reports, 2):
-            ws.cell(row=row, column=1, value=report.equipment.name)
-            ws.cell(row=row, column=2, value=report.workorder.order_number)
-            ws.cell(row=row, column=3, value=report.product_id)
-            ws.cell(row=row, column=4, value=report.work_quantity)
-            ws.cell(row=row, column=5, value=report.defect_quantity)
-            ws.cell(row=row, column=6, value=report.work_date.strftime('%Y-%m-%d'))
-            ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
-        
-        # 調整欄寬
-        for column in ws.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = min(max_length + 2, 50)
-            ws.column_dimensions[column_letter].width = adjusted_width
-        
-        # 儲存檔案
-        from django.http import HttpResponse
-        from io import BytesIO
-        
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-        
-        response = HttpResponse(
-            output.read(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename="SMT報工記錄_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
-        
-        return response
-        
-    except Exception as e:
-        messages.error(request, f'匯出失敗：{str(e)}')
-        return redirect('workorder:smt_supplement_report_index')
+
 
 # ============================================================================
 # 審核功能視圖函數
@@ -5696,84 +5625,7 @@ def operator_supplement_export(request):
         messages.error(request, f'匯出失敗：{str(e)}')
         return redirect('workorder:operator_supplement_report_index')
 
-@login_required
-def smt_supplement_export(request):
-    """匯出SMT補登報工記錄"""
-    try:
-        reports = SMTProductionReport.objects.all().order_by('-work_date')
-        
-        # 篩選條件
-        date_from = request.GET.get('date_from')
-        if date_from:
-            reports = reports.filter(work_date__gte=date_from)
-        
-        date_to = request.GET.get('date_to')
-        if date_to:
-            reports = reports.filter(work_date__lte=date_to)
-        
-        equipment_id = request.GET.get('equipment_id')
-        if equipment_id:
-            reports = reports.filter(equipment_id=equipment_id)
-        
-        # 建立Excel檔案
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, Alignment
-        
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "SMT補登報工記錄"
-        
-        # 設定標題
-        headers = ['設備', '工單號', '產品編號', '良品數量', '不良品數量', '報工日期', '建立時間', '審核者', '審核時間']
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col, value=header)
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
-        
-        # 填入資料
-        for row, report in enumerate(reports, 2):
-            ws.cell(row=row, column=1, value=report.equipment.name)
-            ws.cell(row=row, column=2, value=report.workorder.order_number)
-            ws.cell(row=row, column=3, value=report.product_id)
-            ws.cell(row=row, column=4, value=report.work_quantity)
-            ws.cell(row=row, column=5, value=report.defect_quantity)
-            ws.cell(row=row, column=6, value=report.work_date.strftime('%Y-%m-%d'))
-            ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
-            ws.cell(row=row, column=8, value=report.approved_by or '')
-            ws.cell(row=row, column=9, value=report.approved_at.strftime('%Y-%m-%d %H:%M:%S') if report.approved_at else '')
-        
-        # 調整欄寬
-        for column in ws.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = min(max_length + 2, 50)
-            ws.column_dimensions[column_letter].width = adjusted_width
-        
-        # 儲存檔案
-        from django.http import HttpResponse
-        from io import BytesIO
-        
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-        
-        response = HttpResponse(
-            output.read(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename="SMT補登報工記錄_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
-        
-        return response
-        
-    except Exception as e:
-        messages.error(request, f'匯出失敗：{str(e)}')
-        return redirect('workorder:smt_supplement_report_index')
+
 
 # ============================================================================
 # 模板下載功能視圖函數
@@ -5842,67 +5694,7 @@ def operator_supplement_template(request):
         messages.error(request, f'模板下載失敗：{str(e)}')
         return redirect('workorder:operator_supplement_report_index')
 
-@login_required
-def smt_supplement_template(request):
-    """下載SMT補登報工模板"""
-    try:
-        # 建立Excel檔案
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, Alignment
-        
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "SMT補登報工模板"
-        
-        # 設定標題
-        headers = ['設備', '工單號', '產品編號', '良品數量', '不良品數量', '報工日期', '備註']
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col, value=header)
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
-        
-        # 添加範例資料
-        example_data = [
-            ['SMT-001', 'WO2024001', 'PROD001', 100, 2, '2024-01-15', '正常生產'],
-            ['SMT-002', 'WO2024002', 'PROD002', 50, 1, '2024-01-15', '品質檢查'],
-        ]
-        
-        for row, data in enumerate(example_data, 2):
-            for col, value in enumerate(data, 1):
-                ws.cell(row=row, column=col, value=value)
-        
-        # 調整欄寬
-        for column in ws.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = min(max_length + 2, 50)
-            ws.column_dimensions[column_letter].width = adjusted_width
-        
-        # 儲存檔案
-        from django.http import HttpResponse
-        from io import BytesIO
-        
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-        
-        response = HttpResponse(
-            output.read(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename="SMT補登報工模板_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
-        
-        return response
-        
-    except Exception as e:
-        messages.error(request, f'模板下載失敗：{str(e)}')
-        return redirect('workorder:smt_supplement_report_index')
+
 
 @require_POST
 @login_required

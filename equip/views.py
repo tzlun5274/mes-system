@@ -86,8 +86,8 @@ def add_equipment(request):
             messages.error(request, "請輸入設備名稱！")
             return render(request, "equip/add_equipment.html", {})
 
-        if Equipment.objects.filter(name=name).exists():
-            messages.error(request, f"設備名稱 '{name}' 已存在，請選擇其他名稱！")
+        if Equipment.objects.filter(name__iexact=name).exists():
+            messages.error(request, f"設備名稱 '{name}' 已存在（不區分大小寫），請選擇其他名稱！")
             return render(
                 request,
                 "equip/add_equipment.html",
@@ -218,8 +218,8 @@ def edit_equipment(request, equipment_id):
                 request, "equip/edit_equipment.html", {"equipment": equipment}
             )
 
-        if name != equipment.name and Equipment.objects.filter(name=name).exists():
-            messages.error(request, f"設備名稱 '{name}' 已存在，請選擇其他名稱！")
+        if name != equipment.name and Equipment.objects.filter(name__iexact=name).exists():
+            messages.error(request, f"設備名稱 '{name}' 已存在（不區分大小寫），請選擇其他名稱！")
             return render(
                 request, "equip/edit_equipment.html", {"equipment": equipment}
             )
