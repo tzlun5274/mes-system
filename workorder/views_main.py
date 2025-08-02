@@ -5807,8 +5807,9 @@ def dispatch_delete(request, pk):
 @login_required
 def active_workorders(request):
     """
-    生產中工單詳情視圖
-    顯示所有正在生產中的工單詳細資訊（基於生產中工單表）
+    生產執行監控視圖
+    顯示所有正在執行中的工單詳細資訊（基於生產中工單表）
+    功能：基於實際報工記錄監控生產執行狀況
     """
     from django.core.paginator import Paginator
     from django.db.models import Q
@@ -5862,15 +5863,16 @@ def active_workorders(request):
     total_pending = WorkOrder.objects.filter(status='pending').count()
     total_completed = WorkOrder.objects.filter(status='completed').count()
     
-    # 今日已核准報工統計
-    today_operator_count = OperatorSupplementReport.objects.filter(
-        work_date=today,
-        approval_status='approved'
-    ).count()
-    today_smt_count = SMTProductionReport.objects.filter(
-        work_date=today,
-        approval_status='approved'
-    ).count()
+    # 生產執行監控自己的資料表統計 - 顯示現有記錄數量
+    from workorder.models import WorkOrderProductionDetail
+    
+    # 統計生產中工單報工明細表中的現有記錄
+    production_operator_count = WorkOrderProductionDetail.objects.filter(
+        report_source='operator_supplement'
+    ).count()  # 作業員補登報工記錄
+    production_smt_count = WorkOrderProductionDetail.objects.filter(
+        report_source='smt'
+    ).count()  # SMT報工記錄
     
     # 分頁
     paginator = Paginator(active_workorders, 10)
@@ -5882,8 +5884,8 @@ def active_workorders(request):
         'total_active': total_active,
         'total_pending': total_pending,
         'total_completed': total_completed,
-        'today_operator_count': today_operator_count,
-        'today_smt_count': today_smt_count,
+        'today_operator_count': production_operator_count,
+        'today_smt_count': production_smt_count,
         'today': today,
     }
     

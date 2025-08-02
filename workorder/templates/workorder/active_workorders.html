@@ -157,12 +157,12 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0">
             <i class="fas fa-clipboard-list text-primary"></i>
-            生產中工單詳情
+            生產執行監控
         </h1>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb mb-0">
                 <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                <li class="breadcrumb-item active">生產中工單</li>
+                <li class="breadcrumb-item active">生產執行監控</li>
             </ol>
         </nav>
     </div>
@@ -172,7 +172,7 @@
         <div class="col-md-6">
             <div class="stats-card active">
                 <div class="stats-number">{{ total_active|default:0 }}</div>
-                <div class="stats-label">生產中工單</div>
+                <div class="stats-label">執行中工單</div>
                 <small>基於已核准報工</small>
             </div>
         </div>
@@ -190,12 +190,12 @@
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h6 class="mb-0">
-                        <i class="fas fa-user-clock"></i> 今日作業員報工
+                        <i class="fas fa-user-clock"></i> 作業員報工記錄
                     </h6>
                 </div>
                 <div class="card-body text-center">
                     <h3 class="text-primary">{{ today_operator_count|default:0 }}</h3>
-                    <small class="text-muted">筆已核准記錄</small>
+                    <small class="text-muted">現有記錄數</small>
                 </div>
             </div>
         </div>
@@ -203,12 +203,12 @@
             <div class="card">
                 <div class="card-header bg-success text-white">
                     <h6 class="mb-0">
-                        <i class="fas fa-cogs"></i> 今日SMT報工
+                        <i class="fas fa-cogs"></i> SMT報工記錄
                     </h6>
                 </div>
                 <div class="card-body text-center">
                     <h3 class="text-success">{{ today_smt_count|default:0 }}</h3>
-                    <small class="text-muted">筆已核准記錄</small>
+                    <small class="text-muted">現有記錄數</small>
                 </div>
             </div>
         </div>
@@ -219,7 +219,7 @@
         <div class="card">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">
-                    <i class="fas fa-clipboard-list"></i> 生產中工單列表
+                    <i class="fas fa-clipboard-list"></i> 執行中工單列表
                 </h5>
             </div>
             <div class="card-body p-0">

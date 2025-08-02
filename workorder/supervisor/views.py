@@ -858,17 +858,20 @@ def approved_reports_list(request):
     """
     已審核報工列表視圖 (Approved Reports List View)
     顯示所有已審核的報工記錄（包含作業員報工、SMT報工）
+    
+    重要：統計數字直接來自報工資料表，不依賴工單關聯
+    報工資料表有多少筆已審核記錄就顯示多少筆
     """
     from django.core.paginator import Paginator
     from django.db.models import Q
     from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
     
-    # 獲取已審核的作業員報工記錄
+    # 獲取已審核的作業員報工記錄（直接從報工資料表統計，不依賴工單關聯）
     approved_operator_reports = OperatorSupplementReport.objects.filter(
         approval_status='approved'
     ).select_related('operator', 'workorder', 'process').order_by('-approved_at')
     
-    # 獲取已審核的SMT報工記錄
+    # 獲取已審核的SMT報工記錄（直接從報工資料表統計，不依賴工單關聯）
     approved_smt_reports = SMTProductionReport.objects.filter(
         approval_status='approved'
     ).select_related('workorder').order_by('-approved_at')
@@ -878,11 +881,13 @@ def approved_reports_list(request):
     if search_query:
         approved_operator_reports = approved_operator_reports.filter(
             Q(workorder__order_number__icontains=search_query) |
+            Q(original_workorder_number__icontains=search_query) |
             Q(operator__name__icontains=search_query) |
             Q(process__name__icontains=search_query)
         )
         approved_smt_reports = approved_smt_reports.filter(
             Q(workorder__order_number__icontains=search_query) |
+            Q(original_workorder_number__icontains=search_query) |
             Q(operation__icontains=search_query)
         )
     
@@ -902,10 +907,17 @@ def approved_reports_list(request):
     all_approved_reports = []
     
     for report in approved_operator_reports:
+        # 取得工單號碼：優先使用 workorder，其次使用 original_workorder_number
+        workorder_number = '-'
+        if report.workorder:
+            workorder_number = report.workorder.order_number
+        elif report.original_workorder_number:
+            workorder_number = report.original_workorder_number
+        
         all_approved_reports.append({
             'id': report.id,
             'type': '作業員報工',
-            'workorder': report.workorder.order_number if report.workorder else '-',
+            'workorder': workorder_number,
             'operator': report.operator.name if report.operator else '-',
             'process': report.process.name if report.process else '-',
             'quantity': report.work_quantity or 0,
@@ -918,10 +930,17 @@ def approved_reports_list(request):
         })
     
     for report in approved_smt_reports:
+        # 取得工單號碼：優先使用 workorder，其次使用 original_workorder_number
+        workorder_number = '-'
+        if report.workorder:
+            workorder_number = report.workorder.order_number
+        elif report.original_workorder_number:
+            workorder_number = report.original_workorder_number
+        
         all_approved_reports.append({
             'id': report.id,
             'type': 'SMT報工',
-            'workorder': report.workorder.order_number if report.workorder else '-',
+            'workorder': workorder_number,
             'operator': 'SMT設備',
             'process': report.operation,
             'quantity': report.work_quantity or 0,
@@ -941,8 +960,9 @@ def approved_reports_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # 統計資訊
-    total_approved = len(all_approved_reports)
+    # 統計資訊 - 直接從報工資料表統計，不依賴工單關聯
+    # 這樣確保報工資料表有多少筆已審核記錄就顯示多少筆
+    total_approved = approved_operator_reports.count() + approved_smt_reports.count()
     operator_count = approved_operator_reports.count()
     smt_count = approved_smt_reports.count()
     

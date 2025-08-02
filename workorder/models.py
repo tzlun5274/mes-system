@@ -47,6 +47,7 @@ class WorkOrder(models.Model):
     )
     created_at = models.DateTimeField(default=timezone.now, verbose_name="建立時間")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name="完工時間")
 
     objects = models.Manager()  # 明確宣告 objects manager，解決 linter 錯誤
 
