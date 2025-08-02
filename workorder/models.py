@@ -104,14 +104,21 @@ class WorkOrder(models.Model):
 
     @property
     def completed_quantity(self):
-        """計算工單總完成數量"""
-        return sum(process.completed_quantity for process in self.processes.all())
+        """計算工單完成數量（所有工序完成數量的平均值）"""
+        processes = self.processes.all()
+        if processes.count() > 0:
+            total_completed = sum(process.completed_quantity for process in processes)
+            return round(total_completed / processes.count())
+        return 0
 
     @property
     def progress(self):
         """計算工單進度百分比"""
-        if self.quantity > 0:
-            return round((self.completed_quantity / self.quantity) * 100, 1)
+        # 計算已完成工序的百分比
+        total_processes = self.processes.count()
+        if total_processes > 0:
+            completed_processes = self.processes.filter(status='completed').count()
+            return round((completed_processes / total_processes) * 100, 1)
         return 0.0
 
     @property

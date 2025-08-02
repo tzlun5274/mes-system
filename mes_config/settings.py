@@ -55,12 +55,13 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",  # 重新啟用 session
+    "mes_config.middleware.RobustSessionMiddleware",  # 使用增強版的 Session 中間件
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",  # 重新啟用認證
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "mes_config.middleware.DatabaseConnectionMiddleware",  # 資料庫連線檢查中間件
 ]
 
 # CORS 配置（可選，如果前端或模組跨域訪問 API）
@@ -165,6 +166,18 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_AGE = 30 * 60  # 30 分鐘 * 60 秒
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # 瀏覽器關閉時不立即過期
 SESSION_SAVE_EVERY_REQUEST = True  # 每次請求都更新會話
+
+# Session 安全設定
+SESSION_COOKIE_SECURE = False  # 開發環境設為 False，生產環境應設為 True
+SESSION_COOKIE_HTTPONLY = True  # 防止 XSS 攻擊
+SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF 保護
+
+# Session 資料庫連線設定
+SESSION_COOKIE_DOMAIN = None
+SESSION_COOKIE_PATH = '/'
+
+# 改善 session 處理的設定
+SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 
 # 文件上傳設置
 DATA_UPLOAD_MAX_MEMORY_SIZE = None

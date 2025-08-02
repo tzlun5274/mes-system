@@ -18,6 +18,7 @@ from .views.completed_workorder_views import (
     CompletedWorkOrderListView, CompletedWorkOrderDetailView,
     transfer_workorder_to_completed, batch_transfer_completed_workorders
 )
+from .views import api_views
 
 app_name = "workorder"
 
@@ -43,6 +44,11 @@ urlpatterns = [
     
     # API 路由
     path("api/company_order_info/", get_company_order_info, name="get_company_order_info"),
+    
+    # 工序 API 路由
+    path("api/process/<int:process_id>/", api_views.get_process_detail, name="get_process_detail"),
+    path("api/process/<int:process_id>/edit/", api_views.edit_process, name="edit_process"),
+    path("api/process/<int:process_id>/delete/", api_views.delete_process, name="delete_process"),
     
     # 報工管理首頁 - 使用新的類別視圖
     path("report/", ReportIndexView.as_view(), name="report_index"),

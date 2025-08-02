@@ -61,6 +61,15 @@ class SMTProductionReport(models.Model):
         help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊",
     )
 
+    # 舊資料匯入專用欄位
+    original_workorder_number = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="原始工單號碼",
+        help_text="用於儲存舊資料匯入時的工單號碼，當工單不存在於系統中時使用",
+    )
+
     planned_quantity = models.IntegerField(
         verbose_name="工單預設生產數量",
         help_text="此為工單規劃的總生產數量，不可修改",
@@ -227,6 +236,9 @@ class SMTProductionReport(models.Model):
             return self.rd_workorder_number or "RD樣品"
         elif self.workorder:
             return self.workorder.order_number
+        elif self.original_workorder_number:
+            # 舊資料匯入的工單號碼
+            return self.original_workorder_number
         elif self.product_id:
             # 如果有產品編號但沒有工單，可能是手動輸入的產品編號
             return f"產品編號：{self.product_id}"
@@ -450,6 +462,15 @@ class OperatorSupplementReport(models.Model):
         null=True,
         verbose_name="RD產品編號",
         help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊",
+    )
+
+    # 舊資料匯入專用欄位
+    original_workorder_number = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="原始工單號碼",
+        help_text="用於儲存舊資料匯入時的工單號碼，當工單不存在於系統中時使用",
     )
 
     # 產品編號欄位（用於資料庫相容性）
@@ -745,6 +766,9 @@ class OperatorSupplementReport(models.Model):
             return self.rd_workorder_number or "RD樣品"
         elif self.workorder:
             return self.workorder.order_number
+        elif self.original_workorder_number:
+            # 舊資料匯入的工單號碼
+            return self.original_workorder_number
         elif self.product_id:
             # 如果有產品編號但沒有工單，可能是手動輸入的產品編號
             return f"產品編號：{self.product_id}"

@@ -126,13 +126,26 @@ def operator_report_import_file(request):
                     continue
                 
                 # 2. 驗證並取得公司代號
-                company_code = str(row['公司代號']).strip()
+                company_code_raw = row['公司代號']
+                if pd.isna(company_code_raw):
+                    errors.append(f'第 {index+1} 行：公司代號為空')
+                    error_count += 1
+                    continue
+                
+                # 處理 pandas 自動轉換的數字格式
+                if isinstance(company_code_raw, (int, float)):
+                    # 如果是數字，轉換為整數後再轉字串
+                    company_code = str(int(company_code_raw))
+                else:
+                    # 如果是字串，直接使用
+                    company_code = str(company_code_raw).strip()
+                
                 if not company_code:
                     errors.append(f'第 {index+1} 行：公司代號為空')
                     error_count += 1
                     continue
                 
-                # 確保公司代號是字串格式（處理 pandas 自動轉換數字的情況）
+                # 確保公司代號是兩位數格式
                 if company_code.isdigit():
                     company_code = company_code.zfill(2)  # 確保是兩位數格式
                 
@@ -209,21 +222,19 @@ def operator_report_import_file(request):
                     error_count += 1
                     continue
                 
-                # 6. 驗證並取得工單
+                # 6. 驗證工單號碼格式（不檢查是否存在，因為是匯入舊資料）
                 workorder_number = str(row['工單號']).strip()
                 if not workorder_number:
                     errors.append(f'第 {index+1} 行：工單號為空')
                     error_count += 1
                     continue
                 
+                # 對於舊資料匯入，不檢查工單是否存在，直接使用工單號碼
+                # 如果工單不存在，將使用工單號碼作為字串儲存
                 workorder = WorkOrder.objects.filter(
                     company_code=company_code,
                     order_number=workorder_number
                 ).first()
-                if not workorder:
-                    errors.append(f'第 {index+1} 行：找不到工單 "{workorder_number}" (公司代號: {company_code})')
-                    error_count += 1
-                    continue
                 
                 # 7. 驗證產品編號
                 product_code = str(row['產品編號']).strip()
@@ -307,20 +318,29 @@ def operator_report_import_file(request):
                     continue
                 
                 # 15. 建立報工記錄
-                report = OperatorSupplementReport.objects.create(
-                    operator=operator,
-                    workorder=workorder,
-                    process=process,
-                    equipment=equipment,
-                    work_date=work_date,
-                    start_time=start_time,
-                    end_time=end_time,
-                    work_quantity=work_quantity,
-                    defect_quantity=defect_quantity,
-                    remarks=remarks,
-                    abnormal_notes=abnormal_notes,
-                    created_by=request.user.username
-                )
+                # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
+                report_data = {
+                    'operator': operator,
+                    'process': process,
+                    'equipment': equipment,
+                    'work_date': work_date,
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'work_quantity': work_quantity,
+                    'defect_quantity': defect_quantity,
+                    'remarks': remarks,
+                    'abnormal_notes': abnormal_notes,
+                    'created_by': request.user.username
+                }
+                
+                if workorder:
+                    # 如果工單存在，使用正常的 workorder 欄位
+                    report_data['workorder'] = workorder
+                else:
+                    # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
+                    report_data['original_workorder_number'] = workorder_number
+                
+                report = OperatorSupplementReport.objects.create(**report_data)
                 
                 # 16. 自動計算工時
                 report.calculate_work_hours()
@@ -674,13 +694,26 @@ def smt_report_import_file(request):
                     continue
                 
                 # 2. 驗證並取得公司代號
-                company_code = str(row['公司代號']).strip()
+                company_code_raw = row['公司代號']
+                if pd.isna(company_code_raw):
+                    errors.append(f'第 {index+1} 行：公司代號為空')
+                    error_count += 1
+                    continue
+                
+                # 處理 pandas 自動轉換的數字格式
+                if isinstance(company_code_raw, (int, float)):
+                    # 如果是數字，轉換為整數後再轉字串
+                    company_code = str(int(company_code_raw))
+                else:
+                    # 如果是字串，直接使用
+                    company_code = str(company_code_raw).strip()
+                
                 if not company_code:
                     errors.append(f'第 {index+1} 行：公司代號為空')
                     error_count += 1
                     continue
                 
-                # 確保公司代號是字串格式（處理 pandas 自動轉換數字的情況）
+                # 確保公司代號是兩位數格式
                 if company_code.isdigit():
                     company_code = company_code.zfill(2)  # 確保是兩位數格式
                 
@@ -757,21 +790,19 @@ def smt_report_import_file(request):
                     error_count += 1
                     continue
                 
-                # 6. 驗證並取得工單
+                # 6. 驗證工單號碼格式（不檢查是否存在，因為是匯入舊資料）
                 workorder_number = str(row['工單號']).strip()
                 if not workorder_number:
                     errors.append(f'第 {index+1} 行：工單號為空')
                     error_count += 1
                     continue
                 
+                # 對於舊資料匯入，不檢查工單是否存在，直接使用工單號碼
+                # 如果工單不存在，將使用工單號碼作為字串儲存
                 workorder = WorkOrder.objects.filter(
                     company_code=company_code,
                     order_number=workorder_number
                 ).first()
-                if not workorder:
-                    errors.append(f'第 {index+1} 行：找不到工單 "{workorder_number}" (公司代號: {company_code})')
-                    error_count += 1
-                    continue
                 
                 # 7. 驗證產品編號
                 product_code = str(row['產品編號']).strip()
@@ -841,20 +872,29 @@ def smt_report_import_file(request):
                     continue
                 
                 # 14. 建立SMT報工記錄
-                report = SMTProductionReport.objects.create(
-                    equipment=equipment,
-                    workorder=workorder,
-                    product_id=product_code,
-                    operation=process_name,
-                    work_date=work_date,
-                    start_time=start_time,
-                    end_time=end_time,
-                    work_quantity=work_quantity,
-                    defect_quantity=defect_quantity,
-                    remarks=remarks,
-                    abnormal_notes=abnormal_notes,
-                    created_by=request.user.username
-                )
+                # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
+                report_data = {
+                    'equipment': equipment,
+                    'product_id': product_code,
+                    'operation': process_name,
+                    'work_date': work_date,
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'work_quantity': work_quantity,
+                    'defect_quantity': defect_quantity,
+                    'remarks': remarks,
+                    'abnormal_notes': abnormal_notes,
+                    'created_by': request.user.username
+                }
+                
+                if workorder:
+                    # 如果工單存在，使用正常的 workorder 欄位
+                    report_data['workorder'] = workorder
+                else:
+                    # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
+                    report_data['original_workorder_number'] = workorder_number
+                
+                report = SMTProductionReport.objects.create(**report_data)
                 
                 # 15. 自動計算工時
                 report.calculate_work_hours()

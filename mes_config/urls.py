@@ -20,4 +20,5 @@ urlpatterns = [
     path("rosetta/", include("rosetta.urls")),
     path("workorder/", include("workorder.urls", namespace="workorder")),
     path("reporting/", include("reporting.urls", namespace="reporting")),
+    path("database-error/", views.database_error, name="database_error"),
 ]

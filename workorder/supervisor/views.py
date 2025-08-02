@@ -957,3 +957,117 @@ def approved_reports_list(request):
     }
     
     return render(request, 'supervisor/approved_reports_list.html', context) 
+
+
+@login_required
+def revert_approved_report(request, report_id):
+    """
+    將已核准的報工記錄轉回待核准狀態
+    """
+    if request.method == 'POST':
+        try:
+            # 嘗試獲取作業員報工記錄
+            report = get_object_or_404(OperatorSupplementReport, id=report_id)
+            report_type = 'operator'
+        except:
+            # 如果找不到作業員報工記錄，嘗試獲取SMT報工記錄
+            try:
+                from workorder.workorder_reporting.models import SMTProductionReport
+                report = get_object_or_404(SMTProductionReport, id=report_id)
+                report_type = 'smt'
+            except:
+                messages.error(request, '找不到指定的報工記錄')
+                return redirect('workorder:supervisor:pending_approval_list')
+        
+        # 檢查權限
+        if not request.user.is_superuser and not request.user.groups.filter(name='主管').exists():
+            messages.error(request, '您沒有權限執行此操作')
+            return redirect('workorder:supervisor:pending_approval_list')
+        
+        # 檢查報工狀態
+        if report.approval_status != 'approved':
+            messages.error(request, '只有已核准的報工記錄才能轉回待核准狀態')
+            return redirect('workorder:supervisor:pending_approval_list')
+        
+        # 執行狀態轉換
+        report.approval_status = 'pending'
+        report.approved_by = None
+        report.approved_at = None
+        report.approval_remarks = ''
+        report.save()
+        
+        # 記錄操作日誌
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f'用戶 {request.user.username} 將報工記錄 {report_id} 從已核准轉回待核准狀態')
+        
+        messages.success(request, f'報工記錄 {report.id} 已成功轉回待核准狀態')
+        return redirect('workorder:supervisor:pending_approval_list')
+    
+    return redirect('workorder:supervisor:pending_approval_list') 
+
+
+@login_required
+def batch_revert_all_approved_reports(request):
+    """
+    批量將所有已核准的報工記錄轉回待核准狀態
+    """
+    if request.method == 'POST':
+        # 檢查權限
+        if not request.user.is_superuser and not request.user.groups.filter(name='主管').exists():
+            messages.error(request, '您沒有權限執行此操作')
+            return redirect('workorder:supervisor:approved_reports_list')
+        
+        try:
+            # 獲取所有已核准的作業員報工記錄
+            approved_operator_reports = OperatorSupplementReport.objects.filter(
+                approval_status='approved'
+            )
+            
+            # 獲取所有已核准的SMT報工記錄
+            from workorder.workorder_reporting.models import SMTProductionReport
+            approved_smt_reports = SMTProductionReport.objects.filter(
+                approval_status='approved'
+            )
+            
+            # 統計數量
+            operator_count = approved_operator_reports.count()
+            smt_count = approved_smt_reports.count()
+            total_count = operator_count + smt_count
+            
+            if total_count == 0:
+                messages.warning(request, '目前沒有已核准的報工記錄需要轉回待核准狀態')
+                return redirect('workorder:supervisor:approved_reports_list')
+            
+            # 批量更新作業員報工記錄
+            operator_updated = approved_operator_reports.update(
+                approval_status='pending',
+                approved_by=None,
+                approved_at=None,
+                approval_remarks=''
+            )
+            
+            # 批量更新SMT報工記錄
+            smt_updated = approved_smt_reports.update(
+                approval_status='pending',
+                approved_by=None,
+                approved_at=None,
+                approval_remarks=''
+            )
+            
+            # 記錄操作日誌
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f'用戶 {request.user.username} 批量將 {total_count} 筆已核准報工記錄轉回待核准狀態 (作業員: {operator_updated}, SMT: {smt_updated})')
+            
+            messages.success(request, f'成功將 {total_count} 筆已核准報工記錄轉回待核准狀態\n• 作業員報工: {operator_updated} 筆\n• SMT報工: {smt_updated} 筆')
+            
+        except Exception as e:
+            messages.error(request, f'批量轉換失敗: {str(e)}')
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f'批量轉換已核准報工記錄失敗: {str(e)}')
+        
+        return redirect('workorder:supervisor:approved_reports_list')
+    
+    return redirect('workorder:supervisor:approved_reports_list') 

@@ -110,8 +110,13 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <p><strong>作業員:</strong> {{ report.operator.name|default:report.operator_name|default:"-" }}</p>
-                            <p><strong>工序:</strong> {{ report.process.name|default:report.process_name|default:"-" }}</p>
+                            {% if report_type == 'SMT報工' %}
+                                <p><strong>設備:</strong> {{ report.equipment.name|default:"-" }}</p>
+                                <p><strong>工序:</strong> {{ report.operation|default:"-" }}</p>
+                            {% else %}
+                                <p><strong>作業員:</strong> {{ report.operator.name|default:"-" }}</p>
+                                <p><strong>工序:</strong> {{ report.process.name|default:"-" }}</p>
+                            {% endif %}
                             <p><strong>工單號:</strong> 
                                 {% if report.workorder %}
                                 <a href="{% url 'workorder:detail' report.workorder.id %}" target="_blank">
@@ -123,9 +128,14 @@
                             </p>
                         </div>
                         <div class="col-md-6">
-                            <p><strong>工序代號:</strong> {{ report.process.code|default:"-" }}</p>
-                            <p><strong>產品編號:</strong> {{ report.product_id|default:"-" }}</p>
-                            <p><strong>工序描述:</strong> {{ report.process.description|default:"-" }}</p>
+                            {% if report_type == 'SMT報工' %}
+                                <p><strong>產品編號:</strong> {{ report.product_id|default:"-" }}</p>
+                                <p><strong>報工類型:</strong> {{ report.get_report_type_display|default:"-" }}</p>
+                            {% else %}
+                                <p><strong>工序代號:</strong> {{ report.process.code|default:"-" }}</p>
+                                <p><strong>產品編號:</strong> {{ report.product_id|default:"-" }}</p>
+                                <p><strong>工序描述:</strong> {{ report.process.description|default:"-" }}</p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -175,7 +185,11 @@
                         </div>
                         <div class="col-md-6">
                             <p><strong>總數量:</strong> <span class="badge bg-primary fs-6">{{ report.total_quantity }}</span></p>
-                            <p><strong>良率:</strong> <span class="badge bg-info fs-6">{{ report.yield_rate|floatformat:1 }}%</span></p>
+                            {% if report_type == 'SMT報工' %}
+                                <p><strong>效率:</strong> <span class="badge bg-info fs-6">{{ report.efficiency_rate|floatformat:1 }}%</span></p>
+                            {% else %}
+                                <p><strong>良率:</strong> <span class="badge bg-info fs-6">{{ report.yield_rate|floatformat:1 }}%</span></p>
+                            {% endif %}
                             <p><strong>是否完工:</strong> 
                                 {% if report.is_completed %}
                                 <span class="badge bg-success fs-6">已完工</span>

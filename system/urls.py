@@ -57,6 +57,4 @@ urlpatterns = [
         name="download_log_file",
     ),
     path("environment/clean_logs/", views.clean_logs, name="clean_logs"),
-    
-
 ]

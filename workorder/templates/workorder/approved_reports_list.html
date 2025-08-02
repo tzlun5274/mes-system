@@ -4,6 +4,7 @@
 {% block title %}已核准報工列表{% endblock %}
 
 {% block extra_head %}
+{% csrf_token %}
 <style>
     .approved-reports-container {
         padding: 20px;
@@ -140,6 +141,9 @@
                             <i class="fas fa-list"></i> 已核准報工記錄
                         </h5>
                         <div>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="batchRevertAllApproved()">
+                                <i class="fas fa-undo-alt"></i> 批量轉回所有已核准
+                            </button>
                             <a href="{% url 'workorder:supervisor:pending_approval_list' %}" class="btn btn-warning btn-sm">
                                 <i class="fas fa-clock"></i> 待審核清單
                             </a>
@@ -203,6 +207,11 @@
                                                    onclick="viewDetail('{{ report.report_type }}', {{ report.id }})">
                                                     <i class="fas fa-eye"></i> 詳情
                                                 </a>
+                                                <button type="button" class="btn btn-sm btn-warning" 
+                                                        onclick="revertToPending({{ report.id }}, '{{ report.report_type }}')"
+                                                        title="將此報工記錄轉回待核准狀態">
+                                                    <i class="fas fa-undo"></i> 轉回待核准
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -238,6 +247,50 @@ function viewDetail(reportType, reportId) {
     } else {
         alert('不支援的報工類型');
     }
+}
+
+function revertToPending(reportId, reportType) {
+    // 確認對話框
+    if (!confirm('確定要將此報工記錄轉回待核准狀態嗎？\n\n此操作將：\n• 清除核准人員和核准時間\n• 將狀態改為待核准\n• 允許重新審核')) {
+        return;
+    }
+    
+    // 建立表單並提交
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/workorder/supervisor/revert_approved_report/${reportId}/`;
+    
+    // 添加CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrfToken;
+    form.appendChild(csrfInput);
+    
+    // 提交表單
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function batchRevertAllApproved() {
+    if (!confirm('確定要將所有已核准的報工記錄轉回待核准狀態嗎？\n\n此操作將：\n• 清除所有核准人員和核准時間\n• 將所有狀態改為待核准\n• 允許重新審核')) {
+        return;
+    }
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/workorder/supervisor/batch_revert_all_approved_reports/`;
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrfToken;
+    form.appendChild(csrfInput);
+
+    document.body.appendChild(form);
+    form.submit();
 }
 
 document.addEventListener('DOMContentLoaded', function() {

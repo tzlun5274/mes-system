@@ -11,6 +11,7 @@
         .container { min-height: 80vh; display: flex; justify-content: center; align-items: center; }
         .card { max-width: 400px; width: 100%; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); }
         .card-header { background: #333; color: #ffffff; }
+        .alert { margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -20,6 +21,26 @@
                 <h3 class="mb-0">MES 系統登入</h3>
             </div>
             <div class="card-body">
+                <!-- 資料庫還原成功訊息 -->
+                {% if request.GET.restore_success %}
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <strong>資料庫還原成功！</strong><br>
+                    備份檔案：{{ request.GET.restore_success }}<br>
+                    請重新登入系統。
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+                
+                <!-- 資料庫還原錯誤訊息 -->
+                {% if request.GET.restore_error %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <strong>資料庫還原失敗！</strong><br>
+                    錯誤訊息：{{ request.GET.restore_error }}<br>
+                    請檢查備份檔案或聯繫系統管理員。
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+                
                 <form method="post">
                     {% csrf_token %}
                     <div class="form-group">

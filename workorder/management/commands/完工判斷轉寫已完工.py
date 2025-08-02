@@ -106,8 +106,12 @@ class Command(BaseCommand):
         Args:
             dry_run: 是否為乾跑模式
         """
-        # 獲取所有工單（不限制狀態）
-        all_workorders = WorkOrder.objects.all().select_related('production_record')
+        # 獲取生產中工單明細資料表裡面的所有唯一工單
+        from django.db.models import Q
+        production_workorders = WorkOrderProductionDetail.objects.values_list(
+            'workorder_production__workorder', flat=True
+        ).distinct()
+        all_workorders = WorkOrder.objects.filter(id__in=production_workorders)
         
         self.stdout.write(f'找到 {all_workorders.count()} 個工單')
         

@@ -4582,11 +4582,15 @@ def operator_supplement_report_approve(request, report_id):
         if report.can_approve(request.user):
             report.approve(request.user, request.POST.get('remarks', ''))
             
-            # 核准成功後，同步到生產中工單詳情資料表
+            # 核准成功後，同步到生產中工單詳情資料表並更新工序完成數量
             try:
                 from workorder.services import ProductionReportSyncService
+                from workorder.services.process_update_service import ProcessUpdateService
                 if hasattr(report, 'workorder') and report.workorder:
+                    # 同步到生產詳情資料表
                     ProductionReportSyncService.sync_specific_workorder(report.workorder.id)
+                    # 更新工序完成數量
+                    ProcessUpdateService.update_workorder_processes(report.workorder.id)
             except Exception as sync_error:
                 # 同步失敗不影響核准流程，只記錄錯誤
                 import logging
@@ -4658,6 +4662,22 @@ def smt_supplement_report_approve(request, report_id):
         report.approved_by = request.user.username
         report.approved_at = timezone.now()
         report.save()
+        
+        # 核准成功後，同步到生產中工單詳情資料表並更新工序完成數量
+        try:
+            from workorder.services import ProductionReportSyncService
+            from workorder.services.process_update_service import ProcessUpdateService
+            if hasattr(report, 'workorder') and report.workorder:
+                # 同步到生產詳情資料表
+                ProductionReportSyncService.sync_specific_workorder(report.workorder.id)
+                # 更新工序完成數量
+                ProcessUpdateService.update_workorder_processes(report.workorder.id)
+        except Exception as sync_error:
+            # 同步失敗不影響核准流程，只記錄錯誤
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"同步SMT報工記錄到生產詳情失敗: {str(sync_error)}")
+        
         messages.success(request, 'SMT報工記錄審核通過！')
     except SMTProductionReport.DoesNotExist:
         messages.error(request, '找不到指定的SMT報工記錄！')
@@ -4782,9 +4802,21 @@ def operator_supplement_import_file(request):
             try:
                 # 新格式處理
                 operator_name = str(row['作業員名稱']).strip()
-                company_code = str(row['公司代號']).strip()
                 
-                # 確保公司代號是字串格式（處理 pandas 自動轉換數字的情況）
+                # 處理公司代號 - 修正 pandas 自動轉換的數字格式
+                company_code_raw = row['公司代號']
+                if pd.isna(company_code_raw):
+                    raise ValueError('公司代號為空')
+                
+                # 處理 pandas 自動轉換的數字格式
+                if isinstance(company_code_raw, (int, float)):
+                    # 如果是數字，轉換為整數後再轉字串
+                    company_code = str(int(company_code_raw))
+                else:
+                    # 如果是字串，直接使用
+                    company_code = str(company_code_raw).strip()
+                
+                # 確保公司代號是兩位數格式
                 if company_code.isdigit():
                     company_code = company_code.zfill(2)  # 確保是兩位數格式
                 
@@ -4866,11 +4898,8 @@ def operator_supplement_import_file(request):
                     error_count += 1
                     continue
                 
-                # 驗證工單
-                if not workorder:
-                    errors.append(f'第 {index+1} 行：找不到工單 "{workorder_number}" (公司代號: {company_code})')
-                    error_count += 1
-                    continue
+                # 對於舊資料匯入，不檢查工單是否存在，直接使用工單號碼
+                # 如果工單不存在，將使用工單號碼作為字串儲存
                 
                 # 驗證工序
                 process = ProcessName.objects.filter(name=process_name).first()
@@ -4880,19 +4909,28 @@ def operator_supplement_import_file(request):
                     continue
                 
                 # 建立報工記錄
-                report = OperatorSupplementReport.objects.create(
-                    operator=operator,
-                    workorder=workorder,
-                    process=process,
-                    work_date=work_date,
-                    start_time=start_time,
-                    end_time=end_time,
-                    work_quantity=work_quantity,
-                    defect_quantity=defect_quantity,
-                    remarks=remarks,
-                    abnormal_notes=abnormal_notes,
-                    created_by=request.user.username
-                )
+                # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
+                report_data = {
+                    'operator': operator,
+                    'process': process,
+                    'work_date': work_date,
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'work_quantity': work_quantity,
+                    'defect_quantity': defect_quantity,
+                    'remarks': remarks,
+                    'abnormal_notes': abnormal_notes,
+                    'created_by': request.user.username
+                }
+                
+                if workorder:
+                    # 如果工單存在，使用正常的 workorder 欄位
+                    report_data['workorder'] = workorder
+                else:
+                    # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
+                    report_data['original_workorder_number'] = workorder_number
+                
+                report = OperatorSupplementReport.objects.create(**report_data)
                 
                 # 自動計算工時
                 report.calculate_work_hours()
@@ -4992,8 +5030,8 @@ def operator_supplement_export(request):
         ws = wb.active
         ws.title = "作業員補登報工記錄"
         
-        # 設定標題
-        headers = ['作業員', '工單號', '工序', '數量', '報工日期', '審核狀態', '建立時間', '審核者', '審核時間']
+        # 設定標題 - 與匯入格式保持一致
+        headers = ['作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', '工單號', '產品編號', '工序名稱', '設備名稱', '報工數量', '不良品數量', '備註', '異常紀錄', '審核狀態', '審核者', '審核時間']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True)
@@ -5001,15 +5039,61 @@ def operator_supplement_export(request):
         
         # 填入資料
         for row, report in enumerate(reports, 2):
+            # 作業員名稱
             ws.cell(row=row, column=1, value=report.operator.name if report.operator else '')
-            ws.cell(row=row, column=2, value=report.workorder.order_number if report.workorder else report.rd_workorder_number or '')
-            ws.cell(row=row, column=3, value=report.process.name if report.process else '')
-            ws.cell(row=row, column=4, value=report.work_quantity or 0)
-            ws.cell(row=row, column=5, value=report.work_date.strftime('%Y-%m-%d'))
-            ws.cell(row=row, column=6, value=report.get_approval_status_display())
-            ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
-            ws.cell(row=row, column=8, value=report.approved_by or '')
-            ws.cell(row=row, column=9, value=report.approved_at.strftime('%Y-%m-%d %H:%M:%S') if report.approved_at else '')
+            
+            # 公司代號 - 從工單取得
+            company_code = ''
+            if report.workorder and hasattr(report.workorder, 'company_code'):
+                company_code = report.workorder.company_code
+            elif report.workorder and hasattr(report.workorder, 'order_number'):
+                # 從工單號碼推斷公司代號（假設前兩位是公司代號）
+                order_number = report.workorder.order_number
+                if order_number and len(order_number) >= 2:
+                    company_code = order_number[:2]
+            ws.cell(row=row, column=2, value=company_code)
+            
+            # 報工日期
+            ws.cell(row=row, column=3, value=report.work_date.strftime('%Y-%m-%d'))
+            
+            # 開始時間
+            ws.cell(row=row, column=4, value=report.start_time.strftime('%H:%M') if report.start_time else '')
+            
+            # 結束時間
+            ws.cell(row=row, column=5, value=report.end_time.strftime('%H:%M') if report.end_time else '')
+            
+            # 工單號
+            ws.cell(row=row, column=6, value=report.workorder.order_number if report.workorder else report.rd_workorder_number or '')
+            
+            # 產品編號
+            ws.cell(row=row, column=7, value=report.product_id or '')
+            
+            # 工序名稱
+            ws.cell(row=row, column=8, value=report.process.name if report.process else '')
+            
+            # 設備名稱
+            ws.cell(row=row, column=9, value=report.equipment.name if report.equipment else '')
+            
+            # 報工數量
+            ws.cell(row=row, column=10, value=report.work_quantity or 0)
+            
+            # 不良品數量
+            ws.cell(row=row, column=11, value=report.defect_quantity or 0)
+            
+            # 備註
+            ws.cell(row=row, column=12, value=report.remarks or '')
+            
+            # 異常紀錄
+            ws.cell(row=row, column=13, value=report.abnormal_notes or '')
+            
+            # 審核狀態
+            ws.cell(row=row, column=14, value=report.get_approval_status_display())
+            
+            # 審核者
+            ws.cell(row=row, column=15, value=report.approved_by or '')
+            
+            # 審核時間
+            ws.cell(row=row, column=16, value=report.approved_at.strftime('%Y-%m-%d %H:%M:%S') if report.approved_at else '')
         
         # 調整欄寬
         for column in ws.columns:

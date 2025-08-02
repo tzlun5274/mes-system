@@ -166,3 +166,13 @@ class CustomPasswordResetView(View):
                 return render(request, self.template_name, {"form": form})
         logger.info("表單無效，返回密碼重置頁面")
         return render(request, self.template_name, {"form": form})
+
+# 資料庫錯誤頁面視圖
+def database_error(request):
+    """
+    顯示資料庫連線錯誤頁面
+    """
+    logger.error("顯示資料庫連線錯誤頁面")
+    return render(request, "system/database_error.html", {
+        "title": "資料庫連線錯誤"
+    })

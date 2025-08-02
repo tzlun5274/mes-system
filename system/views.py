@@ -695,6 +695,13 @@ def restore_database(request):
                 return redirect("system:restore_database")
         
         try:
+            # 在開始資料庫還原前，先清除當前 session
+            logger.info("清除當前 session...")
+            try:
+                request.session.flush()
+            except Exception as session_error:
+                logger.warning(f"清除 session 時出現警告: {str(session_error)}")
+            
             database_url = os.environ.get("DATABASE_URL")
             if not database_url:
                 raise ValueError("環境變數 DATABASE_URL 未設置")
@@ -805,18 +812,29 @@ def restore_database(request):
             del os.environ["PGPASSWORD"]
             backup_name = os.path.basename(upload_path)
             logger.info(f"資料庫恢復成功: {backup_name}")
-            messages.success(request, f"資料庫恢復成功：{backup_name}")
             
-        except Exception as e:
-            logger.error(f"資料庫恢復失敗: {str(e)}")
-            messages.error(request, f"資料庫恢復失敗：{str(e)}")
             # 清理上傳的檔案
             if 'upload_path' in locals() and sql_file:
                 try:
                     os.remove(upload_path)
                 except:
                     pass
-        return redirect("system:backup")
+            
+            # 重定向到登入頁面並顯示成功訊息
+            return redirect(f"/accounts/login/?restore_success={backup_name}")
+            
+        except Exception as e:
+            logger.error(f"資料庫恢復失敗: {str(e)}")
+            
+            # 清理上傳的檔案
+            if 'upload_path' in locals() and sql_file:
+                try:
+                    os.remove(upload_path)
+                except:
+                    pass
+            
+            # 重定向到登入頁面並顯示錯誤訊息
+            return redirect(f"/accounts/login/?restore_error={str(e)}")
     
     return render(request, "system/restore.html", {
         "title": "恢復資料庫",
