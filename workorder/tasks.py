@@ -1,5 +1,5 @@
 # 工單管理模組的 Celery 任務檔案
-# 功能：自動同步各公司製令單、自動轉換工單
+# 功能：自動同步各公司製令單、自動轉換工單、自動檢查工單完工
 # 作者：MES 系統
 # 建立時間：2024年
 
@@ -8,6 +8,8 @@ from django.utils import timezone
 from django.core.management import call_command
 from django.db import transaction
 from .models import WorkOrder, CompanyOrder, SystemConfig, WorkOrderProcess
+# 完工判斷服務已移除，避免資料汙染
+# from .services.completion_service import WorkOrderCompletionService
 from erp_integration.models import CompanyConfig
 from process.models import ProductProcessRoute, ProductProcessStandardCapacity
 import logging
@@ -15,6 +17,16 @@ import psycopg2
 
 # 設定工單管理模組的日誌記錄器
 workorder_logger = logging.getLogger("workorder")
+
+
+# 完工判斷任務已移除，避免資料汙染
+# @shared_task
+# def auto_check_workorder_completion():
+#     """
+#     自動檢查工單完工狀態
+#     定期檢查所有生產中工單是否達到完工條件
+#     """
+#     此任務已移除
 
 
 @shared_task
@@ -189,6 +201,16 @@ def auto_convert_orders():
             "message": f"自動轉換失敗：{str(e)}",
             "timestamp": timezone.now().isoformat(),
         }
+
+
+# 清理任務已移除，避免資料汙染
+# @shared_task
+# def cleanup_completed_production_records():
+#     """
+#     定時清理已完工工單的生產中記錄
+#     保持資料庫效能，避免生產中記錄無限增長
+#     """
+#     此任務已移除
 
 
 def get_standard_processes(product_code):

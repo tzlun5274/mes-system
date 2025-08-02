@@ -30,6 +30,7 @@ urlpatterns = [
     path("detail/<int:pk>/", WorkOrderDetailView.as_view(), name="detail"),
     path("list/", WorkOrderListView.as_view(), name="list"),
     path("active/", workorder_views.active_workorders, name="active_workorders"),
+    path("completion-check/", workorder_views.check_workorder_completion, name="completion_check"),
     
     # 已完工工單相關 URL
     path('completed/', CompletedWorkOrderListView.as_view(), name='completed_workorder_list'),

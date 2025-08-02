@@ -4,16 +4,15 @@
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.db import transaction
 from django.utils import timezone
-from .models import (
-    WorkOrder, WorkOrderProcess, CompletedWorkOrder, 
-    CompletedWorkOrderProcess, CompletedProductionReport
-)
-from .workorder_reporting.models import (
-    OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
-)
+from django.db.models import Sum, Count, Q
+from workorder.models import WorkOrder, WorkOrderProcess, WorkOrderProduction, WorkOrderProductionDetail
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+
+# 移除主管報工引用，避免混淆
+# 主管職責：監督、審核、管理，不代為報工
 
 logger = logging.getLogger(__name__)
 
@@ -103,11 +102,6 @@ class WorkOrderCompletionService:
             approval_status='approved'
         )
         
-        supervisor_reports = SupervisorProductionReport.objects.filter(
-            workorder=workorder,
-            approval_status='approved'
-        )
-        
         # 計算統計資料
         total_work_hours = 0.0
         total_overtime_hours = 0.0
@@ -136,18 +130,6 @@ class WorkOrderCompletionService:
             total_good_quantity += report.work_quantity or 0
             total_defect_quantity += report.defect_quantity or 0
             total_report_count += 1
-            if report.equipment and report.equipment.name:
-                unique_equipment.add(report.equipment.name)
-        
-        # 處理主管報工記錄
-        for report in supervisor_reports:
-            total_work_hours += float(report.work_hours_calculated or 0)
-            total_overtime_hours += float(report.overtime_hours_calculated or 0)
-            total_good_quantity += report.work_quantity or 0
-            total_defect_quantity += report.defect_quantity or 0
-            total_report_count += 1
-            if report.operator and report.operator.name:
-                unique_operators.add(report.operator.name)
             if report.equipment and report.equipment.name:
                 unique_equipment.add(report.equipment.name)
         
@@ -211,12 +193,6 @@ class WorkOrderCompletionService:
             approval_status='approved'
         )
         
-        supervisor_reports = SupervisorProductionReport.objects.filter(
-            workorder=process.workorder,
-            process_name=process.process_name,
-            approval_status='approved'
-        )
-        
         # 計算統計資料
         total_work_hours = 0.0
         total_good_quantity = 0
@@ -242,17 +218,6 @@ class WorkOrderCompletionService:
             total_good_quantity += report.work_quantity or 0
             total_defect_quantity += report.defect_quantity or 0
             report_count += 1
-            if report.equipment and report.equipment.name:
-                equipment.add(report.equipment.name)
-        
-        # 處理主管報工記錄
-        for report in supervisor_reports:
-            total_work_hours += float(report.work_hours_calculated or 0)
-            total_good_quantity += report.work_quantity or 0
-            total_defect_quantity += report.defect_quantity or 0
-            report_count += 1
-            if report.operator and report.operator.name:
-                operators.add(report.operator.name)
             if report.equipment and report.equipment.name:
                 equipment.add(report.equipment.name)
         
@@ -319,32 +284,6 @@ class WorkOrderCompletionService:
                 end_time=report.end_time,
                 report_source='SMT報工',
                 report_type='smt',
-                remarks=report.remarks,
-                abnormal_notes=report.abnormal_notes,
-                approval_status=report.approval_status,
-                approved_by=report.approved_by,
-                approved_at=report.approved_at,
-            )
-        
-        # 轉移主管報工記錄
-        for report in SupervisorProductionReport.objects.filter(
-            workorder=workorder,
-            approval_status='approved'
-        ):
-            CompletedProductionReport.objects.create(
-                completed_workorder=completed_workorder,
-                report_date=report.work_date,
-                process_name=report.process_name,
-                operator=report.operator.name if report.operator else '-',
-                equipment=report.equipment.name if report.equipment else '-',
-                work_quantity=report.work_quantity or 0,
-                defect_quantity=report.defect_quantity or 0,
-                work_hours=float(report.work_hours_calculated or 0),
-                overtime_hours=float(report.overtime_hours_calculated or 0),
-                start_time=report.start_time,
-                end_time=report.end_time,
-                report_source='主管報工',
-                report_type='supervisor',
                 remarks=report.remarks,
                 abnormal_notes=report.abnormal_notes,
                 approval_status=report.approval_status,

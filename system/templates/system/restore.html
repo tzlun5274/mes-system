@@ -18,16 +18,59 @@
                     </div>
                 {% endfor %}
             {% endif %}
+            
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
-                <div class="form-group">
-                    <label for="sql_file">上傳備份文件 (.sql)</label>
-                    <input type="file" name="sql_file" id="sql_file" class="form-control-file" accept=".sql" required>
+                
+                <!-- 選擇現有備份檔案 -->
+                <div class="form-group mb-3">
+                    <label for="selected_backup">選擇現有備份檔案</label>
+                    <select name="selected_backup" id="selected_backup" class="form-control">
+                        <option value="">-- 請選擇備份檔案 --</option>
+                        {% for file in backup_files %}
+                        <option value="{{ file.name }}">{{ file.name }} ({{ file.size }} KB, {{ file.date }})</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">選擇現有的備份檔案進行還原</small>
                 </div>
-                <button type="submit" class="btn btn-danger" onclick="return confirm('警告：此操作將覆蓋當前資料庫，是否繼續？');">恢復資料庫</button>
+                
+                <div class="text-center mb-3">
+                    <strong>或</strong>
+                </div>
+                
+                <!-- 上傳新備份檔案 -->
+                <div class="form-group mb-3">
+                    <label for="sql_file">上傳備份文件 (.sql)</label>
+                    <input type="file" name="sql_file" id="sql_file" class="form-control-file" accept=".sql">
+                    <small class="form-text text-muted">上傳新的備份檔案進行還原</small>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <strong>警告：</strong>此操作將完全覆蓋當前資料庫，所有現有資料將被刪除並替換為備份內容。
+                </div>
+                
+                <button type="submit" class="btn btn-danger" onclick="return confirm('確定要還原資料庫嗎？此操作不可逆轉！');">
+                    恢復資料庫
+                </button>
                 <a href="{% url 'system:backup' %}" class="btn btn-secondary">返回</a>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+// 當選擇現有備份時，清空檔案上傳欄位
+document.getElementById('selected_backup').addEventListener('change', function() {
+    if (this.value) {
+        document.getElementById('sql_file').value = '';
+    }
+});
+
+// 當上傳檔案時，清空選擇欄位
+document.getElementById('sql_file').addEventListener('change', function() {
+    if (this.files.length > 0) {
+        document.getElementById('selected_backup').value = '';
+    }
+});
+</script>
 {% endblock %}

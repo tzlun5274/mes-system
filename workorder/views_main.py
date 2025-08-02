@@ -54,6 +54,8 @@ from django.utils.decorators import method_decorator
 from django.views import View
 import json
 from django.views.decorators.csrf import ensure_csrf_cookie
+# 完工判斷服務已移除，避免資料汙染
+# from .services.completion_service import WorkOrderCompletionService
 
 # 棄用警告函數
 def deprecated_warning(func_name):
@@ -935,7 +937,7 @@ def create_workorder_processes(request, workorder_id):
         if is_ajax:
             return JsonResponse({"status": "danger", "message": msg})
         messages.error(request, msg)
-        return redirect("workorder:workorder_list")
+        return redirect("workorder:list")
 
     try:
         # 檢查是否已有工序明細
@@ -5561,10 +5563,11 @@ def dispatch_delete(request, pk):
 def active_workorders(request):
     """
     生產中工單詳情視圖
-    顯示所有正在生產中的工單詳細資訊（基於工單狀態和報工記錄）
+    顯示所有正在生產中的工單詳細資訊（基於生產中工單表）
     """
     from django.core.paginator import Paginator
     from django.db.models import Q
+    from workorder.models import WorkOrderProduction
     from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
     from erp_integration.models import CompanyConfig
     from datetime import date, timedelta
@@ -5573,15 +5576,21 @@ def active_workorders(request):
     today = date.today()
     
     # 修正後的生產中工單判斷邏輯：
-    # 生產中工單 = 所有工單（不管狀態）
-    # 這是一個流動式的統計，反映整個工單資料表的狀態
+    # 生產中工單 = WorkOrderProduction 表中狀態為 'in_production' 的記錄
+    # 這樣符合正確的設計邏輯：報工記錄只負責記錄，生產中工單表負責記錄生產狀態
     
-    # 獲取所有工單（不管狀態）
-    active_workorders = WorkOrder.objects.select_related(
-        'production_record'
-    ).prefetch_related(
-        'processes'
-    ).order_by('created_at')
+    # 獲取所有生產中的工單記錄
+    active_productions = WorkOrderProduction.objects.filter(
+        status='in_production'
+    ).select_related('workorder').order_by('-created_at')
+    
+    # 獲取對應的工單詳細資訊
+    active_workorders = []
+    for production in active_productions:
+        if production.workorder:
+            workorder = production.workorder
+            workorder.production_record = production
+            active_workorders.append(workorder)
     
     # 輔助統計：今日已核准報工記錄
     today_operator_reports = OperatorSupplementReport.objects.filter(
@@ -5604,7 +5613,7 @@ def active_workorders(request):
         workorder.company_name = company_configs.get(workorder.company_code, workorder.company_code or '未知公司')
     
     # 獲取統計數據
-    total_active = active_workorders.count()  # 所有工單
+    total_active = len(active_workorders)  # 基於生產中工單表的生產中工單
     total_pending = WorkOrder.objects.filter(status='pending').count()
     total_completed = WorkOrder.objects.filter(status='completed').count()
     
@@ -5634,3 +5643,107 @@ def active_workorders(request):
     }
     
     return render(request, 'workorder/active_workorders.html', context)
+
+@login_required
+def check_workorder_completion(request):
+    """
+    工單完工檢查視圖
+    允許使用者手動檢查和處理工單完工
+    """
+    if request.method == 'POST':
+        workorder_id = request.POST.get('workorder_id')
+        action = request.POST.get('action')
+        
+        if action == 'check_specific':
+            # 檢查特定工單
+            if workorder_id:
+                try:
+                    workorder = WorkOrder.objects.get(id=workorder_id)
+                    # 完工判斷功能已移除，避免資料汙染
+                    # packaging_quantity = WorkOrderCompletionService._get_packaging_quantity(workorder)
+                    packaging_quantity = 0
+                    
+                    if packaging_quantity >= workorder.quantity:
+                        # 完工判斷功能已移除，避免資料汙染
+                        # success = WorkOrderCompletionService.check_and_complete_workorder(workorder.id)
+                        success = False
+                        if success:
+                            messages.success(request, f'工單 {workorder.order_number} 已成功完工並轉移')
+                        else:
+                            messages.error(request, f'工單 {workorder.order_number} 完工處理失敗')
+                    else:
+                        messages.warning(request, f'工單 {workorder.order_number} 尚未達到完工條件 (出貨包裝數量: {packaging_quantity}/{workorder.quantity})')
+                        
+                except WorkOrder.DoesNotExist:
+                    messages.error(request, f'工單 ID {workorder_id} 不存在')
+                except Exception as e:
+                    messages.error(request, f'檢查工單時發生錯誤: {str(e)}')
+            else:
+                messages.error(request, '請提供工單ID')
+                
+        elif action == 'check_all':
+            # 檢查所有工單
+            try:
+                all_workorders = WorkOrder.objects.all()
+                completed_count = 0
+                error_count = 0
+                
+                for workorder in all_workorders:
+                    try:
+                        # 完工判斷功能已移除，避免資料汙染
+                        # packaging_quantity = WorkOrderCompletionService._get_packaging_quantity(workorder)
+                        packaging_quantity = 0
+                        
+                        if packaging_quantity >= workorder.quantity:
+                            # 完工判斷功能已移除，避免資料汙染
+                            # success = WorkOrderCompletionService.check_and_complete_workorder(workorder.id)
+                            success = False
+                            if success:
+                                completed_count += 1
+                            else:
+                                error_count += 1
+                                
+                    except Exception as e:
+                        error_count += 1
+                        logger.error(f"檢查工單 {workorder.order_number} 時發生錯誤: {str(e)}")
+                
+                if completed_count > 0:
+                    messages.success(request, f'成功完工 {completed_count} 個工單')
+                if error_count > 0:
+                    messages.warning(request, f'處理失敗 {error_count} 個工單')
+                if completed_count == 0 and error_count == 0:
+                    messages.info(request, '沒有工單達到完工條件')
+                    
+            except Exception as e:
+                messages.error(request, f'批量檢查時發生錯誤: {str(e)}')
+    
+    # 獲取生產中工單列表（只顯示真正在生產中的工單）
+    from django.core.paginator import Paginator
+    
+    production_workorders = WorkOrder.objects.filter(
+        status='in_progress'
+    ).select_related(
+        'production_record'
+    ).prefetch_related(
+        'processes'
+    ).order_by('-created_at')
+    
+    # 為每個工單計算出貨包裝數量（功能已移除）
+    for workorder in production_workorders:
+        # workorder.packaging_quantity = WorkOrderCompletionService._get_packaging_quantity(workorder)
+        workorder.packaging_quantity = 0
+        workorder.completion_rate = (workorder.packaging_quantity / workorder.quantity * 100) if workorder.quantity > 0 else 0
+    
+    # 分頁處理
+    paginator = Paginator(production_workorders, 20)  # 每頁顯示20筆
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'production_workorders': page_obj,
+        'page_obj': page_obj,
+        'page_title': '工單完工檢查',
+        'total_workorders': production_workorders.count(),
+    }
+    
+    return render(request, 'workorder/completion_check.html', context)

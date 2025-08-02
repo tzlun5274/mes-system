@@ -55,10 +55,10 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",  # 重新啟用 session
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",  # 重新啟用認證
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -104,6 +104,9 @@ DATABASES = {
         "PASSWORD": os.environ.get("DATABASE_PASSWORD", "mespassword"),
         "HOST": os.environ.get("DATABASE_HOST", "localhost"),
         "PORT": os.environ.get("DATABASE_PORT", "5432"),
+        "OPTIONS": {
+            "options": "-c search_path=public"
+        },
     }
 }
 
@@ -154,6 +157,9 @@ CELERY_TIMEZONE = "Asia/Taipei"
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/home/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
+
+# Session 設定 - 使用快取儲存 session
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 
 # 文件上傳設置
 DATA_UPLOAD_MAX_MEMORY_SIZE = None

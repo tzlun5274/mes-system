@@ -1,20 +1,18 @@
 """
-主管功能服務層 (Supervisor Services Layer)
-負責主管功能的業務邏輯處理，包含審核管理、統計分析、異常處理等
+主管服務模組
+提供主管相關的業務邏輯服務
 """
 
-from django.db.models import Q, Count, Sum
-from django.utils import timezone
-from datetime import date, timedelta
 import logging
+from datetime import datetime, timedelta
+from django.db import transaction
+from django.utils import timezone
+from django.db.models import Sum, Count, Q
+from workorder.models import WorkOrder, WorkOrderProcess, WorkOrderProduction, WorkOrderProductionDetail
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
 
-from workorder.models import (
-    OperatorSupplementReport, 
-    SMTProductionReport, 
-    WorkOrder,
-    WorkOrderProcess
-)
-from workorder.workorder_reporting.models import SupervisorProductionReport
+# 移除主管報工引用，避免混淆
+# 主管職責：監督、審核、管理，不代為報工
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +26,7 @@ class SupervisorStatisticsService:
         統一的主管功能統計數據生成函數 (Supervisor Statistics Generator)
         返回所有主管功能頁面需要的統計數據
         """
-        today = date.today()
+        today = datetime.now().date()
         month_start = today.replace(day=1)
         week_start = today - timedelta(days=today.weekday())
         year_start = today.replace(month=1, day=1)

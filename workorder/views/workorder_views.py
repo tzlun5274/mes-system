@@ -75,7 +75,7 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         context['in_progress_processes_count'] = in_progress_processes_count
         
         # 獲取所有已核准的報工記錄
-        from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport, SupervisorProductionReport
+        from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
         
         # 作業員補登報工記錄（已核准）
         operator_reports = OperatorSupplementReport.objects.filter(
@@ -85,12 +85,6 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         
         # SMT生產報工記錄（已核准）
         smt_reports = SMTProductionReport.objects.filter(
-            workorder=workorder,
-            approval_status='approved'
-        ).order_by('work_date', 'start_time')
-        
-        # 主管報工記錄（已核准）
-        supervisor_reports = SupervisorProductionReport.objects.filter(
             workorder=workorder,
             approval_status='approved'
         ).order_by('work_date', 'start_time')
@@ -133,28 +127,6 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
                 'work_hours': report.work_hours_calculated or 0,
                 'overtime_hours': report.overtime_hours_calculated or 0,
                 'report_source': 'SMT報工',
-                'report_time': report.start_time,
-                'start_time': report.start_time,
-                'end_time': report.end_time,
-                'remarks': report.remarks,
-                'abnormal_notes': report.abnormal_notes,
-                'approved_by': report.approved_by,
-                'approved_at': report.approved_at,
-            })
-        
-        # 添加主管報工記錄
-        for report in supervisor_reports:
-            all_reports.append({
-                'type': 'supervisor',
-                'report_date': report.work_date,
-                'process_name': report.process_name,
-                'operator': report.operator.name if report.operator else '-',
-                'equipment': report.equipment.name if report.equipment else '-',
-                'work_quantity': report.work_quantity or 0,
-                'defect_quantity': report.defect_quantity or 0,
-                'work_hours': report.work_hours_calculated or 0,
-                'overtime_hours': report.overtime_hours_calculated or 0,
-                'report_source': '主管報工',
                 'report_time': report.start_time,
                 'start_time': report.start_time,
                 'end_time': report.end_time,
@@ -248,7 +220,7 @@ class WorkOrderCreateView(LoginRequiredMixin, CreateView):
     model = WorkOrder
     form_class = WorkOrderForm
     template_name = 'workorder/workorder/workorder_form.html'
-    success_url = reverse_lazy('workorder:workorder_list')
+    success_url = reverse_lazy('workorder:list')
 
     def form_valid(self, form):
         """表單驗證成功時的處理"""
@@ -269,7 +241,7 @@ class WorkOrderUpdateView(LoginRequiredMixin, UpdateView):
     model = WorkOrder
     form_class = WorkOrderForm
     template_name = 'workorder/workorder/workorder_form.html'
-    success_url = reverse_lazy('workorder:workorder_list')
+    success_url = reverse_lazy('workorder:list')
 
     def form_valid(self, form):
         """表單驗證成功時的處理"""
@@ -289,7 +261,7 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     """
     model = WorkOrder
     template_name = 'workorder/workorder/workorder_confirm_delete.html'
-    success_url = reverse_lazy('workorder:workorder_list')
+    success_url = reverse_lazy('workorder:list')
 
     def test_func(self):
         """檢查用戶是否有刪除權限"""

@@ -174,11 +174,8 @@ PERMISSION_NAME_TRANSLATIONS = {
     "Can change backup schedule": "可以更改備份計劃",
     "Can delete backup schedule": "可以刪除備份計劃",
     "Can view backup schedule": "可以查看備份計劃",
-    # 工單模組報工相關權限
-    "Can add supervisorproductionreport": "可以添加主管報工記錄",
-    "Can change supervisorproductionreport": "可以更改主管報工記錄",
-    "Can delete supervisorproductionreport": "可以刪除主管報工記錄",
-    "Can view supervisorproductionreport": "可以查看主管報工記錄",
+    # 移除主管報工相關權限翻譯，避免混淆
+    # 主管職責：監督、審核、管理，不代為報工
     "Can add operatorsupplementreport": "可以添加作業員補登報工記錄",
     "Can change operatorsupplementreport": "可以更改作業員補登報工記錄",
     "Can delete operatorsupplementreport": "可以刪除作業員補登報工記錄",
@@ -646,23 +643,58 @@ def download_backup(request, filename):
 @user_passes_test(superuser_required, login_url="/accounts/login/")
 def restore_database(request):
     backup_dir = "/var/www/mes/backups_DB"
+    
+    # 獲取現有備份檔案列表
+    try:
+        backup_files = [
+            {
+                "name": f,
+                "size": os.path.getsize(os.path.join(backup_dir, f)) // 1024,
+                "date": datetime.datetime.fromtimestamp(
+                    os.path.getmtime(os.path.join(backup_dir, f))
+                ).strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            for f in os.listdir(backup_dir)
+            if os.path.isfile(os.path.join(backup_dir, f)) and f.endswith(".sql")
+        ]
+        backup_files.sort(key=lambda x: x["date"], reverse=True)
+    except Exception as e:
+        logger.error(f"無法列出備份文件：{str(e)}")
+        backup_files = []
+    
     if request.method == "POST":
-        if "sql_file" not in request.FILES:
-            logger.error("未上傳備份文件")
-            messages.error(request, "請上傳一個備份文件！")
+        # 檢查是否有上傳檔案或選擇現有備份
+        sql_file = request.FILES.get("sql_file")
+        selected_backup = request.POST.get("selected_backup")
+        
+        if not sql_file and not selected_backup:
+            logger.error("未上傳備份文件或選擇現有備份")
+            messages.error(request, "請上傳一個備份文件或選擇現有備份！")
             return redirect("system:restore_database")
-        sql_file = request.FILES["sql_file"]
-        if not sql_file.name.endswith(".sql"):
-            logger.error(f"上傳文件格式錯誤: {sql_file.name}")
-            messages.error(request, f"請上傳 .sql 格式的備份文件！")
-            return redirect("system:restore_database")
-        try:
+        
+        # 確定要還原的檔案路徑
+        if sql_file:
+            if not sql_file.name.endswith(".sql"):
+                logger.error(f"上傳文件格式錯誤: {sql_file.name}")
+                messages.error(request, f"請上傳 .sql 格式的備份文件！")
+                return redirect("system:restore_database")
+            
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             upload_filename = f"restore_upload_{timestamp}_{sql_file.name}"
             upload_path = os.path.join(backup_dir, upload_filename)
+            
+            # 保存上傳的檔案
             with open(upload_path, "wb+") as destination:
                 for chunk in sql_file.chunks():
                     destination.write(chunk)
+        else:
+            # 使用現有備份檔案
+            upload_path = os.path.join(backup_dir, selected_backup)
+            if not os.path.exists(upload_path):
+                messages.error(request, f"選擇的備份檔案不存在：{selected_backup}")
+                return redirect("system:restore_database")
+        
+        try:
             database_url = os.environ.get("DATABASE_URL")
             if not database_url:
                 raise ValueError("環境變數 DATABASE_URL 未設置")
@@ -675,30 +707,121 @@ def restore_database(request):
             db_port = parsed_url.port
             db_name = parsed_url.path.lstrip("/")
             os.environ["PGPASSWORD"] = db_password
-            cmd = [
+            
+            # 步驟1: 先清空資料庫（斷開所有連線並重建）
+            logger.info("開始清空資料庫...")
+            drop_cmd = [
                 "psql",
-                "-h",
-                db_host,
-                "-p",
-                str(db_port),
-                "-U",
-                db_user,
-                "-d",
-                db_name,
-                "-f",
-                upload_path,
+                "-h", db_host,
+                "-p", str(db_port),
+                "-U", db_user,
+                "-d", "postgres",  # 連接到 postgres 資料庫
+                "-c", f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid();"
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(drop_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.warning(f"斷開資料庫連線時出現警告: {result.stderr}")
+            
+            drop_db_cmd = [
+                "dropdb",
+                "-h", db_host,
+                "-p", str(db_port),
+                "-U", db_user,
+                "--if-exists",
+                db_name
+            ]
+            result = subprocess.run(drop_db_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.warning(f"刪除資料庫時出現警告: {result.stderr}")
+            
+            # 步驟2: 重新建立資料庫
+            logger.info("重新建立資料庫...")
+            create_cmd = [
+                "createdb",
+                "-h", db_host,
+                "-p", str(db_port),
+                "-U", db_user,
+                db_name
+            ]
+            result = subprocess.run(create_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"建立資料庫失敗: {result.stderr}")
+            
+            # 步驟3: 還原備份檔案
+            logger.info("開始還原備份檔案...")
+            restore_cmd = [
+                "psql",
+                "-h", db_host,
+                "-p", str(db_port),
+                "-U", db_user,
+                "-d", db_name,
+                "-f", upload_path,
+            ]
+            result = subprocess.run(restore_cmd, capture_output=True, text=True)
             if result.returncode != 0:
                 raise Exception(f"psql 恢復失敗: {result.stderr}")
+            
+            # 步驟4: 直接建立必要的資料表
+            logger.info("建立必要的 Django 資料表...")
+            
+            # 建立 django_session 資料表
+            session_table_sql = """
+            CREATE TABLE IF NOT EXISTS django_session (
+                session_key VARCHAR(40) NOT NULL PRIMARY KEY,
+                session_data TEXT NOT NULL,
+                expire_date TIMESTAMP WITH TIME ZONE NOT NULL
+            );
+            """
+            
+            # 建立 django_migrations 資料表
+            migrations_table_sql = """
+            CREATE TABLE IF NOT EXISTS django_migrations (
+                id BIGSERIAL PRIMARY KEY,
+                app VARCHAR(255) NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                applied TIMESTAMP WITH TIME ZONE NOT NULL
+            );
+            """
+            
+            try:
+                # 執行 SQL 建立資料表
+                create_tables_cmd = [
+                    "psql",
+                    "-h", db_host,
+                    "-p", str(db_port),
+                    "-U", db_user,
+                    "-d", db_name,
+                    "-c", session_table_sql + migrations_table_sql
+                ]
+                result = subprocess.run(create_tables_cmd, capture_output=True, text=True)
+                if result.returncode == 0:
+                    logger.info("Django 必要資料表建立成功")
+                else:
+                    logger.warning(f"建立資料表時出現警告: {result.stderr}")
+                    
+            except Exception as e:
+                logger.warning(f"建立 Django 資料表失敗: {str(e)}")
+            
             del os.environ["PGPASSWORD"]
-            logger.info(f"資料庫恢復成功: {upload_filename}")
-            messages.success(request, f"資料庫恢復成功：{upload_filename}")
+            backup_name = os.path.basename(upload_path)
+            logger.info(f"資料庫恢復成功: {backup_name}")
+            messages.success(request, f"資料庫恢復成功：{backup_name}")
+            
         except Exception as e:
             logger.error(f"資料庫恢復失敗: {str(e)}")
             messages.error(request, f"資料庫恢復失敗：{str(e)}")
+            # 清理上傳的檔案
+            if 'upload_path' in locals() and sql_file:
+                try:
+                    os.remove(upload_path)
+                except:
+                    pass
         return redirect("system:backup")
-    return render(request, "system/restore.html", {"title": "恢復資料庫"})
+    
+    return render(request, "system/restore.html", {
+        "title": "恢復資料庫",
+        "backup_files": backup_files
+    })
 
 
 @login_required

@@ -53,7 +53,7 @@ class WorkOrder(models.Model):
     class Meta:
         verbose_name = "工單"
         verbose_name_plural = "工單管理"
-        unique_together = (("company_code", "order_number"),)  # 公司代號+工單號碼唯一
+        unique_together = (("company_code", "order_number", "product_code"),)  # 公司代號+工單號碼+產品編號唯一
 
     def __str__(self):
         # 格式化公司代號，確保是兩位數格式（例如：2 -> 02）
@@ -522,7 +522,6 @@ class WorkOrderProductionDetail(models.Model):
     REPORT_SOURCE_CHOICES = [
         ("operator", "作業員現場報工"),
         ("operator_supplement", "作業員補登報工"),
-        ("supervisor", "主管報工"),
         ("smt", "SMT報工"),
     ]
     report_source = models.CharField(max_length=20, choices=REPORT_SOURCE_CHOICES, verbose_name="報工來源")
@@ -531,9 +530,48 @@ class WorkOrderProductionDetail(models.Model):
     start_time = models.TimeField(verbose_name="開始時間", null=True, blank=True)
     end_time = models.TimeField(verbose_name="結束時間", null=True, blank=True)
     
+    # 工時資訊（從報工資料表同步）
+    work_hours = models.FloatField(default=0.0, verbose_name="工作時數")
+    overtime_hours = models.FloatField(default=0.0, verbose_name="加班時數")
+    
+    # 休息時間相關欄位（從報工資料表同步）
+    has_break = models.BooleanField(default=False, verbose_name="是否有休息時間")
+    break_start_time = models.TimeField(blank=True, null=True, verbose_name="休息開始時間")
+    break_end_time = models.TimeField(blank=True, null=True, verbose_name="休息結束時間")
+    break_hours = models.FloatField(default=0.0, verbose_name="休息時數")
+    
+    # 報工類型（從報工資料表同步）
+    report_type = models.CharField(max_length=20, verbose_name="報工類型", default="normal")
+    
+    # 數量相關欄位（從報工資料表同步）
+    allocated_quantity = models.IntegerField(default=0, verbose_name="分配數量")
+    quantity_source = models.CharField(max_length=20, verbose_name="數量來源", default="original")
+    allocation_notes = models.TextField(blank=True, verbose_name="分配說明")
+    
+    # 完工相關欄位（從報工資料表同步）
+    is_completed = models.BooleanField(default=False, verbose_name="是否已完工")
+    completion_method = models.CharField(max_length=20, verbose_name="完工判斷方式", default="manual")
+    auto_completed = models.BooleanField(default=False, verbose_name="自動完工狀態")
+    completion_time = models.DateTimeField(blank=True, null=True, verbose_name="完工確認時間")
+    cumulative_quantity = models.IntegerField(default=0, verbose_name="累積完成數量")
+    cumulative_hours = models.FloatField(default=0.0, verbose_name="累積工時")
+    
+    # 核准相關欄位（從報工資料表同步）
+    approval_status = models.CharField(max_length=20, verbose_name="核准狀態", default="approved")
+    approved_by = models.CharField(max_length=100, null=True, blank=True, verbose_name="核准人員")
+    approved_at = models.DateTimeField(null=True, blank=True, verbose_name="核准時間")
+    approval_remarks = models.TextField(blank=True, verbose_name="核准備註")
+    rejection_reason = models.TextField(blank=True, verbose_name="駁回原因")
+    rejected_by = models.CharField(max_length=100, null=True, blank=True, verbose_name="駁回人員")
+    rejected_at = models.DateTimeField(null=True, blank=True, verbose_name="駁回時間")
+    
     # 備註
     remarks = models.TextField(verbose_name="備註", blank=True)
     abnormal_notes = models.TextField(verbose_name="異常記錄", blank=True)
+    
+    # 原始報工記錄追蹤
+    original_report_id = models.IntegerField(verbose_name="原始報工記錄ID", null=True, blank=True, help_text="對應的原始報工記錄ID")
+    original_report_type = models.CharField(max_length=20, verbose_name="原始報工類型", null=True, blank=True, help_text="原始報工記錄的類型")
     
     # 系統欄位
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
@@ -545,6 +583,15 @@ class WorkOrderProductionDetail(models.Model):
         verbose_name_plural = "生產報工明細"
         db_table = "workorder_production_detail"
         ordering = ["-report_date", "-report_time"]
+        indexes = [
+            # 優化完工判斷查詢的複合索引
+            models.Index(fields=['workorder_production', 'process_name', 'report_source'], 
+                        name='idx_prod_detail_completion'),
+            # 優化按日期查詢的索引
+            models.Index(fields=['report_date'], name='idx_prod_detail_date'),
+            # 優化按工序查詢的索引
+            models.Index(fields=['process_name'], name='idx_prod_detail_process'),
+        ]
 
     def __str__(self):
         return f"{self.workorder_production.workorder.order_number} - {self.process_name} - {self.report_date}"
@@ -557,7 +604,7 @@ class CompletedWorkOrder(models.Model):
     """
     # 原始工單資訊
     original_workorder_id = models.IntegerField(verbose_name="原始工單ID", help_text="對應的原始工單ID")
-    order_number = models.CharField(max_length=100, unique=True, verbose_name="工單號")
+    order_number = models.CharField(max_length=100, verbose_name="工單號")
     product_code = models.CharField(max_length=100, verbose_name="產品編號")
     company_code = models.CharField(max_length=10, verbose_name="公司代號")
     
@@ -597,6 +644,7 @@ class CompletedWorkOrder(models.Model):
         verbose_name_plural = "已完工工單"
         db_table = 'workorder_completed_workorder'
         ordering = ['-completed_at']
+        unique_together = (("order_number", "product_code"),)  # 工單號+產品編號唯一
         indexes = [
             models.Index(fields=['order_number']),
             models.Index(fields=['product_code']),

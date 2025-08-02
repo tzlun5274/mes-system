@@ -56,6 +56,22 @@
         letter-spacing: 0.5px;
     }
     
+    .stat-card a {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+    
+    .stat-card a:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .stat-card a:hover .stat-value {
+        color: #28a745 !important;
+    }
+    
     .workorder-table {
         background: white;
         border-radius: 8px;
@@ -181,6 +197,19 @@
         <div class="stat-card">
             <div class="stat-value text-primary">{{ total_completed }}</div>
             <div class="stat-label">已完工工單</div>
+        </div>
+        
+        <!-- 完工檢查功能卡片 -->
+        <div class="stat-card">
+            <a href="{% url 'workorder:completion_check' %}" class="text-decoration-none">
+                <div class="stat-value text-success">
+                    <i class="fas fa-clipboard-check"></i>
+                </div>
+                <div class="stat-label">完工檢查</div>
+                <div class="stat-description" style="font-size: 0.8rem; color: #6c757d; margin-top: 5px;">
+                    檢查生產中工單完工狀態
+                </div>
+            </a>
         </div>
     </div>
 

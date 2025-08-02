@@ -18,13 +18,12 @@ from django.contrib.auth.decorators import login_required
 
 from ..workorder_reporting.models import (
     OperatorSupplementReport, 
-    SMTProductionReport, 
-    SupervisorProductionReport
+    SMTProductionReport
 )
 from ..forms import (
-    OperatorSupplementReportForm, 
-    SMTSupplementReportForm, 
-    SupervisorProductionReportForm
+    SMTSupplementReportForm, OperatorSupplementReportForm,
+    # 移除主管報工相關的 form，避免混淆
+    # 主管職責：監督、審核、管理，不代為報工
 )
 
 

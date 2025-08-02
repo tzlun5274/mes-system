@@ -1,13 +1,16 @@
 """
-重新計算工作時數管理命令
-用於重新計算現有報工記錄的工作時數和加班時數
+重新計算工作時數命令
 """
 
-from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
+import logging
+from django.core.management.base import BaseCommand
 from django.utils import timezone
-from datetime import date, timedelta
-from workorder.models import OperatorSupplementReport, SupervisorProductionReport
+from workorder.models import OperatorSupplementReport
+
+# 移除主管報工引用，避免混淆
+# 主管職責：監督、審核、管理，不代為報工
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -72,12 +75,10 @@ class Command(BaseCommand):
                 operator__name__icontains=options['worker']
             )
 
-        # 查詢主管報工記錄
-        supervisor_reports = SupervisorProductionReport.objects.filter(
-            work_date__range=[date_from, date_to]
-        )
+        # 移除主管報工相關程式碼，避免混淆
+        # 主管職責：監督、審核、管理，不代為報工
 
-        total_reports = operator_reports.count() + supervisor_reports.count()
+        total_reports = operator_reports.count()
         
         if total_reports == 0:
             self.stdout.write(
@@ -98,24 +99,6 @@ class Command(BaseCommand):
 
         # 處理作業員報工記錄
         for report in operator_reports:
-            try:
-                if not options['dry_run']:
-                    with transaction.atomic():
-                        report.calculate_work_hours()
-                        report.save()
-                updated_count += 1
-                
-                if updated_count % 100 == 0:
-                    self.stdout.write(f'已處理 {updated_count} 筆記錄...')
-                    
-            except Exception as e:
-                error_count += 1
-                self.stdout.write(
-                    self.style.ERROR(f'處理記錄 {report.id} 時發生錯誤: {e}')
-                )
-
-        # 處理主管報工記錄
-        for report in supervisor_reports:
             try:
                 if not options['dry_run']:
                     with transaction.atomic():

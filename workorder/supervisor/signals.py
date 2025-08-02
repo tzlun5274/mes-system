@@ -1,15 +1,16 @@
 """
-主管功能模組信號處理 (Supervisor Module Signals)
-處理主管功能相關的信號事件
+主管功能信號處理模組
 """
 
+import logging
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
-import logging
+from workorder.models import WorkOrder, WorkOrderProcess, WorkOrderProduction, WorkOrderProductionDetail
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
 
-from workorder.models import OperatorSupplementReport, SMTProductionReport
-from workorder.workorder_reporting.models import SupervisorProductionReport
+# 移除主管報工引用，避免混淆
+# 主管職責：監督、審核、管理，不代為報工
 
 logger = logging.getLogger(__name__)
 
@@ -36,17 +37,6 @@ def smt_report_saved(sender, instance, created, **kwargs):
         logger.info(f"更新SMT報工記錄: {instance.id}")
 
 
-@receiver(post_save, sender=SupervisorProductionReport)
-def supervisor_report_saved(sender, instance, created, **kwargs):
-    """
-    主管報工記錄保存後的信號處理
-    """
-    if created:
-        logger.info(f"新增主管報工記錄: {instance.id}")
-    else:
-        logger.info(f"更新主管報工記錄: {instance.id}")
-
-
 @receiver(post_delete, sender=OperatorSupplementReport)
 def operator_report_deleted(sender, instance, **kwargs):
     """
@@ -60,12 +50,4 @@ def smt_report_deleted(sender, instance, **kwargs):
     """
     SMT報工記錄刪除後的信號處理
     """
-    logger.info(f"刪除SMT報工記錄: {instance.id}")
-
-
-@receiver(post_delete, sender=SupervisorProductionReport)
-def supervisor_report_deleted(sender, instance, **kwargs):
-    """
-    主管報工記錄刪除後的信號處理
-    """
-    logger.info(f"刪除主管報工記錄: {instance.id}") 
+    logger.info(f"刪除SMT報工記錄: {instance.id}") 
