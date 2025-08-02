@@ -31,11 +31,17 @@ class Command(BaseCommand):
             action='store_true',
             help='清除現有的生產中工單明細記錄後重新複製',
         )
+        parser.add_argument(
+            '--verbose',
+            action='store_true',
+            help='顯示詳細的同步過程',
+        )
 
     def handle(self, *args, **options):
         workorder_id = options.get('workorder_id')
         force = options.get('force')
         clear = options.get('clear')
+        verbose = options.get('verbose')
         
         self.stdout.write(
             self.style.SUCCESS('開始複製報工紀錄到生產中工單資料表...')
@@ -98,6 +104,9 @@ class Command(BaseCommand):
             
             # 顯示同步後的統計資訊
             self._show_statistics('同步後')
+            
+            # 驗證同步結果
+            self._verify_sync_results()
                     
         except Exception as e:
             self.stdout.write(
@@ -137,7 +146,63 @@ class Command(BaseCommand):
                 if process_counts.count() > 5:
                     self.stdout.write(f'    ... 還有 {process_counts.count() - 5} 個工序')
                     
+                # 顯示報工來源分布
+                source_counts = WorkOrderProductionDetail.objects.values('report_source').annotate(count=Count('report_source')).order_by('-count')
+                self.stdout.write(f'  明細記錄報工來源分布:')
+                for source in source_counts:
+                    source_name = {
+                        'operator_supplement': '作業員補登報工',
+                        'smt': 'SMT報工',
+                        'operator': '作業員現場報工'
+                    }.get(source['report_source'], source['report_source'])
+                    self.stdout.write(f'    {source_name}: {source["count"]} 筆')
+                    
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(f'顯示統計資訊時發生錯誤: {str(e)}')
+            )
+    
+    def _verify_sync_results(self):
+        """驗證同步結果"""
+        try:
+            # 檢查是否有報工記錄但沒有對應的明細記錄
+            operator_reports = OperatorSupplementReport.objects.filter(approval_status='approved')
+            smt_reports = SMTProductionReport.objects.filter(approval_status='approved')
+            
+            missing_details = []
+            
+            # 檢查作業員報工記錄
+            for report in operator_reports:
+                detail_exists = WorkOrderProductionDetail.objects.filter(
+                    original_report_id=report.id,
+                    original_report_type='operator'
+                ).exists()
+                if not detail_exists:
+                    missing_details.append(f'作業員報工記錄 ID:{report.id} (工單:{report.workorder.order_number if report.workorder else "None"})')
+            
+            # 檢查SMT報工記錄
+            for report in smt_reports:
+                detail_exists = WorkOrderProductionDetail.objects.filter(
+                    original_report_id=report.id,
+                    original_report_type='smt'
+                ).exists()
+                if not detail_exists:
+                    missing_details.append(f'SMT報工記錄 ID:{report.id} (工單:{report.workorder.order_number if report.workorder else "None"})')
+            
+            if missing_details:
+                self.stdout.write(
+                    self.style.WARNING(f'發現 {len(missing_details)} 筆報工記錄沒有對應的明細記錄:')
+                )
+                for missing in missing_details[:10]:  # 只顯示前10筆
+                    self.stdout.write(f'  - {missing}')
+                if len(missing_details) > 10:
+                    self.stdout.write(f'  ... 還有 {len(missing_details) - 10} 筆')
+            else:
+                self.stdout.write(
+                    self.style.SUCCESS('所有已核准報工記錄都已成功同步到明細表')
+                )
+                
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f'驗證同步結果時發生錯誤: {str(e)}')
             ) 

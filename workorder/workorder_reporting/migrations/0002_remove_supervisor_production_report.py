@@ -1,4 +1,4 @@
-# Generated manually to remove supervisor production report table
+# Generated manually to remove SupervisorProductionReport model
 
 from django.db import migrations
 
@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('workorder', '0070_add_missing_fields_to_production_detail'),
+        ('workorder_reporting', '0001_initial'),
     ]
 
     operations = [

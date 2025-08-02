@@ -166,7 +166,7 @@
             <div class="stat-number">{{ stats.pending_reports|default:0 }}</div>
             <div class="stat-label">待審核報工</div>
         </a>
-        <a href="{% url 'workorder:supervisor:report_statistics' %}" class="stat-card approved" style="text-decoration: none; cursor: pointer;">
+        <a href="{% url 'workorder:supervisor:approved_reports_list' %}" class="stat-card approved" style="text-decoration: none; cursor: pointer;">
             <div class="stat-number">{{ stats.approved_operator|default:0|add:stats.approved_smt|default:0|add:stats.approved_supervisor|default:0 }}</div>
             <div class="stat-label">已審核報工</div>
         </a>

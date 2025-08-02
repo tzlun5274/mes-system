@@ -64,7 +64,7 @@ class ProductionReportSyncService:
                         workorder=report.workorder,
                         process_name=report.process.name if report.process else '',
                         report_date=report.work_date,
-                        report_time=report.start_time or timezone.now(),
+                        report_time=timezone.now(),
                         work_quantity=report.work_quantity or 0,
                         defect_quantity=report.defect_quantity or 0,
                         operator=report.operator.name if report.operator else None,
@@ -96,11 +96,11 @@ class ProductionReportSyncService:
                         # 新增核准相關欄位
                         approval_status=report.approval_status,
                         approved_by=report.approved_by,
-                        approved_at=report.approved_at,
+                        approved_at=report.approved_at if report.approved_at else None,
                         approval_remarks=report.approval_remarks,
                         rejection_reason=report.rejection_reason,
                         rejected_by=report.rejected_by,
-                        rejected_at=report.rejected_at,
+                        rejected_at=report.rejected_at if report.rejected_at else None,
                         remarks=report.remarks,
                         abnormal_notes=report.abnormal_notes,
                         original_report_id=report.id,
@@ -117,57 +117,68 @@ class ProductionReportSyncService:
     @staticmethod
     def _sync_smt_reports():
         """同步SMT報工記錄"""
-        smt_reports = SMTProductionReport.objects.filter(
-            approval_status='approved'
-        ).select_related('workorder', 'equipment')
-        
-        for report in smt_reports:
-            ProductionReportSyncService._create_or_update_production_detail(
-                workorder=report.workorder,
-                process_name=report.operation,
-                report_date=report.work_date,
-                report_time=report.start_time or timezone.now(),
-                work_quantity=report.work_quantity or 0,
-                defect_quantity=report.defect_quantity or 0,
-                operator=None,  # SMT 不需要作業員
-                equipment=report.equipment.name if report.equipment else None,
-                report_source='smt',
-                start_time=report.start_time,
-                end_time=report.end_time,
-                # 新增工時相關欄位
-                work_hours=float(report.work_hours_calculated) if report.work_hours_calculated else 0.0,
-                overtime_hours=float(report.overtime_hours_calculated) if report.overtime_hours_calculated else 0.0,
-                # SMT 沒有休息時間相關欄位，設為預設值
-                has_break=False,
-                break_start_time=None,
-                break_end_time=None,
-                break_hours=0.0,
-                # 新增報工類型
-                report_type=report.report_type,
-                # SMT 沒有數量分配相關欄位，設為預設值
-                allocated_quantity=0,
-                quantity_source='original',
-                allocation_notes='',
-                # SMT 沒有完工相關欄位，設為預設值
-                is_completed=report.is_completed,
-                completion_method='manual',
-                auto_completed=False,
-                completion_time=None,
-                cumulative_quantity=0,
-                cumulative_hours=0.0,
-                # 新增核准相關欄位
-                approval_status=report.approval_status,
-                approved_by=report.approved_by,
-                approved_at=report.approved_at,
-                approval_remarks=report.approval_remarks,
-                rejection_reason=report.rejection_reason,
-                rejected_by=report.rejected_by,
-                rejected_at=report.rejected_at,
-                remarks=report.remarks,
-                abnormal_notes=report.abnormal_notes,
-                original_report_id=report.id,
-                original_report_type='smt'
-            )
+        try:
+            smt_reports = SMTProductionReport.objects.filter(
+                approval_status='approved'
+            ).select_related('workorder', 'equipment')
+            
+            logger.info(f"找到 {smt_reports.count()} 筆已核准的SMT報工記錄")
+            
+            for report in smt_reports:
+                try:
+                    ProductionReportSyncService._create_or_update_production_detail(
+                        workorder=report.workorder,
+                        process_name=report.operation,
+                        report_date=report.work_date,
+                        report_time=timezone.now(),
+                        work_quantity=report.work_quantity or 0,
+                        defect_quantity=report.defect_quantity or 0,
+                        operator=None,  # SMT 不需要作業員
+                        equipment=report.equipment.name if report.equipment else None,
+                        report_source='smt',
+                        start_time=report.start_time,
+                        end_time=report.end_time,
+                        # 新增工時相關欄位
+                        work_hours=float(report.work_hours_calculated) if report.work_hours_calculated else 0.0,
+                        overtime_hours=float(report.overtime_hours_calculated) if report.overtime_hours_calculated else 0.0,
+                        # SMT 沒有休息時間相關欄位，設為預設值
+                        has_break=False,
+                        break_start_time=None,
+                        break_end_time=None,
+                        break_hours=0.0,
+                        # 新增報工類型
+                        report_type=report.report_type,
+                        # SMT 沒有數量分配相關欄位，設為預設值
+                        allocated_quantity=0,
+                        quantity_source='original',
+                        allocation_notes='',
+                        # SMT 沒有完工相關欄位，設為預設值
+                        is_completed=report.is_completed,
+                        completion_method='manual',
+                        auto_completed=False,
+                        completion_time=None,
+                        cumulative_quantity=0,
+                        cumulative_hours=0.0,
+                        # 新增核准相關欄位
+                        approval_status=report.approval_status,
+                        approved_by=report.approved_by,
+                        approved_at=report.approved_at if report.approved_at else None,
+                        approval_remarks=report.approval_remarks,
+                        rejection_reason=report.rejection_reason,
+                        rejected_by=report.rejected_by,
+                        rejected_at=report.rejected_at if report.rejected_at else None,
+                        remarks=report.remarks,
+                        abnormal_notes=report.abnormal_notes,
+                        original_report_id=report.id,
+                        original_report_type='smt'
+                    )
+                except Exception as e:
+                    logger.error(f"同步SMT報工記錄 {report.id} 失敗: {str(e)}")
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"同步SMT報工記錄失敗: {str(e)}")
+            raise
     
     @staticmethod
     def _create_or_update_production_detail(
@@ -318,14 +329,14 @@ class ProductionReportSyncService:
                 operator_reports = OperatorSupplementReport.objects.filter(
                     workorder=workorder,
                     approval_status='approved'
-                ).select_related('operator', 'equipment')
+                ).select_related('operator', 'equipment', 'process')
                 
                 for report in operator_reports:
                     ProductionReportSyncService._create_or_update_production_detail(
                         workorder=workorder,
                         process_name=report.process.name if report.process else '',
                         report_date=report.work_date,
-                        report_time=report.start_time or timezone.now(),
+                        report_time=timezone.now(),
                         work_quantity=report.work_quantity or 0,
                         defect_quantity=report.defect_quantity or 0,
                         operator=report.operator.name if report.operator else None,
@@ -333,6 +344,35 @@ class ProductionReportSyncService:
                         report_source='operator_supplement',
                         start_time=report.start_time,
                         end_time=report.end_time,
+                        # 新增工時相關欄位
+                        work_hours=float(report.work_hours_calculated) if report.work_hours_calculated else 0.0,
+                        overtime_hours=float(report.overtime_hours_calculated) if report.overtime_hours_calculated else 0.0,
+                        # 新增休息時間相關欄位
+                        has_break=report.has_break,
+                        break_start_time=report.break_start_time,
+                        break_end_time=report.break_end_time,
+                        break_hours=float(report.break_hours) if report.break_hours else 0.0,
+                        # 新增報工類型
+                        report_type=report.report_type,
+                        # 新增數量相關欄位
+                        allocated_quantity=report.allocated_quantity or 0,
+                        quantity_source=report.quantity_source,
+                        allocation_notes=report.allocation_notes,
+                        # 新增完工相關欄位
+                        is_completed=report.is_completed,
+                        completion_method=report.completion_method,
+                        auto_completed=report.auto_completed,
+                        completion_time=report.completion_time,
+                        cumulative_quantity=report.cumulative_quantity or 0,
+                        cumulative_hours=float(report.cumulative_hours) if report.cumulative_hours else 0.0,
+                        # 新增核准相關欄位
+                        approval_status=report.approval_status,
+                        approved_by=report.approved_by,
+                        approved_at=report.approved_at if report.approved_at else None,
+                        approval_remarks=report.approval_remarks,
+                        rejection_reason=report.rejection_reason,
+                        rejected_by=report.rejected_by,
+                        rejected_at=report.rejected_at if report.rejected_at else None,
                         remarks=report.remarks,
                         abnormal_notes=report.abnormal_notes,
                         original_report_id=report.id,
@@ -350,7 +390,7 @@ class ProductionReportSyncService:
                         workorder=workorder,
                         process_name=report.operation,
                         report_date=report.work_date,
-                        report_time=report.start_time or timezone.now(),
+                        report_time=timezone.now(),
                         work_quantity=report.work_quantity or 0,
                         defect_quantity=report.defect_quantity or 0,
                         operator=None,
@@ -358,6 +398,35 @@ class ProductionReportSyncService:
                         report_source='smt',
                         start_time=report.start_time,
                         end_time=report.end_time,
+                        # 新增工時相關欄位
+                        work_hours=float(report.work_hours_calculated) if report.work_hours_calculated else 0.0,
+                        overtime_hours=float(report.overtime_hours_calculated) if report.overtime_hours_calculated else 0.0,
+                        # SMT 沒有休息時間相關欄位，設為預設值
+                        has_break=False,
+                        break_start_time=None,
+                        break_end_time=None,
+                        break_hours=0.0,
+                        # 新增報工類型
+                        report_type=report.report_type,
+                        # SMT 沒有數量分配相關欄位，設為預設值
+                        allocated_quantity=0,
+                        quantity_source='original',
+                        allocation_notes='',
+                        # SMT 沒有完工相關欄位，設為預設值
+                        is_completed=report.is_completed,
+                        completion_method='manual',
+                        auto_completed=False,
+                        completion_time=None,
+                        cumulative_quantity=0,
+                        cumulative_hours=0.0,
+                        # 新增核准相關欄位
+                        approval_status=report.approval_status,
+                        approved_by=report.approved_by,
+                        approved_at=report.approved_at if report.approved_at else None,
+                        approval_remarks=report.approval_remarks,
+                        rejection_reason=report.rejection_reason,
+                        rejected_by=report.rejected_by,
+                        rejected_at=report.rejected_at if report.rejected_at else None,
                         remarks=report.remarks,
                         abnormal_notes=report.abnormal_notes,
                         original_report_id=report.id,

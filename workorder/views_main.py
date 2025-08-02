@@ -3797,6 +3797,167 @@ def execute_maintenance(request):
                 'download_url': f'/media/archives/{archive_filename}'
             })
             
+        elif action == 'check_duplicates':
+            # 檢查重複資料但不刪除，只回報統計
+            duplicate_info = {
+                'operator_duplicates': [],
+                'smt_duplicates': [],
+                'total_operator_duplicates': 0,
+                'total_smt_duplicates': 0
+            }
+            
+            # 檢查作業員報工重複記錄
+            # 定義重複：所有重要欄位都完全相同
+            operator_duplicates = OperatorSupplementReport.objects.values(
+                'operator', 'workorder', 'process', 'work_date', 'start_time', 'end_time',
+                'work_quantity', 'defect_quantity', 'report_type', 'product_id',
+                'equipment', 'remarks', 'abnormal_notes'
+            ).annotate(
+                count=Count('id')
+            ).filter(count__gt=1)
+            
+            for duplicate in operator_duplicates:
+                reports = OperatorSupplementReport.objects.filter(
+                    operator=duplicate['operator'],
+                    workorder=duplicate['workorder'],
+                    process=duplicate['process'],
+                    work_date=duplicate['work_date'],
+                    start_time=duplicate['start_time'],
+                    end_time=duplicate['end_time'],
+                    work_quantity=duplicate['work_quantity'],
+                    defect_quantity=duplicate['defect_quantity'],
+                    report_type=duplicate['report_type'],
+                    product_id=duplicate['product_id'],
+                    equipment=duplicate['equipment'],
+                    remarks=duplicate['remarks'],
+                    abnormal_notes=duplicate['abnormal_notes']
+                ).select_related('operator', 'workorder', 'process').order_by('-created_at')
+                
+                duplicate_info['operator_duplicates'].append({
+                    'operator_name': reports[0].operator.name if reports[0].operator else '未知',
+                    'workorder_number': reports[0].workorder.workorder_number if reports[0].workorder else '未知',
+                    'process_name': reports[0].process.name if reports[0].process else '未知',
+                    'work_date': duplicate['work_date'].isoformat(),
+                    'start_time': duplicate['start_time'].isoformat(),
+                    'end_time': duplicate['end_time'].isoformat(),
+                    'duplicate_count': duplicate['count'],
+                    'report_ids': [str(r.id) for r in reports],
+                    'created_times': [r.created_at.isoformat() for r in reports]
+                })
+                duplicate_info['total_operator_duplicates'] += duplicate['count'] - 1
+            
+            # 檢查SMT報工重複記錄
+            # 定義重複：所有重要欄位都完全相同
+            smt_duplicates = SMTProductionReport.objects.values(
+                'equipment', 'workorder', 'rd_product_code', 'work_date', 'start_time', 'end_time',
+                'work_quantity', 'defect_quantity', 'report_type', 'product_id',
+                'operation', 'remarks', 'abnormal_notes'
+            ).annotate(
+                count=Count('id')
+            ).filter(count__gt=1)
+            
+            for duplicate in smt_duplicates:
+                reports = SMTProductionReport.objects.filter(
+                    equipment=duplicate['equipment'],
+                    workorder=duplicate['workorder'],
+                    rd_product_code=duplicate['rd_product_code'],
+                    work_date=duplicate['work_date'],
+                    start_time=duplicate['start_time'],
+                    end_time=duplicate['end_time'],
+                    work_quantity=duplicate['work_quantity'],
+                    defect_quantity=duplicate['defect_quantity'],
+                    report_type=duplicate['report_type'],
+                    product_id=duplicate['product_id'],
+                    operation=duplicate['operation'],
+                    remarks=duplicate['remarks'],
+                    abnormal_notes=duplicate['abnormal_notes']
+                ).select_related('equipment', 'workorder').order_by('-created_at')
+                
+                duplicate_info['smt_duplicates'].append({
+                    'equipment_name': reports[0].equipment.name if reports[0].equipment else '未知',
+                    'workorder_number': reports[0].workorder.workorder_number if reports[0].workorder else '未知',
+                    'product_code': duplicate['rd_product_code'] or '未知',
+                    'work_date': duplicate['work_date'].isoformat(),
+                    'start_time': duplicate['start_time'].isoformat(),
+                    'end_time': duplicate['end_time'].isoformat(),
+                    'duplicate_count': duplicate['count'],
+                    'report_ids': [str(r.id) for r in reports],
+                    'created_times': [r.created_at.isoformat() for r in reports]
+                })
+                duplicate_info['total_smt_duplicates'] += duplicate['count'] - 1
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'檢查完成：作業員報工重複 {duplicate_info["total_operator_duplicates"]} 筆，SMT報工重複 {duplicate_info["total_smt_duplicates"]} 筆',
+                'data': duplicate_info
+            })
+            
+        elif action == 'cleanup_duplicates':
+            # 清理重複資料
+            deleted_count = 0
+            
+            # 清理作業員報工重複記錄
+            # 定義重複：所有重要欄位都完全相同
+            operator_duplicates = OperatorSupplementReport.objects.values(
+                'operator', 'workorder', 'process', 'work_date', 'start_time', 'end_time',
+                'work_quantity', 'defect_quantity', 'report_type', 'product_id',
+                'equipment', 'remarks', 'abnormal_notes'
+            ).annotate(
+                count=Count('id')
+            ).filter(count__gt=1)
+            
+            for duplicate in operator_duplicates:
+                # 保留最新的記錄，刪除其他重複記錄
+                reports = OperatorSupplementReport.objects.filter(
+                    operator=duplicate['operator'],
+                    workorder=duplicate['workorder'],
+                    process=duplicate['process'],
+                    work_date=duplicate['work_date'],
+                    start_time=duplicate['start_time'],
+                    end_time=duplicate['end_time'],
+                    work_quantity=duplicate['work_quantity'],
+                    defect_quantity=duplicate['defect_quantity'],
+                    report_type=duplicate['report_type'],
+                    product_id=duplicate['product_id'],
+                    equipment=duplicate['equipment'],
+                    remarks=duplicate['remarks'],
+                    abnormal_notes=duplicate['abnormal_notes']
+                ).order_by('-work_date', '-start_time')
+                
+                # 刪除除最新記錄外的所有重複記錄
+                reports_to_delete = reports[1:]
+                deleted_count += reports_to_delete.count()
+                reports_to_delete.delete()
+            
+            # 清理SMT報工重複記錄
+            # 定義重複：相同的設備、工單、產品、報工時間
+            smt_duplicates = SMTProductionReport.objects.values(
+                'equipment', 'workorder', 'rd_product_code', 'work_date', 'start_time', 'end_time'
+            ).annotate(
+                count=Count('id')
+            ).filter(count__gt=1)
+            
+            for duplicate in smt_duplicates:
+                # 保留最新的記錄，刪除其他重複記錄
+                reports = SMTProductionReport.objects.filter(
+                    equipment=duplicate['equipment'],
+                    workorder=duplicate['workorder'],
+                    rd_product_code=duplicate['rd_product_code'],
+                    work_date=duplicate['work_date'],
+                    start_time=duplicate['start_time'],
+                    end_time=duplicate['end_time']
+                ).order_by('-work_date', '-start_time')
+                
+                # 刪除除最新記錄外的所有重複記錄
+                reports_to_delete = reports[1:]
+                deleted_count += reports_to_delete.count()
+                reports_to_delete.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'成功清理 {deleted_count} 筆重複資料'
+            })
+            
         else:
             return JsonResponse({'success': False, 'message': '不支援的操作類型'})
             

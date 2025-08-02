@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}已審核報工列表{% endblock %}
+
+{% block extra_head %}
+<style>
+    .search-filters {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .stats-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .stat-number {
+        font-size: 2em;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        font-size: 0.9em;
+        opacity: 0.9;
+    }
+    
+    .report-table {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .report-type-badge {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: bold;
+    }
+    
+    .badge-operator {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .badge-smt {
+        background-color: #cce5ff;
+        color: #004085;
+    }
+    
+    .table th {
+        background-color: #f8f9fa;
+        border-top: none;
+        font-weight: 600;
+    }
+    
+    .pagination {
+        justify-content: center;
+        margin-top: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-check-circle text-success"></i>
+                    已審核報工列表
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor:supervisor_functions' %}">主管功能</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor:supervisor_report_index' %}">審核管理</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">已審核報工列表</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="stats-cards">
+        <div class="stat-card">
+            <div class="stat-number">{{ total_approved }}</div>
+            <div class="stat-label">總已審核報工</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ operator_count }}</div>
+            <div class="stat-label">作業員報工</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ smt_count }}</div>
+            <div class="stat-label">SMT報工</div>
+        </div>
+    </div>
+
+    <!-- 搜尋和篩選 -->
+    <div class="search-filters">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="search" class="form-label">搜尋</label>
+                <input type="text" class="form-control" id="search" name="search" 
+                       value="{{ search_query }}" placeholder="工單號、作業員、工序...">
+            </div>
+            <div class="col-md-3">
+                <label for="start_date" class="form-label">開始日期</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" 
+                       value="{{ start_date }}">
+            </div>
+            <div class="col-md-3">
+                <label for="end_date" class="form-label">結束日期</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" 
+                       value="{{ end_date }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> 搜尋
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 已審核報工列表 -->
+    <div class="report-table">
+        {% if page_obj %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>報工類型</th>
+                            <th>工單號</th>
+                            <th>作業員/設備</th>
+                            <th>工序</th>
+                            <th>報工日期</th>
+                            <th>良品數量</th>
+                            <th>不良品數量</th>
+                            <th>審核者</th>
+                            <th>審核時間</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for report in page_obj %}
+                        <tr>
+                            <td>
+                                <span class="report-type-badge {% if report.type == '作業員報工' %}badge-operator{% else %}badge-smt{% endif %}">
+                                    {{ report.type }}
+                                </span>
+                            </td>
+                            <td>
+                                <strong>{{ report.workorder }}</strong>
+                            </td>
+                            <td>{{ report.operator }}</td>
+                            <td>{{ report.process }}</td>
+                            <td>{{ report.work_date|date:"Y-m-d" }}</td>
+                            <td>
+                                <span class="text-success">{{ report.quantity }}</span>
+                            </td>
+                            <td>
+                                {% if report.defect_quantity > 0 %}
+                                    <span class="text-danger">{{ report.defect_quantity }}</span>
+                                {% else %}
+                                    <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ report.approved_by|default:"-" }}</td>
+                            <td>{{ report.approved_at|date:"m-d H:i" }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'workorder:supervisor:report_detail' report.report_id %}" 
+                                       class="btn btn-sm btn-info">
+                                        <i class="fas fa-eye"></i> 詳情
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分頁 -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="已審核報工分頁">
+                <ul class="pagination">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            <!-- 顯示結果統計 -->
+            <div class="text-center text-muted mt-3">
+                顯示第 {{ page_obj.start_index }} 到 {{ page_obj.end_index }} 筆，共 {{ total_approved }} 筆已審核報工記錄
+            </div>
+
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-check-circle text-success" style="font-size: 4em;"></i>
+                <h4 class="mt-3 text-muted">目前沒有已審核的報工記錄</h4>
+                <p class="text-muted">或者沒有符合搜尋條件的記錄</p>
+                {% if search_query or start_date or end_date %}
+                    <a href="{% url 'workorder:supervisor:approved_reports_list' %}" class="btn btn-primary">
+                        <i class="fas fa-times"></i> 清除篩選條件
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

@@ -851,3 +851,109 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
         template_name = 'supervisor/abnormal_detail_operator.html'  # 預設使用作業員模板
     
     return render(request, template_name, context) 
+
+
+@login_required
+def approved_reports_list(request):
+    """
+    已審核報工列表視圖 (Approved Reports List View)
+    顯示所有已審核的報工記錄（包含作業員報工、SMT報工）
+    """
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+    
+    # 獲取已審核的作業員報工記錄
+    approved_operator_reports = OperatorSupplementReport.objects.filter(
+        approval_status='approved'
+    ).select_related('operator', 'workorder', 'process').order_by('-approved_at')
+    
+    # 獲取已審核的SMT報工記錄
+    approved_smt_reports = SMTProductionReport.objects.filter(
+        approval_status='approved'
+    ).select_related('workorder').order_by('-approved_at')
+    
+    # 搜尋功能
+    search_query = request.GET.get('search', '')
+    if search_query:
+        approved_operator_reports = approved_operator_reports.filter(
+            Q(workorder__order_number__icontains=search_query) |
+            Q(operator__name__icontains=search_query) |
+            Q(process__name__icontains=search_query)
+        )
+        approved_smt_reports = approved_smt_reports.filter(
+            Q(workorder__order_number__icontains=search_query) |
+            Q(operation__icontains=search_query)
+        )
+    
+    # 日期篩選
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    
+    if start_date:
+        approved_operator_reports = approved_operator_reports.filter(approved_at__date__gte=start_date)
+        approved_smt_reports = approved_smt_reports.filter(approved_at__date__gte=start_date)
+    
+    if end_date:
+        approved_operator_reports = approved_operator_reports.filter(approved_at__date__lte=end_date)
+        approved_smt_reports = approved_smt_reports.filter(approved_at__date__lte=end_date)
+    
+    # 合併並排序所有已審核記錄
+    all_approved_reports = []
+    
+    for report in approved_operator_reports:
+        all_approved_reports.append({
+            'id': report.id,
+            'type': '作業員報工',
+            'workorder': report.workorder.order_number if report.workorder else '-',
+            'operator': report.operator.name if report.operator else '-',
+            'process': report.process.name if report.process else '-',
+            'quantity': report.work_quantity or 0,
+            'defect_quantity': report.defect_quantity or 0,
+            'work_date': report.work_date,
+            'approved_by': report.approved_by,
+            'approved_at': report.approved_at,
+            'report_id': report.id,
+            'report_type': 'operator'
+        })
+    
+    for report in approved_smt_reports:
+        all_approved_reports.append({
+            'id': report.id,
+            'type': 'SMT報工',
+            'workorder': report.workorder.order_number if report.workorder else '-',
+            'operator': 'SMT設備',
+            'process': report.operation,
+            'quantity': report.work_quantity or 0,
+            'defect_quantity': report.defect_quantity or 0,
+            'work_date': report.work_date,
+            'approved_by': report.approved_by,
+            'approved_at': report.approved_at,
+            'report_id': report.id,
+            'report_type': 'smt'
+        })
+    
+    # 按審核時間排序
+    all_approved_reports.sort(key=lambda x: x['approved_at'], reverse=True)
+    
+    # 分頁
+    paginator = Paginator(all_approved_reports, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # 統計資訊
+    total_approved = len(all_approved_reports)
+    operator_count = approved_operator_reports.count()
+    smt_count = approved_smt_reports.count()
+    
+    context = {
+        'page_obj': page_obj,
+        'total_approved': total_approved,
+        'operator_count': operator_count,
+        'smt_count': smt_count,
+        'search_query': search_query,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    
+    return render(request, 'supervisor/approved_reports_list.html', context) 

@@ -259,12 +259,15 @@
                         </div>
                         <button class="btn btn-maintenance 
                             {% if 'cleanup' in option.id %}danger
+                            {% elif 'check' in option.id %}info
                             {% elif 'backup' in option.id %}success
                             {% elif 'restore' in option.id %}warning
                             {% else %}info{% endif %}"
                             onclick="executeMaintenance('{{ option.id }}')">
                             {% if 'cleanup' in option.id %}
                                 <i class="fas fa-trash"></i> 執行
+                            {% elif 'check' in option.id %}
+                                <i class="fas fa-search"></i> 檢查
                             {% elif 'backup' in option.id %}
                                 <i class="fas fa-download"></i> 備份
                             {% elif 'restore' in option.id %}
@@ -327,6 +330,10 @@ function executeMaintenance(operation) {
         case 'cleanup_old':
             confirmMessage = '確定要清理30天前的報工記錄嗎？此操作無法復原！';
             operationName = '清理舊資料';
+            break;
+        case 'check_duplicates':
+            confirmMessage = '確定要檢查重複的報工記錄嗎？此操作只會檢查，不會刪除任何資料。';
+            operationName = '檢查重複資料';
             break;
         case 'cleanup_duplicates':
             confirmMessage = '確定要清理重複的報工記錄嗎？此操作無法復原！';
