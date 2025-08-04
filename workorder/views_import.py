@@ -15,7 +15,7 @@ from datetime import datetime, time
 from io import BytesIO
 
 from workorder.models import WorkOrder
-from workorder.workorder_reporting.models import OperatorSupplementReport
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
 from process.models import Operator, ProcessName
 from equip.models import Equipment
 from erp_integration.models import CompanyConfig
@@ -42,6 +42,7 @@ def operator_report_import_page(request):
 
 @csrf_exempt
 @login_required
+@user_passes_test(import_user_required, login_url='/login/')
 def operator_report_import_file(request):
     """
     作業員報工資料檔案匯入處理
@@ -256,9 +257,17 @@ def operator_report_import_file(request):
                 # 7. 驗證產品編號
                 product_code = str(row['產品編號']).strip()
                 if not product_code:
-                    errors.append(f'第 {index+1} 行：產品編號為空')
-                    error_count += 1
-                    continue
+                    # 如果產品編號為空，嘗試從工單取得
+                    if workorder and workorder.product_code:
+                        product_code = workorder.product_code
+                    else:
+                        # 如果還是沒有，設為預設值
+                        product_code = "未指定產品"
+                        logger.warning(f'第 {index+1} 行：產品編號為空，設為預設值')
+                
+                # 如果工單存在且有產品編號，優先使用工單中的產品編號
+                if workorder and workorder.product_code:
+                    product_code = workorder.product_code
                 
                 # 8. 驗證工序名稱
                 process_name = str(row['工序名稱']).strip()
@@ -272,6 +281,9 @@ def operator_report_import_file(request):
                     errors.append(f'第 {index+1} 行：找不到工序 "{process_name}"')
                     error_count += 1
                     continue
+                
+                # 設定工序名稱到 operation 欄位
+                operation_name = process.name
                 
                 # 9. 驗證報工數量
                 try:
@@ -299,48 +311,27 @@ def operator_report_import_file(request):
                         error_count += 1
                         continue
                 
-                # 11. 處理設備名稱（選填）- 直接操作 OperatorSupplementReport 的 equipment 欄位
+                # 11. 處理設備名稱（選填）
                 equipment = None
                 
-                # 詳細檢查設備名稱欄位
-                logger.info(f'第 {index+1} 行：開始處理設備名稱欄位')
-                logger.info(f'第 {index+1} 行：DataFrame 欄位: {list(df.columns)}')
-                logger.info(f'第 {index+1} 行：是否有設備名稱欄位: {"設備名稱" in df.columns}')
-                
-                if '設備名稱' in df.columns:
-                    logger.info(f'第 {index+1} 行：設備名稱欄位存在')
-                    equipment_value = row['設備名稱']
-                    logger.info(f'第 {index+1} 行：設備名稱原始值: "{equipment_value}" (類型: {type(equipment_value)})')
+                if '設備名稱' in df.columns and pd.notna(row['設備名稱']):
+                    equipment_name = str(row['設備名稱']).strip()
                     
-                    if pd.notna(equipment_value):
-                        equipment_name = str(equipment_value).strip()
-                        logger.info(f'第 {index+1} 行：設備名稱處理後: "{equipment_name}"')
+                    if equipment_name:
+                        # 先嘗試精確匹配
+                        equipment = Equipment.objects.filter(name=equipment_name).first()
                         
-                        if equipment_name:
-                            # 直接查找 Equipment 模型，不與其他報工模型產生關聯
-                            try:
-                                equipment = Equipment.objects.get(name=equipment_name)
-                                # 記錄成功找到設備
-                                logger.info(f'第 {index+1} 行：成功找到設備 "{equipment_name}" (ID: {equipment.id})')
-                            except Equipment.DoesNotExist:
-                                # 如果精確匹配失敗，嘗試不區分大小寫的查找
-                                try:
-                                    equipment = Equipment.objects.get(name__iexact=equipment_name)
-                                    skips.append(f'第 {index+1} 行：設備名稱大小寫不匹配 "{equipment_name}" -> "{equipment.name}"')
-                                    logger.info(f'第 {index+1} 行：設備名稱大小寫不匹配 "{equipment_name}" -> "{equipment.name}"')
-                                except Equipment.DoesNotExist:
-                                    # 如果還是找不到，記錄錯誤但不中斷匯入
-                                    errors.append(f'第 {index+1} 行：找不到設備 "{equipment_name}"，此記錄的設備欄位將設為空')
-                                    logger.warning(f'第 {index+1} 行：找不到設備 "{equipment_name}"，設備欄位設為空')
-                                    equipment = None  # 設為 None，不中斷匯入流程
-                        else:
-                            logger.info(f'第 {index+1} 行：設備名稱為空字串，設備欄位設為空')
-                    else:
-                        logger.info(f'第 {index+1} 行：設備名稱欄位為空 (NaN/None)，設備欄位設為空')
-                else:
-                    logger.warning(f'第 {index+1} 行：DataFrame 中沒有「設備名稱」欄位')
-                
-                logger.info(f'第 {index+1} 行：最終設備物件: {equipment}')
+                        if not equipment:
+                            # 如果精確匹配失敗，嘗試不區分大小寫的查找
+                            equipment = Equipment.objects.filter(name__iexact=equipment_name).first()
+                            
+                            if equipment:
+                                # 記錄大小寫不匹配的情況
+                                logger.info(f'第 {index+1} 行：設備名稱大小寫不匹配 "{equipment_name}" -> "{equipment.name}"')
+                            else:
+                                # 如果還是找不到，記錄警告但不中斷匯入
+                                logger.warning(f'第 {index+1} 行：找不到設備 "{equipment_name}"，設備欄位設為空')
+                                equipment = None
                 
                 # 12. 處理備註（選填）
                 remarks = ""
@@ -353,26 +344,36 @@ def operator_report_import_file(request):
                     abnormal_notes = str(row['異常紀錄']).strip()
                 
                 # 14. 檢查是否已存在相同記錄（避免重複匯入）
-                existing_report = OperatorSupplementReport.objects.filter(
-                    operator=operator,
-                    workorder=workorder,
-                    process=process,
-                    work_date=work_date,
-                    start_time=start_time,
-                    end_time=end_time
-                ).first()
-                
-                if existing_report:
-                    skips.append(f'第 {index+1} 行：已存在相同記錄，跳過匯入')
-                    skip_count += 1
-                    continue
+                # 暫時註解掉重複檢查功能，讓所有資料都能匯入
+                # existing_query = OperatorSupplementReport.objects.filter(
+                #     operator=operator,
+                #     work_date=work_date,
+                #     start_time=start_time,
+                #     end_time=end_time,
+                #     process=process
+                # )
+                # 
+                # # 如果工單存在，加入工單條件
+                # if workorder:
+                #     existing_query = existing_query.filter(workorder=workorder)
+                # else:
+                #     existing_query = existing_query.filter(original_workorder_number=workorder_number)
+                # 
+                # existing_report = existing_query.first()
+                # 
+                # if existing_report:
+                #     skips.append(f'第 {index+1} 行：已存在相同記錄（作業員、日期、時間、工序、工單），跳過匯入')
+                #     skip_count += 1
+                #     continue
                 
                 # 15. 建立報工記錄
                 # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
                 report_data = {
                     'operator': operator,
                     'process': process,
+                    'operation': operation_name,  # 確保工序名稱包含在內
                     'equipment': equipment,  # 確保設備欄位包含在內
+                    'product_id': product_code,  # 確保產品編號包含在內
                     'work_date': work_date,
                     'start_time': start_time,
                     'end_time': end_time,
@@ -383,9 +384,9 @@ def operator_report_import_file(request):
                     'created_by': request.user.username
                 }
                 
-                # 記錄設備資訊，用於除錯
-                logger.info(f'第 {index+1} 行：準備建立記錄，設備資訊: {equipment.name if equipment else "無設備"}')
-                logger.info(f'第 {index+1} 行：report_data 中的 equipment: {report_data["equipment"]}')
+                # 如果工單存在，設定預設生產數量
+                if workorder:
+                    report_data['planned_quantity'] = workorder.quantity
                 
                 if workorder:
                     # 如果工單存在，使用正常的 workorder 欄位
@@ -396,17 +397,9 @@ def operator_report_import_file(request):
                 
                 report = OperatorSupplementReport.objects.create(**report_data)
                 
-                # 記錄建立後的設備資訊，用於除錯
-                logger.info(f'第 {index+1} 行：記錄建立成功，ID: {report.id}')
-                logger.info(f'第 {index+1} 行：建立後的設備欄位: {report.equipment.name if report.equipment else "無設備"}')
-                
                 # 16. 自動計算工時
                 report.calculate_work_hours()
                 report.save()
-                
-                # 再次檢查保存後的設備資訊
-                report.refresh_from_db()
-                logger.info(f'第 {index+1} 行：保存後的設備欄位: {report.equipment.name if report.equipment else "無設備"}')
                 
                 success_count += 1
                 
@@ -450,7 +443,6 @@ def operator_report_import_file(request):
 
 
 @login_required
-@user_passes_test(import_user_required, login_url='/login/')
 def download_import_template(request):
     """
     下載匯入範本檔案
@@ -486,9 +478,9 @@ def download_import_template(request):
         
         # 範例資料
         example_data = [
-            ['張小明', '01', '2025-01-15', '08:00', '12:00', 'WO-01-202501001', 'PROD-001', 'SMT', 'SMT-001', 100, 2, '正常生產', ''],
-            ['李小華', '01', '2025/01/15', '13:00', '17:00', 'WO-01-202501001', 'PROD-001', 'DIP', 'DIP-001', 95, 5, '設備調整', '設備故障30分鐘'],
-            ['王小美', '02', '2025.01.15', '08:00', '16:00', 'WO-02-202501002', 'PROD-002', '測試', '', 200, 0, '加班生產', ''],
+            ['王 珍', '02', '2025-01-15', '08:00', '12:00', 'WO-02-202501001', 'PROD-001', '後焊', 'AOI-1', 100, 2, '正常生產', ''],
+            ['蔡秉儒', '02', '2025/01/15', '13:00', '17:00', 'WO-02-202501001', 'PROD-001', '電測', 'AOI-2', 95, 5, '設備調整', '設備故障30分鐘'],
+            ['林淑惠', '02', '2025.01.15', '08:00', '16:00', 'WO-02-202501002', 'PROD-002', '出貨包裝', '', 200, 0, '加班生產', ''],
         ]
         
         # 寫入範例資料
@@ -531,7 +523,6 @@ def download_import_template(request):
 
 
 @login_required
-@user_passes_test(import_user_required, login_url='/login/')
 def get_import_field_guide(request):
     """
     取得匯入欄位格式說明
@@ -854,19 +845,12 @@ def smt_report_import_file(request):
                     error_count += 1
                     continue
                 
-                # 6. 驗證工單號碼格式（不檢查是否存在，因為是匯入舊資料）
+                # 6. 驗證工單號碼格式
                 workorder_number = str(row['工單號']).strip()
                 if not workorder_number:
                     errors.append(f'第 {index+1} 行：工單號為空')
                     error_count += 1
                     continue
-                
-                # 對於舊資料匯入，不檢查工單是否存在，直接使用工單號碼
-                # 如果工單不存在，將使用工單號碼作為字串儲存
-                workorder = WorkOrder.objects.filter(
-                    company_code=company_code,
-                    order_number=workorder_number
-                ).first()
                 
                 # 7. 驗證產品編號
                 product_code = str(row['產品編號']).strip()
@@ -874,6 +858,12 @@ def smt_report_import_file(request):
                     errors.append(f'第 {index+1} 行：產品編號為空')
                     error_count += 1
                     continue
+                
+                # 8. 查找工單（如果不存在，將使用工單號碼作為字串儲存）
+                workorder = WorkOrder.objects.filter(
+                    company_code=company_code,
+                    order_number=workorder_number
+                ).first()
                 
                 # 8. 驗證並取得工序
                 process_name = str(row['工序名稱']).strip()
@@ -919,27 +909,27 @@ def smt_report_import_file(request):
                     abnormal_notes = str(row['異常紀錄']).strip()
                 
                 # 13. 檢查是否已存在相同記錄（避免重複匯入）
-                from workorder.workorder_reporting.models import SMTProductionReport
-                
-                existing_report = SMTProductionReport.objects.filter(
-                    equipment=equipment,
-                    workorder=workorder,
-                    operation=process_name,
-                    work_date=work_date,
-                    start_time=start_time,
-                    end_time=end_time
-                ).first()
-                
-                if existing_report:
-                    skips.append(f'第 {index+1} 行：已存在相同記錄，跳過匯入')
-                    skip_count += 1
-                    continue
+                # 暫時註解掉重複檢查功能，讓所有資料都能匯入
+                # from workorder.workorder_reporting.models import SMTProductionReport
+                # 
+                # existing_report = SMTProductionReport.objects.filter(
+                #     equipment=equipment,
+                #     workorder=workorder,
+                #     operation=process_name,
+                #     work_date=work_date,
+                #     start_time=start_time,
+                #     end_time=end_time
+                # ).first()
+                # 
+                # if existing_report:
+                #     skips.append(f'第 {index+1} 行：已存在相同記錄，跳過匯入')
+                #     skip_count += 1
+                #     continue
                 
                 # 14. 建立SMT報工記錄
-                # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
                 report_data = {
                     'equipment': equipment,
-                    'product_id': product_code,
+                    'product_id': product_code,  # 確保產品編號寫入
                     'operation': process_name,
                     'work_date': work_date,
                     'start_time': start_time,
@@ -954,9 +944,14 @@ def smt_report_import_file(request):
                 if workorder:
                     # 如果工單存在，使用正常的 workorder 欄位
                     report_data['workorder'] = workorder
+                    # 同時確保產品編號也寫入（從工單取得或使用匯入的）
+                    if workorder.product_code:
+                        report_data['product_id'] = workorder.product_code
                 else:
                     # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
                     report_data['original_workorder_number'] = workorder_number
+                    # 產品編號使用匯入的資料
+                    report_data['product_id'] = product_code
                 
                 report = SMTProductionReport.objects.create(**report_data)
                 
@@ -1332,7 +1327,6 @@ def smt_report_export(request):
 
 
 @login_required
-@user_passes_test(import_user_required, login_url='/login/')
 def operator_report_export(request):
     """
     匯出作業員報工資料

@@ -824,6 +824,11 @@ class OperatorSupplementReport(models.Model):
         return self.process.name if self.process else ""
 
     @property
+    def equipment_name(self):
+        """取得設備名稱"""
+        return self.equipment.name if self.equipment else "未指定設備"
+
+    @property
     def total_quantity(self):
         """取得總數量（工作數量 + 不良品數量）"""
         return self.work_quantity + self.defect_quantity

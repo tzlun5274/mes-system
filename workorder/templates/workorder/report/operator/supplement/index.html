@@ -190,16 +190,7 @@
                                 <i class="fas fa-user-clock"></i> 作業員現場報工
                             </a>
                         </div>
-                        <div class="col-md-2">
-                            <a href="{% url 'workorder:operator_supplement_export' %}" class="btn btn-success btn-lg btn-block mb-2">
-                                <i class="fas fa-download"></i> 匯出資料
-                            </a>
-                        </div>
-                        <div class="col-md-2">
-                            <a href="{% url 'workorder:operator_supplement_template' %}" class="btn btn-secondary btn-lg btn-block mb-2">
-                                <i class="fas fa-file-excel"></i> 下載範本
-                            </a>
-                        </div>
+
                         {% endif %}
                         {% if user.is_superuser %}
                         <div class="col-md-3 ml-auto">
@@ -252,17 +243,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="status">核准狀態</label>
-                                <select class="form-control" id="status" name="status">
-                                    <option value="">全部狀態</option>
-                                                                <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>待核准</option>
-                            <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>已核准</option>
-                                    <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>已駁回</option>
-                                </select>
-                            </div>
-                        </div>
+
                         <div class="col-md-2">
                             <div class="form-group">
                                 <label for="date_from">開始日期</label>
@@ -387,9 +368,18 @@
                                 {% else %}
                                     <tr>
                                         <td colspan="10" class="text-center text-muted">
-                                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                                            <i class="fas fa-search fa-2x mb-2"></i>
                                             <br>
-                                            目前沒有補登報工記錄
+                                            {% if request.GET %}
+                                                沒有符合篩選條件的記錄
+                                                <br>
+                                                <small class="text-muted">
+                                                    請嘗試調整篩選條件或
+                                                    <a href="{% url 'workorder:operator_supplement_report_index' %}" class="text-primary">清除所有篩選條件</a>
+                                                </small>
+                                            {% else %}
+                                                目前沒有補登報工記錄
+                                            {% endif %}
                                         </td>
                                     </tr>
                                 {% endif %}
@@ -397,8 +387,18 @@
                         </table>
                     </div>
                     
+                    <!-- 分頁資訊 -->
+                    <div class="row mt-3">
+                        <div class="col-12 text-center">
+                            <p class="text-muted">
+                                顯示第 {{ supplement_reports.number }} 頁，共 {{ supplement_reports.paginator.num_pages }} 頁
+                                (總計 {{ supplement_reports.paginator.count }} 筆記錄)
+                            </p>
+                        </div>
+                    </div>
+                    
                     <!-- 分頁 -->
-                    {% if supplement_reports.has_other_pages %}
+                    {% if supplement_reports.paginator.num_pages > 1 %}
                     <nav aria-label="補登報工分頁">
                         <ul class="pagination justify-content-center">
                             {% if supplement_reports.has_previous %}
@@ -488,7 +488,6 @@
         document.getElementById('operator').value = '';
         document.getElementById('workorder').value = '';
         document.getElementById('process').value = '';
-        document.getElementById('status').value = '';
         document.getElementById('date_from').value = '';
         document.getElementById('date_to').value = '';
         document.getElementById('searchForm').submit();

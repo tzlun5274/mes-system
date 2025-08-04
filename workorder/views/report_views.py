@@ -61,7 +61,7 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
     model = OperatorSupplementReport
     template_name = 'workorder/report/operator/supplement/index.html'
     context_object_name = 'supplement_reports'
-    paginate_by = 20
+    paginate_by = 50
     ordering = ['-work_date', '-start_time']
 
     def get_queryset(self):
@@ -80,10 +80,6 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
         process_id = self.request.GET.get('process')
         if process_id and process_id != '':
             queryset = queryset.filter(process_id=process_id)
-        
-        status = self.request.GET.get('status')
-        if status and status != '':
-            queryset = queryset.filter(approval_status=status)
         
         date_from = self.request.GET.get('date_from')
         if date_from and date_from != '':
@@ -131,7 +127,6 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
             'selected_operator': self.request.GET.get('operator'),
             'selected_workorder': self.request.GET.get('workorder'),
             'selected_process': self.request.GET.get('process'),
-            'selected_status': self.request.GET.get('status'),
             'selected_date_from': self.request.GET.get('date_from'),
             'selected_date_to': self.request.GET.get('date_to'),
         })
