@@ -289,6 +289,42 @@
     .fs-6 {
         font-size: 1rem !important;
     }
+    
+    /* 序號樣式 */
+    .sequence-number {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        line-height: 24px;
+        text-align: center;
+        border-radius: 50%;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: white;
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    /* 工序統計表格樣式 */
+    .process-stats-table {
+        font-size: 0.9em;
+    }
+    
+    .process-stats-table th {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+        font-weight: 600;
+        text-align: center;
+    }
+    
+    .process-stats-table td {
+        vertical-align: middle;
+        text-align: center;
+    }
+    
+    .process-stats-table .badge {
+        font-size: 0.8em;
+    }
 </style>
 {% endblock %}
 
@@ -499,6 +535,7 @@
                     <table class="table table-hover">
                         <thead>
                             <tr>
+                                <th style="width: 60px;">序號</th>
                                 <th>報工日期</th>
                                 <th>工序名稱</th>
                                 <th>作業員</th>
@@ -512,6 +549,9 @@
                         <tbody>
                             {% for report in all_production_reports %}
                             <tr>
+                                <td class="text-center">
+                                    <span class="badge bg-primary">{{ forloop.counter }}</span>
+                                </td>
                                 <td>{{ report.report_date|date:"Y-m-d" }}</td>
                                 <td>{{ report.process_name }}</td>
                                 <td>{{ report.operator }}</td>
@@ -624,9 +664,10 @@
                 
                 <!-- 按工序統計表格 -->
                 <div class="table-responsive">
-                    <table class="table table-hover stats-table">
+                    <table class="table table-hover stats-table process-stats-table">
                         <thead>
                             <tr>
+                                <th style="width: 60px;">序號</th>
                                 <th>工序名稱</th>
                                 <th>合格品總數</th>
                                 <th>不良品總數</th>
@@ -639,6 +680,9 @@
                         <tbody>
                             {% for process_name, stats in production_stats_by_process.items %}
                             <tr>
+                                <td class="text-center">
+                                    <span class="badge bg-primary">{{ forloop.counter }}</span>
+                                </td>
                                 <td>
                                     <strong>{{ stats.process_name }}</strong>
                                 </td>

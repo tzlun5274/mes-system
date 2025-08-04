@@ -590,7 +590,7 @@ class WorkOrderProductionDetail(models.Model):
         verbose_name = "生產報工明細"
         verbose_name_plural = "生產報工明細"
         db_table = "workorder_production_detail"
-        ordering = ["-report_date", "-report_time"]
+        ordering = ["process_name", "start_time", "report_time"]  # 按工序名稱、開始時間、報工時間排序
         indexes = [
             # 優化完工判斷查詢的複合索引
             models.Index(fields=['workorder_production', 'process_name', 'report_source'], 
@@ -599,6 +599,8 @@ class WorkOrderProductionDetail(models.Model):
             models.Index(fields=['report_date'], name='idx_prod_detail_date'),
             # 優化按工序查詢的索引
             models.Index(fields=['process_name'], name='idx_prod_detail_process'),
+            # 優化按開始時間查詢的索引
+            models.Index(fields=['start_time'], name='idx_prod_detail_start_time'),
         ]
 
     def __str__(self):
@@ -766,6 +768,10 @@ class CompletedProductionReport(models.Model):
     approved_by = models.CharField(max_length=100, null=True, blank=True, verbose_name="審核者")
     approved_at = models.DateTimeField(auto_now_add=True, verbose_name="審核時間")
     
+    # 自動分配標記
+    allocated_at = models.DateTimeField(null=True, blank=True, verbose_name="分配時間")
+    allocation_method = models.CharField(max_length=50, null=True, blank=True, verbose_name="分配方式")
+    
     class Meta:
         verbose_name = "已完工生產報工記錄"
         verbose_name_plural = "已完工生產報工記錄"
@@ -774,6 +780,245 @@ class CompletedProductionReport(models.Model):
 
     def __str__(self):
         return f"{self.completed_workorder.order_number} - {self.process_name} - {self.report_date}"
+
+
+class AutoAllocationSettings(models.Model):
+    """
+    自動分配設定模型
+    用於管理自動分配功能的執行設定
+    """
+    
+    # 基本設定
+    enabled = models.BooleanField(
+        default=False,
+        verbose_name="啟用自動執行",
+        help_text="是否啟用自動分配功能"
+    )
+    
+    interval_minutes = models.IntegerField(
+        default=30,
+        verbose_name="執行頻率（分鐘）",
+        help_text="自動執行的間隔時間"
+    )
+    
+    start_time = models.TimeField(
+        default="08:00",
+        verbose_name="開始時間",
+        help_text="允許執行的開始時間"
+    )
+    
+    end_time = models.TimeField(
+        default="18:00",
+        verbose_name="結束時間",
+        help_text="允許執行的結束時間"
+    )
+    
+    max_execution_time = models.IntegerField(
+        default=30,
+        verbose_name="最大執行時間（分鐘）",
+        help_text="單次執行的最大時間限制"
+    )
+    
+    notification_enabled = models.BooleanField(
+        default=True,
+        verbose_name="啟用通知",
+        help_text="是否啟用執行結果通知"
+    )
+    
+    # 執行狀態
+    is_running = models.BooleanField(
+        default=False,
+        verbose_name="正在執行",
+        help_text="當前是否正在執行"
+    )
+    
+    last_execution = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="最後執行時間",
+        help_text="最近一次執行的時間"
+    )
+    
+    next_execution = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="下次執行時間",
+        help_text="預定的下次執行時間"
+    )
+    
+    # 統計資訊
+    total_executions = models.IntegerField(
+        default=0,
+        verbose_name="總執行次數",
+        help_text="累計執行次數"
+    )
+    
+    success_count = models.IntegerField(
+        default=0,
+        verbose_name="成功次數",
+        help_text="成功執行的次數"
+    )
+    
+    failure_count = models.IntegerField(
+        default=0,
+        verbose_name="失敗次數",
+        help_text="執行失敗的次數"
+    )
+    
+    total_execution_time = models.DurationField(
+        null=True,
+        blank=True,
+        verbose_name="總執行時間",
+        help_text="累計執行時間"
+    )
+    
+    # 系統欄位
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    
+    class Meta:
+        verbose_name = "自動分配設定"
+        verbose_name_plural = "自動分配設定"
+        db_table = "workorder_auto_allocation_settings"
+    
+    def __str__(self):
+        return f"自動分配設定 (啟用: {self.enabled}, 頻率: {self.interval_minutes}分鐘)"
+    
+    @property
+    def avg_execution_time(self):
+        """計算平均執行時間"""
+        if self.total_executions > 0 and self.total_execution_time:
+            total_seconds = self.total_execution_time.total_seconds()
+            return total_seconds / self.total_executions
+        return 0
+    
+    def get_avg_execution_time_display(self):
+        """取得平均執行時間的顯示格式"""
+        avg_seconds = self.avg_execution_time
+        if avg_seconds < 60:
+            return f"{avg_seconds:.1f}秒"
+        elif avg_seconds < 3600:
+            return f"{avg_seconds/60:.1f}分鐘"
+        else:
+            return f"{avg_seconds/3600:.1f}小時"
+    
+    def is_within_execution_window(self):
+        """檢查當前時間是否在執行時間範圍內"""
+        from django.utils import timezone
+        from datetime import time
+        
+        now = timezone.now().time()
+        return self.start_time <= now <= self.end_time
+    
+    def should_execute(self):
+        """判斷是否應該執行"""
+        if not self.enabled:
+            return False
+        
+        # 移除執行時間範圍檢查，允許全天候執行
+        # if not self.is_within_execution_window():
+        #     return False
+        
+        if self.is_running:
+            return False
+        
+        if self.next_execution and timezone.now() < self.next_execution:
+            return False
+        
+        return True
+
+
+class AutoAllocationLog(models.Model):
+    """
+    自動分配執行記錄模型
+    記錄每次自動分配的執行結果
+    """
+    
+    # 執行資訊
+    started_at = models.DateTimeField(
+        verbose_name="開始時間",
+        help_text="執行開始時間"
+    )
+    
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="完成時間",
+        help_text="執行完成時間"
+    )
+    
+    execution_time = models.DurationField(
+        null=True,
+        blank=True,
+        verbose_name="執行時間",
+        help_text="實際執行時間"
+    )
+    
+    # 執行結果
+    success = models.BooleanField(
+        default=False,
+        verbose_name="執行成功",
+        help_text="是否執行成功"
+    )
+    
+    total_workorders = models.IntegerField(
+        default=0,
+        verbose_name="處理工單數",
+        help_text="本次處理的工單數量"
+    )
+    
+    successful_allocations = models.IntegerField(
+        default=0,
+        verbose_name="成功分配數",
+        help_text="成功分配的工單數量"
+    )
+    
+    failed_allocations = models.IntegerField(
+        default=0,
+        verbose_name="失敗分配數",
+        help_text="分配失敗的工單數量"
+    )
+    
+    # 錯誤資訊
+    error_message = models.TextField(
+        blank=True,
+        verbose_name="錯誤訊息",
+        help_text="執行失敗時的錯誤訊息"
+    )
+    
+    # 詳細結果
+    result_details = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name="詳細結果",
+        help_text="執行的詳細結果資訊"
+    )
+    
+    # 系統欄位
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    
+    class Meta:
+        verbose_name = "自動分配執行記錄"
+        verbose_name_plural = "自動分配執行記錄"
+        db_table = "workorder_auto_allocation_log"
+        ordering = ['-started_at']
+    
+    def __str__(self):
+        status = "成功" if self.success else "失敗"
+        return f"自動分配記錄 ({self.started_at.strftime('%Y-%m-%d %H:%M')}) - {status}"
+    
+    @property
+    def execution_time_display(self):
+        """取得執行時間的顯示格式"""
+        if self.execution_time:
+            total_seconds = self.execution_time.total_seconds()
+            if total_seconds < 60:
+                return f"{total_seconds:.1f}秒"
+            elif total_seconds < 3600:
+                return f"{total_seconds/60:.1f}分鐘"
+            else:
+                return f"{total_seconds/3600:.1f}小時"
+        return "--"
 
 
 

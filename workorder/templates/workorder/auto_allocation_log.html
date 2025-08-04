@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .log-table {
+        margin-top: 20px;
+    }
+    
+    .log-table th {
+        background-color: #007bff;
+        color: white;
+        border-top: none;
+        font-weight: 600;
+    }
+    
+    .status-success {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-failure {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-running {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .execution-time {
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .stats-number {
+        font-size: 2em;
+        font-weight: bold;
+    }
+    
+    .stats-label {
+        font-size: 0.9em;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-robot"></i> {{ title }}
+                </h2>
+                <div>
+                    <button type="button" class="btn btn-primary" onclick="window.close()">
+                        <i class="fas fa-times"></i> 關閉
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 統計資訊 -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="stats-card text-center">
+                        <div class="stats-number">{{ logs.count }}</div>
+                        <div class="stats-label">總執行次數</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card text-center">
+                        <div class="stats-number">{{ logs|length }}</div>
+                        <div class="stats-label">顯示記錄數</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card text-center">
+                        <div class="stats-number">
+                            {% for log in logs %}
+                                {% if log.success %}
+                                    {{ forloop.counter }}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="stats-label">成功次數</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card text-center">
+                        <div class="stats-number">
+                            {% for log in logs %}
+                                {% if not log.success %}
+                                    {{ forloop.counter }}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="stats-label">失敗次數</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 執行記錄表格 -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> 執行記錄
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover log-table">
+                            <thead>
+                                <tr>
+                                    <th>執行時間</th>
+                                    <th>狀態</th>
+                                    <th>處理工單數</th>
+                                    <th>成功分配</th>
+                                    <th>失敗分配</th>
+                                    <th>執行時間</th>
+                                    <th>錯誤訊息</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if logs %}
+                                    {% for log in logs %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ log.started_at|date:"Y-m-d" }}</strong><br>
+                                            <small>{{ log.started_at|time:"H:i:s" }}</small>
+                                        </td>
+                                        <td>
+                                            {% if log.success %}
+                                                <span class="badge status-success">成功</span>
+                                            {% else %}
+                                                <span class="badge status-failure">失敗</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-info">{{ log.total_workorders }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-success">{{ log.successful_allocations }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-danger">{{ log.failed_allocations }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="execution-time">{{ log.execution_time_display }}</span>
+                                        </td>
+                                        <td>
+                                            {% if log.error_message %}
+                                                <span class="text-danger" title="{{ log.error_message }}">
+                                                    {{ log.error_message|truncatechars:50 }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">--</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-outline-info" 
+                                                    onclick="viewLogDetail({{ log.id }})" title="查看詳情">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted">
+                                            <i class="fas fa-info-circle fa-2x mb-2"></i>
+                                            <br>
+                                            目前沒有執行記錄
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 詳情模態框 -->
+<div class="modal fade" id="logDetailModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">執行記錄詳情</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="logDetailContent">
+                <!-- 詳情內容將在這裡動態載入 -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function viewLogDetail(logId) {
+        // 這裡可以實現查看詳細記錄的功能
+        // 目前只是顯示一個提示
+        alert('查看記錄詳情功能正在開發中...\n記錄ID: ' + logId);
+    }
+    
+    // 自動刷新頁面（每30秒）
+    setInterval(function() {
+        location.reload();
+    }, 30000);
+</script>
+{% endblock %} 

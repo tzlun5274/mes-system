@@ -132,7 +132,7 @@
                                 <p><strong>產品編號:</strong> {{ report.product_id|default:"-" }}</p>
                                 <p><strong>報工類型:</strong> {{ report.get_report_type_display|default:"-" }}</p>
                             {% else %}
-                                <p><strong>工序代號:</strong> {{ report.process.code|default:"-" }}</p>
+                                <p><strong>使用設備:</strong> {{ report.equipment.name|default:"未指定設備" }}</p>
                                 <p><strong>產品編號:</strong> {{ report.product_id|default:"-" }}</p>
                                 <p><strong>工序描述:</strong> {{ report.process.description|default:"-" }}</p>
                             {% endif %}

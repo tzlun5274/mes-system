@@ -204,9 +204,23 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         total_stats['unique_operators'] = list(total_stats['unique_operators'])
         total_stats['unique_equipment'] = list(total_stats['unique_equipment'])
         
+        # 按照工序的實際執行順序排列統計資料
+        # 根據報工記錄的時間順序，確定工序的執行順序
+        process_order = {}
+        for i, report in enumerate(all_reports):
+            process_name = report['process_name']
+            if process_name not in process_order:
+                process_order[process_name] = i
+        
+        # 按照工序執行順序排序統計資料
+        sorted_stats_by_process = dict(sorted(
+            stats_by_process.items(),
+            key=lambda x: process_order.get(x[0], 999)  # 如果找不到順序，排在最後
+        ))
+        
         context['all_production_reports'] = all_reports
         context['total_reports_count'] = len(all_reports)
-        context['production_stats_by_process'] = dict(stats_by_process)
+        context['production_stats_by_process'] = sorted_stats_by_process
         context['production_total_stats'] = total_stats
         
         return context

@@ -255,6 +255,20 @@
                 <i class="fas fa-wrench"></i> 資料維護
             </button>
         </div>
+
+        <!-- 自動分配管理 -->
+        <div class="function-item">
+            <div class="function-icon">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="function-title">自動分配管理</div>
+            <div class="function-description">
+                管理自動分配功能，設定執行頻率、監控執行狀態等。
+            </div>
+            <button class="function-button" onclick="openAutoAllocationModal()">
+                <i class="fas fa-cog"></i> 管理設定
+            </button>
+        </div>
     </div>
 
     <!-- 最近異常記錄 -->
@@ -333,6 +347,148 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 自動分配設定模態框 -->
+<div class="modal fade" id="autoAllocationModal" tabindex="-1" role="dialog" aria-labelledby="autoAllocationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="autoAllocationModalLabel">
+                    <i class="fas fa-robot"></i> 自動分配管理
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- 當前狀態 -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card border-info">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0"><i class="fas fa-info-circle"></i> 當前狀態</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="currentStatus">
+                                    <p><strong>執行狀態：</strong><span id="executionStatus" class="badge badge-secondary">檢查中...</span></p>
+                                    <p><strong>執行頻率：</strong><span id="executionInterval">--</span></p>
+                                    <p><strong>最後執行：</strong><span id="lastExecution">--</span></p>
+                                    <p><strong>下次執行：</strong><span id="nextExecution">--</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0"><i class="fas fa-chart-bar"></i> 執行統計</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="executionStats">
+                                    <p><strong>今日執行：</strong><span id="todayExecutions">--</span></p>
+                                    <p><strong>成功次數：</strong><span id="successCount">--</span></p>
+                                    <p><strong>失敗次數：</strong><span id="failureCount">--</span></p>
+                                    <p><strong>平均執行時間：</strong><span id="avgExecutionTime">--</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 設定選項 -->
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header bg-warning text-dark">
+                                <h6 class="mb-0"><i class="fas fa-cog"></i> 自動執行設定</h6>
+                            </div>
+                            <div class="card-body">
+                                <form id="autoAllocationForm">
+                                    <div class="form-group">
+                                        <label for="executionEnabled">
+                                            <input type="checkbox" id="executionEnabled" name="executionEnabled">
+                                            啟用自動執行
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="executionInterval">執行頻率（分鐘）</label>
+                                        <select class="form-control" id="executionInterval" name="executionInterval">
+                                            <option value="5">5 分鐘</option>
+                                            <option value="10">10 分鐘</option>
+                                            <option value="15">15 分鐘</option>
+                                            <option value="30">30 分鐘</option>
+                                            <option value="60">1 小時</option>
+                                            <option value="120">2 小時</option>
+                                            <option value="240">4 小時</option>
+                                            <option value="480">8 小時</option>
+                                            <option value="1440">24 小時</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="executionTime">執行時間範圍</label>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label>開始時間</label>
+                                                <input type="time" class="form-control" id="startTime" name="startTime" value="08:00">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label>結束時間</label>
+                                                <input type="time" class="form-control" id="endTime" name="endTime" value="18:00">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="maxExecutionTime">最大執行時間（分鐘）</label>
+                                        <input type="number" class="form-control" id="maxExecutionTime" name="maxExecutionTime" value="30" min="1" max="120">
+                                        <small class="form-text text-muted">超過此時間的執行將被強制停止</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="notificationEnabled">
+                                            <input type="checkbox" id="notificationEnabled" name="notificationEnabled" checked>
+                                            啟用執行通知
+                                        </label>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0"><i class="fas fa-play"></i> 手動操作</h6>
+                            </div>
+                            <div class="card-body">
+                                <button type="button" class="btn btn-success btn-block mb-2" onclick="startManualExecution()">
+                                    <i class="fas fa-play"></i> 立即執行
+                                </button>
+                                <button type="button" class="btn btn-warning btn-block mb-2" onclick="stopAutoExecution()">
+                                    <i class="fas fa-pause"></i> 停止自動執行
+                                </button>
+                                <button type="button" class="btn btn-info btn-block mb-2" onclick="refreshStatus()">
+                                    <i class="fas fa-sync"></i> 刷新狀態
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-block" onclick="viewExecutionLog()">
+                                    <i class="fas fa-list"></i> 查看執行記錄
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveAutoAllocationSettings()">
+                    <i class="fas fa-save"></i> 儲存設定
+                </button>
             </div>
         </div>
     </div>
@@ -428,6 +584,154 @@
             // 導向異常處理頁面
             window.location.href = "{% url 'workorder:supervisor:abnormal_management' %}";
         }
+    }
+    
+    // 自動分配管理相關函數
+    function openAutoAllocationModal() {
+        $('#autoAllocationModal').modal('show');
+        loadAutoAllocationStatus();
+    }
+    
+    // 載入自動分配狀態
+    function loadAutoAllocationStatus() {
+        showLoading();
+        fetch('{% url "workorder:auto_allocation_status" %}')
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                updateStatusDisplay(data);
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('載入狀態失敗:', error);
+                alert('載入狀態失敗，請稍後再試');
+            });
+    }
+    
+    // 更新狀態顯示
+    function updateStatusDisplay(data) {
+        // 更新執行狀態
+        const statusElement = document.getElementById('executionStatus');
+        if (data.is_running) {
+            statusElement.textContent = '執行中';
+            statusElement.className = 'badge badge-success';
+        } else {
+            statusElement.textContent = '已停止';
+            statusElement.className = 'badge badge-secondary';
+        }
+        
+        // 更新其他狀態資訊
+        document.getElementById('executionInterval').textContent = data.interval_minutes + ' 分鐘';
+        document.getElementById('lastExecution').textContent = data.last_execution || '--';
+        document.getElementById('nextExecution').textContent = data.next_execution || '--';
+        document.getElementById('todayExecutions').textContent = data.today_executions || '0';
+        document.getElementById('successCount').textContent = data.success_count || '0';
+        document.getElementById('failureCount').textContent = data.failure_count || '0';
+        document.getElementById('avgExecutionTime').textContent = data.avg_execution_time || '--';
+        
+        // 更新表單設定
+        document.getElementById('executionEnabled').checked = data.enabled;
+        document.getElementById('executionInterval').value = data.interval_minutes;
+        document.getElementById('startTime').value = data.start_time;
+        document.getElementById('endTime').value = data.end_time;
+        document.getElementById('maxExecutionTime').value = data.max_execution_time;
+        document.getElementById('notificationEnabled').checked = data.notification_enabled;
+    }
+    
+    // 儲存自動分配設定
+    function saveAutoAllocationSettings() {
+        const formData = new FormData(document.getElementById('autoAllocationForm'));
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        showLoading();
+        fetch('{% url "workorder:auto_allocation_settings" %}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                alert('設定儲存成功！');
+                $('#autoAllocationModal').modal('hide');
+                loadAutoAllocationStatus();
+            } else {
+                alert('設定儲存失敗：' + data.message);
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            console.error('儲存設定失敗:', error);
+            alert('儲存設定失敗，請稍後再試');
+        });
+    }
+    
+    // 立即執行自動分配
+    function startManualExecution() {
+        if (confirmAction('確定要立即執行自動分配嗎？')) {
+            showLoading();
+            fetch('{% url "workorder:auto_allocation_execute" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    alert('自動分配執行成功！\n處理工單數：' + data.total_workorders + '\n成功分配：' + data.successful_allocations);
+                    loadAutoAllocationStatus();
+                } else {
+                    alert('自動分配執行失敗：' + data.message);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('執行失敗:', error);
+                alert('執行失敗，請稍後再試');
+            });
+        }
+    }
+    
+    // 停止自動執行
+    function stopAutoExecution() {
+        if (confirmAction('確定要停止自動執行嗎？')) {
+            showLoading();
+            fetch('{% url "workorder:auto_allocation_stop" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    alert('自動執行已停止！');
+                    loadAutoAllocationStatus();
+                } else {
+                    alert('停止失敗：' + data.message);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('停止失敗:', error);
+                alert('停止失敗，請稍後再試');
+            });
+        }
+    }
+    
+    // 刷新狀態
+    function refreshStatus() {
+        loadAutoAllocationStatus();
+    }
+    
+    // 查看執行記錄
+    function viewExecutionLog() {
+        window.open('{% url "workorder:auto_allocation_log" %}', '_blank');
     }
 </script>
 {% endblock %} 

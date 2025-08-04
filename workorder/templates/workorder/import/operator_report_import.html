@@ -1,10 +1,42 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}作業員報工資料匯入{% endblock %}
+{% block title %}作業員報工資料維護{% endblock %}
 
 {% block extra_css %}
 <style>
+    /* 麵包屑樣式 */
+    .breadcrumb {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 12px 20px;
+        margin-bottom: 20px;
+    }
+    
+    .breadcrumb-item a {
+        color: #007bff;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.3s ease;
+    }
+    
+    .breadcrumb-item a:hover {
+        color: #0056b3;
+        text-decoration: underline;
+    }
+    
+    .breadcrumb-item.active {
+        color: #6c757d;
+        font-weight: 600;
+    }
+    
+    .breadcrumb-item + .breadcrumb-item::before {
+        content: ">";
+        color: #6c757d;
+        margin: 0 8px;
+    }
+    
     .import-container {
         max-width: 1200px;
         margin: 0 auto;
@@ -111,6 +143,26 @@
         text-decoration: none;
     }
     
+    .btn-export {
+        background-color: #f39c12;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        text-decoration: none;
+        display: inline-block;
+        margin-right: 10px;
+        transition: background-color 0.3s ease;
+    }
+    
+    .btn-export:hover {
+        background-color: #e67e22;
+        color: white;
+        text-decoration: none;
+    }
+    
     .progress-container {
         display: none;
         margin-top: 20px;
@@ -170,7 +222,31 @@
 
 {% block content %}
 <div class="import-container">
-    <h1 class="section-title">作業員報工資料匯入</h1>
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'home_page' %}">
+                    <i class="fas fa-home"></i> 首頁
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:index' %}">
+                    <i class="fas fa-clipboard-list"></i> 工單管理
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:report_index' %}">
+                    <i class="fas fa-chart-bar"></i> 報工管理
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-upload"></i> 作業員報工資料維護
+            </li>
+        </ol>
+    </nav>
+    
+    <h1 class="section-title">作業員報工資料維護</h1>
     
     <!-- 匯入功能區 -->
     <div class="import-section">
@@ -187,10 +263,16 @@
             <button type="button" class="btn-upload" onclick="document.getElementById('fileInput').click()">
                 <i class="fas fa-folder-open"></i> 選擇檔案
             </button>
+            <button type="button" class="btn btn-success" id="importBtn" onclick="startImport()" style="display: none; margin-left: 10px;">
+                <i class="fas fa-upload"></i> 開始匯入
+            </button>
             
             <div class="mt-3">
-                <a href="{% url 'workorder:download_import_template' %}" class="btn-download">
+                <a href="{% url 'workorder:operator_supplement_batch_template' %}" class="btn-download">
                     <i class="fas fa-download"></i> 下載匯入範本
+                </a>
+                <a href="{% url 'workorder:operator_supplement_batch_export' %}" class="btn-export">
+                    <i class="fas fa-file-export"></i> 匯出作業員報工記錄
                 </a>
                 <button type="button" class="btn btn-info" onclick="showFieldGuide()">
                     <i class="fas fa-info-circle"></i> 查看欄位說明
@@ -228,12 +310,20 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td class="required-field">作業員名稱</td>
+                        <td class="required-field">作業員</td>
                         <td><span class="badge bg-danger">必填</span></td>
                         <td>文字</td>
-                        <td>作業員的姓名，必須在系統中已存在</td>
-                        <td>張小明</td>
+                        <td>作業員姓名，必須在系統中已存在</td>
+                        <td>王小明</td>
                         <td>不能為空，必須對應到系統中的作業員</td>
+                    </tr>
+                    <tr>
+                        <td class="required-field">使用的設備</td>
+                        <td><span class="badge bg-danger">必填</span></td>
+                        <td>文字</td>
+                        <td>作業員使用的設備名稱，必須在系統中已存在</td>
+                        <td>設備-001</td>
+                        <td>不能為空，必須對應到系統中的設備</td>
                     </tr>
                     <tr>
                         <td class="required-field">公司代號</td>
@@ -288,16 +378,16 @@
                         <td><span class="badge bg-danger">必填</span></td>
                         <td>文字</td>
                         <td>工序名稱</td>
-                        <td>SMT、DIP、測試</td>
+                        <td>後焊</td>
                         <td>不能為空，必須對應到系統中的工序</td>
                     </tr>
                     <tr>
-                        <td class="optional-field">設備名稱</td>
+                        <td class="optional-field">空白佔位用</td>
                         <td><span class="badge bg-secondary">選填</span></td>
                         <td>文字</td>
-                        <td>使用的設備名稱</td>
-                        <td>SMT-001</td>
-                        <td>可為空，如果填寫必須對應到系統中的設備</td>
+                        <td>空白欄位，用於格式對齊</td>
+                        <td></td>
+                        <td>可為空</td>
                     </tr>
                     <tr>
                         <td class="required-field">報工數量</td>
@@ -339,10 +429,10 @@
             <h5><i class="fas fa-info-circle"></i> 重要注意事項：</h5>
             <ul>
                 <li>所有時間欄位支援 24 小時制格式</li>
-                <li>設備名稱和備註為選填欄位</li>
+                <li>空白佔位用欄位為格式對齊用途，可留空</li>
                 <li>異常紀錄欄位有內容才會列入異常紀錄</li>
                 <li>系統會自動檢查重複記錄並跳過</li>
-                <li>匯入後會自動計算工時和休息時間</li>
+                <li>匯入後會自動計算工時（作業員中午休息1小時，16:30後算加班）</li>
             </ul>
         </div>
     </div>
@@ -363,7 +453,40 @@ document.addEventListener('DOMContentLoaded', function() {
     fileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
-            handleFileUpload(file);
+            // 檢查檔案格式
+            const allowedTypes = ['.xlsx', '.csv'];
+            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            
+            if (!allowedTypes.includes(fileExtension)) {
+                showResult('只支援 Excel (.xlsx) 和 CSV 格式檔案', 'error');
+                return;
+            }
+            
+            // 顯示選中的檔案名稱和匯入按鈕
+            const fileName = file.name;
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInfo = document.createElement('div');
+            fileInfo.className = 'alert alert-info mt-3';
+            fileInfo.innerHTML = `
+                <i class="fas fa-file"></i> 已選擇檔案：${fileName}
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="clearFileSelection()">
+                    <i class="fas fa-times"></i> 重新選擇
+                </button>
+            `;
+            
+            // 移除之前的檔案資訊
+            const existingFileInfo = uploadArea.querySelector('.alert-info');
+            if (existingFileInfo) {
+                existingFileInfo.remove();
+            }
+            
+            uploadArea.appendChild(fileInfo);
+            
+            // 顯示匯入按鈕
+            document.getElementById('importBtn').style.display = 'inline-block';
+            
+            // 儲存選中的檔案
+            window.selectedFile = file;
         }
     });
     
@@ -384,7 +507,42 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const files = e.dataTransfer.files;
         if (files.length > 0) {
-            handleFileUpload(files[0]);
+            const file = files[0];
+            
+            // 檢查檔案格式
+            const allowedTypes = ['.xlsx', '.csv'];
+            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            
+            if (!allowedTypes.includes(fileExtension)) {
+                showResult('只支援 Excel (.xlsx) 和 CSV 格式檔案', 'error');
+                return;
+            }
+            
+            // 顯示選中的檔案名稱和匯入按鈕
+            const fileName = file.name;
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInfo = document.createElement('div');
+            fileInfo.className = 'alert alert-info mt-3';
+            fileInfo.innerHTML = `
+                <i class="fas fa-file"></i> 已選擇檔案：${fileName}
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="clearFileSelection()">
+                    <i class="fas fa-times"></i> 重新選擇
+                </button>
+            `;
+            
+            // 移除之前的檔案資訊
+            const existingFileInfo = uploadArea.querySelector('.alert-info');
+            if (existingFileInfo) {
+                existingFileInfo.remove();
+            }
+            
+            uploadArea.appendChild(fileInfo);
+            
+            // 顯示匯入按鈕
+            document.getElementById('importBtn').style.display = 'inline-block';
+            
+            // 儲存選中的檔案
+            window.selectedFile = file;
         }
     });
     
@@ -417,7 +575,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('file', file);
         
         // 發送請求
-        fetch('{% url "workorder:operator_report_import_file" %}', {
+        fetch('{% url "workorder:operator_supplement_batch_file" %}', {
             method: 'POST',
             body: formData,
             headers: {
@@ -471,17 +629,48 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return cookieValue;
     }
+    
+    // 開始匯入
+    window.startImport = function() {
+        if (!window.selectedFile) {
+            showResult('請先選擇檔案', 'error');
+            return;
+        }
+        
+        handleFileUpload(window.selectedFile);
+    };
+    
+    // 清除檔案選擇
+    window.clearFileSelection = function() {
+        // 清除檔案輸入
+        document.getElementById('fileInput').value = '';
+        
+        // 移除檔案資訊顯示
+        const existingFileInfo = document.querySelector('.alert-info');
+        if (existingFileInfo) {
+            existingFileInfo.remove();
+        }
+        
+        // 隱藏匯入按鈕
+        document.getElementById('importBtn').style.display = 'none';
+        
+        // 清除選中的檔案
+        window.selectedFile = null;
+        
+        // 隱藏結果訊息
+        document.getElementById('resultMessage').style.display = 'none';
+    };
+    
+    // 顯示/隱藏欄位說明
+    window.showFieldGuide = function() {
+        const fieldGuideSection = document.getElementById('fieldGuideSection');
+        if (fieldGuideSection.style.display === 'none') {
+            fieldGuideSection.style.display = 'block';
+            fieldGuideSection.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            fieldGuideSection.style.display = 'none';
+        }
+    };
 });
-
-// 顯示/隱藏欄位說明
-function showFieldGuide() {
-    const fieldGuideSection = document.getElementById('fieldGuideSection');
-    if (fieldGuideSection.style.display === 'none') {
-        fieldGuideSection.style.display = 'block';
-        fieldGuideSection.scrollIntoView({ behavior: 'smooth' });
-    } else {
-        fieldGuideSection.style.display = 'none';
-    }
-}
 </script>
 {% endblock %} 

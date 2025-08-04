@@ -5042,15 +5042,13 @@ def operator_supplement_export(request):
             # 作業員名稱
             ws.cell(row=row, column=1, value=report.operator.name if report.operator else '')
             
-            # 公司代號 - 從工單取得
+            # 公司代號 - 改善處理邏輯
             company_code = ''
-            if report.workorder and hasattr(report.workorder, 'company_code'):
+            if report.workorder and report.workorder.company_code:
                 company_code = report.workorder.company_code
-            elif report.workorder and hasattr(report.workorder, 'order_number'):
-                # 從工單號碼推斷公司代號（假設前兩位是公司代號）
-                order_number = report.workorder.order_number
-                if order_number and len(order_number) >= 2:
-                    company_code = order_number[:2]
+            else:
+                # 如果沒有工單關聯，使用預設值
+                company_code = '10'  # 預設公司代號
             ws.cell(row=row, column=2, value=company_code)
             
             # 報工日期
@@ -5062,11 +5060,15 @@ def operator_supplement_export(request):
             # 結束時間
             ws.cell(row=row, column=5, value=report.end_time.strftime('%H:%M') if report.end_time else '')
             
-            # 工單號
-            ws.cell(row=row, column=6, value=report.workorder.order_number if report.workorder else report.rd_workorder_number or '')
+            # 工單號 - 使用 workorder_number 屬性
+            ws.cell(row=row, column=6, value=report.workorder_number)
             
-            # 產品編號
-            ws.cell(row=row, column=7, value=report.product_id or '')
+            # 產品編號 - 直接使用報工記錄本身的產品編號欄位
+            product_id = report.product_id or ''
+            if not product_id and report.workorder and hasattr(report.workorder, 'product_code') and report.workorder.product_code:
+                # 如果報工記錄的產品編號為空，才從工單取得
+                product_id = report.workorder.product_code
+            ws.cell(row=row, column=7, value=product_id)
             
             # 工序名稱
             ws.cell(row=row, column=8, value=report.process.name if report.process else '')
@@ -5874,6 +5876,73 @@ def active_workorders(request):
         report_source='smt'
     ).count()  # SMT報工記錄
     
+    # 為每個工單添加詳細的報工紀錄統計，按照工序順序和時間順序排列
+    for workorder in active_workorders:
+        if hasattr(workorder, 'production_record') and workorder.production_record:
+            # 獲取該工單的所有報工明細，按照工序順序和開始時間排序
+            # 先按照工序名稱排序，然後按照開始時間排序（越早開始的順序越小）
+            production_details = WorkOrderProductionDetail.objects.filter(
+                workorder_production=workorder.production_record
+            ).order_by('process_name', 'start_time', 'report_time')
+            
+            # 按工序分組統計
+            process_stats = {}
+            for detail in production_details:
+                process_name = detail.process_name
+                if process_name not in process_stats:
+                    process_stats[process_name] = {
+                        'total_work_quantity': 0,
+                        'total_defect_quantity': 0,
+                        'total_work_hours': 0.0,
+                        'total_overtime_hours': 0.0,
+                        'report_count': 0,
+                        'first_report_time': detail.report_time,
+                        'last_report_time': detail.report_time,
+                        'operators': set(),
+                        'equipment': set()
+                    }
+                
+                stats = process_stats[process_name]
+                stats['total_work_quantity'] += detail.work_quantity or 0
+                stats['total_defect_quantity'] += detail.defect_quantity or 0
+                stats['total_work_hours'] += detail.work_hours or 0.0
+                stats['total_overtime_hours'] += detail.overtime_hours or 0.0
+                stats['report_count'] += 1
+                stats['last_report_time'] = detail.report_time
+                
+                if detail.operator:
+                    stats['operators'].add(detail.operator)
+                if detail.equipment:
+                    stats['equipment'].add(detail.equipment)
+            
+            # 將統計結果添加到工單對象中
+            workorder.process_stats = process_stats
+            workorder.total_processes = len(process_stats)
+            
+            # 計算總統計
+            total_work_quantity = sum(stats['total_work_quantity'] for stats in process_stats.values())
+            total_defect_quantity = sum(stats['total_defect_quantity'] for stats in process_stats.values())
+            total_work_hours = sum(stats['total_work_hours'] for stats in process_stats.values())
+            total_overtime_hours = sum(stats['total_overtime_hours'] for stats in process_stats.values())
+            
+            workorder.total_work_quantity = total_work_quantity
+            workorder.total_defect_quantity = total_defect_quantity
+            workorder.total_work_hours = total_work_hours
+            workorder.total_overtime_hours = total_overtime_hours
+    
+    # 計算所有工單的總統計
+    total_work_quantity = 0
+    total_defect_quantity = 0
+    total_work_hours = 0.0
+    total_overtime_hours = 0.0
+    
+    for workorder in active_workorders:
+        if hasattr(workorder, 'total_work_quantity'):
+            total_work_quantity += workorder.total_work_quantity
+            total_defect_quantity += workorder.total_defect_quantity
+            total_work_hours += workorder.total_work_hours
+            total_overtime_hours += workorder.total_overtime_hours
+    
     # 分頁
     paginator = Paginator(active_workorders, 10)
     page_number = request.GET.get('page')
@@ -5886,6 +5955,10 @@ def active_workorders(request):
         'total_completed': total_completed,
         'today_operator_count': production_operator_count,
         'today_smt_count': production_smt_count,
+        'total_work_quantity': total_work_quantity,
+        'total_defect_quantity': total_defect_quantity,
+        'total_work_hours': total_work_hours,
+        'total_overtime_hours': total_overtime_hours,
         'today': today,
     }
     

@@ -42,7 +42,6 @@ def operator_report_import_page(request):
 
 @csrf_exempt
 @login_required
-@user_passes_test(import_user_required, login_url='/login/')
 def operator_report_import_file(request):
     """
     作業員報工資料檔案匯入處理
@@ -54,6 +53,13 @@ def operator_report_import_file(request):
     選填欄位：設備名稱、備註、異常紀錄
     特殊處理：異常紀錄欄位有內容才會列入異常紀錄
     """
+    
+    # 檢查權限
+    if not import_user_required(request.user):
+        return JsonResponse({
+            'success': False,
+            'message': '您沒有權限執行此操作。請聯繫管理員取得匯入權限。'
+        })
     
     if request.method != 'POST':
         return JsonResponse({
@@ -95,6 +101,17 @@ def operator_report_import_file(request):
             '作業員名稱', '公司代號', '報工日期', '開始時間', '結束時間', 
             '工單號', '產品編號', '工序名稱', '報工數量'
         ]
+        
+        # 檢查可選欄位（包括設備名稱）
+        optional_columns = ['設備名稱', '不良品數量', '備註', '異常紀錄']
+        all_expected_columns = required_columns + optional_columns
+        
+        # 檢查是否有設備名稱欄位
+        has_equipment_column = '設備名稱' in df.columns
+        if not has_equipment_column:
+            logger.warning("匯入檔案中沒有「設備名稱」欄位")
+        else:
+            logger.info("匯入檔案中包含「設備名稱」欄位")
         
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
@@ -282,15 +299,48 @@ def operator_report_import_file(request):
                         error_count += 1
                         continue
                 
-                # 11. 處理設備名稱（選填）
+                # 11. 處理設備名稱（選填）- 直接操作 OperatorSupplementReport 的 equipment 欄位
                 equipment = None
-                if '設備名稱' in df.columns and pd.notna(row['設備名稱']):
-                    equipment_name = str(row['設備名稱']).strip()
-                    if equipment_name:
-                        # 使用不區分大小寫的設備查找
-                        equipment = Equipment.objects.filter(name__iexact=equipment_name).first()
-                        if not equipment:
-                            skips.append(f'第 {index+1} 行：找不到設備 "{equipment_name}"，將跳過設備資訊')
+                
+                # 詳細檢查設備名稱欄位
+                logger.info(f'第 {index+1} 行：開始處理設備名稱欄位')
+                logger.info(f'第 {index+1} 行：DataFrame 欄位: {list(df.columns)}')
+                logger.info(f'第 {index+1} 行：是否有設備名稱欄位: {"設備名稱" in df.columns}')
+                
+                if '設備名稱' in df.columns:
+                    logger.info(f'第 {index+1} 行：設備名稱欄位存在')
+                    equipment_value = row['設備名稱']
+                    logger.info(f'第 {index+1} 行：設備名稱原始值: "{equipment_value}" (類型: {type(equipment_value)})')
+                    
+                    if pd.notna(equipment_value):
+                        equipment_name = str(equipment_value).strip()
+                        logger.info(f'第 {index+1} 行：設備名稱處理後: "{equipment_name}"')
+                        
+                        if equipment_name:
+                            # 直接查找 Equipment 模型，不與其他報工模型產生關聯
+                            try:
+                                equipment = Equipment.objects.get(name=equipment_name)
+                                # 記錄成功找到設備
+                                logger.info(f'第 {index+1} 行：成功找到設備 "{equipment_name}" (ID: {equipment.id})')
+                            except Equipment.DoesNotExist:
+                                # 如果精確匹配失敗，嘗試不區分大小寫的查找
+                                try:
+                                    equipment = Equipment.objects.get(name__iexact=equipment_name)
+                                    skips.append(f'第 {index+1} 行：設備名稱大小寫不匹配 "{equipment_name}" -> "{equipment.name}"')
+                                    logger.info(f'第 {index+1} 行：設備名稱大小寫不匹配 "{equipment_name}" -> "{equipment.name}"')
+                                except Equipment.DoesNotExist:
+                                    # 如果還是找不到，記錄錯誤但不中斷匯入
+                                    errors.append(f'第 {index+1} 行：找不到設備 "{equipment_name}"，此記錄的設備欄位將設為空')
+                                    logger.warning(f'第 {index+1} 行：找不到設備 "{equipment_name}"，設備欄位設為空')
+                                    equipment = None  # 設為 None，不中斷匯入流程
+                        else:
+                            logger.info(f'第 {index+1} 行：設備名稱為空字串，設備欄位設為空')
+                    else:
+                        logger.info(f'第 {index+1} 行：設備名稱欄位為空 (NaN/None)，設備欄位設為空')
+                else:
+                    logger.warning(f'第 {index+1} 行：DataFrame 中沒有「設備名稱」欄位')
+                
+                logger.info(f'第 {index+1} 行：最終設備物件: {equipment}')
                 
                 # 12. 處理備註（選填）
                 remarks = ""
@@ -322,7 +372,7 @@ def operator_report_import_file(request):
                 report_data = {
                     'operator': operator,
                     'process': process,
-                    'equipment': equipment,
+                    'equipment': equipment,  # 確保設備欄位包含在內
                     'work_date': work_date,
                     'start_time': start_time,
                     'end_time': end_time,
@@ -333,6 +383,10 @@ def operator_report_import_file(request):
                     'created_by': request.user.username
                 }
                 
+                # 記錄設備資訊，用於除錯
+                logger.info(f'第 {index+1} 行：準備建立記錄，設備資訊: {equipment.name if equipment else "無設備"}')
+                logger.info(f'第 {index+1} 行：report_data 中的 equipment: {report_data["equipment"]}')
+                
                 if workorder:
                     # 如果工單存在，使用正常的 workorder 欄位
                     report_data['workorder'] = workorder
@@ -342,9 +396,17 @@ def operator_report_import_file(request):
                 
                 report = OperatorSupplementReport.objects.create(**report_data)
                 
+                # 記錄建立後的設備資訊，用於除錯
+                logger.info(f'第 {index+1} 行：記錄建立成功，ID: {report.id}')
+                logger.info(f'第 {index+1} 行：建立後的設備欄位: {report.equipment.name if report.equipment else "無設備"}')
+                
                 # 16. 自動計算工時
                 report.calculate_work_hours()
                 report.save()
+                
+                # 再次檢查保存後的設備資訊
+                report.refresh_from_db()
+                logger.info(f'第 {index+1} 行：保存後的設備欄位: {report.equipment.name if report.equipment else "無設備"}')
                 
                 success_count += 1
                 
@@ -379,6 +441,8 @@ def operator_report_import_file(request):
         
     except Exception as e:
         logger.error(f"匯入處理發生未預期錯誤: {str(e)}")
+        import traceback
+        logger.error(f"錯誤詳情: {traceback.format_exc()}")
         return JsonResponse({
             'success': False,
             'message': f'匯入處理失敗: {str(e)}'
@@ -933,6 +997,8 @@ def smt_report_import_file(request):
         
     except Exception as e:
         logger.error(f"匯入處理發生未預期錯誤: {str(e)}")
+        import traceback
+        logger.error(f"錯誤詳情: {traceback.format_exc()}")
         return JsonResponse({
             'success': False,
             'message': f'匯入處理失敗: {str(e)}'
@@ -1199,12 +1265,31 @@ def smt_report_export(request):
         # 填入資料
         for row, report in enumerate(reports, 2):
             ws.cell(row=row, column=1, value=report.equipment.name if report.equipment else '')
-            ws.cell(row=row, column=2, value=report.workorder.company_code if report.workorder else '')
+            
+            # 改善公司代號處理：優先從工單取得，其次使用預設值
+            company_code = ''
+            if report.workorder and report.workorder.company_code:
+                company_code = report.workorder.company_code
+            else:
+                # 如果沒有工單關聯，根據設備名稱或其他邏輯判斷公司代號
+                if report.equipment and report.equipment.name:
+                    # 可以根據設備名稱判斷公司代號，這裡先使用預設值
+                    company_code = '10'  # 預設公司代號
+            ws.cell(row=row, column=2, value=company_code)
+            
             ws.cell(row=row, column=3, value=report.work_date.strftime('%Y-%m-%d'))
             ws.cell(row=row, column=4, value=report.start_time.strftime('%H:%M') if report.start_time else '')
             ws.cell(row=row, column=5, value=report.end_time.strftime('%H:%M') if report.end_time else '')
-            ws.cell(row=row, column=6, value=report.workorder.order_number if report.workorder else '')
-            ws.cell(row=row, column=7, value=report.product_id)
+            
+            # 使用 workorder_number 屬性來取得工單號碼，這個屬性會處理各種情況
+            ws.cell(row=row, column=6, value=report.workorder_number)
+            
+            # 產品編號 - 直接使用報工記錄本身的產品編號欄位
+            product_id = report.product_id or ''
+            if not product_id and report.workorder and hasattr(report.workorder, 'product_code') and report.workorder.product_code:
+                # 如果報工記錄的產品編號為空，才從工單取得
+                product_id = report.workorder.product_code
+            ws.cell(row=row, column=7, value=product_id)
             ws.cell(row=row, column=8, value=report.operation)
             ws.cell(row=row, column=9, value='')  # 空白佔位用
             ws.cell(row=row, column=10, value=report.work_quantity or 0)
@@ -1244,6 +1329,141 @@ def smt_report_export(request):
     except Exception as e:
         messages.error(request, f'SMT匯出失敗：{str(e)}')
         return redirect('workorder:smt_report_import_page') 
+
+
+@login_required
+@user_passes_test(import_user_required, login_url='/login/')
+def operator_report_export(request):
+    """
+    匯出作業員報工資料
+    支援按日期範圍、作業員、工序等條件篩選匯出
+    """
+    try:
+        from django.http import HttpResponse
+        import pandas as pd
+        from io import BytesIO
+        from datetime import datetime
+        
+        # 取得篩選參數
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        operator_name = request.GET.get('operator_name')
+        process_name = request.GET.get('process_name')
+        company_code = request.GET.get('company_code')
+        
+        # 建立查詢 - 只針對 OperatorSupplementReport 模型
+        query = OperatorSupplementReport.objects.select_related(
+            'operator', 'process', 'equipment', 'workorder'
+        ).all()
+        
+        # 應用篩選條件
+        if start_date:
+            query = query.filter(work_date__gte=start_date)
+        if end_date:
+            query = query.filter(work_date__lte=end_date)
+        if operator_name:
+            query = query.filter(operator__name__icontains=operator_name)
+        if process_name:
+            query = query.filter(process__name__icontains=process_name)
+        if company_code:
+            query = query.filter(workorder__company_code=company_code)
+        
+        # 限制匯出數量，避免檔案過大
+        max_export_count = 10000
+        total_count = query.count()
+        if total_count > max_export_count:
+            query = query[:max_export_count]
+        
+        # 準備匯出資料
+        export_data = []
+        for report in query:
+            # 取得工單號碼 - 只從 OperatorSupplementReport 模型取得
+            workorder_number = ''
+            if report.workorder:
+                workorder_number = report.workorder.order_number
+            elif report.original_workorder_number:
+                workorder_number = report.original_workorder_number
+            elif report.rd_workorder_number:
+                workorder_number = report.rd_workorder_number
+            
+            # 取得產品編號 - 只從 OperatorSupplementReport 模型取得
+            product_code = ''
+            if report.workorder and report.workorder.product_code:
+                product_code = report.workorder.product_code
+            elif report.product_id:
+                product_code = report.product_id
+            elif report.rd_product_code:
+                product_code = report.rd_product_code
+            
+            # 取得公司代號 - 只從 OperatorSupplementReport 模型取得
+            company_code_value = ''
+            if report.workorder and report.workorder.company_code:
+                company_code_value = report.workorder.company_code
+            
+            export_data.append({
+                '作業員名稱': report.operator.name if report.operator else '',
+                '公司代號': company_code_value,
+                '報工日期': report.work_date.strftime('%Y-%m-%d') if report.work_date else '',
+                '開始時間': report.start_time.strftime('%H:%M:%S') if report.start_time else '',
+                '結束時間': report.end_time.strftime('%H:%M:%S') if report.end_time else '',
+                '工單號': workorder_number,
+                '產品編號': product_code,
+                '工序名稱': report.process.name if report.process else '',
+                '設備名稱': report.equipment.name if report.equipment else '',  # 直接從 OperatorSupplementReport 的 equipment 欄位取得
+                '報工數量': report.work_quantity,
+                '不良品數量': report.defect_quantity,
+                '備註': report.remarks or '',
+                '異常紀錄': report.abnormal_notes or '',
+                '工作時數': float(report.work_hours_calculated) if report.work_hours_calculated else 0,
+                '加班時數': float(report.overtime_hours_calculated) if report.overtime_hours_calculated else 0,
+                '報工類型': report.report_type,
+                '核准狀態': report.approval_status,
+                '建立時間': report.created_at.strftime('%Y-%m-%d %H:%M:%S') if report.created_at else '',
+            })
+        
+        # 建立 DataFrame
+        df = pd.DataFrame(export_data)
+        
+        # 建立 Excel 檔案
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='作業員報工資料', index=False)
+            
+            # 取得工作表並調整欄寬
+            worksheet = writer.sheets['作業員報工資料']
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        output.seek(0)
+        
+        # 準備檔案名稱
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'作業員報工資料_{timestamp}.xlsx'
+        
+        # 建立回應
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"匯出作業員報工資料失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'匯出失敗: {str(e)}'
+        }) 
 
 
 

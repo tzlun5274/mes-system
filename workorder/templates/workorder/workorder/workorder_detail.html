@@ -696,6 +696,7 @@
                     <table class="table table-hover">
                         <thead>
                             <tr>
+                                <th style="width: 60px;">序號</th>
                                 <th>報工日期</th>
                                 <th>工序名稱</th>
                                 <th>作業員</th>
@@ -709,6 +710,9 @@
                         <tbody>
                             {% for report in all_production_reports %}
                             <tr>
+                                <td class="text-center">
+                                    <span class="badge bg-primary">{{ forloop.counter }}</span>
+                                </td>
                                 <td>{{ report.report_date|date:"Y-m-d" }}</td>
                                 <td>{{ report.process_name }}</td>
                                 <td>{{ report.operator }}</td>
@@ -824,6 +828,7 @@
                     <table class="table table-hover stats-table">
                         <thead>
                             <tr>
+                                <th style="width: 60px;">序號</th>
                                 <th>工序名稱</th>
                                 <th>合格品總數</th>
                                 <th>不良品總數</th>
@@ -836,6 +841,9 @@
                         <tbody>
                             {% for process_name, stats in production_stats_by_process.items %}
                             <tr>
+                                <td class="text-center">
+                                    <span class="badge bg-primary">{{ forloop.counter }}</span>
+                                </td>
                                 <td>
                                     <strong>{{ stats.process_name }}</strong>
                                 </td>
@@ -892,6 +900,7 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
+                        <th style="width: 60px;">序號</th>
                         <th>報工日期</th>
                         <th>工序名稱</th>
                         <th>作業員</th>
@@ -905,6 +914,9 @@
                 <tbody>
                     {% for detail in workorder.production_record.production_details.all|slice:":10" %}
                     <tr>
+                        <td class="text-center">
+                            <span class="badge bg-primary">{{ forloop.counter }}</span>
+                        </td>
                         <td>{{ detail.report_date|date:"Y-m-d" }}</td>
                         <td>{{ detail.process_name }}</td>
                         <td>{{ detail.operator|default:"-" }}</td>

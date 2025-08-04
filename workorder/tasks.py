@@ -7,7 +7,7 @@ from celery import shared_task
 from django.utils import timezone
 from django.core.management import call_command
 from django.db import transaction
-from .models import WorkOrder, CompanyOrder, SystemConfig, WorkOrderProcess
+from .models import WorkOrder, CompanyOrder, SystemConfig, WorkOrderProcess, AutoAllocationSettings
 # 完工判斷服務已移除，避免資料汙染
 # from .services.completion_service import WorkOrderCompletionService
 from erp_integration.models import CompanyConfig
@@ -27,6 +27,70 @@ workorder_logger = logging.getLogger("workorder")
 #     定期檢查所有生產中工單是否達到完工條件
 #     """
 #     此任務已移除
+
+
+@shared_task
+def auto_allocation_task():
+    """
+    自動分配任務
+    定期執行自動分配功能，為數量為0的報工記錄分配數量
+    """
+    try:
+        workorder_logger.info("=== 開始自動分配任務 ===")
+        
+        # 檢查自動分配設定
+        try:
+            settings = AutoAllocationSettings.objects.get(id=1)
+            if not settings.enabled:
+                workorder_logger.info("自動分配功能未啟用，跳過執行")
+                return {
+                    "status": "skipped",
+                    "message": "自動分配功能未啟用",
+                    "timestamp": timezone.now().isoformat(),
+                }
+            
+            if settings.is_running:
+                workorder_logger.warning("自動分配已在執行中，跳過本次執行")
+                return {
+                    "status": "skipped",
+                    "message": "自動分配已在執行中",
+                    "timestamp": timezone.now().isoformat(),
+                }
+                
+        except AutoAllocationSettings.DoesNotExist:
+            workorder_logger.warning("未找到自動分配設定，跳過執行")
+            return {
+                "status": "skipped",
+                "message": "未找到自動分配設定",
+                "timestamp": timezone.now().isoformat(),
+            }
+        
+        # 執行自動分配
+        from .services.auto_allocation_scheduler import scheduler
+        success = scheduler.execute_auto_allocation()
+        
+        if success:
+            workorder_logger.info("自動分配任務執行成功")
+            return {
+                "status": "success",
+                "message": "自動分配執行成功",
+                "timestamp": timezone.now().isoformat(),
+            }
+        else:
+            workorder_logger.error("自動分配任務執行失敗")
+            return {
+                "status": "error",
+                "message": "自動分配執行失敗",
+                "timestamp": timezone.now().isoformat(),
+            }
+            
+    except Exception as e:
+        workorder_logger.error(f"自動分配任務執行異常：{str(e)}")
+        return {
+            "status": "error",
+            "message": f"自動分配任務執行異常：{str(e)}",
+            "timestamp": timezone.now().isoformat(),
+        }
 
 
 @shared_task

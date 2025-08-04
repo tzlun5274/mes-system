@@ -19,6 +19,10 @@ from .views.completed_workorder_views import (
     transfer_workorder_to_completed, batch_transfer_completed_workorders
 )
 from .views import api_views
+from .views.auto_allocation_views import (
+    auto_allocation_status, auto_allocation_settings, auto_allocation_execute,
+    auto_allocation_stop, auto_allocation_log, auto_allocation_summary
+)
 
 app_name = "workorder"
 
@@ -59,6 +63,12 @@ urlpatterns = [
     path("report/operator/supplement/edit/<int:pk>/", OperatorSupplementReportUpdateView.as_view(), name="operator_supplement_report_edit"),
     path("report/operator/supplement/detail/<int:pk>/", OperatorSupplementReportDetailView.as_view(), name="operator_supplement_report_detail"),
     path("report/operator/supplement/delete/<int:pk>/", OperatorSupplementReportDeleteView.as_view(), name="operator_supplement_report_delete"),
+    
+    # 作業員補登報工批量匯入功能
+    path("report/operator/supplement/batch/", import_views.operator_report_import_page, name="operator_supplement_batch"),
+    path("report/operator/supplement/batch/file/", import_views.operator_report_import_file, name="operator_supplement_batch_file"),
+    path("report/operator/supplement/batch/template/", import_views.download_import_template, name="operator_supplement_batch_template"),
+    path("report/operator/supplement/batch/export/", import_views.operator_report_export, name="operator_supplement_batch_export"),
     
     # SMT補登報工功能 - 使用新的類別視圖
     path("report/smt/supplement/", SMTProductionReportListView.as_view(), name="smt_supplement_report_index"),
@@ -119,6 +129,7 @@ urlpatterns = [
     # 作業員報工資料匯入功能
     path("import/operator_report/", import_views.operator_report_import_page, name="operator_report_import_page"),
     path("import/operator_report/file/", import_views.operator_report_import_file, name="operator_report_import_file"),
+    path("export/operator_report/", import_views.operator_report_export, name="operator_report_export"),
     path("import/operator_report/template/", import_views.download_import_template, name="download_import_template"),
     path("import/operator_report/field_guide/", import_views.get_import_field_guide, name="get_import_field_guide"),
     
@@ -190,6 +201,14 @@ urlpatterns = [
     path("get_product_by_workorder/", workorder_views.get_product_by_workorder, name="get_product_by_workorder"),
     path("get_product_codes_for_autocomplete/", workorder_views.get_product_codes_for_autocomplete, name="get_product_codes_for_autocomplete"),
     path("get_workorder_info/", workorder_views.get_workorder_info, name="get_workorder_info"),
+
+    # 自動分配管理相關 URL
+    path("auto_allocation/status/", auto_allocation_status, name="auto_allocation_status"),
+    path("auto_allocation/settings/", auto_allocation_settings, name="auto_allocation_settings"),
+    path("auto_allocation/execute/", auto_allocation_execute, name="auto_allocation_execute"),
+    path("auto_allocation/stop/", auto_allocation_stop, name="auto_allocation_stop"),
+    path("auto_allocation/log/", auto_allocation_log, name="auto_allocation_log"),
+    path("auto_allocation/summary/", auto_allocation_summary, name="auto_allocation_summary"),
 
     # 已完工工單相關 URL
     # path('completed/', workorder_views.CompletedWorkOrderListView.as_view(), name='completed_workorder_list'), # This line is removed as per the edit hint

@@ -86,7 +86,7 @@ class SMTProductionReport(models.Model):
     equipment = models.ForeignKey(
         "equip.Equipment",
         on_delete=models.CASCADE,
-        verbose_name="設備",
+        verbose_name="使用的設備",
         help_text="請選擇本次報工使用的SMT設備",
         null=True,
         blank=True,
@@ -511,8 +511,8 @@ class OperatorSupplementReport(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        verbose_name="設備",
-        help_text="請選擇此次補登的設備（排除SMT相關設備）",
+        verbose_name="使用的設備",
+        help_text="請選擇此次補登使用的設備（排除SMT相關設備）",
     )
 
     # 時間資訊
@@ -608,6 +608,33 @@ class OperatorSupplementReport(models.Model):
         blank=True,
         verbose_name="分配說明",
         help_text="記錄分配計算過程和依據"
+    )
+
+    # 新增：自動分配檢查狀態欄位
+    allocation_checked = models.BooleanField(
+        default=False,
+        verbose_name="已檢查自動分配",
+        help_text="標記此記錄是否已經過自動分配檢查，避免重複檢查"
+    )
+    
+    allocation_checked_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="分配檢查時間",
+        help_text="記錄此記錄被自動分配檢查的時間"
+    )
+    
+    allocation_check_result = models.CharField(
+        max_length=20,
+        choices=[
+            ('not_checked', '未檢查'),
+            ('allocated', '已分配'),
+            ('excluded_packaging', '排除包裝'),
+            ('no_allocation_needed', '無需分配'),
+        ],
+        default='not_checked',
+        verbose_name="分配檢查結果",
+        help_text="記錄自動分配檢查的結果"
     )
 
     defect_quantity = models.IntegerField(
@@ -1046,7 +1073,19 @@ class OperatorSupplementReport(models.Model):
         }
 
     def save(self, *args, **kwargs):
-        """儲存時自動計算工作時數和加班時數"""
+        """儲存時自動計算工作時數和加班時數，並自動取得產品編號"""
+        # 自動從工單取得產品編號
+        if self.workorder and hasattr(self.workorder, 'product_code') and self.workorder.product_code:
+            self.product_id = self.workorder.product_code
+        elif self.report_type == 'rd_sample' and self.rd_product_code:
+            # RD樣品模式使用rd_product_code
+            self.product_id = self.rd_product_code
+        
+        # 確保設備欄位正確保存
+        if hasattr(self, 'equipment') and self.equipment:
+            # 設備欄位存在且有值，確保正確保存
+            pass
+        
         # 自動計算工作時數和加班時數
         self.calculate_work_hours()
         super().save(*args, **kwargs)

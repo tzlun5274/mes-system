@@ -191,11 +191,6 @@
                             </a>
                         </div>
                         <div class="col-md-2">
-                            <a href="{% url 'workorder:operator_supplement_batch' %}" class="btn btn-primary btn-lg btn-block mb-2">
-                                <i class="fas fa-upload"></i> 匯入資料
-                            </a>
-                        </div>
-                        <div class="col-md-2">
                             <a href="{% url 'workorder:operator_supplement_export' %}" class="btn btn-success btn-lg btn-block mb-2">
                                 <i class="fas fa-download"></i> 匯出資料
                             </a>
@@ -203,6 +198,13 @@
                         <div class="col-md-2">
                             <a href="{% url 'workorder:operator_supplement_template' %}" class="btn btn-secondary btn-lg btn-block mb-2">
                                 <i class="fas fa-file-excel"></i> 下載範本
+                            </a>
+                        </div>
+                        {% endif %}
+                        {% if user.is_superuser %}
+                        <div class="col-md-3 ml-auto">
+                            <a href="{% url 'workorder:operator_supplement_batch' %}" class="btn btn-primary btn-lg btn-block mb-2">
+                                <i class="fas fa-upload"></i> 作業員報工資料維護
                             </a>
                         </div>
                         {% endif %}

@@ -148,6 +148,46 @@
         background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
         transform: translateY(-1px);
     }
+    
+    /* 工序統計表格樣式 */
+    .process-stats-table {
+        font-size: 0.9em;
+    }
+    
+    .process-stats-table th {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+        font-weight: 600;
+        text-align: center;
+    }
+    
+    .process-stats-table td {
+        vertical-align: middle;
+        text-align: center;
+    }
+    
+    .process-stats-table .badge {
+        font-size: 0.8em;
+    }
+    
+    /* 總統計卡片樣式 */
+    .total-stats-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .total-stats-card h5 {
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    
+    .total-stats-card small {
+        color: #6c757d;
+        font-size: 0.8em;
+    }
 </style>
 {% endblock %}
 
@@ -186,7 +226,7 @@
 
     <!-- 報工統計詳情 -->
     <div class="row mb-4">
-        <div class="col-md-6">
+        <div class="col-md-3">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h6 class="mb-0">
@@ -199,7 +239,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-3">
             <div class="card">
                 <div class="card-header bg-success text-white">
                     <h6 class="mb-0">
@@ -209,6 +249,32 @@
                 <div class="card-body text-center">
                     <h3 class="text-success">{{ today_smt_count|default:0 }}</h3>
                     <small class="text-muted">現有記錄數</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-line"></i> 總合格品數量
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="text-info">{{ total_work_quantity|default:0 }}</h3>
+                    <small class="text-muted">所有工單總計</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header bg-warning text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-clock"></i> 總工作時數
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="text-warning">{{ total_work_hours|default:0|floatformat:1 }}</h3>
+                    <small class="text-muted">小時</small>
                 </div>
             </div>
         </div>
@@ -223,45 +289,138 @@
                 </h5>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>工單號碼</th>
-                                <th>公司名稱</th>
-                                <th>產品編號</th>
-                                <th>數量</th>
-                                <th>建立時間</th>
-                                <th>狀態</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for workorder in page_obj %}
-                            <tr>
-                                <td>
+                {% for workorder in page_obj %}
+                <div class="workorder-card mb-3">
+                    <div class="workorder-header">
+                        <div class="row align-items-center">
+                            <div class="col-md-3">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-clipboard"></i>
                                     <strong>{{ workorder.order_number }}</strong>
-                                </td>
-                                <td>{{ workorder.company_name|default:"未知公司" }}</td>
-                                <td>{{ workorder.product_code|truncatechars:30 }}</td>
-                                <td>
-                                    <span class="badge bg-info">{{ workorder.quantity }}</span>
-                                </td>
-                                <td>{{ workorder.created_at|date:"m/d H:i" }}</td>
-                                <td>
-                                    <span class="badge bg-warning">生產中</span>
-                                    <small class="text-muted d-block">基於已核准報工</small>
-                                </td>
-                                <td>
-                                    <a href="{% url 'workorder:detail' workorder.id %}" class="btn btn-primary btn-sm">
-                                        <i class="fas fa-eye"></i> 查看詳情
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                </h6>
+                                <small>{{ workorder.company_name|default:"未知公司" }}</small>
+                            </div>
+                            <div class="col-md-3">
+                                <small>產品編號</small><br>
+                                <strong>{{ workorder.product_code|truncatechars:30 }}</strong>
+                            </div>
+                            <div class="col-md-2">
+                                <small>計劃數量</small><br>
+                                <span class="badge bg-info">{{ workorder.quantity }}</span>
+                            </div>
+                            <div class="col-md-2">
+                                <small>建立時間</small><br>
+                                <strong>{{ workorder.created_at|date:"m/d H:i" }}</strong>
+                            </div>
+                            <div class="col-md-2 text-end">
+                                <span class="badge bg-warning">生產中</span><br>
+                                <a href="{% url 'workorder:detail' workorder.id %}" class="btn btn-light btn-sm mt-1">
+                                    <i class="fas fa-eye"></i> 查看詳情
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if workorder.process_stats %}
+                    <div class="workorder-body">
+                        <h6 class="mb-3">
+                            <i class="fas fa-chart-bar"></i> 工序報工統計 (按時間順序排列)
+                        </h6>
+                        
+                        <!-- 總統計 -->
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <div class="total-stats-card text-center">
+                                    <h5 class="text-primary">{{ workorder.total_work_quantity|default:0 }}</h5>
+                                    <small class="text-muted">總合格品</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="total-stats-card text-center">
+                                    <h5 class="text-danger">{{ workorder.total_defect_quantity|default:0 }}</h5>
+                                    <small class="text-muted">總不良品</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="total-stats-card text-center">
+                                    <h5 class="text-success">{{ workorder.total_work_hours|default:0|floatformat:1 }}</h5>
+                                    <small class="text-muted">總工作時數</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="total-stats-card text-center">
+                                    <h5 class="text-warning">{{ workorder.total_overtime_hours|default:0|floatformat:1 }}</h5>
+                                    <small class="text-muted">總加班時數</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 工序詳細統計 -->
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered process-stats-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 15%;">工序名稱</th>
+                                        <th style="width: 10%;">合格品</th>
+                                        <th style="width: 10%;">不良品</th>
+                                        <th style="width: 10%;">工作時數</th>
+                                        <th style="width: 10%;">加班時數</th>
+                                        <th style="width: 10%;">報工次數</th>
+                                        <th style="width: 15%;">首次報工</th>
+                                        <th style="width: 15%;">最後報工</th>
+                                        <th style="width: 5%;">作業員</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for process_name, stats in workorder.process_stats.items %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ process_name }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">{{ stats.total_work_quantity }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger">{{ stats.total_defect_quantity }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ stats.total_work_hours|floatformat:1 }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-warning">{{ stats.total_overtime_hours|floatformat:1 }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ stats.report_count }}</span>
+                                        </td>
+                                        <td>
+                                            <small>{{ stats.first_report_time|date:"m/d H:i" }}</small>
+                                        </td>
+                                        <td>
+                                            <small>{{ stats.last_report_time|date:"m/d H:i" }}</small>
+                                        </td>
+                                        <td>
+                                            <small>
+                                                {% for operator in stats.operators %}
+                                                    {{ operator }}{% if not forloop.last %}, {% endif %}
+                                                {% endfor %}
+                                            </small>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="workorder-body">
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle"></i>
+                            此工單尚未有報工記錄
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
+                {% endfor %}
             </div>
         </div>
 
