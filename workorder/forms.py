@@ -399,7 +399,6 @@ class SMTSupplementReportForm(ProductionReportBaseForm):
             "workorder",
             "product_id", 
             "planned_quantity",
-            "rd_product_code",
             "operation",
             "equipment",
             "work_date",
@@ -415,7 +414,6 @@ class SMTSupplementReportForm(ProductionReportBaseForm):
             "workorder": "工單號碼",
             "product_id": "產品編號",
             "planned_quantity": "工單預設生產數量",
-            "rd_product_code": "RD產品編號",
             "operation": "工序",
             "equipment": "使用的設備",
             "work_date": "報工日期",
@@ -655,12 +653,7 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
     - 工序和設備排除SMT相關
     """
     
-    # 隱藏的報工類型欄位（固定為正式報工）
-    report_type = forms.CharField(
-        widget=forms.HiddenInput(),
-        initial="normal",
-        required=False,
-    )
+
     
     # 作業員選擇（繼承自父類別，但需要自定義查詢集）
     operator = forms.ModelChoiceField(
@@ -1631,7 +1624,7 @@ class RDSampleSupplementReportForm(ProductionReportBaseForm):
         instance = super().save(commit=False)
 
         # 設定RD樣品報工相關欄位
-        instance.report_type = "rd_sample"
+
         instance.workorder = None  # RD樣品沒有對應的工單
         instance.planned_quantity = 0  # RD樣品預設生產數量為0
 

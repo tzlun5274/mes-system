@@ -27,8 +27,8 @@ class Command(BaseCommand):
         try:
             # 統計報工紀錄
             operator_reports_count = OperatorSupplementReport.objects.count()
-            smt_supplement_count = SMTProductionReport.objects.filter(report_type__in=['normal', 'rd_sample']).count()
-            smt_on_site_count = SMTProductionReport.objects.filter(report_type='on_site').count()
+                    smt_supplement_count = SMTProductionReport.objects.count()
+        smt_on_site_count = 0  # 已移除 report_type 欄位
             
             total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
             
@@ -58,14 +58,13 @@ class Command(BaseCommand):
                 # SMT報工詳細統計
                 if smt_supplement_count > 0 or smt_on_site_count > 0:
                     self.stdout.write(f"\n🔧 SMT報工詳細：")
-                    smt_stats = SMTProductionReport.objects.values('equipment__name', 'report_type').annotate(
+                    smt_stats = SMTProductionReport.objects.values('equipment__name').annotate(
                         count=Count('id')
                     ).order_by('-count')[:10]
                     
                     for stat in smt_stats:
                         equipment_name = stat['equipment__name'] or '未知設備'
-                        report_type = stat['report_type'] or '未知類型'
-                        self.stdout.write(f"  • {equipment_name} ({report_type}): {stat['count']} 筆")
+                                        self.stdout.write(f"  • {equipment_name}: {stat['count']} 筆")
 
             self.stdout.write(
                 self.style.SUCCESS(

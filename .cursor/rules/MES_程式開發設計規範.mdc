@@ -1,6 +1,26 @@
+
+## 一、專案總覽
+
+### 專案名稱
+MES 製造執行系統 (Manufacturing Execution System)
+
+### 專案目標
+建立一套完整的製造執行系統，專為電子製造業設計，支援多公司架構，整合 ERP 系統，提供智能化的生產管理解決方案。
+
 ---
-alwaysApply: true
+
+## 二、技術規範
+
+- **開發語言**：Python 3.10+
+- **Web 框架**：Django 5.1.8
+- **資料庫**：PostgreSQL
+- **快取系統**：Redis
+- **任務佇列**：Celery
+- **前端技術**：Bootstrap 5、Chart.js、原生 JavaScript（禁止使用 jQuery）
+- **AI/ML**：TensorFlow、Scikit-learn
+
 ---
+
 ## 三、架構設計
 
 ### 1. 多層式架構
@@ -19,10 +39,6 @@ alwaysApply: true
 │ PostgreSQL + Redis │
 └─────────────────────────────────────┘
 
-yaml
-複製
-編輯
-
 ### 2. 模組化原則
 
 - 每個功能模組獨立開發，禁止交叉存取未授權模組邏輯。
@@ -39,7 +55,6 @@ yaml
 /var/www/mes/
 ├── mes_config/ # 全域 Django 設定
 ├── equip/ # 設備管理模組
-├── smt_equipment/ # SMT 設備模組
 ├── material/ # 物料管理模組
 ├── process/ # 製程管理模組
 ├── scheduling/ # 排程管理模組
@@ -52,15 +67,13 @@ yaml
 ├── workorder/ # 工單主模組（可包含子模組）
 ├── static/ # 全域靜態檔案
 ├── templates/ # 全域模板
+│   └── includes/
+│       └── pagination.html # 全局共用分頁組件
 └── manage.py
-
-shell
-複製
-編輯
 
 ### 模組內部結構
 module_name/
-├── init.py
+├── __init__.py
 ├── models.py
 ├── views.py
 ├── urls.py
@@ -70,14 +83,11 @@ module_name/
 ├── utils.py
 ├── services.py
 ├── serializers.py
+├── templatetags/ # 模板標籤（如需要）
 ├── templates/
-│ └── module_name/
+│   └── module_name/
 └── static/
-└── module_name/
-
-yaml
-複製
-編輯
+    └── module_name/
 
 ---
 
@@ -109,6 +119,10 @@ yaml
 - 每模組需設定 `app_name`。
 - 路由名稱清楚表達資源動作（如 `equipment_add`）。
 
+### 4. 所有的命名條件
+- 前端 後端 資料表 資料表欄位 都必須符合同樣的命名方式 譬如 作業員補登報表 前端 後端 資料表 欄位 都要符合 作業員補登報表 這個命名名稱
+當有重複的資料表名稱出現時，需顯示警告，並暫停創建，然後提出改名稱的方案，等待決定命名後再繼續創建。
+
 ---
 
 ## 七、前端開發規範
@@ -118,20 +132,36 @@ yaml
 - 嚴禁修改非指定模板內容。
 - 遵循 Django Template 語法與區塊結構。
 
-### 2. JavaScript 規範
+### 2. 分頁功能規範
+- **統一使用全局共用分頁組件**：所有模板的分頁功能一律使用 `templates/includes/pagination.html` 共用模組。
+- **嚴禁在模板中寫分頁代碼**：禁止在個別模板中直接編寫分頁 HTML 代碼，除非有特殊需求且經過審核。
+- **標準使用方式**：
+  ```django
+  {% include 'includes/pagination.html' with page_obj=page_obj %}
+  ```
+- **查詢參數保留**：分頁組件會自動保留現有的查詢參數（篩選條件、搜尋關鍵字等）。
+- **響應式設計**：分頁組件支援桌面版和手機版的自適應顯示。
+- **特殊需求處理**：如需自定義分頁樣式或功能，必須：
+  1. 先評估是否可透過參數配置實現
+  2. 如確實需要自定義，需提交審核並說明原因
+  3. 自定義代碼必須符合整體設計風格
+- **分頁組件位置**：`templates/includes/pagination.html`
+- **模板標籤位置**：`workorder/templatetags/pagination_tags.py`
+
+### 3. JavaScript 規範
 - 僅允許使用原生 JavaScript。
 - 嚴禁使用 jQuery。
 - 所有 JS 必須模組化，禁止污染全域作用域。
 - 客製 JS 放置於 `static/module_name/` 內。
 
-### 3. CSS 規範
+### 4. CSS 規範
 - 使用 Bootstrap 5 樣式。
 - 客製樣式請集中於 `static/module_name/`，避免汙染全域樣式。
 
-### 4. 控制元件一致性
+### 5. 控制元件一致性
 - 時間選擇器必須統一為作業員補登報工格式。
 
-### 5. 圖表與看板
+### 6. 圖表與看板
 - 優先使用 Chart.js、Plotly。
 - 圖表資料來源由 API 提供，不得寫死。
 - 看板需支援自動刷新（AJAX 或 WebSocket）。

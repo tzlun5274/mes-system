@@ -25,6 +25,9 @@ from ..forms import (
     # 移除主管報工相關的 form，避免混淆
     # 主管職責：監督、審核、管理，不代為報工
 )
+from process.models import Operator, ProcessName
+from workorder.models import WorkOrder
+from production.models import ProductionLine
 
 
 class ReportIndexView(LoginRequiredMixin, ListView):
@@ -56,80 +59,100 @@ class ReportIndexView(LoginRequiredMixin, ListView):
 class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
     """
     作業員補登報工列表視圖
-    顯示所有作業員補登報工記錄
+    顯示所有待核准的作業員補登報工記錄
     """
     model = OperatorSupplementReport
     template_name = 'workorder/report/operator/supplement/index.html'
     context_object_name = 'supplement_reports'
-    paginate_by = 50
-    ordering = ['-work_date', '-start_time']
+    paginate_by = 20  # 每頁顯示20筆記錄
 
     def get_queryset(self):
-        """取得查詢集，支援搜尋功能"""
-        queryset = super().get_queryset()
+        """取得查詢集 - 只顯示待核准的記錄，並支援篩選功能"""
+        queryset = super().get_queryset().filter(approval_status='pending')
         
-        # 篩選條件
-        operator_id = self.request.GET.get('operator')
-        if operator_id and operator_id != '':
-            queryset = queryset.filter(operator_id=operator_id)
+        # 取得篩選參數
+        company_name = self.request.GET.get('company_name', '').strip()
+        operator_name = self.request.GET.get('operator_name', '').strip()
+        workorder_no = self.request.GET.get('workorder_no', '').strip()
+        product_id = self.request.GET.get('product_id', '').strip()
+        process_name = self.request.GET.get('process_name', '').strip()
+        start_date = self.request.GET.get('start_date', '').strip()
+        end_date = self.request.GET.get('end_date', '').strip()
         
-        workorder_number = self.request.GET.get('workorder')
-        if workorder_number and workorder_number != '':
-            queryset = queryset.filter(workorder__order_number__icontains=workorder_number)
-        
-        process_id = self.request.GET.get('process')
-        if process_id and process_id != '':
-            queryset = queryset.filter(process_id=process_id)
-        
-        date_from = self.request.GET.get('date_from')
-        if date_from and date_from != '':
-            queryset = queryset.filter(work_date__gte=date_from)
-        
-        date_to = self.request.GET.get('date_to')
-        if date_to and date_to != '':
-            queryset = queryset.filter(work_date__lte=date_to)
-        
-        # 搜尋功能
-        search = self.request.GET.get('search', '')
-        if search:
+        # 應用篩選條件
+        if company_name:
             queryset = queryset.filter(
-                Q(operator__name__icontains=search) |
-                Q(workorder__order_number__icontains=search) |
-                Q(process__name__icontains=search)
+                workorder__company_code=company_name
             )
-            
-        return queryset
+        
+        if operator_name:
+            queryset = queryset.filter(
+                operator__name=operator_name
+            )
+        
+        if workorder_no:
+            queryset = queryset.filter(
+                Q(workorder__workorder_no__icontains=workorder_no) |
+                Q(rd_workorder_number__icontains=workorder_no) |
+                Q(original_workorder_number__icontains=workorder_no)
+            )
+        
+        if product_id:
+            queryset = queryset.filter(
+                Q(product_id__icontains=product_id) |
+                Q(rd_product_code__icontains=product_id)
+            )
+        
+        if process_name:
+            queryset = queryset.filter(
+                process__name=process_name
+            )
+        
+        if start_date:
+            queryset = queryset.filter(work_date__gte=start_date)
+        
+        if end_date:
+            queryset = queryset.filter(work_date__lte=end_date)
+        
+        return queryset.select_related(
+            'operator', 
+            'operator__production_line',
+            'workorder', 
+            'process', 
+            'equipment'
+        ).order_by('-work_date', '-start_time')
 
     def get_context_data(self, **kwargs):
-        """提供模板所需的上下文數據"""
+        """添加額外的上下文數據"""
         context = super().get_context_data(**kwargs)
         
-        # 取得選項資料
-        from process.models import Operator, ProcessName
-        operator_list = Operator.objects.all().order_by('name')
-        process_list = ProcessName.objects.all().order_by('name')
+        # 添加篩選參數到上下文，用於保持表單狀態
+        context['filters'] = {
+            'company_name': self.request.GET.get('company_name', ''),
+            'operator_name': self.request.GET.get('operator_name', ''),
+            'workorder_no': self.request.GET.get('workorder_no', ''),
+            'product_id': self.request.GET.get('product_id', ''),
+            'process_name': self.request.GET.get('process_name', ''),
+            'start_date': self.request.GET.get('start_date', ''),
+            'end_date': self.request.GET.get('end_date', ''),
+        }
         
-        # 統計資料（基於全部資料，不受篩選影響）
-        total_reports = OperatorSupplementReport.objects.count()
-        pending_reports = OperatorSupplementReport.objects.filter(approval_status='pending').count()
-        approved_reports = OperatorSupplementReport.objects.filter(approval_status='approved').count()
-        rejected_reports = OperatorSupplementReport.objects.filter(approval_status='rejected').count()
+        # 添加選項數據供篩選下拉選單使用
+        context['operators'] = Operator.objects.filter(
+            operatorsupplementreport__approval_status='pending'
+        ).distinct().order_by('name')
         
-        # 添加額外的上下文數據
-        context.update({
-            'search': self.request.GET.get('search', ''),
-            'total_count': total_reports,
-            'pending_count': pending_reports,
-            'approved_count': approved_reports,
-            'rejected_count': rejected_reports,
-            'operator_list': operator_list,
-            'process_list': process_list,
-            'selected_operator': self.request.GET.get('operator'),
-            'selected_workorder': self.request.GET.get('workorder'),
-            'selected_process': self.request.GET.get('process'),
-            'selected_date_from': self.request.GET.get('date_from'),
-            'selected_date_to': self.request.GET.get('date_to'),
-        })
+        context['processes'] = ProcessName.objects.filter(
+            operatorsupplementreport__approval_status='pending'
+        ).distinct().order_by('name')
+        
+        context['workorders'] = WorkOrder.objects.filter(
+            operatorsupplementreport__approval_status='pending'
+        ).distinct().order_by('-created_at')[:50]  # 限制顯示最近50筆工單
+        
+        # 修正：使用公司設定而不是產線名稱
+        from erp_integration.models import CompanyConfig
+        context['companies'] = CompanyConfig.objects.all().order_by('company_name')
         
         return context
 

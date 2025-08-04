@@ -18,14 +18,14 @@ class SMTProductionReportAdmin(admin.ModelAdmin):
         'workorder_number', 'operation', 'equipment_name', 'work_date',
         'work_quantity', 'defect_quantity', 'approval_status', 'created_at'
     ]
-    list_filter = ['report_type', 'approval_status', 'work_date', 'created_at']
+    list_filter = ['approval_status', 'work_date', 'created_at']
     search_fields = ['workorder_id__order_number', 'operation', 'equipment__name']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['-work_date', '-start_time']
 
     fieldsets = (
         ('基本資訊', {
-            'fields': ('report_type', 'workorder', 'operation', 'equipment')
+            'fields': ('workorder', 'operation', 'equipment')
         }),
         ('時間資訊', {
             'fields': ('work_date', 'start_time', 'end_time')
@@ -54,14 +54,14 @@ class OperatorSupplementReportAdmin(admin.ModelAdmin):
         'operator_name', 'workorder_number', 'process_name', 'work_date',
         'work_quantity', 'defect_quantity', 'approval_status', 'created_at'
     ]
-    list_filter = ['report_type', 'approval_status', 'work_date', 'created_at']
+    list_filter = ['approval_status', 'work_date', 'created_at']
     search_fields = ['operator__name', 'workorder_id__order_number', 'process__name']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['-work_date', '-start_time']
 
     fieldsets = (
         ('基本資訊', {
-            'fields': ('report_type', 'operator', 'workorder', 'process', 'equipment')
+            'fields': ('operator', 'workorder', 'process', 'equipment')
         }),
         ('時間資訊', {
             'fields': ('work_date', 'start_time', 'end_time', 'has_break')

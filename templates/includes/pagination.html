@@ -1,0 +1,95 @@
+{% comment %}
+全局共用分頁組件 (Global Pagination Component)
+使用方式：
+{% include 'includes/pagination.html' with page_obj=your_page_object %}
+或
+{% include 'includes/pagination.html' with page_obj=your_page_object extra_params='param1=value1&param2=value2' %}
+{% endcomment %}
+
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<nav aria-label="分頁導航" class="mt-4">
+    <ul class="pagination justify-content-center mb-0">
+        <!-- 第一頁 -->
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="第一頁">
+                <i class="fas fa-angle-double-left"></i>
+                <span class="d-none d-sm-inline">第一頁</span>
+            </a>
+        </li>
+        {% endif %}
+
+        <!-- 上一頁 -->
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="上一頁">
+                <i class="fas fa-angle-left"></i>
+                <span class="d-none d-sm-inline">上一頁</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link text-muted">
+                <i class="fas fa-angle-left"></i>
+                <span class="d-none d-sm-inline">上一頁</span>
+            </span>
+        </li>
+        {% endif %}
+
+        <!-- 頁碼 -->
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+            </li>
+            {% endif %}
+        {% endfor %}
+
+        <!-- 下一頁 -->
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="下一頁">
+                <span class="d-none d-sm-inline">下一頁</span>
+                <i class="fas fa-angle-right"></i>
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link text-muted">
+                <span class="d-none d-sm-inline">下一頁</span>
+                <i class="fas fa-angle-right"></i>
+            </span>
+        </li>
+        {% endif %}
+
+        <!-- 最後一頁 -->
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" title="最後一頁">
+                <span class="d-none d-sm-inline">最後一頁</span>
+                <i class="fas fa-angle-double-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+<!-- 分頁資訊 -->
+{% if page_obj %}
+<div class="row mt-3">
+    <div class="col-12 text-center">
+        <p class="text-muted">
+            顯示第 {{ page_obj.number }} 頁，共 {{ page_obj.paginator.num_pages }} 頁
+            (總計 {{ page_obj.paginator.count }} 筆記錄)
+            {% if page_obj.paginator.num_pages <= 1 %}
+            <br><small class="text-info">※ 記錄數不足一頁，故不顯示分頁導航</small>
+            {% endif %}
+        </p>
+    </div>
+</div>
+{% endif %} 

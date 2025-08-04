@@ -1896,8 +1896,8 @@ def clear_all_production_reports(request):
         try:
             # 統計要清除的資料數量
             operator_reports_count = OperatorSupplementReport.objects.count()
-            smt_supplement_count = SMTProductionReport.objects.filter(report_type__in=['normal', 'rd_sample']).count()
-            smt_on_site_count = SMTProductionReport.objects.filter(report_type='on_site').count()
+            smt_supplement_count = SMTProductionReport.objects.count()
+            smt_on_site_count = 0  # 已移除 report_type 欄位
             
             total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
             
@@ -1934,8 +1934,8 @@ def clear_all_production_reports(request):
 
     # GET 請求顯示確認頁面
     operator_reports_count = OperatorSupplementReport.objects.count()
-    smt_supplement_count = SMTProductionReport.objects.filter(report_type__in=['normal', 'rd_sample']).count()
-    smt_on_site_count = SMTProductionReport.objects.filter(report_type='on_site').count()
+    smt_supplement_count = SMTProductionReport.objects.count()
+    smt_on_site_count = 0  # 已移除 report_type 欄位
     
     total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
     

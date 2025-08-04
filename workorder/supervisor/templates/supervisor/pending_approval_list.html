@@ -190,7 +190,7 @@
     </div>
 
     <!-- 分頁 -->
-    {% if page_obj.has_other_pages %}
+    {% if paginator.num_pages > 1 %}
     <nav aria-label="分頁導航" class="mt-4">
         <ul class="pagination justify-content-center">
             {% if page_obj.has_previous %}
@@ -199,7 +199,7 @@
             </li>
             {% endif %}
 
-            {% for num in page_obj.paginator.page_range %}
+            {% for num in paginator.page_range %}
             {% if page_obj.number == num %}
             <li class="page-item active">
                 <span class="page-link">{{ num }}</span>
@@ -219,6 +219,11 @@
         </ul>
     </nav>
     {% endif %}
+
+    <!-- 顯示結果統計 -->
+    <div class="text-center text-muted mt-3">
+        顯示第 {{ page_obj.start_index|default:0 }} 到 {{ page_obj.end_index|default:0 }} 筆，共 {{ total_pending }} 筆待審核報工記錄
+    </div>
 </div>
 
 <!-- 拒絕原因模態框 -->

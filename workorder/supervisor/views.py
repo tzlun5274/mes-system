@@ -279,6 +279,7 @@ def pending_approval_list(request):
     context = {
         'page_obj': page_obj,
         'total_pending': len(pending_reports),
+        'paginator': paginator,  # 添加 paginator 到 context
     }
     
     return render(request, 'supervisor/pending_approval_list.html', context)

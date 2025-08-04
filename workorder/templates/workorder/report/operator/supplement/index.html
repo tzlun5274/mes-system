@@ -98,19 +98,59 @@
         color: #721c24;
     }
     
+    /* 簡潔分頁樣式 */
+    .pagination {
+        margin-bottom: 0;
+    }
+    
+    .pagination .page-link {
+        border-radius: 4px;
+        margin: 0 2px;
+        border: 1px solid #dee2e6;
+        color: #495057;
+        padding: 8px 12px;
+        font-weight: 500;
+    }
+    
+    .pagination .page-link:hover {
+        background-color: #e9ecef;
+        border-color: #adb5bd;
+        color: #495057;
+        text-decoration: none;
+    }
+    
+    .pagination .page-item.active .page-link {
+        background-color: #007bff;
+        border-color: #007bff;
+        color: white;
+        font-weight: 600;
+    }
+    
+    .pagination .page-item.disabled .page-link {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+        color: #6c757d;
+        cursor: not-allowed;
+    }
+    
+    /* 上一頁下一頁按鈕特別樣式 */
+    .pagination .page-item:first-child .page-link,
+    .pagination .page-item:last-child .page-link {
+        background-color: #f8f9fa;
+        border-color: #007bff;
+        color: #007bff;
+        font-weight: 600;
+    }
+    
+    .pagination .page-item:first-child .page-link:hover,
+    .pagination .page-item:last-child .page-link:hover {
+        background-color: #007bff;
+        color: white;
+    }
+    
 
     
-    .search-filters {
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-    }
-    
-    .btn-group-sm .btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-    }
+
     
     /* 響應式設計 */
     @media (max-width: 768px) {
@@ -131,7 +171,7 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
-                    <i class="fas fa-history text-warning"></i>
+                    <i class="fas fa-clock text-warning"></i>
                     作業員補登報工
                 </h2>
                 <nav aria-label="breadcrumb">
@@ -205,69 +245,84 @@
         </div>
     </div>
 
-    <!-- 搜尋篩選 -->
+
+
+    <!-- 篩選表單 -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="search-filters">
-                <form method="get" id="searchForm">
-                    <div class="row">
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="operator">作業員</label>
-                                <select class="form-control" id="operator" name="operator">
-                                    <option value="">全部作業員</option>
-                                    {% for operator in operator_list %}
-                                    <option value="{{ operator.id }}" {% if selected_operator|stringformat:'s' == operator.id|stringformat:'s' %}selected{% endif %}>
-                                        {{ operator.name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
+            <div class="card operator-supplement-card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-filter"></i> 篩選條件
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="company_name" class="form-label">公司名稱</label>
+                            <select class="form-select" id="company_name" name="company_name">
+                                <option value="">請選擇公司</option>
+                                {% for company in companies %}
+                                <option value="{{ company.company_code }}" {% if filters.company_name == company.company_code %}selected{% endif %}>
+                                    {{ company.company_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="operator_name" class="form-label">作業員</label>
+                            <select class="form-select" id="operator_name" name="operator_name">
+                                <option value="">請選擇作業員</option>
+                                {% for operator in operators %}
+                                <option value="{{ operator.name }}" {% if filters.operator_name == operator.name %}selected{% endif %}>
+                                    {{ operator.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="workorder_no" class="form-label">工單號</label>
+                            <input type="text" class="form-control" id="workorder_no" name="workorder_no" 
+                                   value="{{ filters.workorder_no }}" placeholder="輸入工單號">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="product_id" class="form-label">產品編號</label>
+                            <input type="text" class="form-control" id="product_id" name="product_id" 
+                                   value="{{ filters.product_id }}" placeholder="輸入產品編號">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="process_name" class="form-label">工序</label>
+                            <select class="form-select" id="process_name" name="process_name">
+                                <option value="">請選擇工序</option>
+                                {% for process in processes %}
+                                <option value="{{ process.name }}" {% if filters.process_name == process.name %}selected{% endif %}>
+                                    {{ process.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="start_date" class="form-label">開始日期</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" 
+                                   value="{{ filters.start_date }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="end_date" class="form-label">結束日期</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" 
+                                   value="{{ filters.end_date }}">
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="d-grid gap-2 d-md-flex">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> 篩選
+                                </button>
+                                <a href="{% url 'workorder:operator_supplement_report_index' %}" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> 清除
+                                </a>
                             </div>
                         </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="workorder">工單號</label>
-                                <input type="text" class="form-control" id="workorder" name="workorder" value="{{ selected_workorder }}" placeholder="工單號">
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="process">工序</label>
-                                <select class="form-control" id="process" name="process">
-                                    <option value="">全部工序</option>
-                                    {% for process in process_list %}
-                                    <option value="{{ process.id }}" {% if selected_process|stringformat:'s' == process.id|stringformat:'s' %}selected{% endif %}>
-                                        {{ process.name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="date_from">開始日期</label>
-                                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ selected_date_from }}">
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="date_to">結束日期</label>
-                                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ selected_date_to }}">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row mt-3">
-                        <div class="col-12 text-center">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-search"></i> 搜尋
-                            </button>
-                            <button type="button" class="btn btn-secondary" onclick="resetSearch()">
-                                <i class="fas fa-undo"></i> 重置
-                            </button>
-                        </div>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -278,7 +333,7 @@
             <div class="card operator-supplement-card">
                 <div class="card-header bg-secondary text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-list"></i> 作業員補登報工列表
+                        <i class="fas fa-clock"></i> 待核准作業員補登報工列表
                     </h5>
                 </div>
                 <div class="card-body">
@@ -287,7 +342,6 @@
                             <thead>
                                 <tr>
                                     <th>報工時間</th>
-                                    <th>報工類型</th>
                                     <th>作業員</th>
                                     <th>工單號/樣品編號</th>
                                     <th>工序</th>
@@ -303,13 +357,6 @@
                                     {% for report in supplement_reports %}
                                     <tr>
                                         <td>{{ report.work_date|date:"Y-m-d" }} {% if report.start_time %}{{ report.start_time|time:"H:i" }}{% else %}-{% endif %}-{% if report.end_time %}{{ report.end_time|time:"H:i" }}{% else %}-{% endif %}</td>
-                                        <td>
-                                            {% if report.report_type == 'rd_sample' or not report.workorder %}
-                                                <span class="badge badge-success">RD樣品</span>
-                                            {% else %}
-                                                <span class="badge badge-warning">正式報工</span>
-                                            {% endif %}
-                                        </td>
                                         <td>{{ report.operator.name|default:"-" }}</td>
                                         <td>
                                             {% if report.report_type == 'rd_sample' or not report.workorder %}
@@ -368,18 +415,11 @@
                                 {% else %}
                                     <tr>
                                         <td colspan="10" class="text-center text-muted">
-                                            <i class="fas fa-search fa-2x mb-2"></i>
+                                            <i class="fas fa-check-circle fa-2x mb-2 text-success"></i>
                                             <br>
-                                            {% if request.GET %}
-                                                沒有符合篩選條件的記錄
-                                                <br>
-                                                <small class="text-muted">
-                                                    請嘗試調整篩選條件或
-                                                    <a href="{% url 'workorder:operator_supplement_report_index' %}" class="text-primary">清除所有篩選條件</a>
-                                                </small>
-                                            {% else %}
-                                                目前沒有補登報工記錄
-                                            {% endif %}
+                                            目前沒有待核准的補登報工記錄
+                                            <br>
+                                            <small class="text-muted">所有記錄都已核准完成</small>
                                         </td>
                                     </tr>
                                 {% endif %}
@@ -387,64 +427,8 @@
                         </table>
                     </div>
                     
-                    <!-- 分頁資訊 -->
-                    <div class="row mt-3">
-                        <div class="col-12 text-center">
-                            <p class="text-muted">
-                                顯示第 {{ supplement_reports.number }} 頁，共 {{ supplement_reports.paginator.num_pages }} 頁
-                                (總計 {{ supplement_reports.paginator.count }} 筆記錄)
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <!-- 分頁 -->
-                    {% if supplement_reports.paginator.num_pages > 1 %}
-                    <nav aria-label="補登報工分頁">
-                        <ul class="pagination justify-content-center">
-                            {% if supplement_reports.has_previous %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?{% if request.GET.operator %}operator={{ request.GET.operator }}{% endif %}{% if request.GET.workorder %}{% if request.GET.operator %}&{% endif %}workorder={{ request.GET.workorder }}{% endif %}{% if request.GET.process %}{% if request.GET.operator or request.GET.workorder %}&{% endif %}process={{ request.GET.process }}{% endif %}{% if request.GET.status %}{% if request.GET.operator or request.GET.workorder or request.GET.process %}&{% endif %}status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status %}&{% endif %}date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status or request.GET.date_from %}&{% endif %}date_to={{ request.GET.date_to }}{% endif %}&page=1" title="第一頁">
-                                        <i class="fas fa-angle-double-left"></i>
-                                        <span class="d-none d-sm-inline">第一頁</span>
-                                    </a>
-                                </li>
-                                <li class="page-item">
-                                    <a class="page-link" href="?{% if request.GET.operator %}operator={{ request.GET.operator }}{% endif %}{% if request.GET.workorder %}{% if request.GET.operator %}&{% endif %}workorder={{ request.GET.workorder }}{% endif %}{% if request.GET.process %}{% if request.GET.operator or request.GET.workorder %}&{% endif %}process={{ request.GET.process }}{% endif %}{% if request.GET.status %}{% if request.GET.operator or request.GET.workorder or request.GET.process %}&{% endif %}status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status %}&{% endif %}date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status or request.GET.date_from %}&{% endif %}date_to={{ request.GET.date_to }}{% endif %}&page={{ supplement_reports.previous_page_number }}" title="上一頁">
-                                        <i class="fas fa-angle-left"></i>
-                                        <span class="d-none d-sm-inline">上一頁</span>
-                                    </a>
-                                </li>
-                            {% endif %}
-                            
-                            {% for num in supplement_reports.paginator.page_range %}
-                                {% if supplement_reports.number == num %}
-                                <li class="page-item active">
-                                    <span class="page-link">{{ num }}</span>
-                                </li>
-                                {% elif num > supplement_reports.number|add:'-3' and num < supplement_reports.number|add:'3' %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?{% if request.GET.operator %}operator={{ request.GET.operator }}{% endif %}{% if request.GET.workorder %}{% if request.GET.operator %}&{% endif %}workorder={{ request.GET.workorder }}{% endif %}{% if request.GET.process %}{% if request.GET.operator or request.GET.workorder %}&{% endif %}process={{ request.GET.process }}{% endif %}{% if request.GET.status %}{% if request.GET.operator or request.GET.workorder or request.GET.process %}&{% endif %}status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status %}&{% endif %}date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status or request.GET.date_from %}&{% endif %}date_to={{ request.GET.date_to }}{% endif %}&page={{ num }}">{{ num }}</a>
-                                </li>
-                                {% endif %}
-                            {% endfor %}
-                            
-                            {% if supplement_reports.has_next %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?{% if request.GET.operator %}operator={{ request.GET.operator }}{% endif %}{% if request.GET.workorder %}{% if request.GET.operator %}&{% endif %}workorder={{ request.GET.workorder }}{% endif %}{% if request.GET.process %}{% if request.GET.operator or request.GET.workorder %}&{% endif %}process={{ request.GET.process }}{% endif %}{% if request.GET.status %}{% if request.GET.operator or request.GET.workorder or request.GET.process %}&{% endif %}status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status %}&{% endif %}date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status or request.GET.date_from %}&{% endif %}date_to={{ request.GET.date_to }}{% endif %}&page={{ supplement_reports.next_page_number }}" title="下一頁">
-                                        <i class="fas fa-angle-right"></i>
-                                        <span class="d-none d-sm-inline">下一頁</span>
-                                    </a>
-                                </li>
-                                <li class="page-item">
-                                    <a class="page-link" href="?{% if request.GET.operator %}operator={{ request.GET.operator }}{% endif %}{% if request.GET.workorder %}{% if request.GET.operator %}&{% endif %}workorder={{ request.GET.workorder }}{% endif %}{% if request.GET.process %}{% if request.GET.operator or request.GET.workorder %}&{% endif %}process={{ request.GET.process }}{% endif %}{% if request.GET.status %}{% if request.GET.operator or request.GET.workorder or request.GET.process %}&{% endif %}status={{ request.GET.status }}{% endif %}{% if request.GET.date_from %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status %}&{% endif %}date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}{% if request.GET.operator or request.GET.workorder or request.GET.process or request.GET.status or request.GET.date_from %}&{% endif %}date_to={{ request.GET.date_to }}{% endif %}&page={{ supplement_reports.paginator.num_pages }}" title="最後一頁">
-                                        <i class="fas fa-angle-double-right"></i>
-                                        <span class="d-none d-sm-inline">最後一頁</span>
-                                    </a>
-                                </li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                    {% endif %}
+                    <!-- 使用全局共用分頁組件 -->
+                    {% include 'includes/pagination.html' with page_obj=page_obj %}
                 </div>
             </div>
         </div>
@@ -483,15 +467,7 @@
         }, 1000);
     });
     
-    // 重置搜尋
-    function resetSearch() {
-        document.getElementById('operator').value = '';
-        document.getElementById('workorder').value = '';
-        document.getElementById('process').value = '';
-        document.getElementById('date_from').value = '';
-        document.getElementById('date_to').value = '';
-        document.getElementById('searchForm').submit();
-    }
+
     
     // 核准通過
     function approveReport(reportId) {
@@ -611,5 +587,7 @@
         `;
         document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
     }
+
+
 </script>
 {% endblock %} 

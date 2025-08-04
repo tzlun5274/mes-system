@@ -13,19 +13,7 @@ class SMTProductionReport(models.Model):
     SMT 設備為自動化運作，不需要作業員
     """
 
-    # 報工類型
-    REPORT_TYPE_CHOICES = [
-        ("normal", "正式工單"),
-        ("rd_sample", "RD樣品"),
-    ]
 
-    report_type = models.CharField(
-        max_length=20,
-        choices=REPORT_TYPE_CHOICES,
-        default="normal",
-        verbose_name="報工類型",
-        help_text="請選擇報工類型：正式工單或RD樣品",
-    )
 
     # 基本資訊
     product_id = models.CharField(
@@ -42,23 +30,6 @@ class SMTProductionReport(models.Model):
         help_text="請選擇工單號碼，或透過產品編號自動帶出",
         null=True,
         blank=True,
-    )
-
-    # RD樣品專用欄位
-    rd_workorder_number = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        verbose_name="RD樣品工單號碼",
-        help_text="RD樣品模式的工單號碼",
-    )
-
-    rd_product_code = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        verbose_name="RD產品編號",
-        help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊",
     )
 
     # 舊資料匯入專用欄位
@@ -222,19 +193,12 @@ class SMTProductionReport(models.Model):
         ordering = ["-work_date", "-start_time"]
 
     def __str__(self):
-        if self.report_type == "rd_sample":
-            rd_info = self.rd_product_code or self.product_id or "RD樣品"
-            return f"RD樣品 - {rd_info} - {self.work_date}"
-        else:
-            return f"{self.workorder.order_number if self.workorder else '無工單'} - {self.work_date}"
+        return f"{self.workorder.order_number if self.workorder else '無工單'} - {self.work_date}"
 
     @property
     def workorder_number(self):
         """取得工單號碼"""
-        if self.report_type == "rd_sample":
-            # RD樣品工單號碼，優先使用rd_workorder_number
-            return self.rd_workorder_number or "RD樣品"
-        elif self.workorder:
+        if self.workorder:
             return self.workorder.order_number
         elif self.original_workorder_number:
             # 舊資料匯入的工單號碼
@@ -244,22 +208,6 @@ class SMTProductionReport(models.Model):
             return f"產品編號：{self.product_id}"
         else:
             return ""
-
-    def is_rd_sample_by_workorder(self):
-        """根據工單號碼判斷是否為RD樣品"""
-        if self.workorder and self.workorder.order_number:
-            # 檢查工單號碼是否包含RD樣品相關關鍵字
-            order_number = self.workorder.order_number.upper()
-            rd_keywords = ["RD", "樣品", "SAMPLE", "RD樣品", "RD-樣品", "RD樣本"]
-            return any(keyword in order_number for keyword in rd_keywords)
-        return False
-
-    def auto_set_report_type(self):
-        """自動設定報工類型"""
-        if self.is_rd_sample_by_workorder():
-            self.report_type = "rd_sample"
-        else:
-            self.report_type = "normal"
 
     @property
     def equipment_name(self):
@@ -303,9 +251,7 @@ class SMTProductionReport(models.Model):
         已核准的記錄只有超級管理員可以編輯
         RD樣品記錄不能修改
         """
-        # RD樣品記錄不能修改
-        if self.report_type == "rd_sample":
-            return False
+
 
         # 已核准的記錄只有超級管理員可以編輯
         if self.approval_status == "approved":
@@ -424,19 +370,7 @@ class OperatorSupplementReport(models.Model):
         help_text="請選擇進行補登報工的作業員",
     )
 
-    # 報工類型
-    REPORT_TYPE_CHOICES = [
-        ("normal", "正式工單"),
-        ("rd_sample", "RD樣品"),
-    ]
 
-    report_type = models.CharField(
-        max_length=20,
-        choices=REPORT_TYPE_CHOICES,
-        default="normal",
-        verbose_name="報工類型",
-        help_text="請選擇報工類型：正式工單或RD樣品",
-    )
 
     workorder = models.ForeignKey(
         'workorder.WorkOrder',
@@ -445,23 +379,6 @@ class OperatorSupplementReport(models.Model):
         help_text="請選擇要補登的工單號碼",
         null=True,
         blank=True,
-    )
-
-    # RD樣品專用欄位
-    rd_workorder_number = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        verbose_name="RD樣品工單號碼",
-        help_text="RD樣品模式的工單號碼",
-    )
-
-    rd_product_code = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        verbose_name="RD產品編號",
-        help_text="請輸入RD樣品的產品編號，用於識別具體的RD樣品工序與設備資訊",
     )
 
     # 舊資料匯入專用欄位
@@ -788,10 +705,7 @@ class OperatorSupplementReport(models.Model):
     @property
     def workorder_number(self):
         """取得工單號碼"""
-        if self.report_type == "rd_sample":
-            # RD樣品工單號碼，優先使用rd_workorder_number
-            return self.rd_workorder_number or "RD樣品"
-        elif self.workorder:
+        if self.workorder:
             return self.workorder.order_number
         elif self.original_workorder_number:
             # 舊資料匯入的工單號碼
@@ -802,21 +716,7 @@ class OperatorSupplementReport(models.Model):
         else:
             return ""
 
-    def is_rd_sample_by_workorder(self):
-        """根據工單號碼判斷是否為RD樣品"""
-        if self.workorder and self.workorder.order_number:
-            # 檢查工單號碼是否包含RD樣品相關關鍵字
-            order_number = self.workorder.order_number.upper()
-            rd_keywords = ["RD", "樣品", "SAMPLE", "RD樣品", "RD-樣品", "RD樣本"]
-            return any(keyword in order_number for keyword in rd_keywords)
-        return False
 
-    def auto_set_report_type(self):
-        """自動設定報工類型"""
-        if self.is_rd_sample_by_workorder():
-            self.report_type = "rd_sample"
-        else:
-            self.report_type = "normal"
 
     @property
     def process_name(self):
@@ -1082,9 +982,6 @@ class OperatorSupplementReport(models.Model):
         # 自動從工單取得產品編號
         if self.workorder and hasattr(self.workorder, 'product_code') and self.workorder.product_code:
             self.product_id = self.workorder.product_code
-        elif self.report_type == 'rd_sample' and self.rd_product_code:
-            # RD樣品模式使用rd_product_code
-            self.product_id = self.rd_product_code
         
         # 確保設備欄位正確保存
         if hasattr(self, 'equipment') and self.equipment:
