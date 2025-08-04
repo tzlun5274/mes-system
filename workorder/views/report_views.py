@@ -92,15 +92,14 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
         
         if workorder_no:
             queryset = queryset.filter(
-                Q(workorder__workorder_no__icontains=workorder_no) |
-                Q(rd_workorder_number__icontains=workorder_no) |
+                Q(workorder__order_number__icontains=workorder_no) |
                 Q(original_workorder_number__icontains=workorder_no)
             )
         
         if product_id:
             queryset = queryset.filter(
                 Q(product_id__icontains=product_id) |
-                Q(rd_product_code__icontains=product_id)
+                Q(workorder__product_code__icontains=product_id)
             )
         
         if process_name:

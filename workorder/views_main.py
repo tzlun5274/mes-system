@@ -4821,6 +4821,14 @@ def operator_supplement_import_file(request):
                 process_name = str(row['工序名稱']).strip()
                 work_quantity = int(row['報工數量'])
                 
+                # 處理產品編號
+                product_code_raw = row['產品編號']
+                # 處理 pandas 讀取的空值問題
+                if pd.isna(product_code_raw) or str(product_code_raw).strip() == '' or str(product_code_raw).strip().lower() == 'nan':
+                    product_code = ""
+                else:
+                    product_code = str(product_code_raw).strip()
+                
                 # 解析日期 - 支援多種格式
                 date_str = str(row['報工日期']).strip()
                 if '/' in date_str:
@@ -4879,14 +4887,22 @@ def operator_supplement_import_file(request):
                 
                 # 處理選填欄位
                 defect_quantity = int(row.get('不良品數量', 0))
-                remarks = str(row.get('備註', ''))
-                abnormal_notes = str(row.get('異常紀錄', ''))
                 
-                # 根據公司代號查找工單
-                workorder = WorkOrder.objects.filter(
-                    company_code=company_code,
-                    order_number=workorder_number
-                ).first()
+                # 處理備註（選填）
+                remarks_raw = row.get('備註', '')
+                if pd.isna(remarks_raw) or str(remarks_raw).strip() == '' or str(remarks_raw).strip().lower() == 'nan':
+                    remarks = ""
+                else:
+                    remarks = str(remarks_raw).strip()
+                
+                # 處理異常紀錄（選填）
+                abnormal_notes_raw = row.get('異常紀錄', '')
+                if pd.isna(abnormal_notes_raw) or str(abnormal_notes_raw).strip() == '' or str(abnormal_notes_raw).strip().lower() == 'nan':
+                    abnormal_notes = ""
+                else:
+                    abnormal_notes = str(abnormal_notes_raw).strip()
+                
+                # 不進行工單查找，直接使用匯入的工單號碼
                 
                 # 驗證作業員
                 operator = Operator.objects.filter(name=operator_name).first()
@@ -4906,10 +4922,11 @@ def operator_supplement_import_file(request):
                     continue
                 
                 # 建立報工記錄
-                # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
+                # 直接使用匯入的工單號碼，不進行工單查找
                 report_data = {
                     'operator': operator,
                     'process': process,
+                    'product_id': product_code,  # 加入產品編號
                     'work_date': work_date,
                     'start_time': start_time,
                     'end_time': end_time,
@@ -4917,15 +4934,9 @@ def operator_supplement_import_file(request):
                     'defect_quantity': defect_quantity,
                     'remarks': remarks,
                     'abnormal_notes': abnormal_notes,
-                    'created_by': request.user.username
+                    'created_by': request.user.username,
+                    'original_workorder_number': workorder_number  # 直接使用匯入的工單號碼
                 }
-                
-                if workorder:
-                    # 如果工單存在，使用正常的 workorder 欄位
-                    report_data['workorder'] = workorder
-                else:
-                    # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
-                    report_data['original_workorder_number'] = workorder_number
                 
                 report = OperatorSupplementReport.objects.create(**report_data)
                 

@@ -240,34 +240,20 @@ def operator_report_import_file(request):
                     error_count += 1
                     continue
                 
-                # 6. 驗證工單號碼格式（不檢查是否存在，因為是匯入舊資料）
+                # 6. 驗證工單號碼格式
                 workorder_number = str(row['工單號']).strip()
                 if not workorder_number:
                     errors.append(f'第 {index+1} 行：工單號為空')
                     error_count += 1
                     continue
                 
-                # 對於舊資料匯入，不檢查工單是否存在，直接使用工單號碼
-                # 如果工單不存在，將使用工單號碼作為字串儲存
-                workorder = WorkOrder.objects.filter(
-                    company_code=company_code,
-                    order_number=workorder_number
-                ).first()
-                
                 # 7. 驗證產品編號
-                product_code = str(row['產品編號']).strip()
-                if not product_code:
-                    # 如果產品編號為空，嘗試從工單取得
-                    if workorder and workorder.product_code:
-                        product_code = workorder.product_code
-                    else:
-                        # 如果還是沒有，設為預設值
-                        product_code = "未指定產品"
-                        logger.warning(f'第 {index+1} 行：產品編號為空，設為預設值')
-                
-                # 如果工單存在且有產品編號，優先使用工單中的產品編號
-                if workorder and workorder.product_code:
-                    product_code = workorder.product_code
+                product_code_raw = row['產品編號']
+                # 處理 pandas 讀取的空值問題
+                if pd.isna(product_code_raw) or str(product_code_raw).strip() == '' or str(product_code_raw).strip().lower() == 'nan':
+                    product_code = ""
+                else:
+                    product_code = str(product_code_raw).strip()
                 
                 # 8. 驗證工序名稱
                 process_name = str(row['工序名稱']).strip()
@@ -315,7 +301,12 @@ def operator_report_import_file(request):
                 equipment = None
                 
                 if '設備名稱' in df.columns and pd.notna(row['設備名稱']):
-                    equipment_name = str(row['設備名稱']).strip()
+                    equipment_name_raw = row['設備名稱']
+                    # 處理 pandas 讀取的空值問題
+                    if pd.isna(equipment_name_raw) or str(equipment_name_raw).strip() == '' or str(equipment_name_raw).strip().lower() == 'nan':
+                        equipment_name = ""
+                    else:
+                        equipment_name = str(equipment_name_raw).strip()
                     
                     if equipment_name:
                         # 先嘗試精確匹配
@@ -336,12 +327,22 @@ def operator_report_import_file(request):
                 # 12. 處理備註（選填）
                 remarks = ""
                 if '備註' in df.columns and pd.notna(row['備註']):
-                    remarks = str(row['備註']).strip()
+                    remarks_raw = row['備註']
+                    # 處理 pandas 讀取的空值問題
+                    if pd.isna(remarks_raw) or str(remarks_raw).strip() == '' or str(remarks_raw).strip().lower() == 'nan':
+                        remarks = ""
+                    else:
+                        remarks = str(remarks_raw).strip()
                 
                 # 13. 處理異常紀錄（選填）
                 abnormal_notes = ""
                 if '異常紀錄' in df.columns and pd.notna(row['異常紀錄']):
-                    abnormal_notes = str(row['異常紀錄']).strip()
+                    abnormal_notes_raw = row['異常紀錄']
+                    # 處理 pandas 讀取的空值問題
+                    if pd.isna(abnormal_notes_raw) or str(abnormal_notes_raw).strip() == '' or str(abnormal_notes_raw).strip().lower() == 'nan':
+                        abnormal_notes = ""
+                    else:
+                        abnormal_notes = str(abnormal_notes_raw).strip()
                 
                 # 14. 檢查是否已存在相同記錄（避免重複匯入）
                 # 暫時註解掉重複檢查功能，讓所有資料都能匯入
@@ -367,7 +368,7 @@ def operator_report_import_file(request):
                 #     continue
                 
                 # 15. 建立報工記錄
-                # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
+                # 直接使用匯入的工單號碼，不進行工單查找
                 report_data = {
                     'operator': operator,
                     'process': process,
@@ -381,19 +382,9 @@ def operator_report_import_file(request):
                     'defect_quantity': defect_quantity,
                     'remarks': remarks,
                     'abnormal_notes': abnormal_notes,
-                    'created_by': request.user.username
+                    'created_by': request.user.username,
+                    'original_workorder_number': workorder_number  # 直接使用匯入的工單號碼
                 }
-                
-                # 如果工單存在，設定預設生產數量
-                if workorder:
-                    report_data['planned_quantity'] = workorder.quantity
-                
-                if workorder:
-                    # 如果工單存在，使用正常的 workorder 欄位
-                    report_data['workorder'] = workorder
-                else:
-                    # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
-                    report_data['original_workorder_number'] = workorder_number
                 
                 report = OperatorSupplementReport.objects.create(**report_data)
                 
@@ -853,22 +844,25 @@ def smt_report_import_file(request):
                     continue
                 
                 # 7. 驗證產品編號
-                product_code = str(row['產品編號']).strip()
-                if not product_code:
-                    errors.append(f'第 {index+1} 行：產品編號為空')
-                    error_count += 1
-                    continue
+                product_code_raw = row['產品編號']
+                # 處理 pandas 讀取的空值問題
+                if pd.isna(product_code_raw) or str(product_code_raw).strip() == '' or str(product_code_raw).strip().lower() == 'nan':
+                    product_code = ""
+                else:
+                    product_code = str(product_code_raw).strip()
                 
-                # 8. 查找工單（如果不存在，將使用工單號碼作為字串儲存）
-                workorder = WorkOrder.objects.filter(
-                    company_code=company_code,
-                    order_number=workorder_number
-                ).first()
+                # 8. 不進行工單查找，直接使用匯入的工單號碼
                 
                 # 8. 驗證並取得工序
                 process_name = str(row['工序名稱']).strip()
                 if not process_name:
                     errors.append(f'第 {index+1} 行：工序名稱為空')
+                    error_count += 1
+                    continue
+                
+                process = ProcessName.objects.filter(name=process_name).first()
+                if not process:
+                    errors.append(f'第 {index+1} 行：找不到工序 "{process_name}"')
                     error_count += 1
                     continue
                 
@@ -901,12 +895,22 @@ def smt_report_import_file(request):
                 # 11. 處理備註（選填）
                 remarks = ""
                 if '備註' in df.columns and pd.notna(row['備註']):
-                    remarks = str(row['備註']).strip()
+                    remarks_raw = row['備註']
+                    # 處理 pandas 讀取的空值問題
+                    if pd.isna(remarks_raw) or str(remarks_raw).strip() == '' or str(remarks_raw).strip().lower() == 'nan':
+                        remarks = ""
+                    else:
+                        remarks = str(remarks_raw).strip()
                 
                 # 12. 處理異常紀錄（選填）
                 abnormal_notes = ""
                 if '異常紀錄' in df.columns and pd.notna(row['異常紀錄']):
-                    abnormal_notes = str(row['異常紀錄']).strip()
+                    abnormal_notes_raw = row['異常紀錄']
+                    # 處理 pandas 讀取的空值問題
+                    if pd.isna(abnormal_notes_raw) or str(abnormal_notes_raw).strip() == '' or str(abnormal_notes_raw).strip().lower() == 'nan':
+                        abnormal_notes = ""
+                    else:
+                        abnormal_notes = str(abnormal_notes_raw).strip()
                 
                 # 13. 檢查是否已存在相同記錄（避免重複匯入）
                 # 暫時註解掉重複檢查功能，讓所有資料都能匯入
@@ -927,10 +931,12 @@ def smt_report_import_file(request):
                 #     continue
                 
                 # 14. 建立SMT報工記錄
+                # 直接使用匯入的工單號碼，不進行工單查找
                 report_data = {
                     'equipment': equipment,
-                    'product_id': product_code,  # 確保產品編號寫入
-                    'operation': process_name,
+                    'product_id': product_code,  # 直接使用匯入的產品編號
+                    'process': process,  # 使用工序 ID
+                    'operation': process_name,  # 保留工序名稱字串
                     'work_date': work_date,
                     'start_time': start_time,
                     'end_time': end_time,
@@ -938,20 +944,9 @@ def smt_report_import_file(request):
                     'defect_quantity': defect_quantity,
                     'remarks': remarks,
                     'abnormal_notes': abnormal_notes,
-                    'created_by': request.user.username
+                    'created_by': request.user.username,
+                    'original_workorder_number': workorder_number  # 直接使用匯入的工單號碼
                 }
-                
-                if workorder:
-                    # 如果工單存在，使用正常的 workorder 欄位
-                    report_data['workorder'] = workorder
-                    # 同時確保產品編號也寫入（從工單取得或使用匯入的）
-                    if workorder.product_code:
-                        report_data['product_id'] = workorder.product_code
-                else:
-                    # 如果工單不存在，將工單號碼儲存到 original_workorder_number 欄位
-                    report_data['original_workorder_number'] = workorder_number
-                    # 產品編號使用匯入的資料
-                    report_data['product_id'] = product_code
                 
                 report = SMTProductionReport.objects.create(**report_data)
                 
