@@ -4513,8 +4513,8 @@ def export_operator_reports(request):
         ws = wb.active
         ws.title = "作業員報工記錄"
         
-        # 設定標題
-        headers = ['作業員', '工單號', '工序', '數量', '報工日期', '審核狀態', '建立時間']
+        # 設定標題（移除審核相關欄位）
+        headers = ['作業員', '工單號', '工序', '數量', '報工日期']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True)
@@ -4527,8 +4527,6 @@ def export_operator_reports(request):
             ws.cell(row=row, column=3, value=report.process.name if report.process else '')
             ws.cell(row=row, column=4, value=report.work_quantity or 0)
             ws.cell(row=row, column=5, value=report.work_date.strftime('%Y-%m-%d'))
-            ws.cell(row=row, column=6, value=report.get_approval_status_display())
-            ws.cell(row=row, column=7, value=report.created_at.strftime('%Y-%m-%d %H:%M:%S'))
         
         # 調整欄寬
         for column in ws.columns:

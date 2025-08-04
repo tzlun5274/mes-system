@@ -82,7 +82,7 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
         # 應用篩選條件
         if company_name:
             queryset = queryset.filter(
-                workorder__company_code=company_name
+                company_code=company_name
             )
         
         if operator_name:
@@ -208,6 +208,28 @@ class OperatorSupplementReportDetailView(LoginRequiredMixin, DetailView):
     template_name = 'workorder/report/operator/supplement/detail.html'
     context_object_name = 'report'
 
+    def get_context_data(self, **kwargs):
+        """提供模板所需的上下文數據"""
+        context = super().get_context_data(**kwargs)
+        
+        # 獲取公司資訊
+        from erp_integration.models import CompanyConfig
+        
+        # 直接從記錄的 company_code 欄位獲取公司代號
+        company_code = self.object.company_code
+        
+        # 獲取公司名稱
+        company_name = ""
+        if company_code:
+            company = CompanyConfig.objects.filter(company_code=company_code).first()
+            if company:
+                company_name = company.company_name
+        
+        context['company_name'] = company_name
+        context['company_code'] = company_code
+        
+        return context
+
 
 class SMTProductionReportListView(LoginRequiredMixin, ListView):
     """
@@ -235,7 +257,7 @@ class SMTProductionReportListView(LoginRequiredMixin, ListView):
         # 應用篩選條件
         if company_name:
             queryset = queryset.filter(
-                workorder__company_code=company_name
+                company_code=company_name
             )
         
         if smt_line:
@@ -348,6 +370,28 @@ class SMTProductionReportDetailView(LoginRequiredMixin, DetailView):
     model = SMTProductionReport
     template_name = 'workorder/report/smt/supplement/detail.html'
     context_object_name = 'supplement_report'
+
+    def get_context_data(self, **kwargs):
+        """提供模板所需的上下文數據"""
+        context = super().get_context_data(**kwargs)
+        
+        # 獲取公司資訊
+        from erp_integration.models import CompanyConfig
+        
+        # 直接從記錄的 company_code 欄位獲取公司代號
+        company_code = self.object.company_code
+        
+        # 獲取公司名稱
+        company_name = ""
+        if company_code:
+            company = CompanyConfig.objects.filter(company_code=company_code).first()
+            if company:
+                company_name = company.company_name
+        
+        context['company_name'] = company_name
+        context['company_code'] = company_code
+        
+        return context
 
 
 class SMTProductionReportDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):

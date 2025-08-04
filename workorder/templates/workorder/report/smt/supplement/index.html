@@ -293,12 +293,12 @@
                                 <tr>
                                     <th>報工時間</th>
                                     <th>設備</th>
-                                    <th>工單號/樣品編號</th>
+                                    <th>工單號</th>
                                     <th>產品編號</th>
+                                    <th>工序</th>
                                     <th>報工數量</th>
                                     <th>工時</th>
                                     <th>核准狀態</th>
-                                    <th>建立時間</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -306,18 +306,30 @@
                                 {% if reports %}
                                     {% for report in reports %}
                                     <tr>
-                                        <td>{{ report.work_date|date:"Y-m-d" }} {{ report.start_time|time:"H:i" }}-{{ report.end_time|time:"H:i" }}</td>
-                                        <td>{{ report.equipment.name }}</td>
-                                        <td>{{ report.workorder.order_number|default:"-" }}</td>
-                                        <td>{{ report.workorder.product_code|default:"-" }}</td>
-                                        <td>{{ report.work_quantity }}</td>
-                                        <td>{{ report.work_duration|floatformat:2 }}小時</td>
+                                        <td>{{ report.work_date|date:"Y-m-d" }}</td>
+                                        <td>{{ report.equipment.name|default:"" }}</td>
                                         <td>
-                                            <span class="status-badge status-{{ report.approval_status }}">
-                                                {{ report.get_approval_status_display }}
+                                            {% if report.original_workorder_number %}
+                                                {{ report.original_workorder_number }}
+                                            {% elif report.workorder %}
+                                                {{ report.workorder.order_number }}
+                                            {% else %}
+                                                {{ "" }}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ report.product_id|default:"" }}</td>
+                                        <td>{{ report.operation|default:"" }}</td>
+                                        <td>{{ report.work_quantity|default:"0" }}</td>
+                                        <td>{{ report.work_hours_calculated|default:"0" }}</td>
+                                        <td>
+                                            <span class="badge {% if report.approval_status == 'pending' %}bg-warning{% elif report.approval_status == 'approved' %}bg-success{% elif report.approval_status == 'rejected' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                                {% if report.approval_status == 'pending' %}待核准
+                                                {% elif report.approval_status == 'approved' %}已核准
+                                                {% elif report.approval_status == 'rejected' %}已駁回
+                                                {% else %}未知狀態
+                                                {% endif %}
                                             </span>
                                         </td>
-                                        <td>{{ report.created_at|date:"Y-m-d H:i" }}</td>
                                         <td>
                                             <div class="d-flex gap-2" role="group">
                                                 <!-- 詳情按鈕 - 永遠顯示 -->
@@ -332,21 +344,16 @@
                                                 </a>
                                                 {% endif %}
                                                 
-                                                <!-- 刪除按鈕 - 核准後只有超級管理員可以刪除 -->
-                                                {% if report.approval_status == 'pending' or report.approval_status == 'rejected' or user.is_superuser %}
-                                                <a href="{% url 'workorder:smt_supplement_report_delete' report.id %}" class="btn btn-danger btn-sm" onclick="return confirm('確定要刪除這筆補登記錄嗎？')">
-                                                    <i class="fas fa-trash me-1"></i>刪除
-                                                </a>
-                                                {% endif %}
+
                                             </div>
                                         </td>
                                     </tr>
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="9" class="text-center py-4">
-                                            <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
-                                            <p class="text-muted">目前沒有補登報工記錄</p>
+                                        <td colspan="9" class="text-center text-muted py-4">
+                                            <i class="fas fa-inbox fa-2x mb-3"></i>
+                                            <p class="mb-0">暫無待核准的SMT補登報工記錄</p>
                                         </td>
                                     </tr>
                                 {% endif %}

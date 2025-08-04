@@ -371,6 +371,7 @@ def operator_report_import_file(request):
                 # 直接使用匯入的工單號碼，不進行工單查找
                 report_data = {
                     'operator': operator,
+                    'company_code': company_code,  # 加入公司代號
                     'process': process,
                     'operation': operation_name,  # 確保工序名稱包含在內
                     'equipment': equipment,  # 確保設備欄位包含在內
@@ -934,6 +935,7 @@ def smt_report_import_file(request):
                 # 直接使用匯入的工單號碼，不進行工單查找
                 report_data = {
                     'equipment': equipment,
+                    'company_code': company_code,  # 加入公司代號
                     'product_id': product_code,  # 直接使用匯入的產品編號
                     'process': process,  # 使用工序 ID
                     'operation': process_name,  # 保留工序名稱字串
@@ -1240,10 +1242,10 @@ def smt_report_export(request):
         ws = wb.active
         ws.title = "SMT設備報工記錄"
         
-        # 設定標題（按照圖片格式順序）
+        # 設定標題（移除審核相關欄位）
         headers = [
             '設備名稱', '公司代號', '報工日期', '開始時間', '結束時間', 
-            '工單號', '產品編號', '工序名稱', '空白佔位用', '報工數量', 
+            '工單號', '產品編號', '工序名稱', '報工數量', 
             '不良品數量', '備註', '異常紀錄'
         ]
         
@@ -1281,11 +1283,10 @@ def smt_report_export(request):
                 product_id = report.workorder.product_code
             ws.cell(row=row, column=7, value=product_id)
             ws.cell(row=row, column=8, value=report.operation)
-            ws.cell(row=row, column=9, value='')  # 空白佔位用
-            ws.cell(row=row, column=10, value=report.work_quantity or 0)
-            ws.cell(row=row, column=11, value=report.defect_quantity or 0)
-            ws.cell(row=row, column=12, value=report.remarks or '')
-            ws.cell(row=row, column=13, value=report.abnormal_notes or '')
+            ws.cell(row=row, column=9, value=report.work_quantity or 0)
+            ws.cell(row=row, column=10, value=report.defect_quantity or 0)
+            ws.cell(row=row, column=11, value=report.remarks or '')
+            ws.cell(row=row, column=12, value=report.abnormal_notes or '')
         
         # 調整欄寬
         for column in ws.columns:
@@ -1406,8 +1407,6 @@ def operator_report_export(request):
                 '工作時數': float(report.work_hours_calculated) if report.work_hours_calculated else 0,
                 '加班時數': float(report.overtime_hours_calculated) if report.overtime_hours_calculated else 0,
                 '報工類型': report.report_type,
-                '核准狀態': report.approval_status,
-                '建立時間': report.created_at.strftime('%Y-%m-%d %H:%M:%S') if report.created_at else '',
             })
         
         # 建立 DataFrame

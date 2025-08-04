@@ -295,28 +295,28 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="detail-item">
+                                    <span class="detail-label">公司名稱：</span>
+                                    <span class="detail-value">{{ company_name|default:"" }}</span>
+                                </div>
+                                <div class="detail-item">
                                     <span class="detail-label">作業員：</span>
                                     <span class="detail-value">{{ report.operator.name }} ({{ report.operator.id }})</span>
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">工單號：</span>
                                     <span class="detail-value">
-                                        {% if report.report_type == 'rd_sample' %}
-                                            RD樣品
+                                        {% if report.original_workorder_number %}
+                                            {{ report.original_workorder_number }}
+                                        {% elif report.workorder %}
+                                            {{ report.workorder.order_number }}
                                         {% else %}
-                                            {{ report.workorder.order_number|default:"-" }}
+                                            {{ "" }}
                                         {% endif %}
                                     </span>
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">產品編號：</span>
-                                    <span class="detail-value">
-                                        {% if report.report_type == 'rd_sample' %}
-                                            {{ report.product_id|default:"-" }}
-                                        {% else %}
-                                            {{ report.workorder.product_code|default:"-" }}
-                                        {% endif %}
-                                    </span>
+                                    <span class="detail-value">{{ report.product_id|default:"" }}</span>
                                 </div>
                             </div>
                             <div class="col-md-6">

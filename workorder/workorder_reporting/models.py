@@ -16,6 +16,14 @@ class SMTProductionReport(models.Model):
 
 
     # 基本資訊
+    # 公司代號欄位
+    company_code = models.CharField(
+        max_length=10,
+        verbose_name="公司代號",
+        help_text="公司代號，用於多公司架構",
+        default="",
+    )
+
     product_id = models.CharField(
         max_length=100,
         verbose_name="產品編號",
@@ -47,10 +55,19 @@ class SMTProductionReport(models.Model):
         default=0,
     )
 
-    operation = models.CharField(
-        max_length=100,
+    process = models.ForeignKey(
+        "process.ProcessName",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         verbose_name="工序",
         help_text="請選擇此次補登的SMT工序",
+    )
+
+    operation = models.CharField(
+        max_length=100,
+        verbose_name="工序名稱",
+        help_text="工序名稱（自動從 process 欄位取得）",
         default="",
     )
 
@@ -370,7 +387,13 @@ class OperatorSupplementReport(models.Model):
         help_text="請選擇進行補登報工的作業員",
     )
 
-
+    # 公司代號欄位
+    company_code = models.CharField(
+        max_length=10,
+        verbose_name="公司代號",
+        help_text="公司代號，用於多公司架構",
+        default="",
+    )
 
     workorder = models.ForeignKey(
         'workorder.WorkOrder',
