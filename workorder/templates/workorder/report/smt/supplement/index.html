@@ -208,72 +208,71 @@
         </div>
     </div>
 
-    <!-- 搜尋篩選 -->
+    <!-- 篩選表單 -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="search-filters">
-                <form method="get" id="searchForm">
-                    <div class="row">
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="equipment">設備</label>
-                                <select class="form-control" id="equipment" name="equipment">
-                                    <option value="">全部設備</option>
-                                    {% for equipment in equipment_list %}
-                                    <option value="{{ equipment.id }}" {% if selected_equipment|stringformat:'s' == equipment.id|stringformat:'s' %}selected{% endif %}>
-                                        {{ equipment.name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
+            <div class="card smt-supplement-card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-filter"></i> 篩選條件
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="company_name" class="form-label">公司名稱</label>
+                            <select class="form-select" id="company_name" name="company_name">
+                                <option value="">請選擇公司</option>
+                                {% for company in companies %}
+                                <option value="{{ company.company_code }}" {% if filters.company_name == company.company_code %}selected{% endif %}>
+                                    {{ company.company_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="smt_line" class="form-label">SMT產線</label>
+                            <select class="form-select" id="smt_line" name="smt_line">
+                                <option value="">請選擇SMT產線</option>
+                                {% for line in smt_lines %}
+                                <option value="{{ line.line_name }}" {% if filters.smt_line == line.line_name %}selected{% endif %}>
+                                    {{ line.line_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="workorder_no" class="form-label">工單號</label>
+                            <input type="text" class="form-control" id="workorder_no" name="workorder_no" 
+                                   value="{{ filters.workorder_no }}" placeholder="輸入工單號">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="product_id" class="form-label">產品編號</label>
+                            <input type="text" class="form-control" id="product_id" name="product_id" 
+                                   value="{{ filters.product_id }}" placeholder="輸入產品編號">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="start_date" class="form-label">開始日期</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" 
+                                   value="{{ filters.start_date }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="end_date" class="form-label">結束日期</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" 
+                                   value="{{ filters.end_date }}">
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="d-grid gap-2 d-md-flex">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> 篩選
+                                </button>
+                                <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> 清除
+                                </a>
                             </div>
                         </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="workorder">工單號</label>
-                                <input type="text" class="form-control" id="workorder" name="workorder" value="{{ selected_workorder }}" placeholder="工單號">
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="product">產品編號</label>
-                                <input type="text" class="form-control" id="product" name="product" value="{{ selected_product }}" placeholder="產品編號">
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="status">核准狀態</label>
-                                <select class="form-control" id="status" name="status">
-                                    <option value="">全部狀態</option>
-                                    <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>待核准</option>
-                                    <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>已核准</option>
-                                    <option value="rejected" {% if selected_status == 'rejected' %}selected{% endif %}>已駁回</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="date_from">開始日期</label>
-                                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ selected_date_from }}">
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="date_to">結束日期</label>
-                                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ selected_date_to }}">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row mt-3">
-                        <div class="col-12 text-center">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-search"></i> 搜尋
-                            </button>
-                            <button type="button" class="btn btn-secondary" onclick="resetSearch()">
-                                <i class="fas fa-undo"></i> 重置
-                            </button>
-                        </div>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -293,7 +292,6 @@
                             <thead>
                                 <tr>
                                     <th>報工時間</th>
-                                    <th>報工類型</th>
                                     <th>設備</th>
                                     <th>工單號/樣品編號</th>
                                     <th>產品編號</th>
@@ -309,28 +307,9 @@
                                     {% for report in reports %}
                                     <tr>
                                         <td>{{ report.work_date|date:"Y-m-d" }} {{ report.start_time|time:"H:i" }}-{{ report.end_time|time:"H:i" }}</td>
-                                        <td>
-                                            {% if report.report_type == 'rd_sample' %}
-                                                <span class="badge badge-success">RD樣品</span>
-                                            {% else %}
-                                                <span class="badge badge-warning">正式報工</span>
-                                            {% endif %}
-                                        </td>
                                         <td>{{ report.equipment.name }}</td>
-                                        <td>
-                                            {% if report.report_type == 'rd_sample' %}
-                                                {{ report.workorder_number|default:"-" }}
-                                            {% else %}
-                                                {{ report.workorder.order_number|default:"-" }}
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.report_type == 'rd_sample' %}
-                                                {{ report.rd_product_code|default:"-" }}
-                                            {% else %}
-                                                {{ report.workorder.product_code|default:"-" }}
-                                            {% endif %}
-                                        </td>
+                                        <td>{{ report.workorder.order_number|default:"-" }}</td>
+                                        <td>{{ report.workorder.product_code|default:"-" }}</td>
                                         <td>{{ report.work_quantity }}</td>
                                         <td>{{ report.work_duration|floatformat:2 }}小時</td>
                                         <td>
@@ -365,7 +344,7 @@
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="10" class="text-center py-4">
+                                        <td colspan="9" class="text-center py-4">
                                             <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
                                             <p class="text-muted">目前沒有補登報工記錄</p>
                                         </td>

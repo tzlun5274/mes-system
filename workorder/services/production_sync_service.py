@@ -146,31 +146,10 @@ class ProductionReportSyncService:
                         break_start_time=None,
                         break_end_time=None,
                         break_hours=0.0,
-                        # 新增報工類型
-                        report_type=report.report_type,
                         # SMT 沒有數量分配相關欄位，設為預設值
                         allocated_quantity=0,
                         quantity_source='original',
-                        allocation_notes='',
-                        # SMT 沒有完工相關欄位，設為預設值
-                        is_completed=report.is_completed,
-                        completion_method='manual',
-                        auto_completed=False,
-                        completion_time=None,
-                        cumulative_quantity=0,
-                        cumulative_hours=0.0,
-                        # 新增核准相關欄位
-                        approval_status=report.approval_status,
-                        approved_by=report.approved_by,
-                        approved_at=report.approved_at if report.approved_at else None,
-                        approval_remarks=report.approval_remarks,
-                        rejection_reason=report.rejection_reason,
-                        rejected_by=report.rejected_by,
-                        rejected_at=report.rejected_at if report.rejected_at else None,
-                        remarks=report.remarks,
-                        abnormal_notes=report.abnormal_notes,
-                        original_report_id=report.id,
-                        original_report_type='smt'
+                        allocation_notes=''
                     )
                 except Exception as e:
                     logger.error(f"同步SMT報工記錄 {report.id} 失敗: {str(e)}")

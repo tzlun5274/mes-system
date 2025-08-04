@@ -304,38 +304,12 @@
                                     <span class="detail-value">{{ supplement_report.equipment.name }}</span>
                                 </div>
                                 <div class="detail-item">
-                                    <span class="detail-label">工單號：</span>
-                                    <span class="detail-value">
-                                        {% if supplement_report.report_type == 'rd_sample' %}
-                                            {{ supplement_report.workorder_number }}
-                                        {% elif supplement_report.workorder %}
-                                            {{ supplement_report.workorder.order_number }}
-                                        {% elif supplement_report.workorder_number %}
-                                            {{ supplement_report.workorder_number }}
-                                        {% else %}
-                                            未設定
-                                            {% if supplement_report.report_type %}
-                                                <br><small class="text-muted">報工類型：{{ supplement_report.get_report_type_display }}</small>
-                                            {% endif %}
-                                        {% endif %}
-                                    </span>
+                                    <span class="detail-label">工單號碼：</span>
+                                    <span class="detail-value">{{ supplement_report.workorder.order_number|default:"-" }}</span>
                                 </div>
                                 <div class="detail-item">
                                     <span class="detail-label">產品編號：</span>
-                                    <span class="detail-value">
-                                        {% if supplement_report.report_type == 'rd_sample' %}
-                                            {{ supplement_report.rd_product_code|default:supplement_report.product_id|default:"未設定" }}
-                                        {% elif supplement_report.workorder %}
-                                            {{ supplement_report.workorder.product_code }}
-                                        {% elif supplement_report.product_id %}
-                                            {{ supplement_report.product_id }}
-                                        {% else %}
-                                            未設定
-                                            {% if supplement_report.report_type %}
-                                                <br><small class="text-muted">報工類型：{{ supplement_report.get_report_type_display }}</small>
-                                            {% endif %}
-                                        {% endif %}
-                                    </span>
+                                    <span class="detail-value">{{ supplement_report.workorder.product_code|default:"-" }}</span>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -348,16 +322,10 @@
                                     <span class="detail-value">
                                         {% if supplement_report.workorder %}
                                             {{ supplement_report.workorder.product_name|default:"未設定" }}
-                                        {% elif supplement_report.report_type == 'rd_sample' %}
-                                            RD樣品
                                         {% else %}
                                             未設定
                                         {% endif %}
                                     </span>
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">報工類型：</span>
-                                    <span class="detail-value">{{ supplement_report.get_report_type_display }}</span>
                                 </div>
                             </div>
                         </div>
