@@ -138,6 +138,19 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
             'end_date': self.request.GET.get('end_date', ''),
         }
         
+        # 計算統計數據
+        context['pending_count'] = OperatorSupplementReport.objects.filter(
+            approval_status='pending'
+        ).count()
+        
+        context['approved_count'] = OperatorSupplementReport.objects.filter(
+            approval_status='approved'
+        ).count()
+        
+        context['rejected_count'] = OperatorSupplementReport.objects.filter(
+            approval_status='rejected'
+        ).count()
+        
         # 添加選項數據供篩選下拉選單使用
         context['operators'] = Operator.objects.filter(
             operatorsupplementreport__approval_status='pending'
