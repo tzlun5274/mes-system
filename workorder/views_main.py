@@ -4513,8 +4513,8 @@ def export_operator_reports(request):
         ws = wb.active
         ws.title = "作業員報工記錄"
         
-        # 設定標題（移除審核相關欄位）
-        headers = ['作業員', '工單號', '工序', '數量', '報工日期']
+        # 設定標題（包含公司代號）
+        headers = ['作業員', '公司代號', '工單號', '工序', '數量', '報工日期']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True)
@@ -4523,10 +4523,19 @@ def export_operator_reports(request):
         # 填入資料
         for row, report in enumerate(reports, 2):
             ws.cell(row=row, column=1, value=report.operator.name if report.operator else '')
-            ws.cell(row=row, column=2, value=report.workorder.order_number if report.workorder else '')
-            ws.cell(row=row, column=3, value=report.process.name if report.process else '')
-            ws.cell(row=row, column=4, value=report.work_quantity or 0)
-            ws.cell(row=row, column=5, value=report.work_date.strftime('%Y-%m-%d'))
+            
+            # 取得公司代號 - 優先從 OperatorSupplementReport 的 company_code 欄位取得
+            company_code = ''
+            if report.company_code:
+                company_code = report.company_code
+            elif report.workorder and report.workorder.company_code:
+                company_code = report.workorder.company_code
+            ws.cell(row=row, column=2, value=company_code)
+            
+            ws.cell(row=row, column=3, value=report.workorder.order_number if report.workorder else '')
+            ws.cell(row=row, column=4, value=report.process.name if report.process else '')
+            ws.cell(row=row, column=5, value=report.work_quantity or 0)
+            ws.cell(row=row, column=6, value=report.work_date.strftime('%Y-%m-%d'))
         
         # 調整欄寬
         for column in ws.columns:

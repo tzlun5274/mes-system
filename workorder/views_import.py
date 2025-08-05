@@ -1258,15 +1258,15 @@ def smt_report_export(request):
         for row, report in enumerate(reports, 2):
             ws.cell(row=row, column=1, value=report.equipment.name if report.equipment else '')
             
-            # 改善公司代號處理：優先從工單取得，其次使用預設值
+            # 改善公司代號處理：優先從 SMTProductionReport 的 company_code 欄位取得
             company_code = ''
-            if report.workorder and report.workorder.company_code:
+            if report.company_code:
+                company_code = report.company_code
+            elif report.workorder and report.workorder.company_code:
                 company_code = report.workorder.company_code
             else:
-                # 如果沒有工單關聯，根據設備名稱或其他邏輯判斷公司代號
-                if report.equipment and report.equipment.name:
-                    # 可以根據設備名稱判斷公司代號，這裡先使用預設值
-                    company_code = '10'  # 預設公司代號
+                # 如果都沒有，使用預設值
+                company_code = '10'  # 預設公司代號
             ws.cell(row=row, column=2, value=company_code)
             
             ws.cell(row=row, column=3, value=report.work_date.strftime('%Y-%m-%d'))
@@ -1385,9 +1385,11 @@ def operator_report_export(request):
             elif report.rd_product_code:
                 product_code = report.rd_product_code
             
-            # 取得公司代號 - 只從 OperatorSupplementReport 模型取得
+            # 取得公司代號 - 優先從 OperatorSupplementReport 的 company_code 欄位取得
             company_code_value = ''
-            if report.workorder and report.workorder.company_code:
+            if report.company_code:
+                company_code_value = report.company_code
+            elif report.workorder and report.workorder.company_code:
                 company_code_value = report.workorder.company_code
             
             export_data.append({
@@ -1404,9 +1406,6 @@ def operator_report_export(request):
                 '不良品數量': report.defect_quantity,
                 '備註': report.remarks or '',
                 '異常紀錄': report.abnormal_notes or '',
-                '工作時數': float(report.work_hours_calculated) if report.work_hours_calculated else 0,
-                '加班時數': float(report.overtime_hours_calculated) if report.overtime_hours_calculated else 0,
-                '報工類型': report.report_type,
             })
         
         # 建立 DataFrame

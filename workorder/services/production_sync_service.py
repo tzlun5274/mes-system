@@ -81,7 +81,7 @@ class ProductionReportSyncService:
                         break_end_time=report.break_end_time,
                         break_hours=float(report.break_hours) if report.break_hours else 0.0,
                         # 新增報工類型
-                        report_type=report.report_type,
+                        report_type='operator',  # 固定為作業員類型
                         # 新增數量相關欄位
                         allocated_quantity=report.allocated_quantity or 0,
                         quantity_source=report.quantity_source,
@@ -332,7 +332,7 @@ class ProductionReportSyncService:
                         break_end_time=report.break_end_time,
                         break_hours=float(report.break_hours) if report.break_hours else 0.0,
                         # 新增報工類型
-                        report_type=report.report_type,
+                        report_type='operator',  # 固定為作業員類型
                         # 新增數量相關欄位
                         allocated_quantity=report.allocated_quantity or 0,
                         quantity_source=report.quantity_source,
@@ -386,7 +386,7 @@ class ProductionReportSyncService:
                         break_end_time=None,
                         break_hours=0.0,
                         # 新增報工類型
-                        report_type=report.report_type,
+                        report_type='smt',  # 固定為SMT類型
                         # SMT 沒有數量分配相關欄位，設為預設值
                         allocated_quantity=0,
                         quantity_source='original',

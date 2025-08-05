@@ -89,7 +89,7 @@ class Command(BaseCommand):
                         break_start_time=report.break_start_time,
                         break_end_time=report.break_end_time,
                         break_hours=float(report.break_hours) if report.break_hours else 0.0,
-                        report_type=report.report_type,
+                        report_type='operator',  # 固定為作業員類型
                         allocated_quantity=report.allocated_quantity or 0,
                         quantity_source=report.quantity_source,
                         allocation_notes=report.allocation_notes,
