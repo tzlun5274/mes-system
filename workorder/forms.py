@@ -769,11 +769,15 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
         )
         self.fields["equipment"].queryset = equipments
 
-        # 設定工單查詢集（直接從工單表取得）
+        # 設定工單查詢集（直接從工單表取得，排除RD樣品相關工單）
         from .models import WorkOrder
 
-        workorders = WorkOrder.objects.exclude(status="completed").order_by(
-            "-created_at"
+        workorders = (
+            WorkOrder.objects.exclude(status="completed")
+            .exclude(order_number__icontains="RD樣品")
+            .exclude(order_number__icontains="RD-樣品")
+            .exclude(order_number__icontains="RD樣本")
+            .order_by("-created_at")
         )
         self.fields["workorder"].queryset = workorders
 
@@ -788,12 +792,15 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
             self.fields["work_date"].initial = date.today()
 
     def get_product_choices(self):
-        """獲取產品編號選項（直接從工單表取得）"""
+        """獲取產品編號選項（直接從工單表取得，排除RD樣品相關產品）"""
         from .models import WorkOrder
 
-        # 直接從工單表中獲取所有產品編號
+        # 直接從工單表中獲取所有產品編號，排除RD樣品相關工單
         products = (
             WorkOrder.objects.exclude(status="completed")
+            .exclude(order_number__icontains="RD樣品")
+            .exclude(order_number__icontains="RD-樣品")
+            .exclude(order_number__icontains="RD樣本")
             .values_list("product_code", flat=True)
             .distinct()
             .order_by("product_code")

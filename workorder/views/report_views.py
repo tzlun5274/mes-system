@@ -26,6 +26,7 @@ from ..forms import (
     # 主管職責：監督、審核、管理，不代為報工
 )
 from ..forms_smt_rd_sample import SMTRDSampleSupplementReportForm
+from ..forms_operator_rd_sample import OperatorRDSampleSupplementReportForm
 from process.models import Operator, ProcessName
 from workorder.models import WorkOrder
 from production.models import ProductionLine
@@ -520,6 +521,59 @@ class SMTRDSampleProductionReportUpdateView(LoginRequiredMixin, UpdateView):
         """表單驗證失敗時的處理"""
         messages.error(self.request, 'SMT RD樣品生產報工記錄更新失敗，請檢查輸入資料！')
         return super().form_invalid(form)
+
+
+# 已移除作業員RD樣品補登報工列表視圖 - 只保留新增功能
+
+
+class OperatorRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView):
+    """
+    作業員RD樣品補登報工新增視圖
+    使用專用的RD樣品表單
+    """
+    model = OperatorSupplementReport
+    form_class = OperatorRDSampleSupplementReportForm
+    template_name = 'workorder/report/operator/rd_sample_supplement/form.html'
+    
+    def get_success_url(self):
+        return reverse_lazy('workorder:operator_supplement_report_index')
+    
+    def get_initial(self):
+        """設定表單初始值"""
+        initial = super().get_initial()
+        initial['product_id'] = 'PFP-CCT'
+        initial['original_workorder_number'] = 'RD樣品'
+        return initial
+    
+    def form_valid(self, form):
+        """表單驗證成功時的處理"""
+        form.instance.created_by = self.request.user.username
+        messages.success(self.request, '作業員RD樣品補登報工記錄已成功建立！')
+        return super().form_valid(form)
+
+
+class OperatorRDSampleSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
+    """
+    作業員RD樣品補登報工編輯視圖
+    使用專用的RD樣品表單
+    """
+    model = OperatorSupplementReport
+    form_class = OperatorRDSampleSupplementReportForm
+    template_name = 'workorder/report/operator/rd_sample_supplement/form.html'
+    
+    def get_success_url(self):
+        return reverse_lazy('workorder:operator_rd_sample_supplement_report_index')
+    
+    def form_valid(self, form):
+        """表單驗證成功時的處理"""
+        messages.success(self.request, '作業員RD樣品補登報工記錄已成功更新！')
+        return super().form_valid(form)
+
+
+# 已移除作業員RD樣品補登報工詳情視圖 - 只保留新增功能
+
+
+# 已移除作業員RD樣品補登報工刪除視圖 - 只保留新增功能
 
 
 @require_POST

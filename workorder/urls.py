@@ -13,6 +13,7 @@ from .views.report_views import (
     OperatorSupplementReportDeleteView, SMTProductionReportListView, SMTProductionReportCreateView,
     SMTProductionReportUpdateView, SMTProductionReportDetailView, SMTProductionReportDeleteView,
     SMTRDSampleProductionReportCreateView, SMTRDSampleProductionReportUpdateView,
+    OperatorRDSampleSupplementReportCreateView,
     approve_report, reject_report
 )
 from .views.completed_workorder_views import (
@@ -64,6 +65,9 @@ urlpatterns = [
     path("report/operator/supplement/edit/<int:pk>/", OperatorSupplementReportUpdateView.as_view(), name="operator_supplement_report_edit"),
     path("report/operator/supplement/detail/<int:pk>/", OperatorSupplementReportDetailView.as_view(), name="operator_supplement_report_detail"),
     path("report/operator/supplement/delete/<int:pk>/", OperatorSupplementReportDeleteView.as_view(), name="operator_supplement_report_delete"),
+    
+    # 作業員RD樣品補登報工功能 - 只保留新增功能
+    path("report/operator/rd_sample_supplement/create/", OperatorRDSampleSupplementReportCreateView.as_view(), name="operator_rd_sample_supplement_create"),
     
     # 作業員補登報工批量匯入功能
     path("report/operator/supplement/batch/", import_views.operator_report_import_page, name="operator_supplement_batch"),

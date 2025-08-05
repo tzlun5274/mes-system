@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block title %}
-    {% if supplement_report %}編輯作業員補登報工{% else %}新增作業員補登報工{% endif %}
+    {% if supplement_report %}編輯作業員RD樣品補登報工{% else %}新增作業員RD樣品補登報工{% endif %}
 {% endblock %}
 
 {% block extra_css %}
@@ -277,23 +277,23 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h2 class="mb-0">
-                        <i class="fas fa-edit text-warning"></i> 
-                        {% if supplement_report %}編輯作業員補登報工{% else %}新增作業員補登報工{% endif %}
+                        <i class="fas fa-flask text-warning"></i> 
+                        {% if supplement_report %}編輯作業員RD樣品補登報工{% else %}新增作業員RD樣品補登報工{% endif %}
                     </h2>
                     <p class="text-muted mb-0">
                         {% if supplement_report %}
-                            修改作業員補登報工記錄的詳細資訊
+                            修改作業員RD樣品補登報工記錄的詳細資訊
                         {% else %}
-                            建立新的作業員補登報工記錄
+                            建立新的作業員RD樣品補登報工記錄
                         {% endif %}
                     </p>
                 </div>
                 <div class="d-flex gap-2">
-                    <a href="{% url 'workorder:operator_rd_sample_supplement_create' %}" class="btn btn-success">
-                        <i class="fas fa-flask"></i> 新增作業員RD樣品補登報工
+                    <a href="{% url 'workorder:operator_supplement_report_create' %}" class="btn btn-warning">
+                        <i class="fas fa-plus"></i> 新增作業員補登報工
                     </a>
                     <a href="{% url 'workorder:operator_supplement_report_index' %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left"></i> 返回列表
+                        <i class="fas fa-arrow-left"></i> 返回作業員補登報工列表
                     </a>
                 </div>
             </div>
@@ -307,8 +307,8 @@
                 <div class="card-header bg-primary text-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
-                            <i class="fas fa-clipboard-list"></i> 
-                            {% if supplement_report %}編輯補登記錄{% else %}新增補登記錄{% endif %}
+                            <i class="fas fa-flask"></i> 
+                            {% if supplement_report %}編輯RD樣品補登記錄{% else %}新增RD樣品補登記錄{% endif %}
                         </h5>
                     </div>
                 </div>
@@ -326,21 +326,20 @@
                         </div>
                     {% endif %}
                     
-                    <form method="post" id="operator_supplement_form">
+                    <form method="post" id="operator_rd_sample_supplement_form">
                         {% csrf_token %}
                         
 
-
-                        <!-- 報工資訊區塊 -->
+                        <!-- RD樣品資訊區塊 -->
                         <div class="form-section">
-                            <h6><i class="fas fa-info-circle"></i> 報工資訊</h6>
+                            <h6><i class="fas fa-flask"></i> RD樣品資訊</h6>
 
                             <!-- 產品編號和工單號碼欄位 -->
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label for="{{ form.product_id.id_for_label }}" class="form-label">
-                                            產品編號 <span class="required-field">*</span>
+                                            RD產品編號 <span class="required-field">*</span>
                                         </label>
                                         {{ form.product_id }}
                                         {% if form.product_id.help_text %}
@@ -353,20 +352,19 @@
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label for="{{ form.workorder.id_for_label }}" class="form-label">
-                                            工單號碼 <span class="required-field">*</span>
+                                        <label for="{{ form.original_workorder_number.id_for_label }}" class="form-label">
+                                            RD工單號碼
                                         </label>
-                                        {{ form.workorder }}
-                                        {% if form.workorder.help_text %}
-                                            <div class="help-text">{{ form.workorder.help_text }}</div>
+                                        {{ form.original_workorder_number }}
+                                        {% if form.original_workorder_number.help_text %}
+                                            <div class="help-text">{{ form.original_workorder_number.help_text }}</div>
                                         {% endif %}
-                                        {% if form.workorder.errors %}
-                                            <div class="error-text">{{ form.workorder.errors.0 }}</div>
+                                        {% if form.original_workorder_number.errors %}
+                                            <div class="error-text">{{ form.original_workorder_number.errors.0 }}</div>
                                         {% endif %}
                                     </div>
                                 </div>
                             </div>
-
 
                             
                             <div class="row">
@@ -603,11 +601,11 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('=== 作業員補登報工表單初始化 ===');
+    console.log('=== 作業員RD樣品補登報工表單初始化 ===');
     
     // 全域變數
     
-    // ==================== 報工表單 JavaScript ====================
+    // ==================== RD樣品報工表單 JavaScript ====================
     
     // 創建時間選擇器
     function createTimePicker(inputElement) {
@@ -705,210 +703,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 取得DOM元素
-    const workorderSelect = document.getElementById('{{ form.workorder.id_for_label }}');
     const plannedQuantityInput = document.getElementById('{{ form.planned_quantity.id_for_label }}');
-
     
     // 除錯：檢查元素是否存在
     console.log('DOM元素檢查:');
-    console.log('productSelect:', document.getElementById('product_id_select'));
-    console.log('workorderSelect:', workorderSelect);
     console.log('plannedQuantityInput:', plannedQuantityInput);
     
-    // 載入工單的函數
-    function loadWorkordersByProduct(productCode) {
-        console.log('載入產品編號相關工單:', productCode);
-        
-        if (productCode) {
-            // 呼叫API取得相關工單
-            fetch(`{% url 'workorder:get_workorders_by_product' %}?product_id=${encodeURIComponent(productCode)}`, {
-                method: 'GET',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Content-Type': 'application/json',
-                },
-            })
-                .then(response => {
-                    console.log('API回應狀態:', response.status);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('API回應資料:', data);
-                    if (data.status === 'success' && data.workorders.length > 0) {
-                        // 更新工單下拉選單
-                        workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                        
-                        data.workorders.forEach(workorder => {
-                            const option = document.createElement('option');
-                            option.value = workorder.id;
-                            // 格式化公司代號，確保是兩位數格式（例如：2 -> 02）
-                            let formattedCompanyCode = workorder.company_code;
-                            if (formattedCompanyCode && /^\d+$/.test(formattedCompanyCode)) {
-                                formattedCompanyCode = formattedCompanyCode.padStart(2, '0');
-                            }
-                            option.textContent = `${formattedCompanyCode} - ${workorder.order_number}`;
-                            workorderSelect.appendChild(option);
-                        });
-                        
-                        // 如果只有一個工單，自動選擇
-                        if (data.workorders.length === 1) {
-                            workorderSelect.value = data.workorders[0].id;
-                            workorderSelect.dispatchEvent(new Event('change'));
-                        }
-                    } else {
-                        workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                        console.log('沒有找到相關工單');
-                    }
-                })
-                .catch(error => {
-                    console.error('API錯誤:', error);
-                    workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                });
-        } else {
-            workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-        }
+    // 設定RD樣品預設值
+    if (plannedQuantityInput) {
+        plannedQuantityInput.value = '0';
     }
-    
-
-
-    // 產品編號選擇事件（自動帶出工單）
-    const productSelect = document.getElementById('product_id_select');
-    if (productSelect) {
-        // 檢查初始值，如果產品編號已經有值，自動載入工單
-        if (productSelect.value) {
-            console.log('產品編號已有初始值:', productSelect.value);
-            loadWorkordersByProduct(productSelect.value);
-        }
-        
-        productSelect.addEventListener('change', function() {
-            const productCode = this.value;
-            console.log('產品編號選擇變更:', productCode);
-            
-            if (productCode) {
-                // 載入該產品編號相關的工單
-                loadWorkordersByProduct(productCode);
-            } else {
-                // 清空工單選項
-                if (workorderSelect) {
-                    workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                }
-                // 清空工單預設生產數量
-                if (plannedQuantityInput) {
-                    plannedQuantityInput.value = '';
-                }
-            }
-        });
-    }
-    
-    // 工單選擇事件（自動帶出產品編號和數量）
-    if (workorderSelect) {
-        workorderSelect.addEventListener('change', function() {
-            const workorderId = this.value;
-            console.log('工單選擇變更:', workorderId);
-            
-            if (workorderId) {
-                // 載入工單詳細資訊
-                fetch(`{% url 'workorder:get_product_by_workorder' %}?workorder_id=${workorderId}`, {
-                    method: 'GET',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Content-Type': 'application/json',
-                    },
-                })
-                    .then(response => {
-                        console.log('產品資訊API回應狀態:', response.status);
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('產品資訊API回應:', data);
-                        if (data.status === 'success') {
-                            const product = data.product;
-                            
-                            // 更新工單預設生產數量
-                            if (plannedQuantityInput) {
-                                plannedQuantityInput.value = product.quantity || '';
-                                // 觸發 change 事件以確保表單驗證
-                                plannedQuantityInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                console.log('更新工單預設生產數量:', product.quantity);
-                            }
-                            
-                            // 自動填入產品編號
-                            if (productSelect && product.product_code) {
-                                productSelect.value = product.product_code;
-                                console.log('更新產品編號:', product.product_code);
-                            }
-                            
-                            // 自動帶入工單日期
-                            if (workorder.work_date) {
-                                let dateStr = workorder.work_date;
-                                console.log('原始工單日期:', dateStr, '類型:', typeof dateStr);
-                                
-                                // 處理不同的日期格式
-                                if (typeof dateStr === 'string') {
-                                    // 如果是字串格式，先嘗試替換斜線為橫線
-                                    dateStr = dateStr.replace(/\//g, '-');
-                                    
-                                    // 檢查是否符合 YYYY-MM-DD 格式
-                                    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                                        // 如果不是標準格式，嘗試用 Date 物件解析
-                                        const d = new Date(dateStr);
-                                        if (!isNaN(d)) {
-                                            dateStr = d.toISOString().slice(0, 10);
-                                        } else {
-                                            // 如果解析失敗，設為今天的日期
-                                            dateStr = new Date().toISOString().slice(0, 10);
-                                        }
-                                    }
-                                } else if (dateStr instanceof Date) {
-                                    // 如果已經是 Date 物件
-                                    dateStr = dateStr.toISOString().slice(0, 10);
-                                } else {
-                                    // 其他情況，設為今天的日期
-                                    dateStr = new Date().toISOString().slice(0, 10);
-                                }
-                                
-                                const workDateInput = document.getElementById('{{ form.work_date.id_for_label }}');
-                                if (workDateInput) {
-                                    // 確保日期格式正確
-                                    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                                        workDateInput.value = dateStr;
-                                        console.log('成功設定工單日期:', dateStr);
-                                    } else {
-                                        console.warn('日期格式不正確，使用今天日期:', dateStr);
-                                        workDateInput.value = new Date().toISOString().slice(0, 10);
-                                    }
-                                }
-                            }
-                            
-
-                        } else {
-                            console.error('API回傳錯誤:', data.message);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('AJAX 錯誤:', error);
-                    });
-            } else {
-                if (plannedQuantityInput) {
-                    plannedQuantityInput.value = '';
-                    console.log('清空工單預設生產數量');
-                }
-            }
-        });
-    }
-    
-
     
     // ==================== 表單驗證 ====================
     
     // 表單驗證
-    const form = document.getElementById('operator_supplement_form');
+    const form = document.getElementById('operator_rd_sample_supplement_form');
     if (form) {
         form.addEventListener('submit', function(e) {
             if (startTimeInput && endTimeInput && startTimeInput.value && endTimeInput.value) {
@@ -945,7 +754,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    console.log('=== 作業員補登報工表單初始化完成 ===');
+    console.log('=== 作業員RD樣品補登報工表單初始化完成 ===');
 });
 </script>
 {% endblock %} 
