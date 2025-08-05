@@ -152,6 +152,16 @@
         background-color: #545b62;
     }
     
+    .btn-success {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+    }
+    
+    .btn-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+    }
+    
     /* RD樣品模式樣式 */
     .rd-sample-toggle {
         display: flex;
@@ -230,14 +240,10 @@
                         </p>
                     </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
-                    <!-- RD樣品模式切換 -->
-                    <div class="rd-sample-toggle">
-                        <input type="checkbox" id="rd_sample_mode" name="rd_sample_mode" value="on" 
-                               {% if request.GET.rd_sample_mode == 'on' %}checked{% endif %}>
-                        <label for="rd_sample_mode">
-                            <i class="fas fa-flask"></i> RD樣品補登報工
-                        </label>
-                    </div>
+                    <!-- 新增SMT RD樣品補登報工按鈕 -->
+                    <a href="{% url 'workorder:smt_rd_sample_report_create' %}" class="btn btn-success">
+                        <i class="fas fa-flask"></i> 新增SMT RD樣品補登報工
+                    </a>
                     <!-- 返回按鈕 -->
                     <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> 返回列表
@@ -251,13 +257,7 @@
             <form method="post" id="smt_supplement_form">
                 {% csrf_token %}
                 
-                <!-- RD樣品模式說明 -->
-                <div id="rd_sample_mode_info" style="display: none; margin-bottom: 20px;">
-                    <div style="background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 6px; padding: 15px; color: #0c5460;">
-                        <i class="fas fa-info-circle"></i>
-                        <strong>RD樣品模式已啟用：</strong>產品編號預設為「PFP-CCT」，可手動修改，工單號碼固定為「RD樣品」
-                    </div>
-                </div>
+
 
                 <!-- 一般工單資訊區塊 -->
                 <div id="normal_fields" class="form-block">
@@ -294,36 +294,7 @@
                     </div>
                 </div>
 
-                        <!-- RD樣品模式欄位 -->
-                <div id="rd_sample_fields" class="form-block" style="display: none;">
-                            <h6><i class="fas fa-flask"></i> RD樣品資訊</h6>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <!-- RD產品編號 -->
-                        <div class="form-field">
-                            <label for="{{ form.rd_product_code.id_for_label }}" class="form-label">
-                                RD產品編號 <span class="required">*</span>
-                            </label>
-                            {{ form.rd_product_code }}
-                            {% if form.rd_product_code.help_text %}
-                                <div class="help-text">{{ form.rd_product_code.help_text }}</div>
-                            {% endif %}
-                            {% if form.rd_product_code.errors %}
-                                <div class="error-text">{{ form.rd_product_code.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                        
-                        <!-- RD工單號碼 -->
-                        <div class="form-field">
-                            <label for="rd_sample_workorder" class="form-label">
-                                RD工單號碼
-                            </label>
-                            <input type="text" class="form-control" id="rd_sample_workorder" name="rd_sample_workorder" 
-                                   value="RD樣品" readonly>
-                            <div class="help-text">RD樣品模式下的工單號碼固定為「RD樣品」</div>
-                        </div>
-                    </div>
-                </div>
+
                             
                                 <!-- 工序與設備資訊區塊 -->
                 <div class="form-block">
@@ -561,10 +532,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('=== SMT 補登報工表單初始化 ===');
     
     // 全域變數
-    const rdSampleModeCheckbox = document.getElementById('rd_sample_mode');
     const normalFields = document.getElementById('normal_fields');
-    const rdSampleFields = document.getElementById('rd_sample_fields');
-    const rdSampleInfo = document.getElementById('rd_sample_mode_info');
     
     // 創建時間選擇器
     function createTimePicker(inputElement) {
@@ -661,60 +629,7 @@ document.addEventListener('DOMContentLoaded', function() {
         createTimePicker(endTimeInput);
     }
     
-    // RD樣品模式切換功能
-    function toggleRDSampleMode() {
-        const isChecked = rdSampleModeCheckbox.checked;
-        console.log('RD樣品模式切換:', isChecked);
-        
-        if (isChecked) {
-            // 切換到RD樣品模式
-            normalFields.style.display = 'none';
-            rdSampleFields.style.display = 'block';
-            rdSampleInfo.style.display = 'block';
-            
-            // RD樣品模式下，工單預設生產數量設為0
-            const plannedQuantityInput = document.getElementById('{{ form.planned_quantity.id_for_label }}');
-            if (plannedQuantityInput) {
-                plannedQuantityInput.value = '0';
-            }
-            
 
-            
-            // 設定預設RD產品編號（如果沒有填寫）
-            const rdProductCodeInput = document.getElementById('{{ form.rd_product_code.id_for_label }}');
-            if (rdProductCodeInput && !rdProductCodeInput.value) {
-                rdProductCodeInput.value = 'PFP-CCT';
-            }
-        } else {
-            // 切換到一般模式
-            normalFields.style.display = 'block';
-            rdSampleFields.style.display = 'none';
-            rdSampleInfo.style.display = 'none';
-            
-            // 一般模式下，清空工單預設生產數量
-            const plannedQuantityInput = document.getElementById('{{ form.planned_quantity.id_for_label }}');
-            if (plannedQuantityInput) {
-                plannedQuantityInput.value = '';
-            }
-        }
-    }
-    
-    // 綁定事件
-    if (rdSampleModeCheckbox) {
-        rdSampleModeCheckbox.addEventListener('change', toggleRDSampleMode);
-        
-        // 初始化狀態
-        toggleRDSampleMode();
-    }
-    
-    // 檢查URL參數
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('rd_sample_mode') === 'on') {
-        if (rdSampleModeCheckbox) {
-            rdSampleModeCheckbox.checked = true;
-            toggleRDSampleMode();
-        }
-    }
     
     // 取得DOM元素
     const productSelect = document.getElementById('{{ form.product_id.id_for_label }}');

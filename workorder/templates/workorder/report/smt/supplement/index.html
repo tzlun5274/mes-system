@@ -188,6 +188,12 @@
                                 <i class="fas fa-plus"></i> 新增正式報工
                             </a>
                         </div>
+                        <div class="col-md-3">
+                            <a href="{% url 'workorder:smt_rd_sample_report_create' %}" class="btn btn-success btn-lg btn-block mb-2">
+                                <i class="fas fa-flask"></i> 新增RD樣品報工
+                            </a>
+                        </div>
+
                         {% if user.is_staff or user.is_superuser %}
                         <div class="col-md-3">
                             <a href="{% url 'workorder:smt_on_site_report' %}" class="btn btn-info btn-lg btn-block mb-2">

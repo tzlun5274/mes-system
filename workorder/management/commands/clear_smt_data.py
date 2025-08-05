@@ -100,12 +100,9 @@ class Command(BaseCommand):
             # 顯示詳細統計
             self.stdout.write(f"\n📋 詳細統計資訊：")
             
-            # 按報工類型統計
-            type_stats = queryset.values('report_type').annotate(count=Count('id')).order_by('-count')
+            # 按報工類型統計（已移除 report_type 欄位）
             self.stdout.write(f"\n📊 按報工類型統計：")
-            for stat in type_stats:
-                report_type = stat['report_type'] or '未知類型'
-                self.stdout.write(f"  • {report_type}: {stat['count']} 筆")
+            self.stdout.write(f"  • SMT報工: {total_count} 筆")
 
             # 按日期統計
             date_stats = queryset.values('work_date').annotate(count=Count('id')).order_by('-work_date')[:10]

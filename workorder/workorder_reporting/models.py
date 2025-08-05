@@ -148,6 +148,8 @@ class SMTProductionReport(models.Model):
         help_text="記錄生產過程中的異常情況，如設備故障、品質問題等",
     )
 
+    # 報工類型欄位已移除，所有SMT報工都視為正常工作
+
     # 核准相關欄位
     approval_status = models.CharField(
         max_length=20,

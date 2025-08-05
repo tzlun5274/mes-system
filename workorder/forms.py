@@ -1579,44 +1579,13 @@ class RDSampleSupplementReportForm(ProductionReportBaseForm):
     def clean(self):
         """表單驗證"""
         cleaned_data = super().clean()
-
-        start_time = cleaned_data.get("start_time")
-        end_time = cleaned_data.get("end_time")
-        work_quantity = cleaned_data.get("work_quantity")
-
-        # 驗證時間格式
-        if start_time:
-            try:
-                from datetime import datetime
-
-                datetime.strptime(start_time, "%H:%M")
-            except ValueError:
-                raise forms.ValidationError("開始時間格式錯誤，請使用 HH:MM 格式")
-
-        if end_time:
-            try:
-                from datetime import datetime
-
-                datetime.strptime(end_time, "%H:%M")
-            except ValueError:
-                raise forms.ValidationError("結束時間格式錯誤，請使用 HH:MM 格式")
-
-        # 驗證時間邏輯
-        if start_time and end_time:
-            try:
-                from datetime import datetime
-
-                start = datetime.strptime(start_time, "%H:%M")
-                end = datetime.strptime(end_time, "%H:%M")
-                if start >= end:
-                    raise forms.ValidationError("結束時間必須大於開始時間")
-            except ValueError:
-                pass  # 時間格式錯誤已在上面處理
-
-        # 驗證數量
-        if work_quantity is not None and work_quantity < 0:
-            raise forms.ValidationError("完成數量不能為負數")
-
+        
+        # RD樣品模式下，設定預設值
+        cleaned_data['workorder'] = None
+        cleaned_data['original_workorder_number'] = 'RD樣品'  # 修正：將RD樣品寫入原始工單號碼欄位
+        cleaned_data['product_id'] = cleaned_data.get('product_id', 'PFP-CCT')
+        cleaned_data['operation'] = 'SMT_RD樣品'  # 自動設定工序名稱
+        
         return cleaned_data
 
     def save(self, commit=True):
@@ -1827,3 +1796,9 @@ class OperatorOnSiteReportForm(forms.ModelForm):
         self.fields['equipment'].queryset = Equipment.objects.exclude(
             name__icontains='SMT'
         ).order_by('name')
+
+
+
+
+
+

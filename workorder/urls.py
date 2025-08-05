@@ -12,6 +12,7 @@ from .views.report_views import (
     OperatorSupplementReportUpdateView, OperatorSupplementReportDetailView, 
     OperatorSupplementReportDeleteView, SMTProductionReportListView, SMTProductionReportCreateView,
     SMTProductionReportUpdateView, SMTProductionReportDetailView, SMTProductionReportDeleteView,
+    SMTRDSampleProductionReportCreateView, SMTRDSampleProductionReportUpdateView,
     approve_report, reject_report
 )
 from .views.completed_workorder_views import (
@@ -76,6 +77,12 @@ urlpatterns = [
     path("report/smt/supplement/edit/<int:pk>/", SMTProductionReportUpdateView.as_view(), name="smt_supplement_report_edit"),
     path("report/smt/supplement/delete/<int:pk>/", SMTProductionReportDeleteView.as_view(), name="smt_supplement_report_delete"),
     path("report/smt/supplement/detail/<int:pk>/", SMTProductionReportDetailView.as_view(), name="smt_supplement_report_detail"),
+    
+    # SMT RD樣品補登報工功能
+    path("report/smt/rd_sample/create/", SMTRDSampleProductionReportCreateView.as_view(), name="smt_rd_sample_report_create"),
+    path("report/smt/rd_sample/edit/<int:pk>/", SMTRDSampleProductionReportUpdateView.as_view(), name="smt_rd_sample_report_edit"),
+    
+
     
     # 報工核准功能
     path("report/approve/<int:report_id>/", approve_report, name="approve_report"),

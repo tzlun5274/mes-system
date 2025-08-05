@@ -25,6 +25,7 @@ from ..forms import (
     # 移除主管報工相關的 form，避免混淆
     # 主管職責：監督、審核、管理，不代為報工
 )
+from ..forms_smt_rd_sample import SMTRDSampleSupplementReportForm
 from process.models import Operator, ProcessName
 from workorder.models import WorkOrder
 from production.models import ProductionLine
@@ -341,6 +342,9 @@ class SMTProductionReportCreateView(LoginRequiredMixin, CreateView):
         return super().form_invalid(form)
 
 
+
+
+
 class SMTProductionReportUpdateView(LoginRequiredMixin, UpdateView):
     """
     SMT生產報工編輯視圖
@@ -473,6 +477,49 @@ class OperatorSupplementReportDeleteView(LoginRequiredMixin, UserPassesTestMixin
     def delete(self, request, *args, **kwargs):
         messages.success(request, '作業員補登報工記錄刪除成功！')
         return super().delete(request, *args, **kwargs)
+
+
+class SMTRDSampleProductionReportCreateView(LoginRequiredMixin, CreateView):
+    """
+    SMT RD樣品生產報工新增視圖
+    用於建立新的SMT RD樣品生產報工記錄
+    """
+    model = SMTProductionReport
+    form_class = SMTRDSampleSupplementReportForm
+    template_name = 'workorder/report/smt/rd_sample/form.html'
+    success_url = reverse_lazy('workorder:smt_supplement_report_index')
+
+    def form_valid(self, form):
+        """表單驗證成功時的處理"""
+        form.instance.created_by = self.request.user.username
+        messages.success(self.request, 'SMT RD樣品生產報工記錄建立成功！')
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        """表單驗證失敗時的處理"""
+        messages.error(self.request, 'SMT RD樣品生產報工記錄建立失敗，請檢查輸入資料！')
+        return super().form_invalid(form)
+
+
+class SMTRDSampleProductionReportUpdateView(LoginRequiredMixin, UpdateView):
+    """
+    SMT RD樣品生產報工編輯視圖
+    用於編輯現有SMT RD樣品生產報工記錄
+    """
+    model = SMTProductionReport
+    form_class = SMTRDSampleSupplementReportForm
+    template_name = 'workorder/report/smt/rd_sample/form.html'
+    success_url = reverse_lazy('workorder:smt_supplement_report_index')
+
+    def form_valid(self, form):
+        """表單驗證成功時的處理"""
+        messages.success(self.request, 'SMT RD樣品生產報工記錄更新成功！')
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        """表單驗證失敗時的處理"""
+        messages.error(self.request, 'SMT RD樣品生產報工記錄更新失敗，請檢查輸入資料！')
+        return super().form_invalid(form)
 
 
 @require_POST
