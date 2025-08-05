@@ -3,6 +3,7 @@ from django.utils import timezone
 
 
 class KanbanProductionProgress(models.Model):
+    company_code = models.CharField(max_length=10, verbose_name="公司代號", null=True, blank=True)
     work_order_number = models.CharField(max_length=50, verbose_name="工單編號")
     product_name = models.CharField(max_length=100, verbose_name="產品名稱")
     total_quantity = models.IntegerField(verbose_name="總數量")

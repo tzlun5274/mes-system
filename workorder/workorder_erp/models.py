@@ -168,17 +168,4 @@ class SystemConfig(models.Model):
         verbose_name_plural = "系統設定"
 
     def __str__(self):
-        return f"{self.key}: {self.value}"
-
-    @staticmethod
-    def get_no_distribute_keywords():
-        """
-        取得不分配關鍵字列表
-        用於判斷哪些工序不需要分配作業員
-        """
-        try:
-            config = SystemConfig.objects.get(key="no_distribute_keywords")
-            return [keyword.strip() for keyword in config.value.split(",") if keyword.strip()]
-        except SystemConfig.DoesNotExist:
-            # 預設關鍵字
-            return ["SMT", "自動化", "無人", "機器"] 
+        return f"{self.key}: {self.value}" 

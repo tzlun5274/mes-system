@@ -33,6 +33,7 @@
             <table class="table table-striped">
                 <thead>
                     <tr>
+                        <th>{% trans "公司代號" %}</th>
                         <th>{% trans "工單編號" %}</th>
                         <th>{% trans "產品名稱" %}</th>
                         <th>{% trans "總數量" %}</th>
@@ -44,6 +45,9 @@
                 <tbody>
                     {% for progress in page_obj %}
                     <tr>
+                        <td>
+                            <span class="badge bg-info">{{ progress.company_code|default:"-" }}</span>
+                        </td>
                         <td>{{ progress.work_order_number }}</td>
                         <td>{{ progress.product_name }}</td>
                         <td>{{ progress.total_quantity }}</td>
@@ -59,7 +63,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6">{% trans "無生產進度數據" %}</td>
+                        <td colspan="7">{% trans "無生產進度數據" %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

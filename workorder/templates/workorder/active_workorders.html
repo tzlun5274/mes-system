@@ -296,6 +296,7 @@
                             <div class="col-md-3">
                                 <h6 class="mb-0">
                                     <i class="fas fa-clipboard"></i>
+                                    <span class="badge bg-info me-1">{{ workorder.company_code|default:"-" }}</span>
                                     <strong>{{ workorder.order_number }}</strong>
                                 </h6>
                                 <small>{{ workorder.company_name|default:"未知公司" }}</small>

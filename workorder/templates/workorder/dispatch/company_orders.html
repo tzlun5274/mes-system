@@ -1,6 +1,13 @@
 {% extends 'base.html' %}
-{% block title %}公司製令單{% endblock %}
+{% block title %}未結案公司製令單{% endblock %}
 {% block content %}
+
+<!-- 頁面說明 -->
+<div class="alert alert-info" role="alert">
+    <i class="fas fa-info-circle"></i>
+    <strong>說明：</strong>此頁面顯示 ERP 同步來的原始工單（來自各公司 MES 資料庫 prdMKOrdMain 表），
+    只顯示未結案的公司製令單（CompleteStatus=2 或空白，且 BillStatus 不是 1），方便現場追蹤與管理。
+</div>
 
 <!-- 統計卡片 -->
 <div class="row mb-4">
@@ -78,23 +85,6 @@
         </div>
     </form>
     
-    <!-- 不分攤關鍵字設定 -->
-    <form method="post" action="" class="row g-2 align-items-center mt-3">
-        {% csrf_token %}
-        <div class="col-auto">
-            <label for="no_distribute_keywords" class="col-form-label"><b>不分攤關鍵字（逗號分隔）</b>：</label>
-        </div>
-        <div class="col-auto">
-            <input type="text" name="no_distribute_keywords" id="no_distribute_keywords" class="form-control" value="{{ no_distribute_keywords|default:'' }}" style="width: 300px;">
-        </div>
-        <div class="col-auto text-success">
-            <small>（備註包含任一關鍵字時，只計算最後一天的產量）</small>
-        </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-warning">儲存關鍵字</button>
-        </div>
-    </form>
-    
     <!-- 手動操作按鈕 -->
     <div class="row mt-3 g-2 align-items-center">
         <div class="col-auto">
@@ -161,7 +151,8 @@
                         <option value="{{ company.company_code }}">{{ company.company_name }}</option>
                     {% endfor %}
                     {% for workorder in workorders %}
-                        <option value="{{ workorder.MKOrdNO }}">單號</option>
+                        <option value="{{ workorder.company_code }}">公司代號</option>
+                        <option value="{{ workorder.mkordno }}">製令單號</option>
                         <option value="{{ workorder.ProductID }}">產品編號</option>
                     {% endfor %}
                 </datalist>
@@ -174,6 +165,7 @@
     <table class="table table-striped">
         <thead>
             <tr>
+                <th>公司代號</th>
                 <th>製令單號<br><span class="text-secondary">(MKOrdNO)</span></th>
                 <th>產品編號<br><span class="text-secondary">(ProductID)</span></th>
                 <th>生產數量<br><span class="text-secondary">(ProdtQty)</span></th>
@@ -188,7 +180,12 @@
         <tbody>
             {% for workorder in workorders %}
             <tr>
-                <td>{{ workorder.MKOrdNO }}</td>
+                <td>
+                    <span class="badge bg-info">{{ workorder.company_code }}</span>
+                </td>
+                <td>
+                    <strong>{{ workorder.mkordno }}</strong>
+                </td>
                 <td>{{ workorder.ProductID }}</td>
                 <td>{{ workorder.ProdtQty }}</td>
                 <td>{{ workorder.EstTakeMatDate }}</td>

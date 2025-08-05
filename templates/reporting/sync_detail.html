@@ -209,6 +209,7 @@
                                 <table class="table table-sm table-striped">
                                     <thead>
                                         <tr>
+                                            <th>公司代號</th>
                                             <th>工單編號</th>
                                             <th>產品代號</th>
                                             <th>完成數量</th>
@@ -219,6 +220,9 @@
                                     <tbody>
                                         {% for workorder in sync_details.processed_workorders %}
                                         <tr>
+                                            <td>
+                                                <span class="badge bg-info">{{ workorder.company_code|default:"-" }}</span>
+                                            </td>
                                             <td>{{ workorder.workorder_number }}</td>
                                             <td>{{ workorder.product_code }}</td>
                                             <td>{{ workorder.completed_quantity }}</td>
@@ -243,6 +247,7 @@
                                     <thead>
                                         <tr>
                                             <th>作業員</th>
+                                            <th>公司代號</th>
                                             <th>工單編號</th>
                                             <th>工序</th>
                                             <th>工作時數</th>
@@ -254,6 +259,9 @@
                                         {% for worker in sync_details.processed_workers %}
                                         <tr>
                                             <td>{{ worker.worker_name }}</td>
+                                            <td>
+                                                <span class="badge bg-info">{{ worker.company_code|default:"-" }}</span>
+                                            </td>
                                             <td>{{ worker.workorder_number }}</td>
                                             <td>{{ worker.process_name }}</td>
                                             <td>{{ worker.total_work_hours }}小時</td>

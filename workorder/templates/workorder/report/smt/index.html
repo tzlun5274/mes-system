@@ -286,6 +286,7 @@
                                 <tr>
                                     <th>報工時間</th>
                                     <th>設備名稱</th>
+                                    <th>公司代號</th>
                                     <th>工單號</th>
                                     <th>產出數量</th>
                                     <th>運行時間</th>
@@ -300,6 +301,9 @@
                                     <tr>
                                         <td>{{ report.report_time|date:"Y-m-d H:i" }}</td>
                                         <td>{{ report.equipment_name }}</td>
+                                        <td>
+                                            <span class="badge bg-info">{{ report.company_code|default:"-" }}</span>
+                                        </td>
                                         <td>{{ report.workorder_number }}</td>
                                         <td>{{ report.output_quantity }}</td>
                                         <td>{{ report.running_hours }}小時</td>
@@ -318,7 +322,7 @@
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="8" class="text-center text-muted">
+                                        <td colspan="9" class="text-center text-muted">
                                             <i class="fas fa-inbox fa-2x mb-2"></i>
                                             <br>
                                             目前沒有SMT報工記錄

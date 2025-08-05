@@ -228,6 +228,7 @@
                                 <tr>
                                     <th>報工時間</th>
                                     <th>作業員</th>
+                                    <th>公司代號</th>
                                     <th>工單號</th>
                                     <th>工序</th>
                                     <th>報工數量</th>
@@ -242,6 +243,9 @@
                                     <tr>
                                         <td>{{ report.work_date|date:"Y-m-d" }} {{ report.start_time|time:"H:i" }}-{{ report.end_time|time:"H:i" }}</td>
                                         <td>{{ report.operator.name }}</td>
+                                        <td>
+                                            <span class="badge bg-info">{{ report.company_code|default:"-" }}</span>
+                                        </td>
                                         <td>{{ report.workorder.order_number|default:report.rd_workorder_number|default:"-" }}</td>
                                         <td>{{ report.process.name|default:report.operation|default:"-" }}</td>
                                         <td>{{ report.work_quantity|default:0 }}</td>
@@ -260,7 +264,7 @@
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="8" class="text-center text-muted">
+                                        <td colspan="9" class="text-center text-muted">
                                             <i class="fas fa-inbox fa-2x mb-2"></i>
                                             <br>
                                             目前沒有作業員報工記錄

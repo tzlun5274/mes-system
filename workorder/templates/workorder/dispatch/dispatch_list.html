@@ -108,6 +108,7 @@
             <table class="table table-striped">
                 <thead>
                     <tr>
+                        <th>公司代號</th>
                         <th>工單編號</th>
                         <th>產品編號</th>
                         <th>數量</th>
@@ -123,6 +124,9 @@
                     {# 1. 待生產工單 #}
                     {% for workorder in pending_orders %}
                     <tr>
+                        <td>
+                            <span class="badge bg-info">{{ workorder.company_code|default:"-" }}</span>
+                        </td>
                         <td>{{ workorder.order_number }}</td>
                         <td>{{ workorder.product_code }}</td>
                         <td>{{ workorder.quantity }}</td>
@@ -170,6 +174,9 @@
                     {# 2. 生產中工單 #}
                     {% for workorder in in_progress_orders %}
                     <tr>
+                        <td>
+                            <span class="badge bg-info">{{ workorder.company_code|default:"-" }}</span>
+                        </td>
                         <td>{{ workorder.order_number }}</td>
                         <td>{{ workorder.product_code }}</td>
                         <td>{{ workorder.quantity }}</td>
@@ -210,7 +217,7 @@
                     </tr>
                     {% endfor %}
                     {% if not pending_orders and not in_progress_orders %}
-                    <tr><td colspan="8" class="text-center">目前沒有活躍工單</td></tr>
+                    <tr><td colspan="9" class="text-center">目前沒有活躍工單</td></tr>
                     {% endif %}
                 </tbody>
             </table>

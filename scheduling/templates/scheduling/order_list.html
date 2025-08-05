@@ -188,7 +188,10 @@
                     <tbody>
                         {% for order in orders %}
                         <tr>
-                            <td>{{ order.company_name }}</td>
+                            <td>
+                                <span class="badge bg-info me-1">{{ order.company_code|default:"-" }}</span>
+                                {{ order.company_name }}
+                            </td>
                             <td>{{ order.order_number }}</td>
                             <td>{{ order.customer_name }}</td>
                             <td>{{ order.product_code }}</td>
