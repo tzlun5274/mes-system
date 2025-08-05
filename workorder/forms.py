@@ -130,17 +130,17 @@ class ProductionReportBaseForm(forms.ModelForm):
     )
 
     # 工序欄位
-    process = forms.CharField(
-        max_length=100,
+    process = forms.ModelChoiceField(
+        queryset=None,
         label="工序",
-        widget=forms.TextInput(
+        widget=forms.Select(
             attrs={
                 "class": "form-control",
-                "placeholder": "請輸入工序名稱",
+                "placeholder": "請選擇工序名稱",
             }
         ),
         required=True,
-        help_text="請輸入工序名稱",
+        help_text="請選擇工序名稱",
     )
 
     # 設備欄位
