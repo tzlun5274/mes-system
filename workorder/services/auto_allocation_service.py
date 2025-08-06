@@ -271,6 +271,18 @@ class AutoAllocationService:
         
         logger.info(f"找到 {len(workorder_groups)} 個工單需要分配，共 {len(pending_reports)} 筆記錄")
         
+        # 如果沒有找到需要分配的工單，直接返回結果
+        if not workorder_groups:
+            logger.info("沒有找到需要分配的工單，自動分配完成")
+            return {
+                "total_workorders": 0,
+                "total_reports": 0,
+                "successful_allocations": 0,
+                "failed_allocations": 0,
+                "results": [],
+                "message": "沒有找到需要分配的工單"
+            }
+        
         batch_results = {
             "total_workorders": len(workorder_groups),
             "total_reports": len(pending_reports),

@@ -94,8 +94,10 @@ class AutoAllocationScheduler:
             output_text = output.getvalue()
             logger.info(f"自動分配命令輸出: {output_text}")
             
-            # 簡單的成功判斷（可以根據實際輸出調整）
-            success = "成功分配" in output_text or "分配完成" in output_text
+            # 成功判斷：包括成功分配、分配完成、或沒有找到需要分配的工單
+            success = ("成功分配" in output_text or 
+                      "分配完成" in output_text or 
+                      "沒有找到需要分配的工單" in output_text)
             
             # 嘗試從輸出中提取統計資訊
             total_workorders = 0
@@ -178,6 +180,15 @@ class AutoAllocationScheduler:
             settings.save()
             
             return False
+        
+        finally:
+            # 確保執行狀態被重置
+            try:
+                settings.is_running = False
+                settings.save()
+                logger.info("自動分配執行狀態已重置")
+            except Exception as e:
+                logger.error(f"重置執行狀態時發生錯誤: {str(e)}")
     
     def _calculate_next_execution(self, settings):
         """計算下次執行時間"""
