@@ -150,6 +150,7 @@
                         <tr>
                             <th>報工類型</th>
                             <th>工單號</th>
+                            <th>公司名稱</th>
                             <th>作業員/設備</th>
                             <th>工序</th>
                             <th>報工日期</th>
@@ -170,6 +171,9 @@
                             </td>
                             <td>
                                 <strong>{{ report.workorder }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ report.company_name|default:"-" }}</span>
                             </td>
                             <td>{{ report.operator }}</td>
                             <td>{{ report.process }}</td>

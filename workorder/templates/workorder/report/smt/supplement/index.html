@@ -300,6 +300,7 @@
                                     <th>報工時間</th>
                                     <th>設備</th>
                                     <th>工單號</th>
+                                    <th>公司名稱</th>
                                     <th>產品編號</th>
                                     <th>工序</th>
                                     <th>報工數量</th>
@@ -322,6 +323,25 @@
                                             {% else %}
                                                 {{ "" }}
                                             {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">
+                                                {% if report.workorder and report.workorder.company_code %}
+                                                    {% for config in companies %}
+                                                        {% if config.company_code == report.workorder.company_code %}
+                                                            {{ config.company_name }}
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                {% elif report.company_code %}
+                                                    {% for config in companies %}
+                                                        {% if config.company_code == report.company_code %}
+                                                            {{ config.company_name }}
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </span>
                                         </td>
                                         <td>{{ report.product_id|default:"" }}</td>
                                         <td>{{ report.operation|default:"" }}</td>

@@ -291,6 +291,10 @@ def report_detail(request, report_id):
     報工記錄詳情視圖 (Report Detail View)
     顯示單一報工記錄的詳細資訊（支援作業員報工、SMT報工、主管報工）
     """
+    # 獲取公司配置對照表
+    from erp_integration.models import CompanyConfig
+    company_configs = list(CompanyConfig.objects.all())
+    
     # 嘗試從作業員報工中查找
     try:
         report = OperatorSupplementReport.objects.get(id=report_id)
@@ -308,6 +312,7 @@ def report_detail(request, report_id):
     context = {
         'report': report,
         'report_type': report_type,
+        'company_configs': company_configs,
     }
     
     return render(request, 'supervisor/report_detail.html', context)
@@ -867,6 +872,12 @@ def approved_reports_list(request):
     from django.db.models import Q
     from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
     
+    # 獲取公司配置對照表
+    from erp_integration.models import CompanyConfig
+    company_configs = {}
+    for config in CompanyConfig.objects.all():
+        company_configs[config.company_code] = config.company_name
+    
     # 獲取已審核的作業員報工記錄（直接從報工資料表統計，不依賴工單關聯）
     approved_operator_reports = OperatorSupplementReport.objects.filter(
         approval_status='approved'
@@ -915,10 +926,18 @@ def approved_reports_list(request):
         elif report.original_workorder_number:
             workorder_number = report.original_workorder_number
         
+        # 獲取公司名稱
+        company_name = '-'
+        if report.workorder and report.workorder.company_code:
+            company_name = company_configs.get(report.workorder.company_code, report.workorder.company_code)
+        elif hasattr(report, 'company_code') and report.company_code:
+            company_name = company_configs.get(report.company_code, report.company_code)
+        
         all_approved_reports.append({
             'id': report.id,
             'type': '作業員報工',
             'workorder': workorder_number,
+            'company_name': company_name,
             'operator': report.operator.name if report.operator else '-',
             'process': report.process.name if report.process else '-',
             'quantity': report.work_quantity or 0,
@@ -938,10 +957,18 @@ def approved_reports_list(request):
         elif report.original_workorder_number:
             workorder_number = report.original_workorder_number
         
+        # 獲取公司名稱
+        company_name = '-'
+        if report.workorder and report.workorder.company_code:
+            company_name = company_configs.get(report.workorder.company_code, report.workorder.company_code)
+        elif hasattr(report, 'company_code') and report.company_code:
+            company_name = company_configs.get(report.company_code, report.company_code)
+        
         all_approved_reports.append({
             'id': report.id,
             'type': 'SMT報工',
             'workorder': workorder_number,
+            'company_name': company_name,
             'operator': 'SMT設備',
             'process': report.operation,
             'quantity': report.work_quantity or 0,

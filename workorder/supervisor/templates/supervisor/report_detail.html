@@ -117,11 +117,32 @@
                                 <p><strong>作業員:</strong> {{ report.operator.name|default:"-" }}</p>
                                 <p><strong>工序:</strong> {{ report.process.name|default:"-" }}</p>
                             {% endif %}
+                            <p><strong>公司名稱:</strong> 
+                                <span class="badge bg-info">
+                                    {% if report.workorder and report.workorder.company_code %}
+                                        {% for config in company_configs %}
+                                            {% if config.company_code == report.workorder.company_code %}
+                                                {{ config.company_name }}
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% elif report.company_code %}
+                                        {% for config in company_configs %}
+                                            {% if config.company_code == report.company_code %}
+                                                {{ config.company_name }}
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </span>
+                            </p>
                             <p><strong>工單號:</strong> 
                                 {% if report.workorder %}
                                 <a href="{% url 'workorder:detail' report.workorder.id %}" target="_blank">
                                     {{ report.workorder.order_number }}
                                 </a>
+                                {% elif report.original_workorder_number %}
+                                {{ report.original_workorder_number }}
                                 {% else %}
                                 -
                                 {% endif %}

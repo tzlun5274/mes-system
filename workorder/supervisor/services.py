@@ -212,18 +212,32 @@ class SupervisorApprovalService:
         """
         pending_reports = []
         
+        # 獲取公司配置對照表
+        from erp_integration.models import CompanyConfig
+        company_configs = {}
+        for config in CompanyConfig.objects.all():
+            company_configs[config.company_code] = config.company_name
+        
         # 作業員待審核記錄
         operator_pending = OperatorSupplementReport.objects.select_related(
             'operator', 'workorder', 'process'
         ).filter(approval_status='pending').order_by('-work_date', '-start_time')
         
         for report in operator_pending:
+            # 獲取公司名稱
+            company_name = '-'
+            if report.workorder and report.workorder.company_code:
+                company_name = company_configs.get(report.workorder.company_code, report.workorder.company_code)
+            elif hasattr(report, 'company_code') and report.company_code:
+                company_name = company_configs.get(report.company_code, report.company_code)
+            
             pending_reports.append({
                 'report_id': report.id,
                 'report_type': '作業員報工',
                 'work_date': report.work_date,
+                'company_name': company_name,
                 'operator_name': report.operator.name if report.operator else '-',
-                'workorder_number': report.workorder.order_number if report.workorder else '-',
+                'workorder_number': report.workorder.order_number if report.workorder else (report.original_workorder_number if report.original_workorder_number else '-'),
                 'process_name': report.process.name if report.process else '-',
                 'work_quantity': report.work_quantity,
                 'defect_quantity': report.defect_quantity,
@@ -239,12 +253,20 @@ class SupervisorApprovalService:
         ).filter(approval_status='pending').order_by('-work_date', '-start_time')
         
         for report in smt_pending:
+            # 獲取公司名稱
+            company_name = '-'
+            if report.workorder and report.workorder.company_code:
+                company_name = company_configs.get(report.workorder.company_code, report.workorder.company_code)
+            elif hasattr(report, 'company_code') and report.company_code:
+                company_name = company_configs.get(report.company_code, report.company_code)
+            
             pending_reports.append({
                 'report_id': report.id,
                 'report_type': 'SMT報工',
                 'work_date': report.work_date,
+                'company_name': company_name,
                 'operator_name': report.equipment_name if report.equipment_name else '-',
-                'workorder_number': report.workorder.order_number if report.workorder else '-',
+                'workorder_number': report.workorder.order_number if report.workorder else (report.original_workorder_number if report.original_workorder_number else '-'),
                 'process_name': 'SMT',
                 'work_quantity': report.work_quantity,
                 'defect_quantity': report.defect_quantity,

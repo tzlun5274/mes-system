@@ -17,6 +17,16 @@
         border-radius: 5px;
         margin-bottom: 20px;
     }
+    
+    .work-time {
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        color: #495057;
+    }
+    
+    .work-time .text-muted {
+        font-size: 0.8em;
+    }
 </style>
 {% endblock %}
 
@@ -99,13 +109,12 @@
                             </th>
                             <th>作業員</th>
                             <th>報工日期</th>
+                            <th>公司名稱</th>
                             <th>工單號</th>
                             <th>工序</th>
                             <th>良品數量</th>
                             <th>不良品數量</th>
-                            <th>開始時間</th>
-                            <th>結束時間</th>
-                            <th>建立時間</th>
+                            <th>工作時間</th>
                             <th width="200">操作</th>
                         </tr>
                     </thead>
@@ -122,7 +131,14 @@
                             </td>
                             <td>{{ report.work_date|date:"Y-m-d" }}</td>
                             <td>
+                                <span class="badge bg-info">{{ report.company_name }}</span>
+                            </td>
+                            <td>
+                                {% if report.workorder_number and report.workorder_number != '-' %}
                                 <strong>{{ report.workorder_number }}</strong>
+                                {% else %}
+                                <span class="text-muted">未關聯工單</span>
+                                {% endif %}
                             </td>
                             <td>{{ report.process_name }}</td>
                             <td>
@@ -135,24 +151,16 @@
                                 <span class="badge bg-secondary">0</span>
                                 {% endif %}
                             </td>
-                            <td>
-                                {% if report.start_time %}
-                                {{ report.start_time|time:"H:i" }}
+                            <td class="work-time">
+                                {% if report.start_time and report.end_time %}
+                                {{ report.start_time|time:"H:i" }} - {{ report.end_time|time:"H:i" }}
+                                {% elif report.start_time %}
+                                {{ report.start_time|time:"H:i" }} - <span class="text-muted">未結束</span>
+                                {% elif report.end_time %}
+                                <span class="text-muted">未開始</span> - {{ report.end_time|time:"H:i" }}
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
-                            </td>
-                            <td>
-                                {% if report.end_time %}
-                                {{ report.end_time|time:"H:i" }}
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <small class="text-muted">
-                                    {{ report.work_date|date:"m-d" }}
-                                </small>
                             </td>
                             <td class="approval-actions">
                                 <div class="btn-group btn-group-sm" role="group">
