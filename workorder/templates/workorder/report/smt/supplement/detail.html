@@ -371,17 +371,29 @@
                             <div class="col-md-6">
                                 <div class="detail-item">
                                     <span class="detail-label">工作時數：</span>
-                                    <span class="detail-value">{{ supplement_report.work_hours|default:"未設定" }} 小時</span>
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">停機時間：</span>
-                                    <span class="detail-value">{{ supplement_report.down_time_minutes|default:"0" }} 分鐘</span>
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">實際工作時數：</span>
                                     <span class="detail-value">
-                                        {% if supplement_report.work_hours %}
-                                            {{ supplement_report.work_hours|floatformat:2 }} 小時
+                                        {% if supplement_report.work_hours_calculated %}
+                                            {{ supplement_report.work_hours_calculated|floatformat:2 }} 小時
+                                        {% else %}
+                                            未設定
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">加班時數：</span>
+                                    <span class="detail-value">
+                                        {% if supplement_report.overtime_hours_calculated %}
+                                            {{ supplement_report.overtime_hours_calculated|floatformat:2 }} 小時
+                                        {% else %}
+                                            0.00 小時
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">總工作時數：</span>
+                                    <span class="detail-value">
+                                        {% if total_work_hours %}
+                                            {{ total_work_hours|floatformat:2 }} 小時
                                         {% else %}
                                             未設定
                                         {% endif %}

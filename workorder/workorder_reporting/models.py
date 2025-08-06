@@ -337,25 +337,29 @@ class SMTProductionReport(models.Model):
             # 加班時數：超過16:30以後的時間才算加班
             overtime_start_time = time(16, 30)  # 16:30開始算加班
             
-            # 計算加班時數：如果結束時間超過16:30，則計算加班時數
-            if self.end_time > overtime_start_time:
-                # 計算從16:30到結束時間的加班時數
-                overtime_start_dt = datetime.combine(self.work_date, overtime_start_time)
-                end_dt = datetime.combine(self.work_date, self.end_time)
-                if end_dt < overtime_start_dt:
-                    end_dt += timedelta(days=1)
+            # 修正：正確計算加班時數
+            if self.start_time >= overtime_start_time:
+                # 開始時間在16:30之後，全部算加班
+                self.overtime_hours_calculated = round(total_hours, 2)
+                self.work_hours_calculated = 0.0
+            elif self.end_time > overtime_start_time:
+                # 開始時間在16:30之前，結束時間在16:30之後
+                # 計算正常工時（從開始時間到16:30）
+                normal_end_dt = datetime.combine(self.work_date, overtime_start_time)
+                normal_duration = normal_end_dt - start_dt
+                normal_hours = round(normal_duration.total_seconds() / 3600, 2)
                 
+                # 計算加班時數（從16:30到結束時間）
+                overtime_start_dt = datetime.combine(self.work_date, overtime_start_time)
                 overtime_duration = end_dt - overtime_start_dt
                 overtime_hours = round(overtime_duration.total_seconds() / 3600, 2)
                 
-                self.overtime_hours_calculated = overtime_hours
-                
-                # 正常工時 = 總工時 - 加班時數（但不能小於0）
-                self.work_hours_calculated = round(max(0, total_hours - overtime_hours), 2)
+                self.work_hours_calculated = round(normal_hours, 2)
+                self.overtime_hours_calculated = round(overtime_hours, 2)
             else:
-                # 結束時間在16:30之前，無加班
-                self.overtime_hours_calculated = 0.0
+                # 開始和結束時間都在16:30之前，全部算正常工時
                 self.work_hours_calculated = round(total_hours, 2)
+                self.overtime_hours_calculated = 0.0
             
             return {
                 'total_hours': total_hours,
@@ -962,30 +966,37 @@ class OperatorSupplementReport(models.Model):
             # 加班時數：超過17:30以後的時間才算加班
             overtime_start_time = time(17, 30)  # 17:30開始算加班
             
-            # 計算加班時數：如果結束時間超過17:30，則計算加班時數
-            if self.end_time > overtime_start_time:
-                # 計算從17:30到結束時間的加班時數
-                overtime_start_dt = datetime.combine(self.work_date, overtime_start_time)
-                end_dt = datetime.combine(self.work_date, self.end_time)
-                if end_dt < overtime_start_dt:
-                    end_dt += timedelta(days=1)
+            # 修正：正確計算加班時數
+            if self.start_time >= overtime_start_time:
+                # 開始時間在17:30之後，全部算加班
+                self.overtime_hours_calculated = round(actual_work_hours, 2)
+                self.work_hours_calculated = 0.0
+            elif self.end_time > overtime_start_time:
+                # 開始時間在17:30之前，結束時間在17:30之後
+                # 計算正常工時（從開始時間到17:30）
+                normal_end_dt = datetime.combine(self.work_date, overtime_start_time)
+                normal_duration = normal_end_dt - start_dt
+                normal_hours = round(normal_duration.total_seconds() / 3600, 2)
                 
+                # 如果正常工時橫跨休息時間，需要扣除休息時間
+                if self.has_break and self.start_time < lunch_start and overtime_start_time > lunch_end:
+                    normal_hours = max(0, normal_hours - 1.0)
+                
+                # 計算加班時數（從17:30到結束時間）
+                overtime_start_dt = datetime.combine(self.work_date, overtime_start_time)
                 overtime_duration = end_dt - overtime_start_dt
                 overtime_hours = round(overtime_duration.total_seconds() / 3600, 2)
                 
                 # 如果加班時間橫跨休息時間，需要扣除休息時間
                 if self.has_break and overtime_start_time < lunch_start and self.end_time > lunch_end:
-                    # 加班時間有橫跨休息時間，扣除休息時間
                     overtime_hours = max(0, overtime_hours - 1.0)
                 
-                self.overtime_hours_calculated = overtime_hours
-                
-                # 正常工時 = 實際工作時數 - 加班時數
-                self.work_hours_calculated = round(actual_work_hours - overtime_hours, 2)
+                self.work_hours_calculated = round(normal_hours, 2)
+                self.overtime_hours_calculated = round(overtime_hours, 2)
             else:
-                # 結束時間在17:30之前，無加班
-                self.overtime_hours_calculated = 0.0
+                # 開始和結束時間都在17:30之前，全部算正常工時
                 self.work_hours_calculated = round(actual_work_hours, 2)
+                self.overtime_hours_calculated = 0.0
             
             return {
                 'total_hours': total_hours,
