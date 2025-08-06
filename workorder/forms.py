@@ -8,6 +8,7 @@ from .models import (
     WorkOrderAssignment,
     WorkOrderProduction,
     WorkOrderProductionDetail,
+    AutoManagementConfig,
 )
 from .workorder_reporting.models import SMTProductionReport, OperatorSupplementReport
 from process.models import Operator
@@ -1814,3 +1815,59 @@ class OperatorOnSiteReportForm(forms.ModelForm):
         self.fields["equipment"].queryset = Equipment.objects.exclude(
             name__icontains="SMT"
         ).order_by("name")
+
+
+class AutoManagementConfigForm(forms.ModelForm):
+    """
+    自動管理功能設定表單
+    """
+    
+    class Meta:
+        model = AutoManagementConfig
+        fields = ['function_type', 'is_enabled', 'interval_minutes']
+        widgets = {
+            'function_type': forms.Select(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': '請選擇功能類型'
+                }
+            ),
+            'is_enabled': forms.CheckboxInput(
+                attrs={
+                    'class': 'form-check-input',
+                }
+            ),
+            'interval_minutes': forms.NumberInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': '請輸入執行間隔（分鐘）',
+                    'min': '1',
+                    'max': '1440',  # 最多24小時
+                }
+            ),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # 設定欄位標籤
+        self.fields['function_type'].label = '功能類型'
+        self.fields['is_enabled'].label = '是否啟用'
+        self.fields['interval_minutes'].label = '執行間隔（分鐘）'
+        
+        # 設定說明文字
+        self.fields['function_type'].help_text = '選擇要設定的自動化功能類型'
+        self.fields['is_enabled'].help_text = '是否啟用此自動化功能'
+        self.fields['interval_minutes'].help_text = '設定自動化功能的執行間隔，以分鐘為單位（1-1440分鐘）'
+    
+    def clean_interval_minutes(self):
+        """驗證執行間隔"""
+        interval_minutes = self.cleaned_data.get('interval_minutes')
+        
+        if interval_minutes is not None:
+            if interval_minutes < 1:
+                raise forms.ValidationError('執行間隔不能少於1分鐘')
+            elif interval_minutes > 1440:
+                raise forms.ValidationError('執行間隔不能超過1440分鐘（24小時）')
+        
+        return interval_minutes

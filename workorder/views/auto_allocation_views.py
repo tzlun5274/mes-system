@@ -34,10 +34,24 @@ def auto_allocation_status(request):
         return JsonResponse(status)
     except Exception as e:
         logger.error(f"取得自動分配狀態失敗: {str(e)}")
+        # 返回預設狀態而不是錯誤
         return JsonResponse({
-            'error': '取得狀態失敗',
+            'enabled': False,
+            'is_running': False,
+            'interval_minutes': 30,
+            'start_time': '08:00',
+            'end_time': '18:00',
+            'max_execution_time': 30,
+            'notification_enabled': True,
+            'last_execution': None,
+            'next_execution': None,
+            'today_executions': 0,
+            'success_count': 0,
+            'failure_count': 0,
+            'avg_execution_time': '0秒',
+            'error': '取得狀態失敗，使用預設值',
             'message': str(e)
-        }, status=500)
+        })
 
 
 @login_required
@@ -48,10 +62,23 @@ def auto_allocation_settings(request):
     try:
         # 解析表單數據
         enabled = request.POST.get('executionEnabled') == 'on'
-        interval_minutes = int(request.POST.get('executionInterval', 30))
+        
+        # 安全地處理數字欄位，避免空字串轉換錯誤
+        interval_minutes_str = request.POST.get('executionInterval', '30')
+        try:
+            interval_minutes = int(interval_minutes_str) if interval_minutes_str and interval_minutes_str.strip() else 30
+        except (ValueError, TypeError):
+            interval_minutes = 30
+        
         start_time = request.POST.get('startTime', '08:00')
         end_time = request.POST.get('endTime', '18:00')
-        max_execution_time = int(request.POST.get('maxExecutionTime', 30))
+        
+        max_execution_time_str = request.POST.get('maxExecutionTime', '30')
+        try:
+            max_execution_time = int(max_execution_time_str) if max_execution_time_str and max_execution_time_str.strip() else 30
+        except (ValueError, TypeError):
+            max_execution_time = 30
+        
         notification_enabled = request.POST.get('notificationEnabled') == 'on'
         
         # 驗證數據

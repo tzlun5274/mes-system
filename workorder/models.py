@@ -894,13 +894,16 @@ class AutoAllocationSettings(models.Model):
     
     def get_avg_execution_time_display(self):
         """取得平均執行時間的顯示格式"""
-        avg_seconds = self.avg_execution_time
-        if avg_seconds < 60:
-            return f"{avg_seconds:.1f}秒"
-        elif avg_seconds < 3600:
-            return f"{avg_seconds/60:.1f}分鐘"
-        else:
-            return f"{avg_seconds/3600:.1f}小時"
+        try:
+            avg_seconds = self.avg_execution_time
+            if avg_seconds < 60:
+                return f"{avg_seconds:.1f}秒"
+            elif avg_seconds < 3600:
+                return f"{avg_seconds/60:.1f}分鐘"
+            else:
+                return f"{avg_seconds/3600:.1f}小時"
+        except Exception:
+            return "0秒"
     
     def is_within_execution_window(self):
         """檢查當前時間是否在執行時間範圍內"""
@@ -1019,6 +1022,185 @@ class AutoAllocationLog(models.Model):
             else:
                 return f"{total_seconds/3600:.1f}小時"
         return "--"
+
+
+class AutoManagementConfig(models.Model):
+    """
+    自動管理功能設定模型
+    用於設定各種自動化功能的執行間隔和開關狀態
+    """
+    
+    # 功能類型選擇
+    FUNCTION_TYPE_CHOICES = [
+        ('auto_completion_check', '完工判斷轉寫已完工'),
+        ('auto_approval', '自動核准'),
+        ('auto_notification', '自動通知'),
+    ]
+    
+    function_type = models.CharField(
+        max_length=50,
+        choices=FUNCTION_TYPE_CHOICES,
+        verbose_name="功能類型",
+        help_text="選擇要設定的自動化功能類型"
+    )
+    
+    is_enabled = models.BooleanField(
+        default=True,
+        verbose_name="是否啟用",
+        help_text="是否啟用此自動化功能"
+    )
+    
+    interval_minutes = models.IntegerField(
+        default=30,
+        verbose_name="執行間隔（分鐘）",
+        help_text="設定自動化功能的執行間隔，以分鐘為單位"
+    )
+    
+    last_execution = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="最後執行時間",
+        help_text="記錄此功能最後執行的時間"
+    )
+    
+    next_execution = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="下次執行時間",
+        help_text="預估下次執行的時間"
+    )
+    
+    execution_count = models.IntegerField(
+        default=0,
+        verbose_name="執行次數",
+        help_text="記錄此功能已執行的次數"
+    )
+    
+    success_count = models.IntegerField(
+        default=0,
+        verbose_name="成功次數",
+        help_text="記錄此功能成功執行的次數"
+    )
+    
+    error_count = models.IntegerField(
+        default=0,
+        verbose_name="錯誤次數",
+        help_text="記錄此功能執行失敗的次數"
+    )
+    
+    last_error_message = models.TextField(
+        blank=True,
+        verbose_name="最後錯誤訊息",
+        help_text="記錄最後一次執行失敗的錯誤訊息"
+    )
+    
+    # 系統欄位
+    created_by = models.CharField(
+        max_length=100,
+        verbose_name="建立人員",
+        default="system"
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="建立時間"
+    )
+    
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="更新時間"
+    )
+    
+    class Meta:
+        verbose_name = "自動管理功能設定"
+        verbose_name_plural = "自動管理功能設定"
+        db_table = "workorder_auto_management_config"
+        unique_together = ['function_type']
+        ordering = ['function_type']
+    
+    def __str__(self):
+        return f"{self.get_function_type_display()} - {self.interval_minutes}分鐘"
+    
+    def save(self, *args, **kwargs):
+        """儲存時自動計算下次執行時間"""
+        if self.is_enabled and self.interval_minutes > 0:
+            from django.utils import timezone
+            from datetime import timedelta
+            
+            if self.last_execution:
+                # 如果有最後執行時間，則下次執行時間 = 最後執行時間 + 間隔
+                self.next_execution = self.last_execution + timedelta(minutes=self.interval_minutes)
+            else:
+                # 如果沒有最後執行時間，則下次執行時間 = 現在時間 + 間隔
+                self.next_execution = timezone.now() + timedelta(minutes=self.interval_minutes)
+        
+        super().save(*args, **kwargs)
+    
+    def update_execution_time(self, success=True, error_message=""):
+        """
+        更新執行時間和統計資訊
+        
+        Args:
+            success: 是否執行成功
+            error_message: 錯誤訊息（如果執行失敗）
+        """
+        from django.utils import timezone
+        
+        self.last_execution = timezone.now()
+        self.execution_count += 1
+        
+        if success:
+            self.success_count += 1
+            self.last_error_message = ""
+        else:
+            self.error_count += 1
+            self.last_error_message = error_message
+        
+        self.save()
+    
+    @classmethod
+    def get_config(cls, function_type):
+        """
+        獲取指定功能的設定
+        
+        Args:
+            function_type: 功能類型
+            
+        Returns:
+            AutoManagementConfig: 設定實例，如果不存在則建立預設設定
+        """
+        config, created = cls.objects.get_or_create(
+            function_type=function_type,
+            defaults={
+                'is_enabled': True,
+                'interval_minutes': 30,
+            }
+        )
+        return config
+    
+    @classmethod
+    def get_enabled_functions(cls):
+        """
+        獲取所有已啟用的功能設定
+        
+        Returns:
+            QuerySet: 已啟用的功能設定列表
+        """
+        return cls.objects.filter(is_enabled=True)
+    
+    @classmethod
+    def get_due_functions(cls):
+        """
+        獲取需要執行的功能（下次執行時間已到）
+        
+        Returns:
+            QuerySet: 需要執行的功能設定列表
+        """
+        from django.utils import timezone
+        return cls.objects.filter(
+            is_enabled=True,
+            next_execution__lte=timezone.now()
+        )
 
 
 

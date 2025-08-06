@@ -28,13 +28,15 @@ class AutoAllocationScheduler:
     
     def get_settings(self):
         """取得自動分配設定"""
+        from datetime import time
+        
         settings, created = AutoAllocationSettings.objects.get_or_create(
             id=1,  # 使用單一設定
             defaults={
                 'enabled': False,
                 'interval_minutes': 30,
-                'start_time': '08:00',
-                'end_time': '18:00',
+                'start_time': time(8, 0),  # 08:00
+                'end_time': time(18, 0),   # 18:00
                 'max_execution_time': 30,
                 'notification_enabled': True
             }
@@ -207,31 +209,56 @@ class AutoAllocationScheduler:
     
     def get_status(self):
         """取得當前狀態"""
-        settings = self.get_settings()
-        
-        # 計算今日執行次數
-        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end = today_start + timedelta(days=1)
-        today_executions = AutoAllocationLog.objects.filter(
-            started_at__gte=today_start,
-            started_at__lt=today_end
-        ).count()
-        
-        return {
-            'enabled': settings.enabled,
-            'is_running': settings.is_running,
-            'interval_minutes': settings.interval_minutes,
-            'start_time': settings.start_time.strftime('%H:%M'),
-            'end_time': settings.end_time.strftime('%H:%M'),
-            'max_execution_time': settings.max_execution_time,
-            'notification_enabled': settings.notification_enabled,
-            'last_execution': settings.last_execution.strftime('%Y-%m-%d %H:%M:%S') if settings.last_execution else None,
-            'next_execution': settings.next_execution.strftime('%Y-%m-%d %H:%M:%S') if settings.next_execution else None,
-            'today_executions': today_executions,
-            'success_count': settings.success_count,
-            'failure_count': settings.failure_count,
-            'avg_execution_time': settings.get_avg_execution_time_display(),
-        }
+        try:
+            settings = self.get_settings()
+            
+            # 計算今日執行次數
+            today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_end = today_start + timedelta(days=1)
+            today_executions = AutoAllocationLog.objects.filter(
+                started_at__gte=today_start,
+                started_at__lt=today_end
+            ).count()
+            
+            # 安全地處理時間欄位
+            start_time_str = settings.start_time.strftime('%H:%M') if settings.start_time else '08:00'
+            end_time_str = settings.end_time.strftime('%H:%M') if settings.end_time else '18:00'
+            last_execution_str = settings.last_execution.strftime('%Y-%m-%d %H:%M:%S') if settings.last_execution else None
+            next_execution_str = settings.next_execution.strftime('%Y-%m-%d %H:%M:%S') if settings.next_execution else None
+            
+            return {
+                'enabled': settings.enabled,
+                'is_running': settings.is_running,
+                'interval_minutes': settings.interval_minutes,
+                'start_time': start_time_str,
+                'end_time': end_time_str,
+                'max_execution_time': settings.max_execution_time,
+                'notification_enabled': settings.notification_enabled,
+                'last_execution': last_execution_str,
+                'next_execution': next_execution_str,
+                'today_executions': today_executions,
+                'success_count': settings.success_count,
+                'failure_count': settings.failure_count,
+                'avg_execution_time': settings.get_avg_execution_time_display(),
+            }
+        except Exception as e:
+            logger.error(f"取得自動分配狀態失敗: {str(e)}")
+            # 返回預設狀態
+            return {
+                'enabled': False,
+                'is_running': False,
+                'interval_minutes': 30,
+                'start_time': '08:00',
+                'end_time': '18:00',
+                'max_execution_time': 30,
+                'notification_enabled': True,
+                'last_execution': None,
+                'next_execution': None,
+                'today_executions': 0,
+                'success_count': 0,
+                'failure_count': 0,
+                'avg_execution_time': '0秒',
+            }
     
     def update_settings(self, **kwargs):
         """更新設定"""

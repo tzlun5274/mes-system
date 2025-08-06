@@ -25,6 +25,14 @@ from .views.auto_allocation_views import (
     auto_allocation_status, auto_allocation_settings, auto_allocation_execute,
     auto_allocation_stop, auto_allocation_log, auto_allocation_summary
 )
+from .views.auto_management_views import (
+    AutoManagementConfigListView, AutoManagementConfigCreateView,
+    AutoManagementConfigUpdateView, AutoManagementConfigDeleteView,
+    execute_auto_function, toggle_auto_function
+)
+from .views.completion_automation_views import (
+    CompletionAutomationManagementView
+)
 
 app_name = "workorder"
 
@@ -220,6 +228,17 @@ urlpatterns = [
     path("auto_allocation/stop/", auto_allocation_stop, name="auto_allocation_stop"),
     path("auto_allocation/log/", auto_allocation_log, name="auto_allocation_log"),
     path("auto_allocation/summary/", auto_allocation_summary, name="auto_allocation_summary"),
+
+    # 完工自動化管理相關 URL
+    path("completion-automation/", CompletionAutomationManagementView.as_view(), name="completion_automation_management"),
+    path("auto-management/execute/<str:function_type>/", execute_auto_function, name="execute_auto_function"),
+    path("auto-management/toggle/<str:function_type>/", toggle_auto_function, name="toggle_auto_function"),
+    
+    # 自動管理功能相關 URL (保留原有功能)
+    path("auto-management/", AutoManagementConfigListView.as_view(), name="auto_management_config_list"),
+    path("auto-management/create/", AutoManagementConfigCreateView.as_view(), name="auto_management_config_create"),
+    path("auto-management/edit/<int:pk>/", AutoManagementConfigUpdateView.as_view(), name="auto_management_config_update"),
+    path("auto-management/delete/<int:pk>/", AutoManagementConfigDeleteView.as_view(), name="auto_management_config_delete"),
 
     # 已完工工單相關 URL
     # path('completed/', workorder_views.CompletedWorkOrderListView.as_view(), name='completed_workorder_list'), # This line is removed as per the edit hint

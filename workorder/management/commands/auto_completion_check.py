@@ -1,5 +1,5 @@
 """
-完工判斷轉寫已完工管理命令
+Auto Completion Check Management Command
 檢查生產中工單詳情資料表中出貨包裝工序的合格品累積數量，達到生產數量時轉寫到已完工資料表
 """
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = '完工判斷轉寫已完工'
+    help = 'Auto Completion Check - 完工判斷轉寫已完工'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -34,6 +34,10 @@ class Command(BaseCommand):
         dry_run = options['dry_run']
         workorder_id = options.get('workorder_id')
         
+        # 記錄開始執行
+        logger.info(f'開始執行完工判斷轉寫命令 - 乾跑模式: {dry_run}, 指定工單ID: {workorder_id}')
+        self.stdout.write(f'開始執行完工判斷轉寫命令 - 乾跑模式: {dry_run}')
+        
         if dry_run:
             self.stdout.write(
                 self.style.WARNING('執行乾跑模式，不會進行實際操作')
@@ -42,16 +46,20 @@ class Command(BaseCommand):
         try:
             if workorder_id:
                 # 檢查特定工單
+                logger.info(f'檢查特定工單 ID: {workorder_id}')
                 self._check_specific_workorder(workorder_id, dry_run)
             else:
                 # 檢查所有生產中工單
+                logger.info('檢查所有生產中工單')
                 self._check_all_production_workorders(dry_run)
                 
         except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f'執行過程中發生錯誤: {str(e)}')
-            )
+            error_msg = f'執行過程中發生錯誤: {str(e)}'
+            self.stdout.write(self.style.ERROR(error_msg))
             logger.error(f'完工判斷轉寫命令執行錯誤: {str(e)}')
+            raise
+        finally:
+            logger.info('完工判斷轉寫命令執行完成')
     
     def _check_specific_workorder(self, workorder_id, dry_run):
         """
@@ -112,7 +120,13 @@ class Command(BaseCommand):
         ).distinct()
         all_workorders = WorkOrder.objects.filter(id__in=production_workorders)
         
+        logger.info(f'找到 {all_workorders.count()} 個需要檢查的工單')
         self.stdout.write(f'找到 {all_workorders.count()} 個工單')
+        
+        if all_workorders.count() == 0:
+            logger.info('沒有找到需要檢查的工單，執行完成')
+            self.stdout.write(self.style.WARNING('沒有找到需要檢查的工單'))
+            return
         
         completed_count = 0
         error_count = 0
@@ -154,6 +168,8 @@ class Command(BaseCommand):
                 )
         
         # 輸出統計結果
+        logger.info(f'完工判斷轉寫結果統計 - 總檢查工單數: {all_workorders.count()}, 成功轉寫數: {completed_count}, 錯誤數: {error_count}')
+        
         self.stdout.write('')
         self.stdout.write('=' * 50)
         self.stdout.write('完工判斷轉寫結果統計:')
@@ -189,7 +205,7 @@ class Command(BaseCommand):
             )['total'] or 0
             
             # 記錄日誌
-            logger.debug(f"工單 {workorder.order_number} 出貨包裝合格品累積數量: {total_quantity}")
+            logger.info(f"工單 {workorder.order_number} 出貨包裝合格品累積數量: {total_quantity}")
             
             return total_quantity
             
@@ -212,6 +228,7 @@ class Command(BaseCommand):
         Returns:
             bool: 是否成功轉寫
         """
+        logger.info(f"開始轉寫工單 {workorder.order_number} 到已完工資料表")
         try:
             with transaction.atomic():
                 # 檢查是否已經轉寫過，如果已轉寫則刪除舊記錄重新轉寫

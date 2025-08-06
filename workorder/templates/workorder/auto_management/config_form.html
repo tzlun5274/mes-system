@@ -1,0 +1,252 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if form.instance.pk %}編輯{% else %}新增{% endif %}自動管理功能設定
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    .form-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px 15px 0 0;
+        padding: 1.5rem;
+    }
+    
+    .form-body {
+        padding: 2rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    
+    .form-check-input:checked {
+        background-color: #667eea;
+        border-color: #667eea;
+    }
+    
+    .help-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    
+    .btn-custom {
+        border-radius: 25px;
+        padding: 0.5rem 2rem;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card form-card">
+                <div class="form-header">
+                    <h3 class="mb-0">
+                        <i class="fas fa-cogs"></i>
+                        {% if form.instance.pk %}
+                            編輯自動管理功能設定
+                        {% else %}
+                            新增自動管理功能設定
+                        {% endif %}
+                    </h3>
+                </div>
+                
+                <div class="form-body">
+                    <form method="post" id="autoManagementForm">
+                        {% csrf_token %}
+                        
+                        <!-- 功能類型 -->
+                        <div class="form-group">
+                            <label for="{{ form.function_type.id_for_label }}" class="form-label">
+                                <i class="fas fa-list"></i> {{ form.function_type.label }}
+                            </label>
+                            {{ form.function_type }}
+                            {% if form.function_type.help_text %}
+                                <div class="help-text">{{ form.function_type.help_text }}</div>
+                            {% endif %}
+                            {% if form.function_type.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.function_type.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 是否啟用 -->
+                        <div class="form-group">
+                            <div class="form-check">
+                                {{ form.is_enabled }}
+                                <label class="form-check-label" for="{{ form.is_enabled.id_for_label }}">
+                                    <i class="fas fa-toggle-on"></i> {{ form.is_enabled.label }}
+                                </label>
+                                {% if form.is_enabled.help_text %}
+                                    <div class="help-text">{{ form.is_enabled.help_text }}</div>
+                                {% endif %}
+                            </div>
+                            {% if form.is_enabled.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.is_enabled.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 執行間隔 -->
+                        <div class="form-group">
+                            <label for="{{ form.interval_minutes.id_for_label }}" class="form-label">
+                                <i class="fas fa-clock"></i> {{ form.interval_minutes.label }}
+                            </label>
+                            <div class="input-group">
+                                {{ form.interval_minutes }}
+                                <span class="input-group-text">分鐘</span>
+                            </div>
+                            {% if form.interval_minutes.help_text %}
+                                <div class="help-text">{{ form.interval_minutes.help_text }}</div>
+                            {% endif %}
+                            {% if form.interval_minutes.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.interval_minutes.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- 按鈕區域 -->
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <a href="{% url 'workorder:auto_management_config_list' %}" class="btn btn-secondary btn-custom">
+                                <i class="fas fa-arrow-left"></i> 返回列表
+                            </a>
+                            
+                            <div>
+                                <button type="submit" class="btn btn-primary btn-custom">
+                                    <i class="fas fa-save"></i>
+                                    {% if form.instance.pk %}
+                                        更新設定
+                                    {% else %}
+                                        建立設定
+                                    {% endif %}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- 功能說明卡片 -->
+            <div class="card mt-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle"></i> 功能說明
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-check-double text-success"></i> 完工判斷轉寫已完工</h6>
+                            <p class="small text-muted">
+                                自動檢查生產中工單的出貨包裝工序累積數量，達到生產數量時自動轉寫到已完工資料表。
+                            </p>
+                        </div>
+
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-stamp text-warning"></i> 自動核准</h6>
+                            <p class="small text-muted">
+                                根據設定的規則自動核准符合條件的報工記錄，減少人工審核工作量。
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-bell text-primary"></i> 自動通知</h6>
+                            <p class="small text-muted">
+                                在特定事件發生時自動發送通知，如工單完工、異常報工等。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 表單驗證
+    $('#autoManagementForm').submit(function(e) {
+        const intervalMinutes = $('#id_interval_minutes').val();
+        
+        if (intervalMinutes < 1) {
+            e.preventDefault();
+            showAlert('error', '執行間隔不能少於1分鐘');
+            return false;
+        }
+        
+        if (intervalMinutes > 1440) {
+            e.preventDefault();
+            showAlert('error', '執行間隔不能超過1440分鐘（24小時）');
+            return false;
+        }
+    });
+    
+    // 顯示提示訊息
+    function showAlert(type, message) {
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        const alertHtml = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        $('.container-fluid').prepend(alertHtml);
+        
+        // 自動隱藏
+        setTimeout(function() {
+            $('.alert').fadeOut();
+        }, 5000);
+    }
+    
+    // 即時驗證執行間隔
+    $('#id_interval_minutes').on('input', function() {
+        const value = parseInt($(this).val());
+        const feedback = $(this).siblings('.invalid-feedback');
+        
+        if (value < 1) {
+            $(this).addClass('is-invalid');
+            feedback.text('執行間隔不能少於1分鐘').show();
+        } else if (value > 1440) {
+            $(this).addClass('is-invalid');
+            feedback.text('執行間隔不能超過1440分鐘（24小時）').show();
+        } else {
+            $(this).removeClass('is-invalid');
+            feedback.hide();
+        }
+    });
+});
+</script>
+{% endblock %} 

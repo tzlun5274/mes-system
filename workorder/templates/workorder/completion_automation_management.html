@@ -1,0 +1,608 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}完工自動化管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    .management-section {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+        transition: transform 0.2s;
+    }
+    
+    .management-section:hover {
+        transform: translateY(-2px);
+    }
+    
+    .section-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 10px 10px 0 0;
+        font-weight: bold;
+    }
+    
+    .section-body {
+        padding: 1.5rem;
+    }
+    
+    .status-badge {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .stats-card.success {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    
+    .stats-card.warning {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .function-card {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background: #f8f9fa;
+    }
+    
+    .function-card.enabled {
+        border-left: 4px solid #28a745;
+        background: #d4edda;
+    }
+    
+    .function-card.disabled {
+        border-left: 4px solid #dc3545;
+        background: #f8d7da;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .nav-tabs .nav-link {
+        border: none;
+        border-radius: 0;
+        color: #6c757d;
+    }
+    
+    .nav-tabs .nav-link.active {
+        background-color: #007bff;
+        color: white;
+        border: none;
+    }
+    
+    .tab-content {
+        padding: 1.5rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-robot"></i> 完工自動化管理
+                </h2>
+                                        <a href="{% url 'workorder:supervisor_functions' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> 返回主管功能
+                        </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 導航標籤 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <ul class="nav nav-tabs" id="automationTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="allocation-tab" data-bs-toggle="tab" data-bs-target="#allocation" type="button" role="tab">
+                        <i class="fas fa-cog"></i> 分配設定
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="functions-tab" data-bs-toggle="tab" data-bs-target="#functions" type="button" role="tab">
+                        <i class="fas fa-cogs"></i> 功能管理
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 標籤內容 -->
+    <div class="tab-content" id="automationTabsContent">
+        <!-- 分配設定標籤 -->
+        <div class="tab-pane fade show active" id="allocation" role="tabpanel">
+            <div class="management-section">
+                <div class="section-header">
+                    <i class="fas fa-cog"></i> 智能分配設定
+                </div>
+                <div class="section-body">
+                    <!-- 分配統計 -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="stats-card">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h4 class="mb-0" id="allocationStatus">檢查中...</h4>
+                                        <p class="mb-0">執行狀態</p>
+                                    </div>
+                                    <i class="fas fa-robot fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stats-card success">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h4 class="mb-0" id="successCount">--</h4>
+                                        <p class="mb-0">成功次數</p>
+                                    </div>
+                                    <i class="fas fa-check-circle fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stats-card warning">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h4 class="mb-0" id="failureCount">--</h4>
+                                        <p class="mb-0">失敗次數</p>
+                                    </div>
+                                    <i class="fas fa-exclamation-triangle fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stats-card">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h4 class="mb-0" id="todayExecutions">--</h4>
+                                        <p class="mb-0">今日執行</p>
+                                    </div>
+                                    <i class="fas fa-calendar-day fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 分配設定表單 -->
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0"><i class="fas fa-cog"></i> 自動執行設定</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form id="autoAllocationForm">
+                                        <div class="form-group mb-3">
+                                            <label for="executionEnabled">
+                                                <input type="checkbox" id="executionEnabled" name="executionEnabled">
+                                                啟用完工自動化分配
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="form-group mb-3">
+                                            <label for="executionInterval">執行頻率（分鐘）</label>
+                                            <select class="form-control" id="executionInterval" name="executionInterval">
+                                                <option value="5">5 分鐘</option>
+                                                <option value="10">10 分鐘</option>
+                                                <option value="15">15 分鐘</option>
+                                                <option value="30">30 分鐘</option>
+                                                <option value="60">1 小時</option>
+                                                <option value="120">2 小時</option>
+                                                <option value="240">4 小時</option>
+                                                <option value="480">8 小時</option>
+                                                <option value="1440">24 小時</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="form-group mb-3">
+                                            <label for="executionTime">執行時間範圍</label>
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <label>開始時間</label>
+                                                    <input type="time" class="form-control" id="startTime" name="startTime" value="08:00">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label>結束時間</label>
+                                                    <input type="time" class="form-control" id="endTime" name="endTime" value="18:00">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="form-group mb-3">
+                                            <label for="maxExecutionTime">最大執行時間（分鐘）</label>
+                                            <input type="number" class="form-control" id="maxExecutionTime" name="maxExecutionTime" value="30" min="1" max="120">
+                                        </div>
+                                        
+                                        <div class="form-group mb-3">
+                                            <label for="notificationEnabled">
+                                                <input type="checkbox" id="notificationEnabled" name="notificationEnabled">
+                                                啟用執行通知
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-primary" onclick="saveAutoAllocationSettings()">
+                                                <i class="fas fa-save"></i> 儲存設定
+                                            </button>
+                                            <button type="button" class="btn btn-success" onclick="startManualExecution()">
+                                                <i class="fas fa-play"></i> 立即執行
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> 執行資訊</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>執行狀態：</strong><span id="executionStatus" class="badge badge-secondary">檢查中...</span></p>
+                                    <p><strong>執行頻率：</strong><span id="executionIntervalDisplay">--</span></p>
+                                    <p><strong>最後執行：</strong><span id="lastExecution">--</span></p>
+                                    <p><strong>下次執行：</strong><span id="nextExecution">--</span></p>
+                                    <p><strong>平均執行時間：</strong><span id="avgExecutionTime">--</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 功能管理標籤 -->
+        <div class="tab-pane fade" id="functions" role="tabpanel">
+            <div class="management-section">
+                <div class="section-header">
+                    <i class="fas fa-cogs"></i> 自動化功能管理
+                </div>
+                <div class="section-body">
+                    <!-- 功能統計 -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="stats-card">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h4 class="mb-0">{{ total_configs|default:0 }}</h4>
+                                        <p class="mb-0">總功能數</p>
+                                    </div>
+                                    <i class="fas fa-list fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stats-card success">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h4 class="mb-0">{{ enabled_configs|default:0 }}</h4>
+                                        <p class="mb-0">已啟用</p>
+                                    </div>
+                                    <i class="fas fa-check-circle fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stats-card warning">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h4 class="mb-0">{{ disabled_configs|default:0 }}</h4>
+                                        <p class="mb-0">已停用</p>
+                                    </div>
+                                    <i class="fas fa-pause-circle fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 新增功能按鈕 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <a href="{% url 'workorder:auto_management_config_create' %}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> 新增自動化功能
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- 功能列表 -->
+                    <div class="row">
+                        <div class="col-12">
+                            {% if configs %}
+                                {% for config in configs %}
+                                <div class="function-card {% if config.is_enabled %}enabled{% else %}disabled{% endif %}">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-3">
+                                            <h6 class="mb-1">{{ config.get_function_type_display }}</h6>
+                                            <span class="badge {% if config.is_enabled %}bg-success{% else %}bg-danger{% endif %}">
+                                                {% if config.is_enabled %}已啟用{% else %}已停用{% endif %}
+                                            </span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <small class="text-muted">執行間隔</small><br>
+                                            <strong>{{ config.interval_minutes }} 分鐘</strong>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <small class="text-muted">執行次數</small><br>
+                                            <strong>{{ config.execution_count }}</strong>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <small class="text-muted">最後執行</small><br>
+                                            <strong>{{ config.last_execution|default:"--" }}</strong>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="action-buttons">
+                                                <button class="btn btn-sm btn-primary" onclick="executeFunction('{{ config.function_type }}')">
+                                                    <i class="fas fa-play"></i> 執行
+                                                </button>
+                                                <button class="btn btn-sm {% if config.is_enabled %}btn-warning{% else %}btn-success{% endif %}" 
+                                                        onclick="toggleFunction('{{ config.function_type }}')">
+                                                    <i class="fas {% if config.is_enabled %}fa-pause{% else %}fa-play{% endif %}"></i>
+                                                    {% if config.is_enabled %}停用{% else %}啟用{% endif %}
+                                                </button>
+                                                <a href="{% url 'workorder:auto_management_config_update' config.pk %}" class="btn btn-sm btn-info">
+                                                    <i class="fas fa-edit"></i> 編輯
+                                                </a>
+                                                <a href="{% url 'workorder:auto_management_config_delete' config.pk %}" class="btn btn-sm btn-danger">
+                                                    <i class="fas fa-trash"></i> 刪除
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="text-center py-5">
+                                    <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
+                                    <h4 class="text-muted">尚無自動化功能設定</h4>
+                                    <p class="text-muted">點擊上方「新增自動化功能」按鈕來建立第一個自動化功能</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 載入中遮罩 -->
+<div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-none" style="z-index: 9999;">
+    <div class="position-absolute top-50 start-50 translate-middle text-center text-white">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">載入中...</span>
+        </div>
+        <div class="mt-2">處理中，請稍候...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 頁面載入時初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        loadAutoAllocationStatus();
+    });
+
+    // 載入自動分配狀態
+    function loadAutoAllocationStatus() {
+        showLoading();
+        fetch('{% url "workorder:auto_allocation_status" %}')
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                updateAllocationStatusDisplay(data);
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('載入狀態失敗:', error);
+                alert('載入狀態失敗，請稍後再試');
+            });
+    }
+
+    // 更新分配狀態顯示
+    function updateAllocationStatusDisplay(data) {
+        // 更新執行狀態
+        const statusElement = document.getElementById('allocationStatus');
+        const executionStatusElement = document.getElementById('executionStatus');
+        
+        if (data.is_running) {
+            statusElement.textContent = '執行中';
+            statusElement.className = 'badge badge-success';
+            executionStatusElement.textContent = '執行中';
+            executionStatusElement.className = 'badge badge-success';
+        } else {
+            statusElement.textContent = '已停止';
+            statusElement.className = 'badge badge-secondary';
+            executionStatusElement.textContent = '已停止';
+            executionStatusElement.className = 'badge badge-secondary';
+        }
+        
+        // 更新統計資訊
+        document.getElementById('successCount').textContent = data.success_count || '0';
+        document.getElementById('failureCount').textContent = data.failure_count || '0';
+        document.getElementById('todayExecutions').textContent = data.today_executions || '0';
+        document.getElementById('executionIntervalDisplay').textContent = (data.interval_minutes || '--') + ' 分鐘';
+        document.getElementById('lastExecution').textContent = data.last_execution || '--';
+        document.getElementById('nextExecution').textContent = data.next_execution || '--';
+        document.getElementById('avgExecutionTime').textContent = data.avg_execution_time || '--';
+        
+        // 更新表單設定
+        document.getElementById('executionEnabled').checked = data.enabled;
+        document.getElementById('executionInterval').value = data.interval_minutes;
+        document.getElementById('startTime').value = data.start_time;
+        document.getElementById('endTime').value = data.end_time;
+        document.getElementById('maxExecutionTime').value = data.max_execution_time;
+        document.getElementById('notificationEnabled').checked = data.notification_enabled;
+    }
+
+    // 儲存自動分配設定
+    function saveAutoAllocationSettings() {
+        // 驗證表單數據
+        const form = document.getElementById('autoAllocationForm');
+        const intervalSelect = document.getElementById('executionInterval');
+        const maxTimeInput = document.getElementById('maxExecutionTime');
+        
+        // 確保數字欄位有有效值
+        if (!intervalSelect.value || intervalSelect.value.trim() === '') {
+            alert('請選擇執行頻率');
+            return;
+        }
+        
+        if (!maxTimeInput.value || maxTimeInput.value.trim() === '') {
+            alert('請輸入最大執行時間');
+            return;
+        }
+        
+        const maxTime = parseInt(maxTimeInput.value);
+        if (isNaN(maxTime) || maxTime < 1 || maxTime > 120) {
+            alert('最大執行時間必須在1-120分鐘之間');
+            return;
+        }
+        
+        const formData = new FormData(form);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        showLoading();
+        fetch('{% url "workorder:auto_allocation_settings" %}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                alert('設定儲存成功！');
+                loadAutoAllocationStatus();
+            } else {
+                alert('設定儲存失敗：' + data.message);
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            console.error('儲存設定失敗:', error);
+            alert('儲存設定失敗，請稍後再試');
+        });
+    }
+
+    // 立即執行自動分配
+    function startManualExecution() {
+        if (confirm('確定要立即執行完工自動化分配嗎？')) {
+            showLoading();
+            fetch('{% url "workorder:auto_allocation_execute" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    alert('執行成功！');
+                    loadAutoAllocationStatus();
+                } else {
+                    alert('執行失敗：' + data.message);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('執行失敗:', error);
+                alert('執行失敗，請稍後再試');
+            });
+        }
+    }
+
+    // 執行自動化功能
+    function executeFunction(functionType) {
+        if (confirm('確定要立即執行此功能嗎？')) {
+            showLoading();
+            fetch(`/workorder/auto-management/execute/${functionType}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    alert('功能執行成功！');
+                    location.reload();
+                } else {
+                    alert('功能執行失敗：' + data.message);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('執行失敗:', error);
+                alert('執行失敗，請稍後再試');
+            });
+        }
+    }
+
+    // 切換功能啟用狀態
+    function toggleFunction(functionType) {
+        showLoading();
+        fetch(`/workorder/auto-management/toggle/${functionType}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('操作失敗：' + data.message);
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            console.error('操作失敗:', error);
+            alert('操作失敗，請稍後再試');
+        });
+    }
+
+    // 顯示載入遮罩
+    function showLoading() {
+        document.getElementById('loadingOverlay').classList.remove('d-none');
+    }
+
+    // 隱藏載入遮罩
+    function hideLoading() {
+        document.getElementById('loadingOverlay').classList.add('d-none');
+    }
+</script>
+{% endblock %} 
