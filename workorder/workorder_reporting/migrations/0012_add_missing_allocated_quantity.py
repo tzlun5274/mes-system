@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
     dependencies = [
         (
             "workorder_reporting",
-            "0011_remove_report_type_field",
+            "0008_operatorsupplementreport_company_code",
         ),
     ]
 

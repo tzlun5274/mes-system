@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("workorder_reporting", "0007_smtproductionreport_process_and_more"),
+        ("workorder_reporting", "0004_operatorsupplementreport_allocation_check_result_and_more"),
     ]
 
     operations = [

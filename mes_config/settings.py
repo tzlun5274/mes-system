@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "ai.apps.AiConfig",
     "production",
     "reporting",
+    "unified_work_reporting",
     "django.contrib.humanize",
 ]
 
