@@ -932,9 +932,17 @@ def smt_report_import_file(request):
                 #     continue
                 
                 # 14. 建立SMT報工記錄
+                # 使用SMT作業員服務自動設定作業員名稱
+                from workorder.services.smt_operator_service import SMTOperatorService
+                
+                # 自動設定設備作業員名稱
+                equipment_operator_name = SMTOperatorService.get_smt_equipment_operator_name(equipment.name)
+                
                 # 直接使用匯入的工單號碼，不進行工單查找
                 report_data = {
                     'equipment': equipment,
+                    'operator': equipment_operator_name,  # 設定作業員名稱
+                    'equipment_operator_name': equipment_operator_name,  # 設定設備作業員名稱
                     'company_code': company_code,  # 加入公司代號
                     'product_id': product_code,  # 直接使用匯入的產品編號
                     'process': process,  # 使用工序 ID

@@ -112,6 +112,7 @@
                         <div class="col-md-6">
                             {% if report_type == 'SMT報工' %}
                                 <p><strong>設備:</strong> {{ report.equipment.name|default:"-" }}</p>
+                                <p><strong>作業員:</strong> {{ report.get_operator_display_name|default:"-" }}</p>
                                 <p><strong>工序:</strong> {{ report.operation|default:"-" }}</p>
                             {% else %}
                                 <p><strong>作業員:</strong> {{ report.operator.name|default:"-" }}</p>

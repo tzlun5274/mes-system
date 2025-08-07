@@ -4182,12 +4182,15 @@ def submit_smt_report(request):
                 'message': '找不到指定的工序'
             })
         
-        report = SMTProductionReport.objects.create(
+        # 使用SMT作業員服務建立報工記錄
+        from .services.smt_operator_service import SMTOperatorService
+        
+        report = SMTOperatorService.create_smt_report_with_operator_name(
+            equipment=equipment,
             product_id=workorder.product_code,
             workorder=workorder,
             planned_quantity=workorder.quantity,
             operation=process_name,
-            equipment=equipment,
             work_date=timezone.now().date(),
             start_time=timezone.now().time(),
             end_time=timezone.now().time(),
@@ -5283,9 +5286,19 @@ def smt_supplement_batch_create(request):
                         errors.append(f'缺少必要欄位：{field}')
                         continue
                 
+                # 使用SMT作業員服務自動設定作業員名稱
+                from workorder.services.smt_operator_service import SMTOperatorService
+                from equip.models import Equipment
+                
+                # 取得設備並設定作業員名稱
+                equipment = Equipment.objects.get(id=report_data['equipment_id'])
+                equipment_operator_name = SMTOperatorService.get_smt_equipment_operator_name(equipment.name)
+                
                 # 建立報工記錄
                 report = SMTProductionReport.objects.create(
-                    equipment_id=report_data['equipment_id'],
+                    equipment=equipment,
+                    operator=equipment_operator_name,  # 設定作業員名稱
+                    equipment_operator_name=equipment_operator_name,  # 設定設備作業員名稱
                     workorder_id=report_data['workorder_id'],
                     product_id=report_data['product_id'],
                     work_quantity=report_data['work_quantity'],

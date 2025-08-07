@@ -148,6 +148,53 @@ class SMTProductionReport(models.Model):
         help_text="記錄生產過程中的異常情況，如設備故障、品質問題等",
     )
 
+    # 休息時間相關欄位（SMT設備通常不需要休息，但保留用於相容性）
+    has_break = models.BooleanField(
+        default=False,
+        verbose_name="是否有休息時間",
+        help_text="SMT設備通常不需要休息時間，此欄位保留用於相容性",
+    )
+
+    break_start_time = models.TimeField(
+        blank=True,
+        null=True,
+        verbose_name="休息開始時間",
+        help_text="SMT設備通常不需要休息時間，此欄位保留用於相容性",
+    )
+
+    break_end_time = models.TimeField(
+        blank=True,
+        null=True,
+        verbose_name="休息結束時間",
+        help_text="SMT設備通常不需要休息時間，此欄位保留用於相容性",
+    )
+
+    break_hours = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=0,
+        verbose_name="休息時數",
+        help_text="SMT設備通常不需要休息時間，此欄位保留用於相容性",
+    )
+
+    # 作業員欄位（SMT設備通常不需要作業員，但保留用於相容性）
+    operator = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="作業員",
+        help_text="SMT設備報工時，此欄位會自動填入設備名稱作為作業員名稱",
+    )
+
+    # 新增：設備作業員名稱（用於報表顯示）
+    equipment_operator_name = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="設備作業員名稱",
+        help_text="SMT設備的作業員名稱，通常與設備名稱相同",
+    )
+
     # 報工類型欄位已移除，所有SMT報工都視為正常工作
 
     # 核准相關欄位
@@ -374,9 +421,34 @@ class SMTProductionReport(models.Model):
 
     def save(self, *args, **kwargs):
         """儲存時自動計算工作時數和加班時數"""
+        # 確保 planned_quantity 有預設值
+        if self.planned_quantity is None:
+            self.planned_quantity = 0
+        
         # 自動計算工作時數和加班時數
         self.calculate_work_hours()
-        super().save(*args, **kwargs) 
+        super().save(*args, **kwargs)
+
+    def get_operator_display_name(self):
+        """取得作業員顯示名稱"""
+        if self.equipment_operator_name:
+            # 如果設備作業員名稱已經包含(SMT設備)，就直接返回
+            if '(SMT設備)' in self.equipment_operator_name:
+                return self.equipment_operator_name
+            else:
+                return f"{self.equipment_operator_name} (SMT設備)"
+        elif self.operator:
+            # 如果作業員名稱已經包含(SMT設備)，就直接返回
+            if '(SMT設備)' in self.operator:
+                return self.operator
+            else:
+                return self.operator
+        else:
+            return "未指定"
+
+    def is_smt_equipment_report(self):
+        """判斷是否為SMT設備報工"""
+        return bool(self.equipment and self.equipment.name and 'SMT' in self.equipment.name)
 
 
 class OperatorSupplementReport(models.Model):

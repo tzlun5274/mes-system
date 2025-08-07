@@ -463,10 +463,14 @@ class SMTSupplementReportForm(ProductionReportBaseForm):
 
         # 設定設備查詢集 - 根據設備名稱過濾SMT設備
         from equip.models import Equipment
+        from workorder.services.smt_operator_service import SMTOperatorService
 
-        self.fields["equipment"].queryset = Equipment.objects.filter(
+        smt_equipment = Equipment.objects.filter(
             name__icontains="SMT"
         ).order_by("name")
+        
+        # 設定 equipment 的 queryset，而不是 choices
+        self.fields["equipment"].queryset = smt_equipment
 
         # 設定工單查詢集（直接從工單表取得）
         from .models import WorkOrder

@@ -79,9 +79,15 @@ class ReportingViewsTestCase(TestCase):
         )
         
         # 創建待核准的SMT報工記錄
+        from workorder.services.smt_operator_service import SMTOperatorService
+        
+        equipment_operator_name = SMTOperatorService.get_smt_equipment_operator_name(self.equipment.name)
+        
         self.smt_report = SMTProductionReport.objects.create(
             workorder=self.workorder,
             equipment=self.equipment,
+            operator=equipment_operator_name,  # 設定作業員名稱
+            equipment_operator_name=equipment_operator_name,  # 設定設備作業員名稱
             operation='SMT測試工序',
             work_date=date.today(),
             start_time=time(8, 0),
