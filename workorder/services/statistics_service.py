@@ -5,7 +5,7 @@
 
 from datetime import date, timedelta
 from django.db.models import Q, Count
-from workorder.models import OperatorSupplementReport, SMTProductionReport
+from workorder.models import OperatorSupplementReport, SMTSupplementReport
 
 
 class StatisticsService:
@@ -78,13 +78,13 @@ class StatisticsService:
         month_start_datetime = timezone.make_aware(datetime.combine(month_start, datetime.min.time()))
         
         return {
-            'today': SMTProductionReport.objects.filter(created_at__range=(today_start, today_end)).count(),
-            'month': SMTProductionReport.objects.filter(created_at__gte=month_start_datetime).count(),
-            'pending': SMTProductionReport.objects.filter(approval_status='pending').count(),
-            'abnormal': SMTProductionReport.objects.filter(
+            'today': SMTSupplementReport.objects.filter(created_at__range=(today_start, today_end)).count(),
+            'month': SMTSupplementReport.objects.filter(created_at__gte=month_start_datetime).count(),
+            'pending': SMTSupplementReport.objects.filter(approval_status='pending').count(),
+            'abnormal': SMTSupplementReport.objects.filter(
                 Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
             ).count(),
-            'approved': SMTProductionReport.objects.filter(approval_status='approved').count(),
+            'approved': SMTSupplementReport.objects.filter(approval_status='approved').count(),
         }
     
     @staticmethod

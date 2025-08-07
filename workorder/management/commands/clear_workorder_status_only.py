@@ -5,7 +5,7 @@
 import logging
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
 
 # 移除主管報工相關程式碼，避免混淆
 # 主管職責：監督、審核、管理，不代為報工
@@ -39,7 +39,7 @@ class Command(BaseCommand):
 
         # 統計報工記錄數量
         operator_reports = OperatorSupplementReport.objects.count()
-        smt_reports = SMTProductionReport.objects.count()
+        smt_reports = SMTSupplementReport.objects.count()
         
         # 移除主管報工相關程式碼，避免混淆
         # 主管職責：監督、審核、管理，不代為報工
@@ -100,7 +100,7 @@ class Command(BaseCommand):
 
                 # 確認報工記錄被保留
                 remaining_operator = OperatorSupplementReport.objects.count()
-                remaining_smt = SMTProductionReport.objects.count()
+                remaining_smt = SMTSupplementReport.objects.count()
                 
                 self.stdout.write(self.style.SUCCESS('=== 確認報工記錄被保留 ==='))
                 self.stdout.write(f'作業員報工記錄: {remaining_operator} 筆')

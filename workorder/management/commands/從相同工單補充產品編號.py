@@ -5,7 +5,7 @@
 """
 
 from django.core.management.base import BaseCommand
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
 from workorder.models import WorkOrder
 from django.db import transaction, models
 
@@ -104,7 +104,7 @@ class Command(BaseCommand):
         self.stdout.write('處理SMT記錄...')
         
         # 找出產品編號為空的記錄
-        empty_reports = SMTProductionReport.objects.filter(
+        empty_reports = SMTSupplementReport.objects.filter(
             models.Q(product_id='') | 
             models.Q(product_id__isnull=True) |
             models.Q(product_id='nan')
@@ -118,7 +118,7 @@ class Command(BaseCommand):
                 # 方法1: 從相同公司代號和工單號的其他記錄中找到產品編號
                 if report.company_code and report.original_workorder_number:
                     # 查找相同公司代號和工單號的其他記錄
-                    same_company_workorder_reports = SMTProductionReport.objects.filter(
+                    same_company_workorder_reports = SMTSupplementReport.objects.filter(
                         company_code=report.company_code,
                         original_workorder_number=report.original_workorder_number
                     ).exclude(

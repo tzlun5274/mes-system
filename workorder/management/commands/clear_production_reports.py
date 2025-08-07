@@ -5,7 +5,7 @@
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Count
-from workorder.models import OperatorSupplementReport, SMTProductionReport
+from workorder.models import OperatorSupplementReport, SMTSupplementReport
 import logging
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class Command(BaseCommand):
         try:
             # 統計報工紀錄
             operator_reports_count = OperatorSupplementReport.objects.count()
-                    smt_supplement_count = SMTProductionReport.objects.count()
+                    smt_supplement_count = SMTSupplementReport.objects.count()
         smt_on_site_count = 0  # 已移除 report_type 欄位
             
             total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
@@ -58,7 +58,7 @@ class Command(BaseCommand):
                 # SMT報工詳細統計
                 if smt_supplement_count > 0 or smt_on_site_count > 0:
                     self.stdout.write(f"\n🔧 SMT報工詳細：")
-                    smt_stats = SMTProductionReport.objects.values('equipment__name').annotate(
+                    smt_stats = SMTSupplementReport.objects.values('equipment__name').annotate(
                         count=Count('id')
                     ).order_by('-count')[:10]
                     

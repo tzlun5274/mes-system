@@ -9,7 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.db.models import Sum, Count, Q
 from workorder.models import WorkOrder, WorkOrderProcess, WorkOrderProduction, WorkOrderProductionDetail
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
 
 # 移除主管報工引用，避免混淆
 # 主管職責：監督、審核、管理，不代為報工
@@ -97,7 +97,7 @@ class WorkOrderCompletionService:
             approval_status='approved'
         )
         
-        smt_reports = SMTProductionReport.objects.filter(
+        smt_reports = SMTSupplementReport.objects.filter(
             workorder=workorder,
             approval_status='approved'
         )
@@ -187,7 +187,7 @@ class WorkOrderCompletionService:
             approval_status='approved'
         )
         
-        smt_reports = SMTProductionReport.objects.filter(
+        smt_reports = SMTSupplementReport.objects.filter(
             workorder=process.workorder,
             operation=process.process_name,
             approval_status='approved'
@@ -266,7 +266,7 @@ class WorkOrderCompletionService:
             )
         
         # 轉移SMT報工記錄
-        for report in SMTProductionReport.objects.filter(
+        for report in SMTSupplementReport.objects.filter(
             workorder=workorder,
             approval_status='approved'
         ):

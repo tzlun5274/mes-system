@@ -418,7 +418,7 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name="SMTProductionReport",
+            name="SMTSupplementReport",
             fields=[
                 (
                     "id",

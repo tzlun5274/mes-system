@@ -4,7 +4,7 @@
 """
 
 from django.core.management.base import BaseCommand
-from workorder.workorder_reporting.models import SMTProductionReport
+from workorder.workorder_reporting.models import SMTSupplementReport
 from workorder.services.smt_operator_service import SMTOperatorService
 
 
@@ -26,7 +26,7 @@ class Command(BaseCommand):
         )
         
         # 取得所有SMT報工記錄
-        smt_reports = SMTProductionReport.objects.filter(
+        smt_reports = SMTSupplementReport.objects.filter(
             equipment__name__icontains='SMT'
         ).select_related('equipment')
         

@@ -6,7 +6,7 @@
 from django.core.management.base import BaseCommand
 from workorder.services import ProductionReportSyncService
 from workorder.models import WorkOrderProduction, WorkOrderProductionDetail
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
 import logging
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,7 @@ class Command(BaseCommand):
                 
                 # 檢查報工記錄數量
                 operator_count = OperatorSupplementReport.objects.filter(approval_status='approved').count()
-                smt_count = SMTProductionReport.objects.filter(approval_status='approved').count()
+                smt_count = SMTSupplementReport.objects.filter(approval_status='approved').count()
                 total_reports = operator_count + smt_count
                 
                 self.stdout.write(f'找到 {operator_count} 筆已核准作業員報工記錄')
@@ -126,7 +126,7 @@ class Command(BaseCommand):
         """顯示統計資訊"""
         try:
             operator_count = OperatorSupplementReport.objects.filter(approval_status='approved').count()
-            smt_count = SMTProductionReport.objects.filter(approval_status='approved').count()
+            smt_count = SMTSupplementReport.objects.filter(approval_status='approved').count()
             production_count = WorkOrderProduction.objects.count()
             detail_count = WorkOrderProductionDetail.objects.count()
             
@@ -167,7 +167,7 @@ class Command(BaseCommand):
         try:
             # 檢查是否有報工記錄但沒有對應的明細記錄
             operator_reports = OperatorSupplementReport.objects.filter(approval_status='approved')
-            smt_reports = SMTProductionReport.objects.filter(approval_status='approved')
+            smt_reports = SMTSupplementReport.objects.filter(approval_status='approved')
             
             missing_details = []
             

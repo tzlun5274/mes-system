@@ -17,7 +17,7 @@ import logging
 # 導入工單模組的模型
 from workorder.models import (
     OperatorSupplementReport, 
-    SMTProductionReport, 
+    SMTSupplementReport, 
     WorkOrder,
     WorkOrderProcess
 )
@@ -62,7 +62,7 @@ def get_supervisor_statistics():
     # 資料維護統計
     data_stats = {
         'total_operator_reports': OperatorSupplementReport.objects.count(),
-        'total_smt_reports': SMTProductionReport.objects.count(),
+        'total_smt_reports': SMTSupplementReport.objects.count(),
         'total_supplement_reports': 0,  # 補登報工記錄數量
         'old_reports_30d': OperatorSupplementReport.objects.filter(work_date__lt=today - timedelta(days=30)).count(),
         'old_reports_90d': OperatorSupplementReport.objects.filter(work_date__lt=today - timedelta(days=90)).count(),
@@ -146,7 +146,7 @@ def supervisor_functions(request):
         })
     
     # SMT異常記錄 (SMT Abnormal Records)
-    smt_abnormal_records = SMTProductionReport.objects.select_related(
+    smt_abnormal_records = SMTSupplementReport.objects.select_related(
         'workorder'
     ).filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
@@ -209,7 +209,7 @@ def supervisor_report_index(request):
         })
     
     # 最近已審核的SMT報工
-    recent_approved_smt = SMTProductionReport.objects.filter(
+    recent_approved_smt = SMTSupplementReport.objects.filter(
         approval_status='approved'
     ).select_related('workorder').order_by('-approved_at')[:5]
     
@@ -302,10 +302,10 @@ def report_detail(request, report_id):
     except OperatorSupplementReport.DoesNotExist:
         # 嘗試從SMT報工中查找
         try:
-            from workorder.workorder_reporting.models import SMTProductionReport
-            report = SMTProductionReport.objects.get(id=report_id)
+            from workorder.workorder_reporting.models import SMTSupplementReport
+            report = SMTSupplementReport.objects.get(id=report_id)
             report_type = 'SMT報工'
-        except SMTProductionReport.DoesNotExist:
+        except SMTSupplementReport.DoesNotExist:
             # 移除主管報工查找 - 主管不應該有報工記錄
             raise Http404("報工記錄不存在")
     
@@ -381,8 +381,8 @@ def approve_smt_report(request, report_id):
     處理SMT報工記錄的核准操作
     """
     if request.method == 'POST':
-        from workorder.workorder_reporting.models import SMTProductionReport
-        report = get_object_or_404(SMTProductionReport, id=report_id)
+        from workorder.workorder_reporting.models import SMTSupplementReport
+        report = get_object_or_404(SMTSupplementReport, id=report_id)
         report.approval_status = 'approved'
         report.approved_by = request.user.username
         report.approved_at = timezone.now()
@@ -412,8 +412,8 @@ def reject_smt_report(request, report_id):
     處理SMT報工記錄的駁回操作
     """
     if request.method == 'POST':
-        from workorder.workorder_reporting.models import SMTProductionReport
-        report = get_object_or_404(SMTProductionReport, id=report_id)
+        from workorder.workorder_reporting.models import SMTSupplementReport
+        report = get_object_or_404(SMTSupplementReport, id=report_id)
         report.approval_status = 'rejected'
         report.rejected_by = request.user.username
         report.rejected_at = timezone.now()
@@ -460,8 +460,8 @@ def batch_approve_reports(request):
                 
                 # 嘗試從SMT報工中查找
                 try:
-                    from workorder.workorder_reporting.models import SMTProductionReport
-                    report = SMTProductionReport.objects.get(id=report_id)
+                    from workorder.workorder_reporting.models import SMTSupplementReport
+                    report = SMTSupplementReport.objects.get(id=report_id)
                     report.approval_status = 'approved'
                     report.approved_by = request.user.username
                     report.approved_at = timezone.now()
@@ -472,7 +472,7 @@ def batch_approve_reports(request):
                     if hasattr(report, 'workorder') and report.workorder:
                         synced_workorders.add(report.workorder.id)
                     continue
-                except SMTProductionReport.DoesNotExist:
+                except SMTSupplementReport.DoesNotExist:
                     pass
                 
                 # 移除主管報工批量核准 - 主管不應該有報工記錄
@@ -552,7 +552,7 @@ def report_statistics(request):
     smt_trend = []
     for i in range(7):
         check_date = today - timedelta(days=i)
-        count = SMTProductionReport.objects.filter(work_date=check_date).count()
+        count = SMTSupplementReport.objects.filter(work_date=check_date).count()
         smt_trend.append({
             'date': check_date.strftime('%m-%d'),
             'count': count
@@ -595,7 +595,7 @@ def abnormal_management(request):
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
     ).order_by('-work_date', '-start_time')
     
-    smt_abnormal = SMTProductionReport.objects.select_related(
+    smt_abnormal = SMTSupplementReport.objects.select_related(
         'workorder'
     ).filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
@@ -683,7 +683,7 @@ def batch_resolve_abnormal(request):
                 Q(approval_status='pending')
             )
             
-            smt_pending = SMTProductionReport.objects.filter(
+            smt_pending = SMTSupplementReport.objects.filter(
                 Q(abnormal_notes__isnull=False) & 
                 ~Q(abnormal_notes='') & 
                 ~Q(abnormal_notes='nan') &
@@ -828,7 +828,7 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
     if abnormal_type == 'operator':
         report = get_object_or_404(OperatorSupplementReport, id=abnormal_id)
     elif abnormal_type == 'smt':
-        report = get_object_or_404(SMTProductionReport, id=abnormal_id)
+        report = get_object_or_404(SMTSupplementReport, id=abnormal_id)
     elif abnormal_type == 'supplement':
         # 補登報工異常詳情
         # 這裡可以添加補登報工異常的處理邏輯
@@ -870,7 +870,7 @@ def approved_reports_list(request):
     """
     from django.core.paginator import Paginator
     from django.db.models import Q
-    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
     
     # 獲取公司配置對照表
     from erp_integration.models import CompanyConfig
@@ -884,7 +884,7 @@ def approved_reports_list(request):
     ).select_related('operator', 'workorder', 'process').order_by('-approved_at')
     
     # 獲取已審核的SMT報工記錄（直接從報工資料表統計，不依賴工單關聯）
-    approved_smt_reports = SMTProductionReport.objects.filter(
+    approved_smt_reports = SMTSupplementReport.objects.filter(
         approval_status='approved'
     ).select_related('workorder').order_by('-approved_at')
     
@@ -1020,8 +1020,8 @@ def revert_approved_report(request, report_id):
         except:
             # 如果找不到作業員報工記錄，嘗試獲取SMT報工記錄
             try:
-                from workorder.workorder_reporting.models import SMTProductionReport
-                report = get_object_or_404(SMTProductionReport, id=report_id)
+                from workorder.workorder_reporting.models import SMTSupplementReport
+                report = get_object_or_404(SMTSupplementReport, id=report_id)
                 report_type = 'smt'
             except:
                 messages.error(request, '找不到指定的報工記錄')
@@ -1073,8 +1073,8 @@ def batch_revert_all_approved_reports(request):
             )
             
             # 獲取所有已核准的SMT報工記錄
-            from workorder.workorder_reporting.models import SMTProductionReport
-            approved_smt_reports = SMTProductionReport.objects.filter(
+            from workorder.workorder_reporting.models import SMTSupplementReport
+            approved_smt_reports = SMTSupplementReport.objects.filter(
                 approval_status='approved'
             )
             

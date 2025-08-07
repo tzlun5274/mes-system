@@ -22,7 +22,7 @@ from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 
 from workorder.models import (
-    WorkOrder, OperatorSupplementReport, SMTProductionReport
+    WorkOrder, OperatorSupplementReport, SMTSupplementReport
 )
 from equip.models import Equipment
 from django.contrib.auth.models import User
@@ -392,7 +392,7 @@ def get_work_hour_smt_report_data(report_type, start_date, end_date):
     """
     獲取 SMT 設備工時報表數據
     """
-    reports = SMTProductionReport.objects.filter(
+    reports = SMTSupplementReport.objects.filter(
         work_date__range=[start_date, end_date]
     ).select_related('equipment')
     
@@ -454,7 +454,7 @@ def get_smt_equipment_report_data(start_date, end_date):
     """
     獲取 SMT 設備效率報表數據
     """
-    reports = SMTProductionReport.objects.filter(
+    reports = SMTSupplementReport.objects.filter(
         work_date__range=[start_date, end_date]
     ).values('equipment__name').annotate(
         total_quantity=Sum('work_quantity'),

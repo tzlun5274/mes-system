@@ -7,10 +7,10 @@ from django.db import models
 from django.utils import timezone
 
 
-class SMTProductionReport(models.Model):
+class SMTSupplementReport(models.Model):
     """
-    SMT 生產報工記錄模型 (SMT Production Report Model)
-    SMT 設備為自動化運作，不需要作業員
+    SMT 補登報工記錄模型 (SMT Supplement Report Model)
+    專為SMT設備的歷史報工記錄管理而設計，支援離線數據輸入、歷史數據修正和批量數據處理
     """
 
 
@@ -148,43 +148,8 @@ class SMTProductionReport(models.Model):
         help_text="記錄生產過程中的異常情況，如設備故障、品質問題等",
     )
 
-    # 休息時間相關欄位（SMT設備通常不需要休息，但保留用於相容性）
-    has_break = models.BooleanField(
-        default=False,
-        verbose_name="是否有休息時間",
-        help_text="SMT設備通常不需要休息時間，此欄位保留用於相容性",
-    )
-
-    break_start_time = models.TimeField(
-        blank=True,
-        null=True,
-        verbose_name="休息開始時間",
-        help_text="SMT設備通常不需要休息時間，此欄位保留用於相容性",
-    )
-
-    break_end_time = models.TimeField(
-        blank=True,
-        null=True,
-        verbose_name="休息結束時間",
-        help_text="SMT設備通常不需要休息時間，此欄位保留用於相容性",
-    )
-
-    break_hours = models.DecimalField(
-        max_digits=4,
-        decimal_places=2,
-        default=0,
-        verbose_name="休息時數",
-        help_text="SMT設備通常不需要休息時間，此欄位保留用於相容性",
-    )
-
-    # 作業員欄位（SMT設備通常不需要作業員，但保留用於相容性）
-    operator = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        verbose_name="作業員",
-        help_text="SMT設備報工時，此欄位會自動填入設備名稱作為作業員名稱",
-    )
+    # 休息時間相關欄位已移除 - SMT設備不需要休息時間
+    # 作業員欄位已移除 - SMT設備不需要作業員
 
     # 新增：設備作業員名稱（用於報表顯示）
     equipment_operator_name = models.CharField(
@@ -253,9 +218,9 @@ class SMTProductionReport(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
 
     class Meta:
-        verbose_name = "SMT生產報工記錄"
-        verbose_name_plural = "SMT生產報工記錄"
-        db_table = "workorder_smt_production_report"
+        verbose_name = "SMT補登報工記錄"
+        verbose_name_plural = "SMT補登報工記錄"
+        db_table = "workorder_smt_supplement_report"
         ordering = ["-work_date", "-start_time"]
 
     def __str__(self):
@@ -448,7 +413,361 @@ class SMTProductionReport(models.Model):
 
     def is_smt_equipment_report(self):
         """判斷是否為SMT設備報工"""
-        return bool(self.equipment and self.equipment.name and 'SMT' in self.equipment.name)
+        return True
+
+
+class SMTRealtimeReport(models.Model):
+    """
+    SMT 現場報工記錄模型 (SMT Realtime Report Model)
+    專為SMT設備現場即時報工而設計，支援快速數據輸入和狀態更新
+    """
+
+    # 基本資訊
+    # 公司代號欄位
+    company_code = models.CharField(
+        max_length=10,
+        verbose_name="公司代號",
+        help_text="公司代號，用於多公司架構",
+        default="",
+    )
+
+    product_id = models.CharField(
+        max_length=100,
+        verbose_name="產品編號",
+        help_text="請選擇產品編號，將自動帶出相關工單",
+        default="",
+    )
+
+    workorder = models.ForeignKey(
+        'workorder.WorkOrder',
+        on_delete=models.CASCADE,
+        verbose_name="工單號碼",
+        help_text="請選擇工單號碼，或透過產品編號自動帶出",
+        null=True,
+        blank=True,
+    )
+
+    process = models.ForeignKey(
+        "process.ProcessName",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name="工序",
+        help_text="請選擇此次報工的SMT工序",
+    )
+
+    operation = models.CharField(
+        max_length=100,
+        verbose_name="工序名稱",
+        help_text="工序名稱（自動從 process 欄位取得）",
+        default="",
+    )
+
+    equipment = models.ForeignKey(
+        "equip.Equipment",
+        on_delete=models.CASCADE,
+        verbose_name="使用的設備",
+        help_text="請選擇本次報工使用的SMT設備",
+        null=True,
+        blank=True,
+    )
+
+    # 時間資訊
+    work_date = models.DateField(
+        verbose_name="日期", help_text="報工日期", default=timezone.now
+    )
+
+    start_time = models.TimeField(
+        verbose_name="開始時間",
+        help_text="報工開始時間",
+        default=timezone.now,
+    )
+
+    end_time = models.TimeField(
+        verbose_name="結束時間",
+        help_text="報工結束時間",
+        default=timezone.now,
+    )
+
+    # 數量資訊
+    work_quantity = models.IntegerField(
+        verbose_name="工作數量",
+        help_text="請輸入該時段內實際完成的合格產品數量",
+        default=0,
+    )
+
+    defect_quantity = models.IntegerField(
+        default=0,
+        verbose_name="不良品數量",
+        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0",
+    )
+
+    # 報工狀態
+    STATUS_CHOICES = [
+        ("start", "開始生產"),
+        ("pause", "暫停"),
+        ("complete", "完工"),
+    ]
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="start",
+        verbose_name="報工狀態",
+        help_text="選擇此次報工的狀態",
+    )
+
+    # 備註
+    remarks = models.TextField(
+        blank=True,
+        verbose_name="備註",
+        help_text="請輸入任何需要補充的資訊",
+    )
+
+    # 異常記錄
+    abnormal_notes = models.TextField(
+        blank=True,
+        verbose_name="異常記錄",
+        help_text="記錄生產過程中的異常情況",
+    )
+
+    # 設備作業員名稱（用於報表顯示）
+    equipment_operator_name = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="設備作業員名稱",
+        help_text="SMT設備的作業員名稱，通常與設備名稱相同",
+    )
+
+    # 系統欄位
+    created_by = models.CharField(
+        max_length=100, verbose_name="建立人員", default="system"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+
+    class Meta:
+        verbose_name = "SMT現場報工記錄"
+        verbose_name_plural = "SMT現場報工記錄"
+        db_table = "workorder_smt_realtime_report"
+        ordering = ["-work_date", "-start_time"]
+
+    def __str__(self):
+        return f"SMT現場報工 - {self.equipment_operator_name or '設備'} - {self.work_date}"
+
+    @property
+    def workorder_number(self):
+        """工單號碼"""
+        if self.workorder:
+            return self.workorder.workorder_number
+        return self.product_id
+
+    @property
+    def equipment_name(self):
+        """設備名稱"""
+        if self.equipment:
+            return self.equipment.name
+        return self.equipment_operator_name or "未知設備"
+
+    @property
+    def total_quantity(self):
+        """總產量（良品+不良品）"""
+        return self.work_quantity + self.defect_quantity
+
+    @property
+    def work_duration(self):
+        """工作時長（小時）"""
+        if self.start_time and self.end_time:
+            start_dt = datetime.combine(self.work_date, self.start_time)
+            end_dt = datetime.combine(self.work_date, self.end_time)
+            if end_dt > start_dt:
+                duration = end_dt - start_dt
+                return round(duration.total_seconds() / 3600, 2)
+        return 0
+
+    @property
+    def efficiency_rate(self):
+        """效率率（良品率）"""
+        total = self.total_quantity
+        if total > 0:
+            return round((self.work_quantity / total) * 100, 2)
+        return 0
+
+    def can_edit(self, user):
+        """檢查用戶是否可以編輯此記錄"""
+        return user.is_superuser or user.has_perm('workorder_reporting.change_smtrealtimereport')
+
+    def can_delete(self, user):
+        """檢查用戶是否可以刪除此記錄"""
+        return user.is_superuser or user.has_perm('workorder_reporting.delete_smtrealtimereport')
+
+    def is_smt_equipment_report(self):
+        """判斷是否為SMT設備報工"""
+        return True
+
+
+class OperatorRealtimeReport(models.Model):
+    """
+    作業員現場報工記錄模型 (Operator Realtime Report Model)
+    專為作業員現場即時報工而設計，支援快速數據輸入和狀態更新
+    """
+
+    # 基本資訊
+    operator = models.ForeignKey(
+        "process.Operator",
+        on_delete=models.CASCADE,
+        verbose_name="作業員",
+        help_text="請選擇進行現場報工的作業員",
+    )
+
+    # 公司代號欄位
+    company_code = models.CharField(
+        max_length=10,
+        verbose_name="公司代號",
+        help_text="公司代號，用於多公司架構",
+        default="",
+    )
+
+    workorder = models.ForeignKey(
+        'workorder.WorkOrder',
+        on_delete=models.CASCADE,
+        verbose_name="工單號碼",
+        help_text="請選擇要報工的工單號碼",
+        null=True,
+        blank=True,
+    )
+
+    process = models.ForeignKey(
+        "process.ProcessName",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name="工序",
+        help_text="請選擇此次報工的工序（排除SMT相關工序）",
+    )
+
+    # 設備資訊（可選）
+    equipment = models.ForeignKey(
+        "equip.Equipment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="使用的設備",
+        help_text="請選擇此次報工使用的設備（排除SMT相關設備）",
+    )
+
+    # 時間資訊
+    work_date = models.DateField(
+        verbose_name="日期", help_text="報工日期", default=timezone.now
+    )
+
+    start_time = models.TimeField(
+        verbose_name="開始時間",
+        help_text="報工開始時間",
+        default=timezone.now,
+    )
+
+    end_time = models.TimeField(
+        verbose_name="結束時間",
+        help_text="報工結束時間",
+        default=timezone.now,
+    )
+
+    # 數量資訊
+    work_quantity = models.IntegerField(
+        verbose_name="工作數量",
+        help_text="請輸入該時段內實際完成的合格產品數量",
+        default=0,
+    )
+
+    defect_quantity = models.IntegerField(
+        default=0,
+        verbose_name="不良品數量",
+        help_text="請輸入本次生產中產生的不良品數量，若無則留空或填寫0",
+    )
+
+    # 報工狀態
+    STATUS_CHOICES = [
+        ("start", "開始生產"),
+        ("pause", "暫停"),
+        ("complete", "完工"),
+    ]
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="start",
+        verbose_name="報工狀態",
+        help_text="選擇此次報工的狀態",
+    )
+
+    # 備註
+    remarks = models.TextField(
+        blank=True,
+        verbose_name="備註",
+        help_text="請輸入任何需要補充的資訊",
+    )
+
+    # 異常記錄
+    abnormal_notes = models.TextField(
+        blank=True,
+        verbose_name="異常記錄",
+        help_text="記錄生產過程中的異常情況",
+    )
+
+    # 系統欄位
+    created_by = models.CharField(
+        max_length=100, verbose_name="建立人員", default="system"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+
+    class Meta:
+        verbose_name = "作業員現場報工記錄"
+        verbose_name_plural = "作業員現場報工記錄"
+        db_table = "workorder_operator_realtime_report"
+        ordering = ["-work_date", "-start_time"]
+
+    def __str__(self):
+        return (
+            f"{self.operator.name} - {self.workorder.order_number if self.workorder else 'N/A'} - {self.work_date}"
+        )
+
+    @property
+    def operator_name(self):
+        """取得作業員名稱"""
+        return self.operator.name if self.operator else ""
+
+    @property
+    def workorder_number(self):
+        """取得工單號碼"""
+        return self.workorder.order_number if self.workorder else ""
+
+    @property
+    def process_name(self):
+        """取得工序名稱"""
+        return self.process.name if self.process else ""
+
+    @property
+    def equipment_name(self):
+        """取得設備名稱"""
+        return self.equipment.name if self.equipment else ""
+
+    @property
+    def total_quantity(self):
+        """取得總數量（合格品+不良品）"""
+        return self.work_quantity + self.defect_quantity
+
+    @property
+    def yield_rate(self):
+        """計算良率"""
+        if self.total_quantity > 0:
+            return (self.work_quantity / self.total_quantity) * 100
+        return 0.0
 
 
 class OperatorSupplementReport(models.Model):

@@ -6,7 +6,7 @@ SMT 報工統計管理命令
 from django.core.management.base import BaseCommand
 from django.db.models import Count
 from datetime import date, timedelta
-from workorder.models import SMTProductionReport
+from workorder.models import SMTSupplementReport
 from equip.models import Equipment
 import logging
 
@@ -49,7 +49,7 @@ class Command(BaseCommand):
             date_filter = f"最近 {days} 天 ({start_date} 到 {end_date})"
 
         # 查詢資料
-        queryset = SMTProductionReport.objects.all()
+        queryset = SMTSupplementReport.objects.all()
 
         if start_date and end_date:
             queryset = queryset.filter(work_date__range=[start_date, end_date])

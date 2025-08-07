@@ -19,7 +19,7 @@ from .models import (
 
 # 導入子模組的模型
 from .workorder_erp.models import PrdMKOrdMain, SystemConfig, CompanyOrder
-from .workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from .workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport, SMTRealtimeReport
 from .tasks import get_standard_processes
 from .forms import WorkOrderForm, OperatorSupplementReportForm, OperatorOnSiteReportForm, SMTSupplementReportForm
 from django.contrib import messages
@@ -846,7 +846,7 @@ def generate_completed_workorder_processes(workorder):
                 process_data[process_name]['abnormal_notes'].append(report.abnormal_notes)
     
     # 2. 收集SMT報工資料
-    smt_reports = SMTProductionReport.objects.filter(
+    smt_reports = SMTSupplementReport.objects.filter(
         workorder=workorder,
         approval_status='approved'
     ).select_related('equipment')
@@ -1886,7 +1886,7 @@ def clear_all_production_reports(request):
     包括：作業員補登報工、SMT補登報工、SMT現場報工
     只有管理員可以執行此操作
     """
-    from .workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+    from .workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
     
     if not (request.user.is_staff or request.user.is_superuser):
         messages.error(request, "只有管理員可以執行此操作")
@@ -1896,7 +1896,7 @@ def clear_all_production_reports(request):
         try:
             # 統計要清除的資料數量
             operator_reports_count = OperatorSupplementReport.objects.count()
-            smt_supplement_count = SMTProductionReport.objects.count()
+            smt_supplement_count = SMTSupplementReport.objects.count()
             smt_on_site_count = 0  # 已移除 report_type 欄位
             
             total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
@@ -1907,7 +1907,7 @@ def clear_all_production_reports(request):
             
             # 清除所有報工紀錄
             OperatorSupplementReport.objects.all().delete()
-            SMTProductionReport.objects.all().delete()
+            SMTSupplementReport.objects.all().delete()
             
             # 記錄操作日誌
             from system.models import OperationLog
@@ -1934,7 +1934,7 @@ def clear_all_production_reports(request):
 
     # GET 請求顯示確認頁面
     operator_reports_count = OperatorSupplementReport.objects.count()
-    smt_supplement_count = SMTProductionReport.objects.count()
+    smt_supplement_count = SMTSupplementReport.objects.count()
     smt_on_site_count = 0  # 已移除 report_type 欄位
     
     total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
@@ -2552,7 +2552,7 @@ def batch_approve_pending(request):
     批次審核所有待審核報工記錄 API
     只有超級管理員可以使用此功能
     """
-    from .workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+    from .workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
     
     # 檢查是否為超級管理員
     if not request.user.is_superuser:
@@ -2581,7 +2581,7 @@ def batch_approve_pending(request):
         approved_count += operator_count
         
         # 批次審核SMT生產報工記錄
-        smt_reports = SMTProductionReport.objects.filter(
+        smt_reports = SMTSupplementReport.objects.filter(
             approval_status='pending'
         )
         smt_count = smt_reports.count()
@@ -3068,7 +3068,7 @@ def supervisor_report_index(request):
         })
     
     # SMT報工最近審核
-    smt_reviews = SMTProductionReport.objects.select_related(
+    smt_reviews = SMTSupplementReport.objects.select_related(
         'workorder'
     ).filter(approval_status='approved').order_by('-approved_at')[:3]
     
@@ -3155,7 +3155,7 @@ def supervisor_functions(request):
         })
     
     # SMT異常
-    smt_abnormal = SMTProductionReport.objects.select_related(
+    smt_abnormal = SMTSupplementReport.objects.select_related(
         'workorder'
     ).filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
@@ -3194,7 +3194,7 @@ def report_statistics(request):
     """
     from datetime import date, timedelta
     from django.db.models import Q, Count, Sum, Avg
-    from .models import OperatorSupplementReport, SMTProductionReport
+    from .models import OperatorSupplementReport, SMTSupplementReport
     
     today = date.today()
     month_start = today.replace(day=1)
@@ -3223,13 +3223,13 @@ def report_statistics(request):
     }
     
     smt_stats = {
-        'today': SMTProductionReport.objects.filter(work_date=today).count(),
-        'week': SMTProductionReport.objects.filter(work_date__gte=week_start).count(),
-        'month': SMTProductionReport.objects.filter(work_date__gte=month_start).count(),
-        'year': SMTProductionReport.objects.filter(work_date__year=today.year).count(),
-        'pending': SMTProductionReport.objects.filter(approval_status='pending').count(),
-        'approved': SMTProductionReport.objects.filter(approval_status='approved').count(),
-        'rejected': SMTProductionReport.objects.filter(approval_status='rejected').count(),
+        'today': SMTSupplementReport.objects.filter(work_date=today).count(),
+        'week': SMTSupplementReport.objects.filter(work_date__gte=week_start).count(),
+        'month': SMTSupplementReport.objects.filter(work_date__gte=month_start).count(),
+        'year': SMTSupplementReport.objects.filter(work_date__year=today.year).count(),
+        'pending': SMTSupplementReport.objects.filter(approval_status='pending').count(),
+        'approved': SMTSupplementReport.objects.filter(approval_status='approved').count(),
+        'rejected': SMTSupplementReport.objects.filter(approval_status='rejected').count(),
     }
     
     # 計算總計
@@ -3272,7 +3272,7 @@ def report_statistics(request):
     operator_avg_hours = operator_total_hours / len(operator_reports_list) if operator_reports_list else 0
     
     # SMT報工統計
-    smt_reports_30d = SMTProductionReport.objects.filter(
+    smt_reports_30d = SMTSupplementReport.objects.filter(
         work_date__gte=thirty_days_ago
     ).aggregate(
         total_quantity=Sum('work_quantity'),
@@ -3280,7 +3280,7 @@ def report_statistics(request):
     )
     
     # 計算SMT總工作時數（使用Python計算）
-    smt_reports_list = SMTProductionReport.objects.filter(
+    smt_reports_list = SMTSupplementReport.objects.filter(
         work_date__gte=thirty_days_ago
     )
     smt_total_hours = sum(report.work_duration for report in smt_reports_list if report.work_duration)
@@ -3326,7 +3326,7 @@ def abnormal_management(request):
     """
     from datetime import date, timedelta
     from django.db.models import Q
-    from .models import OperatorSupplementReport, SMTProductionReport
+    from .models import OperatorSupplementReport, SMTSupplementReport
     
     today = date.today()
     week_start = today - timedelta(days=7)
@@ -3339,7 +3339,7 @@ def abnormal_management(request):
         Q(work_date__gte=week_start)
     ).order_by('-work_date', '-start_time')
     
-    smt_abnormal = SMTProductionReport.objects.select_related(
+    smt_abnormal = SMTSupplementReport.objects.select_related(
         'workorder'
     ).filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & 
@@ -3437,7 +3437,7 @@ def batch_resolve_abnormal(request):
                 operator_resolved_count += 1
         
         # SMT異常 - 標記為已解決（包含所有狀態的異常）
-        smt_abnormal = SMTProductionReport.objects.filter(
+        smt_abnormal = SMTSupplementReport.objects.filter(
             Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & 
             Q(work_date__gte=week_start)
         )
@@ -3483,14 +3483,14 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
     異常詳情頁面
     顯示特定異常的詳細資訊
     """
-    from .models import OperatorSupplementReport, SMTProductionReport
+    from .models import OperatorSupplementReport, SMTSupplementReport
     
     try:
         if abnormal_type == 'operator':
             abnormal = get_object_or_404(OperatorSupplementReport, id=abnormal_id)
             template_name = 'workorder/report/supervisor/abnormal_detail_operator.html'
         elif abnormal_type == 'smt':
-            abnormal = get_object_or_404(SMTProductionReport, id=abnormal_id)
+            abnormal = get_object_or_404(SMTSupplementReport, id=abnormal_id)
             template_name = 'workorder/report/supervisor/abnormal_detail_smt.html'
         else:
             messages.error(request, '無效的異常類型')
@@ -3519,22 +3519,22 @@ def data_maintenance(request):
     """
     from datetime import date, timedelta
     from django.db.models import Q, Count
-    from .models import OperatorSupplementReport, SMTProductionReport
+    from .models import OperatorSupplementReport, SMTSupplementReport
     
     today = date.today()
     
     # 資料統計
     data_stats = {
         'total_operator_reports': OperatorSupplementReport.objects.count(),
-        'total_smt_reports': SMTProductionReport.objects.count(),
+        'total_smt_reports': SMTSupplementReport.objects.count(),
         'old_reports_30d': OperatorSupplementReport.objects.filter(
             work_date__lt=today - timedelta(days=30)
-        ).count() + SMTProductionReport.objects.filter(
+        ).count() + SMTSupplementReport.objects.filter(
             work_date__lt=today - timedelta(days=30)
         ).count(),
         'old_reports_90d': OperatorSupplementReport.objects.filter(
             work_date__lt=today - timedelta(days=90)
-        ).count() + SMTProductionReport.objects.filter(
+        ).count() + SMTSupplementReport.objects.filter(
             work_date__lt=today - timedelta(days=90)
         ).count(),
         'duplicate_reports': 0,  # 將在下面實作重複檢查邏輯
@@ -3552,7 +3552,7 @@ def data_maintenance(request):
     operator_duplicate_count = sum(duplicate['count'] - 1 for duplicate in operator_duplicates)
     
     # SMT報工重複：相同的設備、工單、產品、報工時間
-    smt_duplicates = SMTProductionReport.objects.values(
+    smt_duplicates = SMTSupplementReport.objects.values(
         'equipment', 'workorder', 'rd_product_code', 'work_date', 'start_time', 'end_time'
     ).annotate(
         count=Count('id')
@@ -3646,7 +3646,7 @@ def execute_maintenance(request):
             old_operator_reports.delete()
             
             # 清理SMT報工記錄
-            old_smt_reports = SMTProductionReport.objects.filter(
+            old_smt_reports = SMTSupplementReport.objects.filter(
                 work_date__lt=cutoff_date
             )
             smt_count = old_smt_reports.count()
@@ -3689,7 +3689,7 @@ def execute_maintenance(request):
             
             # 清理SMT報工重複記錄
             # 定義重複：相同的設備、工單、產品、報工時間
-            smt_duplicates = SMTProductionReport.objects.values(
+            smt_duplicates = SMTSupplementReport.objects.values(
                 'equipment', 'workorder', 'rd_product_code', 'work_date', 'start_time', 'end_time'
             ).annotate(
                 count=Count('id')
@@ -3697,7 +3697,7 @@ def execute_maintenance(request):
             
             for duplicate in smt_duplicates:
                 # 保留最新的記錄，刪除其他重複記錄
-                reports = SMTProductionReport.objects.filter(
+                reports = SMTSupplementReport.objects.filter(
                     equipment=duplicate['equipment'],
                     workorder=duplicate['workorder'],
                     rd_product_code=duplicate['rd_product_code'],
@@ -3721,19 +3721,19 @@ def execute_maintenance(request):
             with connection.cursor() as cursor:
                 # 分析資料表
                 cursor.execute("ANALYZE workorder_operatorsupplementreport;")
-                cursor.execute("ANALYZE workorder_smtproductionreport;")
+                cursor.execute("ANALYZE workorder_smt_supplement_report;")
                 cursor.execute("ANALYZE workorder_workorder;")
                 cursor.execute("ANALYZE workorder_workorderprocess;")
                 
                 # 重新整理資料表
                 cursor.execute("REINDEX TABLE workorder_operatorsupplementreport;")
-                cursor.execute("REINDEX TABLE workorder_smtproductionreport;")
+                cursor.execute("REINDEX TABLE workorder_smt_supplement_report;")
                 cursor.execute("REINDEX TABLE workorder_workorder;")
                 cursor.execute("REINDEX TABLE workorder_workorderprocess;")
                 
                 # 清理過期的統計資訊
                 cursor.execute("VACUUM ANALYZE workorder_operatorsupplementreport;")
-                cursor.execute("VACUUM ANALYZE workorder_smtproductionreport;")
+                cursor.execute("VACUUM ANALYZE workorder_smt_supplement_report;")
                 cursor.execute("VACUUM ANALYZE workorder_workorder;")
                 cursor.execute("VACUUM ANALYZE workorder_workorderprocess;")
             
@@ -3754,7 +3754,7 @@ def execute_maintenance(request):
                 'operator_reports': OperatorSupplementReport.objects.filter(
                     created_at__lt=cutoff_date
                 ),
-                'smt_reports': SMTProductionReport.objects.filter(
+                'smt_reports': SMTSupplementReport.objects.filter(
                     created_at__lt=cutoff_date
                 ),
                 'completed_workorders': WorkOrder.objects.filter(
@@ -3848,7 +3848,7 @@ def execute_maintenance(request):
             
             # 檢查SMT報工重複記錄
             # 定義重複：所有重要欄位都完全相同
-            smt_duplicates = SMTProductionReport.objects.values(
+            smt_duplicates = SMTSupplementReport.objects.values(
                 'equipment', 'workorder', 'rd_product_code', 'work_date', 'start_time', 'end_time',
                 'work_quantity', 'defect_quantity', 'report_type', 'product_id',
                 'operation', 'remarks', 'abnormal_notes'
@@ -3857,7 +3857,7 @@ def execute_maintenance(request):
             ).filter(count__gt=1)
             
             for duplicate in smt_duplicates:
-                reports = SMTProductionReport.objects.filter(
+                reports = SMTSupplementReport.objects.filter(
                     equipment=duplicate['equipment'],
                     workorder=duplicate['workorder'],
                     rd_product_code=duplicate['rd_product_code'],
@@ -3931,7 +3931,7 @@ def execute_maintenance(request):
             
             # 清理SMT報工重複記錄
             # 定義重複：相同的設備、工單、產品、報工時間
-            smt_duplicates = SMTProductionReport.objects.values(
+            smt_duplicates = SMTSupplementReport.objects.values(
                 'equipment', 'workorder', 'rd_product_code', 'work_date', 'start_time', 'end_time'
             ).annotate(
                 count=Count('id')
@@ -3939,7 +3939,7 @@ def execute_maintenance(request):
             
             for duplicate in smt_duplicates:
                 # 保留最新的記錄，刪除其他重複記錄
-                reports = SMTProductionReport.objects.filter(
+                reports = SMTSupplementReport.objects.filter(
                     equipment=duplicate['equipment'],
                     workorder=duplicate['workorder'],
                     rd_product_code=duplicate['rd_product_code'],
@@ -3994,7 +3994,7 @@ def smt_report_index(request):
     顯示SMT報工的主要功能卡片和統計資訊
     """
     from equip.models import Equipment
-    from .models import SMTProductionReport
+    from .models import SMTSupplementReport
     from .services.statistics_service import StatisticsService
     
     # 使用統一的統計服務 - 僅SMT數據
@@ -4019,7 +4019,7 @@ def smt_report_index(request):
         equipment_efficiency = 0
     
     # 取得最近SMT報工記錄
-    recent_reports = SMTProductionReport.objects.select_related(
+    recent_reports = SMTSupplementReport.objects.select_related(
         'workorder', 'equipment'
     ).order_by('-created_at')[:10]
     
@@ -4042,7 +4042,7 @@ def smt_on_site_report(request):
     """
     from equip.models import Equipment
     from datetime import date
-    from .models import SMTProductionReport
+    from .models import SMTSupplementReport
     
     # 取得 SMT 設備列表（假設設備名稱包含 'SMT' 或 '貼片'）
     equipment_list = Equipment.objects.filter(
@@ -4080,7 +4080,7 @@ def smt_on_site_report(request):
             # 計算今日該設備的產出數量
     today_output = 0
     try:
-        today_reports = SMTProductionReport.objects.filter(
+        today_reports = SMTSupplementReport.objects.filter(
             equipment=equipment,
             work_date=today
         )
@@ -4102,7 +4102,7 @@ def smt_on_site_report(request):
     
     # 取得今日的 SMT 報工記錄
     today = date.today()
-    today_reports_list = SMTProductionReport.objects.filter(
+    today_reports_list = SMTSupplementReport.objects.filter(
         work_date=today
     ).select_related('equipment', 'workorder').order_by('-created_at')
     
@@ -4168,7 +4168,7 @@ def submit_smt_report(request):
         workorder = WorkOrder.objects.get(id=workorder_id)
         
         # 建立報工記錄
-        from .models import SMTProductionReport
+        from .models import SMTSupplementReport
         from process.models import ProcessName
         from django.utils import timezone
         
@@ -4309,19 +4309,19 @@ def operator_on_site_report(request):
 # SMT補登報工功能視圖函數
 # ============================================================================
 
-# 此函數已被移除，請使用 SMTProductionReportListView 類別視圖
+# 此函數已被移除，請使用 SMTSupplementReportListView 類別視圖
 # 位置：workorder/views/report_views.py
 
-# 此函數已被移除，請使用 SMTProductionReportCreateView 類別視圖
+# 此函數已被移除，請使用 SMTSupplementReportCreateView 類別視圖
 # 位置：workorder/views/report_views.py
 
-# 此函數已被移除，請使用 SMTProductionReportUpdateView 類別視圖
+# 此函數已被移除，請使用 SMTSupplementReportUpdateView 類別視圖
 # 位置：workorder/views/report_views.py
 
-# 此函數已被移除，請使用 SMTProductionReportDeleteView 類別視圖
+# 此函數已被移除，請使用 SMTSupplementReportDeleteView 類別視圖
 # 位置：workorder/views/report_views.py
 
-# 此函數已被移除，請使用 SMTProductionReportDetailView 類別視圖
+# 此函數已被移除，請使用 SMTSupplementReportDetailView 類別視圖
 # 位置：workorder/views/report_views.py
 
 # ============================================================================
@@ -4444,7 +4444,7 @@ def api_get_operator_reports(request):
 def api_get_smt_reports(request):
     """API：取得SMT報工記錄"""
     try:
-        reports = SMTProductionReport.objects.all().order_by('-work_date')
+        reports = SMTSupplementReport.objects.all().order_by('-work_date')
         
         # 篩選條件
         equipment_id = request.GET.get('equipment_id')
@@ -4664,7 +4664,7 @@ def operator_supplement_report_reject(request, report_id):
 def smt_supplement_report_approve(request, report_id):
     """審核SMT補登報工"""
     try:
-        report = SMTProductionReport.objects.get(id=report_id)
+        report = SMTSupplementReport.objects.get(id=report_id)
         report.approval_status = 'approved'
         report.approved_by = request.user.username
         report.approved_at = timezone.now()
@@ -4686,7 +4686,7 @@ def smt_supplement_report_approve(request, report_id):
             logger.error(f"同步SMT報工記錄到生產詳情失敗: {str(sync_error)}")
         
         messages.success(request, 'SMT報工記錄審核通過！')
-    except SMTProductionReport.DoesNotExist:
+    except SMTSupplementReport.DoesNotExist:
         messages.error(request, '找不到指定的SMT報工記錄！')
     
     return redirect('workorder:smt_supplement_report_index')
@@ -4695,13 +4695,13 @@ def smt_supplement_report_approve(request, report_id):
 def smt_supplement_report_reject(request, report_id):
     """駁回SMT補登報工"""
     try:
-        report = SMTProductionReport.objects.get(id=report_id)
+        report = SMTSupplementReport.objects.get(id=report_id)
         report.approval_status = 'rejected'
         report.approved_by = request.user.username
         report.approved_at = timezone.now()
         report.save()
         messages.success(request, 'SMT報工記錄已駁回！')
-    except SMTProductionReport.DoesNotExist:
+    except SMTSupplementReport.DoesNotExist:
         messages.error(request, '找不到指定的SMT報工記錄！')
     
     return redirect('workorder:smt_supplement_report_index')
@@ -4986,7 +4986,7 @@ def smt_supplement_batch(request):
             return redirect('workorder:smt_supplement_report_index')
         
         try:
-            reports = SMTProductionReport.objects.filter(id__in=report_ids)
+            reports = SMTSupplementReport.objects.filter(id__in=report_ids)
             
             if action == 'approve':
                 reports.update(
@@ -5295,9 +5295,8 @@ def smt_supplement_batch_create(request):
                 equipment_operator_name = SMTOperatorService.get_smt_equipment_operator_name(equipment.name)
                 
                 # 建立報工記錄
-                report = SMTProductionReport.objects.create(
+                report = SMTSupplementReport.objects.create(
                     equipment=equipment,
-                    operator=equipment_operator_name,  # 設定作業員名稱
                     equipment_operator_name=equipment_operator_name,  # 設定設備作業員名稱
                     workorder_id=report_data['workorder_id'],
                     product_id=report_data['product_id'],
@@ -5336,9 +5335,9 @@ def supervisor_index(request):
     pending_operator_reports = OperatorSupplementReport.objects.filter(approval_status="pending").count()
     approved_operator_reports = OperatorSupplementReport.objects.filter(approval_status="approved").count()
     
-    total_smt_reports = SMTProductionReport.objects.count()
-    pending_smt_reports = SMTProductionReport.objects.filter(approval_status="pending").count()
-    approved_smt_reports = SMTProductionReport.objects.filter(approval_status="approved").count()
+    total_smt_reports = SMTSupplementReport.objects.count()
+    pending_smt_reports = SMTSupplementReport.objects.filter(approval_status="pending").count()
+    approved_smt_reports = SMTSupplementReport.objects.filter(approval_status="approved").count()
     
     context = {
         'total_operator_reports': total_operator_reports,
@@ -5844,7 +5843,7 @@ def active_workorders(request):
     from django.core.paginator import Paginator
     from django.db.models import Q
     from workorder.models import WorkOrderProduction
-    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
     from erp_integration.models import CompanyConfig
     from datetime import date, timedelta
     
@@ -5874,7 +5873,7 @@ def active_workorders(request):
         approval_status='approved'
     ).values_list('workorder_id', flat=True).distinct()
     
-    today_smt_reports = SMTProductionReport.objects.filter(
+    today_smt_reports = SMTSupplementReport.objects.filter(
         work_date=today,
         approval_status='approved'
     ).values_list('workorder_id', flat=True).distinct()

@@ -6,13 +6,13 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import SMTProductionReport, OperatorSupplementReport
+from .models import SMTSupplementReport, OperatorSupplementReport
 
 
-@admin.register(SMTProductionReport)
-class SMTProductionReportAdmin(admin.ModelAdmin):
+@admin.register(SMTSupplementReport)
+class SMTSupplementReportAdmin(admin.ModelAdmin):
     """
-    SMT生產報工記錄管理介面
+    SMT補登報工記錄管理介面
     """
     list_display = [
         'workorder_number', 'operation', 'equipment_name', 'work_date',

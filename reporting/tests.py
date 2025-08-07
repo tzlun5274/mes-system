@@ -5,7 +5,7 @@
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from django.urls import reverse
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
 from process.models import Operator, ProcessName
 from equip.models import Equipment
 from workorder.models import WorkOrder
@@ -83,10 +83,9 @@ class ReportingViewsTestCase(TestCase):
         
         equipment_operator_name = SMTOperatorService.get_smt_equipment_operator_name(self.equipment.name)
         
-        self.smt_report = SMTProductionReport.objects.create(
+        self.smt_report = SMTSupplementReport.objects.create(
             workorder=self.workorder,
             equipment=self.equipment,
-            operator=equipment_operator_name,  # 設定作業員名稱
             equipment_operator_name=equipment_operator_name,  # 設定設備作業員名稱
             operation='SMT測試工序',
             work_date=date.today(),
@@ -117,7 +116,7 @@ class ReportingViewsTestCase(TestCase):
         
         # 確認刪除前有記錄
         self.assertEqual(OperatorSupplementReport.objects.filter(approval_status='pending').count(), 1)
-        self.assertEqual(SMTProductionReport.objects.filter(approval_status='pending').count(), 1)
+        self.assertEqual(SMTSupplementReport.objects.filter(approval_status='pending').count(), 1)
         
         # 執行批次刪除
         response = self.client.post(reverse('reporting:batch_delete_pending_reports'))
@@ -125,7 +124,7 @@ class ReportingViewsTestCase(TestCase):
         
         # 確認記錄已被刪除
         self.assertEqual(OperatorSupplementReport.objects.filter(approval_status='pending').count(), 0)
-        self.assertEqual(SMTProductionReport.objects.filter(approval_status='pending').count(), 0)
+        self.assertEqual(SMTSupplementReport.objects.filter(approval_status='pending').count(), 0)
 
     def test_normal_user_cannot_execute_batch_delete(self):
         """測試一般用戶無法執行批次刪除"""
@@ -137,7 +136,7 @@ class ReportingViewsTestCase(TestCase):
         
         # 確認記錄未被刪除
         self.assertEqual(OperatorSupplementReport.objects.filter(approval_status='pending').count(), 1)
-        self.assertEqual(SMTProductionReport.objects.filter(approval_status='pending').count(), 1)
+        self.assertEqual(SMTSupplementReport.objects.filter(approval_status='pending').count(), 1)
 
     def test_pending_approval_list_shows_superuser_buttons(self):
         """測試待審核清單頁面對超級管理員顯示批次刪除按鈕"""

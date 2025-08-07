@@ -22,7 +22,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.contrib.auth.decorators import login_required
 
-from ..workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from ..workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
 from ..forms import (
     SMTSupplementReportForm,
     OperatorSupplementReportForm,
@@ -256,13 +256,13 @@ class OperatorSupplementReportDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class SMTProductionReportListView(LoginRequiredMixin, ListView):
+class SMTSupplementReportListView(LoginRequiredMixin, ListView):
     """
-    SMT生產報工列表視圖
-    顯示所有SMT生產報工記錄
+    SMT補登報工列表視圖
+    顯示所有SMT補登報工記錄
     """
 
-    model = SMTProductionReport
+    model = SMTSupplementReport
     template_name = "workorder/report/smt/supplement/index.html"
     context_object_name = "reports"
     paginate_by = 20
@@ -309,19 +309,19 @@ class SMTProductionReportListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
 
         # 計算統計數據
-        context["pending_count"] = SMTProductionReport.objects.filter(
+        context["pending_count"] = SMTSupplementReport.objects.filter(
             approval_status="pending"
         ).count()
 
-        context["approved_count"] = SMTProductionReport.objects.filter(
+        context["approved_count"] = SMTSupplementReport.objects.filter(
             approval_status="approved"
         ).count()
 
-        context["rejected_count"] = SMTProductionReport.objects.filter(
+        context["rejected_count"] = SMTSupplementReport.objects.filter(
             approval_status="rejected"
         ).count()
 
-        context["total_count"] = SMTProductionReport.objects.count()
+        context["total_count"] = SMTSupplementReport.objects.count()
 
         # 添加篩選參數到上下文，用於保持表單狀態
         context["filters"] = {
@@ -357,13 +357,13 @@ class SMTProductionReportListView(LoginRequiredMixin, ListView):
         return context
 
 
-class SMTProductionReportCreateView(LoginRequiredMixin, CreateView):
+class SMTSupplementReportCreateView(LoginRequiredMixin, CreateView):
     """
-    SMT生產報工新增視圖
-    用於建立新的SMT生產報工記錄
+    SMT補登報工新增視圖
+    用於建立新的SMT補登報工記錄
     """
 
-    model = SMTProductionReport
+    model = SMTSupplementReport
     form_class = SMTSupplementReportForm
     template_name = "workorder/report/smt/supplement/form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -380,13 +380,13 @@ class SMTProductionReportCreateView(LoginRequiredMixin, CreateView):
         return super().form_invalid(form)
 
 
-class SMTProductionReportUpdateView(LoginRequiredMixin, UpdateView):
+class SMTSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
     """
-    SMT生產報工編輯視圖
-    用於編輯現有SMT生產報工記錄
+    SMT補登報工編輯視圖
+    用於編輯現有SMT補登報工記錄
     """
 
-    model = SMTProductionReport
+    model = SMTSupplementReport
     form_class = SMTSupplementReportForm
     template_name = "workorder/report/smt/supplement/form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -402,13 +402,13 @@ class SMTProductionReportUpdateView(LoginRequiredMixin, UpdateView):
         return super().form_invalid(form)
 
 
-class SMTProductionReportDetailView(LoginRequiredMixin, DetailView):
+class SMTSupplementReportDetailView(LoginRequiredMixin, DetailView):
     """
-    SMT生產報工詳情視圖
-    顯示單一SMT生產報工記錄的詳細資訊
+    SMT補登報工詳情視圖
+    顯示單一SMT補登報工記錄的詳細資訊
     """
 
-    model = SMTProductionReport
+    model = SMTSupplementReport
     template_name = "workorder/report/smt/supplement/detail.html"
     context_object_name = "supplement_report"
 
@@ -439,15 +439,15 @@ class SMTProductionReportDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class SMTProductionReportDeleteView(
+class SMTSupplementReportDeleteView(
     LoginRequiredMixin, UserPassesTestMixin, DeleteView
 ):
     """
-    SMT生產報工刪除視圖
-    用於刪除SMT生產報工記錄，僅限管理員使用
+    SMT補登報工刪除視圖
+    用於刪除SMT補登報工記錄，僅限管理員使用
     """
 
-    model = SMTProductionReport
+    model = SMTSupplementReport
     template_name = "workorder/report/smt/supplement/delete_confirm.html"
     context_object_name = "supplement_report"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -459,7 +459,7 @@ class SMTProductionReportDeleteView(
             obj = self.get_object()
             # 檢查用戶權限
             return self.request.user.is_staff or self.request.user.is_superuser
-        except SMTProductionReport.DoesNotExist:
+        except SMTSupplementReport.DoesNotExist:
             # 記錄不存在，返回 False 讓 handle_no_permission 處理
             return False
 
@@ -477,7 +477,7 @@ class SMTProductionReportDeleteView(
 
             messages.success(request, "SMT生產報工記錄刪除成功！")
             return redirect("workorder:smt_supplement_report_index")
-        except SMTProductionReport.DoesNotExist:
+        except SMTSupplementReport.DoesNotExist:
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                 return JsonResponse(
                     {
@@ -504,7 +504,7 @@ class SMTProductionReportDeleteView(
             self.get_object()
             # 如果記錄存在，則是權限問題
             messages.error(self.request, "您沒有權限執行此操作！")
-        except SMTProductionReport.DoesNotExist:
+        except SMTSupplementReport.DoesNotExist:
             # 記錄不存在
             messages.error(
                 self.request, "找不到指定的SMT報工記錄！該記錄可能已被刪除或不存在。"
@@ -542,13 +542,13 @@ class OperatorSupplementReportDeleteView(
         return super().delete(request, *args, **kwargs)
 
 
-class SMTRDSampleProductionReportCreateView(LoginRequiredMixin, CreateView):
+class SMTRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView):
     """
-    SMT RD樣品生產報工新增視圖
-    用於建立新的SMT RD樣品生產報工記錄
+    SMT RD樣品補登報工新增視圖
+    用於建立新的SMT RD樣品補登報工記錄
     """
 
-    model = SMTProductionReport
+    model = SMTSupplementReport
     form_class = SMTRDSampleSupplementReportForm
     template_name = "workorder/report/smt/rd_sample/form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -565,13 +565,13 @@ class SMTRDSampleProductionReportCreateView(LoginRequiredMixin, CreateView):
         return super().form_invalid(form)
 
 
-class SMTRDSampleProductionReportUpdateView(LoginRequiredMixin, UpdateView):
+class SMTRDSampleSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
     """
-    SMT RD樣品生產報工編輯視圖
-    用於編輯現有SMT RD樣品生產報工記錄
+    SMT RD樣品補登報工編輯視圖
+    用於編輯現有SMT RD樣品補登報工記錄
     """
 
-    model = SMTProductionReport
+    model = SMTSupplementReport
     form_class = SMTRDSampleSupplementReportForm
     template_name = "workorder/report/smt/rd_sample/form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -654,7 +654,7 @@ def approve_report(request, report_id):
         if report_type == "operator":
             report = get_object_or_404(OperatorSupplementReport, id=report_id)
         elif report_type == "smt":
-            report = get_object_or_404(SMTProductionReport, id=report_id)
+            report = get_object_or_404(SMTSupplementReport, id=report_id)
         else:
             messages.error(request, "無效的報工記錄類型！")
             return redirect("workorder:report_index")
@@ -699,7 +699,7 @@ def reject_report(request, report_id):
         if report_type == "operator":
             report = get_object_or_404(OperatorSupplementReport, id=report_id)
         elif report_type == "smt":
-            report = get_object_or_404(SMTProductionReport, id=report_id)
+            report = get_object_or_404(SMTSupplementReport, id=report_id)
         else:
             messages.error(request, "無效的報工記錄類型！")
             return redirect("workorder:report_index")

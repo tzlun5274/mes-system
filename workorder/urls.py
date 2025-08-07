@@ -10,9 +10,9 @@ from .views.workorder_views import (
 from .views.report_views import (
     ReportIndexView, OperatorSupplementReportListView, OperatorSupplementReportCreateView,
     OperatorSupplementReportUpdateView, OperatorSupplementReportDetailView, 
-    OperatorSupplementReportDeleteView, SMTProductionReportListView, SMTProductionReportCreateView,
-    SMTProductionReportUpdateView, SMTProductionReportDetailView, SMTProductionReportDeleteView,
-    SMTRDSampleProductionReportCreateView, SMTRDSampleProductionReportUpdateView,
+    OperatorSupplementReportDeleteView, SMTSupplementReportListView, SMTSupplementReportCreateView,
+    SMTSupplementReportUpdateView, SMTSupplementReportDetailView, SMTSupplementReportDeleteView,
+    SMTRDSampleSupplementReportCreateView, SMTRDSampleSupplementReportUpdateView,
     OperatorRDSampleSupplementReportCreateView,
     approve_report, reject_report
 )
@@ -84,15 +84,15 @@ urlpatterns = [
     path("report/operator/supplement/batch/export/", import_views.operator_report_export, name="operator_supplement_batch_export"),
     
     # SMT補登報工功能 - 使用新的類別視圖
-    path("report/smt/supplement/", SMTProductionReportListView.as_view(), name="smt_supplement_report_index"),
-    path("report/smt/supplement/create/", SMTProductionReportCreateView.as_view(), name="smt_supplement_report_create"),
-    path("report/smt/supplement/edit/<int:pk>/", SMTProductionReportUpdateView.as_view(), name="smt_supplement_report_edit"),
-    path("report/smt/supplement/delete/<int:pk>/", SMTProductionReportDeleteView.as_view(), name="smt_supplement_report_delete"),
-    path("report/smt/supplement/detail/<int:pk>/", SMTProductionReportDetailView.as_view(), name="smt_supplement_report_detail"),
+    path("report/smt/supplement/", SMTSupplementReportListView.as_view(), name="smt_supplement_report_index"),
+    path("report/smt/supplement/create/", SMTSupplementReportCreateView.as_view(), name="smt_supplement_report_create"),
+    path("report/smt/supplement/edit/<int:pk>/", SMTSupplementReportUpdateView.as_view(), name="smt_supplement_report_edit"),
+    path("report/smt/supplement/delete/<int:pk>/", SMTSupplementReportDeleteView.as_view(), name="smt_supplement_report_delete"),
+    path("report/smt/supplement/detail/<int:pk>/", SMTSupplementReportDetailView.as_view(), name="smt_supplement_report_detail"),
     
     # SMT RD樣品補登報工功能
-    path("report/smt/rd_sample/create/", SMTRDSampleProductionReportCreateView.as_view(), name="smt_rd_sample_report_create"),
-    path("report/smt/rd_sample/edit/<int:pk>/", SMTRDSampleProductionReportUpdateView.as_view(), name="smt_rd_sample_report_edit"),
+    path("report/smt/rd_sample/create/", SMTRDSampleSupplementReportCreateView.as_view(), name="smt_rd_sample_report_create"),
+    path("report/smt/rd_sample/edit/<int:pk>/", SMTRDSampleSupplementReportUpdateView.as_view(), name="smt_rd_sample_report_edit"),
     
 
     

@@ -8,7 +8,7 @@ from datetime import datetime
 from django.db import transaction
 from django.utils import timezone
 from workorder.models import WorkOrder, WorkOrderProduction, WorkOrderProductionDetail
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ class ProductionReportSyncService:
     def _sync_smt_reports():
         """同步SMT報工記錄"""
         try:
-            smt_reports = SMTProductionReport.objects.filter(
+            smt_reports = SMTSupplementReport.objects.filter(
                 approval_status='approved'
             ).select_related('workorder', 'equipment')
             
@@ -359,7 +359,7 @@ class ProductionReportSyncService:
                     )
                 
                 # 同步該工單的SMT報工記錄
-                smt_reports = SMTProductionReport.objects.filter(
+                smt_reports = SMTSupplementReport.objects.filter(
                     workorder=workorder,
                     approval_status='approved'
                 ).select_related('equipment')

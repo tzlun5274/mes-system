@@ -6,7 +6,7 @@
 from django.core.management.base import BaseCommand
 from workorder.services import ProductionReportSyncService
 from workorder.models import WorkOrderProduction, WorkOrderProductionDetail
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
 import logging
 from django.utils import timezone
 
@@ -143,7 +143,7 @@ class Command(BaseCommand):
         """顯示統計資訊"""
         try:
             operator_count = OperatorSupplementReport.objects.filter(approval_status='approved').count()
-            smt_count = SMTProductionReport.objects.filter(approval_status='approved').count()
+            smt_count = SMTSupplementReport.objects.filter(approval_status='approved').count()
             production_count = WorkOrderProduction.objects.count()
             detail_count = WorkOrderProductionDetail.objects.count()
             

@@ -4,7 +4,7 @@ SMT RD樣品補登報工表單模組
 """
 
 from django import forms
-from workorder.workorder_reporting.models import SMTProductionReport
+from workorder.workorder_reporting.models import SMTSupplementReport
 
 
 class SMTRDSampleSupplementReportForm(forms.ModelForm):
@@ -12,7 +12,7 @@ class SMTRDSampleSupplementReportForm(forms.ModelForm):
     【規範】SMT RD樣品補登報工表單 (獨立版本)
     - 專門用於SMT RD樣品的報工記錄
     - 與主要forms.py完全分離
-    - 共用SMTProductionReport資料表
+    - 共用SMTSupplementReport資料表
     """
     
     # 產品編號欄位 - 手動輸入
@@ -221,7 +221,7 @@ class SMTRDSampleSupplementReportForm(forms.ModelForm):
     )
     
     class Meta:
-        model = SMTProductionReport
+        model = SMTSupplementReport
         fields = [
             "product_id",
             "original_workorder_number",

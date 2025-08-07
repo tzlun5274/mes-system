@@ -6,7 +6,7 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from workorder.models import WorkOrder, WorkOrderProductionDetail
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
 import logging
 
 logger = logging.getLogger(__name__)
@@ -151,7 +151,7 @@ class Command(BaseCommand):
             self.stdout.write(f'      已更新 {operator_reports.count()} 筆作業員報工記錄')
             
             # 更新SMT報工記錄
-            smt_reports = SMTProductionReport.objects.filter(workorder=wrong_workorder)
+            smt_reports = SMTSupplementReport.objects.filter(workorder=wrong_workorder)
             for report in smt_reports:
                 report.workorder = correct_workorder
                 report.save()

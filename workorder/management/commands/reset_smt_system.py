@@ -6,7 +6,7 @@
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 from datetime import date
-from workorder.models import SMTProductionReport
+from workorder.models import SMTSupplementReport
 from equip.models import Equipment
 import logging
 
@@ -57,7 +57,7 @@ class Command(BaseCommand):
             return
 
         # 查詢 SMT 報工記錄
-        smt_reports = SMTProductionReport.objects.all()
+        smt_reports = SMTSupplementReport.objects.all()
         total_reports = smt_reports.count()
 
         # 顯示當前狀態
@@ -69,7 +69,7 @@ class Command(BaseCommand):
         # 顯示設備狀態
         self.stdout.write("\n🔧 設備狀態：")
         for equipment in smt_equipment:
-            today_reports = SMTProductionReport.objects.filter(
+            today_reports = SMTSupplementReport.objects.filter(
                 equipment=equipment, report_time__date=date.today()
             ).count()
 
@@ -154,12 +154,12 @@ class Command(BaseCommand):
         # 重新查詢設備狀態
         smt_equipment = Equipment.objects.filter(name__icontains="SMT").order_by("name")
 
-        remaining_reports = SMTProductionReport.objects.count()
+        remaining_reports = SMTSupplementReport.objects.count()
         self.stdout.write(f"  • 剩餘 SMT 報工記錄：{remaining_reports} 筆")
 
         self.stdout.write("\n🔧 設備狀態：")
         for equipment in smt_equipment:
-            today_reports = SMTProductionReport.objects.filter(
+            today_reports = SMTSupplementReport.objects.filter(
                 equipment=equipment, report_time__date=date.today()
             ).count()
 

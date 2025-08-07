@@ -91,7 +91,7 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         # 獲取所有已核准的報工記錄
         from workorder.workorder_reporting.models import (
             OperatorSupplementReport,
-            SMTProductionReport,
+            SMTSupplementReport,
         )
 
         # 作業員補登報工記錄（已核准）
@@ -100,7 +100,7 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         ).order_by("work_date", "start_time")
 
         # SMT生產報工記錄（已核准）
-        smt_reports = SMTProductionReport.objects.filter(
+        smt_reports = SMTSupplementReport.objects.filter(
             workorder=workorder, approval_status="approved"
         ).order_by("work_date", "start_time")
 

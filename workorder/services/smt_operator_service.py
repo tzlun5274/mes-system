@@ -6,7 +6,7 @@ SMT設備作業員名稱服務
 from typing import Optional, Dict, List
 from equip.models import Equipment
 from process.models import Operator
-from workorder.workorder_reporting.models import SMTProductionReport
+from workorder.workorder_reporting.models import SMTSupplementReport
 
 
 class SMTOperatorService:
@@ -101,7 +101,7 @@ class SMTOperatorService:
     def create_smt_report_with_operator_name(
         equipment: Equipment,
         **kwargs
-    ) -> SMTProductionReport:
+    ) -> SMTSupplementReport:
         """
         建立SMT報工記錄，自動設定作業員名稱
         
@@ -110,23 +110,22 @@ class SMTOperatorService:
             **kwargs: 其他報工參數
             
         Returns:
-            SMTProductionReport: 建立的報工記錄
+            SMTSupplementReport: 建立的報工記錄
         """
         # 自動設定設備作業員名稱
         equipment_operator_name = SMTOperatorService.get_smt_equipment_operator_name(equipment.name)
         
         # 建立報工記錄
-        report = SMTProductionReport.objects.create(
+        report = SMTSupplementReport.objects.create(
             equipment=equipment,
             equipment_operator_name=equipment_operator_name,
-            operator=equipment_operator_name,  # 同時設定operator欄位
             **kwargs
         )
         
         return report
     
     @staticmethod
-    def update_smt_report_operator_name(report: SMTProductionReport) -> None:
+    def update_smt_report_operator_name(report: SMTSupplementReport) -> None:
         """
         更新SMT報工記錄的作業員名稱
         
@@ -136,11 +135,10 @@ class SMTOperatorService:
         if report.equipment:
             equipment_operator_name = SMTOperatorService.get_smt_equipment_operator_name(report.equipment.name)
             report.equipment_operator_name = equipment_operator_name
-            report.operator = equipment_operator_name
             report.save()
     
     @staticmethod
-    def get_operator_display_name_for_report(report: SMTProductionReport) -> str:
+    def get_operator_display_name_for_report(report: SMTSupplementReport) -> str:
         """
         取得報工記錄的作業員顯示名稱
         
@@ -177,7 +175,7 @@ class SMTOperatorService:
         smt_equipment = Equipment.objects.filter(name__icontains='SMT').count()
         
         # 取得SMT報工記錄統計
-        smt_reports = SMTProductionReport.objects.filter(
+        smt_reports = SMTSupplementReport.objects.filter(
             equipment__name__icontains='SMT'
         ).count()
         

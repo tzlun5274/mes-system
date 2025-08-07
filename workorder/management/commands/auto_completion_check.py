@@ -218,7 +218,7 @@ class Command(BaseCommand):
         將已完工的工單資料轉寫到已完工工單資料表
         
         正確的資料流程：
-        1. 報工資料表 (OperatorSupplementReport, SMTProductionReport) - 永遠保留原始記錄
+        1. 報工資料表 (OperatorSupplementReport, SMTSupplementReport) - 永遠保留原始記錄
         2. 生產中資料表 (WorkOrderProductionDetail) - 轉移到已完工資料表
         3. 工單記錄 (WorkOrder) - 狀態改為已完工，不刪除記錄
         

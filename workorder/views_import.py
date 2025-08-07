@@ -15,7 +15,7 @@ from datetime import datetime, time
 from io import BytesIO
 
 from workorder.models import WorkOrder
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
 from process.models import Operator, ProcessName
 from equip.models import Equipment
 from erp_integration.models import CompanyConfig
@@ -915,9 +915,9 @@ def smt_report_import_file(request):
                 
                 # 13. 檢查是否已存在相同記錄（避免重複匯入）
                 # 暫時註解掉重複檢查功能，讓所有資料都能匯入
-                # from workorder.workorder_reporting.models import SMTProductionReport
+                # from workorder.workorder_reporting.models import SMTSupplementReport
                 # 
-                # existing_report = SMTProductionReport.objects.filter(
+                # existing_report = SMTSupplementReport.objects.filter(
                 #     equipment=equipment,
                 #     workorder=workorder,
                 #     operation=process_name,
@@ -941,7 +941,6 @@ def smt_report_import_file(request):
                 # 直接使用匯入的工單號碼，不進行工單查找
                 report_data = {
                     'equipment': equipment,
-                    'operator': equipment_operator_name,  # 設定作業員名稱
                     'equipment_operator_name': equipment_operator_name,  # 設定設備作業員名稱
                     'company_code': company_code,  # 加入公司代號
                     'product_id': product_code,  # 直接使用匯入的產品編號
@@ -958,7 +957,7 @@ def smt_report_import_file(request):
                     'original_workorder_number': workorder_number  # 直接使用匯入的工單號碼
                 }
                 
-                report = SMTProductionReport.objects.create(**report_data)
+                report = SMTSupplementReport.objects.create(**report_data)
                 
                 # 15. 自動計算工時
                 report.calculate_work_hours()
@@ -1225,9 +1224,9 @@ def smt_report_export(request):
     支援篩選條件和Excel格式匯出
     """
     try:
-        from workorder.workorder_reporting.models import SMTProductionReport
+        from workorder.workorder_reporting.models import SMTSupplementReport
         
-        reports = SMTProductionReport.objects.all().order_by('-work_date')
+        reports = SMTSupplementReport.objects.all().order_by('-work_date')
         
         # 篩選條件
         date_from = request.GET.get('date_from')
@@ -1266,7 +1265,7 @@ def smt_report_export(request):
         for row, report in enumerate(reports, 2):
             ws.cell(row=row, column=1, value=report.equipment.name if report.equipment else '')
             
-            # 改善公司代號處理：優先從 SMTProductionReport 的 company_code 欄位取得
+            # 改善公司代號處理：優先從 SMTSupplementReport 的 company_code 欄位取得
             company_code = ''
             if report.company_code:
                 company_code = report.company_code

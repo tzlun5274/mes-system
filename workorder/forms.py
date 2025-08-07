@@ -10,7 +10,7 @@ from .models import (
     WorkOrderProductionDetail,
     AutoManagementConfig,
 )
-from .workorder_reporting.models import SMTProductionReport, OperatorSupplementReport
+from .workorder_reporting.models import SMTSupplementReport, OperatorSupplementReport
 from process.models import Operator
 from equip.models import Equipment
 from datetime import datetime, date, timedelta
@@ -410,7 +410,7 @@ class SMTSupplementReportForm(ProductionReportBaseForm):
     )
 
     class Meta:
-        model = SMTProductionReport
+        model = SMTSupplementReport
         fields = [
             "workorder",
             "product_id",
@@ -1671,7 +1671,7 @@ class RDSampleSupplementReportForm(ProductionReportBaseForm):
 
 # ==================== SMT補登報工表單 ====================
 
-# 已刪除違反設計規範的 SMTProductionReportForm
+# 已刪除違反設計規範的 SMTSupplementReportForm
 # 現在使用符合規範的 SMTSupplementReportForm，它繼承自 ProductionReportBaseForm
 
 

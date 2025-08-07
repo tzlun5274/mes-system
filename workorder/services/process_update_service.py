@@ -7,7 +7,7 @@ import logging
 from django.db import transaction
 from django.db.models import Sum
 from workorder.models import WorkOrder, WorkOrderProcess
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTProductionReport
+from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class ProcessUpdateService:
                 approval_status='approved'
             )
             
-            smt_reports = SMTProductionReport.objects.filter(
+            smt_reports = SMTSupplementReport.objects.filter(
                 workorder=process.workorder,
                 operation=process.process_name,
                 approval_status='approved'
