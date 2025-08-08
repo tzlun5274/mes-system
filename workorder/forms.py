@@ -697,6 +697,7 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
         model = OperatorSupplementReport
         fields = [
             "operator",
+            "report_type",
             "workorder",
             "product_id",
             "process",
@@ -714,6 +715,7 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
         ]
         labels = {
             "operator": "作業員",
+            "report_type": "報工類型",
             "workorder": "工單號碼",
             "product_id": "產品編號",
             "process": "工序",
