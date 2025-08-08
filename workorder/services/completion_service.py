@@ -9,7 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.db.models import Sum, Count, Q
 from workorder.models import WorkOrder, WorkOrderProduction, WorkOrderProductionDetail, CompletedWorkOrder
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
+from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
 
 # 移除主管報工引用，避免混淆
 # 主管職責：監督、審核、管理，不代為報工

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}新增SMT RD樣品補登報工{% endblock %}
+{% block title %}新增備用SMT RD樣品補登報工{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -215,14 +215,14 @@
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h2>
-                        <i class="fas fa-flask"></i> 新增SMT RD樣品補登報工
+                        <i class="fas fa-flask"></i> 新增備用SMT RD樣品補登報工
                     </h2>
-                    <p>建立新的SMT RD樣品補登報工記錄</p>
+                    <p>建立新的備用SMT RD樣品補登報工記錄</p>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
-                    <!-- 新增SMT補登報工按鈕 -->
+                    <!-- 新增備用SMT補登報工按鈕 -->
                     <a href="{% url 'workorder:smt_supplement_report_create' %}" class="btn btn-warning">
-                        <i class="fas fa-plus"></i> 新增SMT補登報工
+                        <i class="fas fa-plus"></i> 新增備用SMT補登報工
                     </a>
                     <!-- 返回按鈕 -->
                     <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-secondary">

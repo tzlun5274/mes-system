@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}報工統計分析{% endblock %}
+{% block title %}備用報工統計分析{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -95,12 +95,12 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
                     <i class="fas fa-chart-bar text-primary"></i>
-                    報工統計分析
+                    備用報工統計分析
                 </h2>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">備用報工管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor:supervisor_functions' %}">主管功能</a></li>
                         <li class="breadcrumb-item active" aria-current="page">統計分析</li>
                     </ol>
@@ -113,19 +113,19 @@
     <div class="stats-overview">
         <div class="stat-card">
             <div class="stat-number">{{ stats.total_reports_today|default:0 }}</div>
-            <div class="stat-label">今日報工總數</div>
+            <div class="stat-label">今日備用報工總數</div>
         </div>
         <div class="stat-card">
             <div class="stat-number">{{ stats.total_reports_week|default:0 }}</div>
-            <div class="stat-label">本週報工總數</div>
+            <div class="stat-label">本週備用報工總數</div>
         </div>
         <div class="stat-card">
             <div class="stat-number">{{ stats.total_reports_month|default:0 }}</div>
-            <div class="stat-label">本月報工總數</div>
+            <div class="stat-label">本月備用報工總數</div>
         </div>
         <div class="stat-card">
             <div class="stat-number">{{ stats.total_reports_year|default:0 }}</div>
-            <div class="stat-label">今年報工總數</div>
+            <div class="stat-label">今年備用報工總數</div>
         </div>
     </div>
 
@@ -134,7 +134,7 @@
         <div class="col-md-6">
             <div class="analysis-section">
                 <div class="analysis-title">
-                    <i class="fas fa-user mr-2"></i>作業員報工統計
+                    <i class="fas fa-user mr-2"></i>備用作業員報工統計
                 </div>
                 <div class="row">
                     <div class="col-6">
@@ -178,7 +178,7 @@
         <div class="col-md-6">
             <div class="analysis-section">
                 <div class="analysis-title">
-                    <i class="fas fa-microchip mr-2"></i>SMT報工統計
+                    <i class="fas fa-microchip mr-2"></i>備用SMT報工統計
                 </div>
                 <div class="row">
                     <div class="col-6">

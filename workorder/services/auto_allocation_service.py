@@ -9,7 +9,7 @@ import logging
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
-from workorder.workorder_reporting.models import OperatorSupplementReport
+from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
 from workorder.models import WorkOrder, CompletedWorkOrder, CompletedProductionReport
 
 logger = logging.getLogger(__name__)
@@ -233,7 +233,7 @@ class AutoAllocationService:
             )
         
         # 查詢原始報工記錄中未檢查過的記錄
-        from workorder.workorder_reporting.models import OperatorSupplementReport
+        from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
         original_pending_reports = OperatorSupplementReport.objects.filter(
             work_quantity=0,  # 數量為0
             allocation_checked=False  # 未檢查過的記錄
@@ -400,7 +400,7 @@ class AutoAllocationService:
         ).select_related('completed_workorder')
         
         # 同時查詢原始報工記錄中未檢查過的記錄
-        from workorder.workorder_reporting.models import OperatorSupplementReport
+        from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
         original_pending_reports = OperatorSupplementReport.objects.filter(
             work_quantity=0,  # 數量為0
             allocation_checked=False  # 未檢查過的記錄

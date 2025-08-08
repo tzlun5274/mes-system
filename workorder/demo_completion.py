@@ -17,7 +17,7 @@ django.setup()
 from django.contrib.auth.models import User
 from django.utils import timezone
 from workorder.models import WorkOrder, WorkOrderProcess
-from workorder.workorder_reporting.models import OperatorSupplementReport
+from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
 from workorder.services.completion_service import WorkOrderCompletionService
 
 

@@ -21,9 +21,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 
-from workorder.models import (
-    WorkOrder, OperatorSupplementReport, SMTSupplementReport
-)
+from workorder.models import WorkOrder
+from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
 from equip.models import Equipment
 from django.contrib.auth.models import User
 

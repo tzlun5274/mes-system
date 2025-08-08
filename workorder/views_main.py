@@ -19,9 +19,9 @@ from .models import (
 
 # 導入子模組的模型
 from .workorder_erp.models import PrdMKOrdMain, SystemConfig, CompanyOrder
-from .workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport, SMTRealtimeReport
+from .workorder_reporting.models import BackupOperatorSupplementReport, BackupSMTSupplementReport, BackupSMTRealtimeReport
 from .tasks import get_standard_processes
-from .forms import WorkOrderForm, OperatorSupplementReportForm, OperatorOnSiteReportForm, SMTSupplementReportForm
+from .forms import WorkOrderForm, BackupOperatorSupplementReportForm, OperatorOnSiteReportForm, SMTSupplementReportForm
 from django.contrib import messages
 
 from datetime import datetime, timedelta, date
@@ -1886,7 +1886,7 @@ def clear_all_production_reports(request):
     包括：作業員補登報工、SMT補登報工、SMT現場報工
     只有管理員可以執行此操作
     """
-    from .workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
+    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
     
     if not (request.user.is_staff or request.user.is_superuser):
         messages.error(request, "只有管理員可以執行此操作")
@@ -2552,7 +2552,7 @@ def batch_approve_pending(request):
     批次審核所有待審核報工記錄 API
     只有超級管理員可以使用此功能
     """
-    from .workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
+    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
     
     # 檢查是否為超級管理員
     if not request.user.is_superuser:
@@ -3194,7 +3194,7 @@ def report_statistics(request):
     """
     from datetime import date, timedelta
     from django.db.models import Q, Count, Sum, Avg
-    from .models import OperatorSupplementReport, SMTSupplementReport
+    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
     
     today = date.today()
     month_start = today.replace(day=1)
@@ -3326,7 +3326,7 @@ def abnormal_management(request):
     """
     from datetime import date, timedelta
     from django.db.models import Q
-    from .models import OperatorSupplementReport, SMTSupplementReport
+    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
     
     today = date.today()
     week_start = today - timedelta(days=7)
@@ -3483,7 +3483,7 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
     異常詳情頁面
     顯示特定異常的詳細資訊
     """
-    from .models import OperatorSupplementReport, SMTSupplementReport
+    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
     
     try:
         if abnormal_type == 'operator':
@@ -3519,7 +3519,7 @@ def data_maintenance(request):
     """
     from datetime import date, timedelta
     from django.db.models import Q, Count
-    from .models import OperatorSupplementReport, SMTSupplementReport
+    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
     
     today = date.today()
     
@@ -3970,7 +3970,7 @@ def operator_report_index(request):
     顯示作業員報工的主要功能卡片和統計資訊
     """
     from .services.statistics_service import StatisticsService
-    from .models import OperatorSupplementReport
+    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
     
     # 使用統一的統計服務 - 僅作業員數據
     context = StatisticsService.get_operator_only_statistics()
@@ -3994,7 +3994,7 @@ def smt_report_index(request):
     顯示SMT報工的主要功能卡片和統計資訊
     """
     from equip.models import Equipment
-    from .models import SMTSupplementReport
+    from workorder.workorder_reporting.models import BackupSMTSupplementReport as SMTSupplementReport
     from .services.statistics_service import StatisticsService
     
     # 使用統一的統計服務 - 僅SMT數據
@@ -4042,7 +4042,7 @@ def smt_on_site_report(request):
     """
     from equip.models import Equipment
     from datetime import date
-    from .models import SMTSupplementReport
+    from workorder.workorder_reporting.models import BackupSMTSupplementReport as SMTSupplementReport
     
     # 取得 SMT 設備列表（假設設備名稱包含 'SMT' 或 '貼片'）
     equipment_list = Equipment.objects.filter(
@@ -4168,7 +4168,7 @@ def submit_smt_report(request):
         workorder = WorkOrder.objects.get(id=workorder_id)
         
         # 建立報工記錄
-        from .models import SMTSupplementReport
+        from workorder.workorder_reporting.models import BackupSMTSupplementReport as SMTSupplementReport
         from process.models import ProcessName
         from django.utils import timezone
         
@@ -4278,7 +4278,7 @@ def operator_on_site_report(request):
 
     
     # 獲取統計資料
-    from workorder.models import OperatorSupplementReport
+    from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
     today_reports = OperatorSupplementReport.objects.filter(
         work_date=timezone.now().date()
     ).count()
@@ -4293,7 +4293,7 @@ def operator_on_site_report(request):
     
     context = {
         'form': form,
-        'title': '作業員現場報工',
+        'title': '備用作業員現場報工',
         'operator_list': operator_list,
         'equipment_list': equipment_list,
         'working_operators': working_operators,
@@ -4763,7 +4763,7 @@ def operator_supplement_import_file(request):
     """作業員補登報工檔案匯入處理"""
     from process.models import Operator, ProcessName
     from workorder.models import WorkOrder
-    from workorder.workorder_reporting.models import OperatorSupplementReport
+    from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
     from datetime import datetime, time
     
     try:
@@ -5843,7 +5843,7 @@ def active_workorders(request):
     from django.core.paginator import Paginator
     from django.db.models import Q
     from workorder.models import WorkOrderProduction
-    from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
+    from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
     from erp_integration.models import CompanyConfig
     from datetime import date, timedelta
     

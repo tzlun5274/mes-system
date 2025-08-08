@@ -15,7 +15,7 @@ from .workorder_erp.models import PrdMKOrdMain, PrdMkOrdMats, CompanyOrder, Syst
 # from .workorder_completed.models import CompletedWorkOrder, CompletedWorkOrderProcess  # 已移除
 
 # 導入報工管理子模組的模型
-from .workorder_reporting.models import SMTSupplementReport, OperatorSupplementReport
+from .workorder_reporting.models import BackupSMTSupplementReport, BackupOperatorSupplementReport
 
 
 class WorkOrder(models.Model):

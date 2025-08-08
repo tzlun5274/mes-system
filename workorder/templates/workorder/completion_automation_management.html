@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}完工自動化管理{% endblock %}
+{% block title %}備用完工自動化管理{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -104,7 +104,7 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <h2 class="mb-0">
-                    <i class="fas fa-robot"></i> 完工自動化管理
+                    <i class="fas fa-robot"></i> 備用完工自動化管理
                 </h2>
                                         <a href="{% url 'workorder:supervisor_functions' %}" class="btn btn-outline-secondary">
                             <i class="fas fa-arrow-left"></i> 返回主管功能
@@ -200,7 +200,7 @@
                                         <div class="form-group mb-3">
                                             <label for="executionEnabled">
                                                 <input type="checkbox" id="executionEnabled" name="executionEnabled">
-                                                啟用完工自動化分配
+                                                啟用備用完工自動化分配
                                             </label>
                                         </div>
                                         
@@ -512,7 +512,7 @@
 
     // 立即執行自動分配
     function startManualExecution() {
-        if (confirm('確定要立即執行完工自動化分配嗎？')) {
+                        if (confirm('確定要立即執行備用完工自動化分配嗎？')) {
             showLoading();
             fetch('{% url "workorder:auto_allocation_execute" %}', {
                 method: 'POST',

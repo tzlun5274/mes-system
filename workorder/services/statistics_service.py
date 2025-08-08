@@ -5,7 +5,7 @@
 
 from datetime import date, timedelta
 from django.db.models import Q, Count
-from workorder.models import OperatorSupplementReport, SMTSupplementReport
+from workorder.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
 
 
 class StatisticsService:

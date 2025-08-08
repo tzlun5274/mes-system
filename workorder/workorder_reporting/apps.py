@@ -11,4 +11,4 @@ class WorkOrderReportingConfig(AppConfig):
     """
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'workorder.workorder_reporting'
-    verbose_name = '報工管理' 
+    verbose_name = '備用的報工管理' 

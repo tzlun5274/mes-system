@@ -94,7 +94,7 @@
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">備用報工管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor_report_index' %}">主管功能</a></li>
                         <li class="breadcrumb-item active" aria-current="page">已核准列表</li>
                     </ol>
@@ -120,13 +120,13 @@
         <div class="col-md-3">
             <div class="stats-card">
                 <div class="stats-number text-success">{{ operator_count }}</div>
-                <div class="stats-label">作業員報工</div>
+                                    <div class="stats-label">備用作業員報工</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="stats-card">
                 <div class="stats-number text-danger">{{ smt_count }}</div>
-                <div class="stats-label">SMT報工</div>
+                                    <div class="stats-label">備用SMT報工</div>
             </div>
         </div>
     </div>

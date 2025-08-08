@@ -10,7 +10,7 @@ from .models import (
     WorkOrderProductionDetail,
     AutoManagementConfig,
 )
-from .workorder_reporting.models import SMTSupplementReport, OperatorSupplementReport
+from .workorder_reporting.models import BackupSMTSupplementReport, BackupOperatorSupplementReport
 from process.models import Operator
 from equip.models import Equipment
 from datetime import datetime, date, timedelta
@@ -410,7 +410,7 @@ class SMTSupplementReportForm(ProductionReportBaseForm):
     )
 
     class Meta:
-        model = SMTSupplementReport
+        model = BackupSMTSupplementReport
         fields = [
             "workorder",
             "product_id",
@@ -671,7 +671,7 @@ class SMTSupplementBatchForm(forms.Form):
 # ==================== 作業員補登報工表單 ====================
 
 
-class OperatorSupplementReportForm(ProductionReportBaseForm):
+class BackupOperatorSupplementReportForm(ProductionReportBaseForm):
     """
     【規範】作業員補登報工表單
     - 繼承共用表單，專門用於作業員補登報工
@@ -694,7 +694,7 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
     )
 
     class Meta:
-        model = OperatorSupplementReport
+        model = BackupOperatorSupplementReport
         fields = [
             "operator",
             "report_type",
@@ -1040,7 +1040,7 @@ class OperatorSupplementReportForm(ProductionReportBaseForm):
         return choices
 
     class Meta:
-        model = OperatorSupplementReport
+        model = BackupOperatorSupplementReport
         fields = [
             "operator",
             "process",
@@ -1323,7 +1323,7 @@ class OperatorSupplementBatchForm(forms.Form):
         return cleaned_data
 
 
-class RDSampleSupplementReportForm(ProductionReportBaseForm):
+class BackupRDSampleSupplementReportForm(ProductionReportBaseForm):
     """
     【規範】RD樣品補登報工表單
     - 繼承共用表單，專門用於RD樣品的報工記錄
@@ -1386,7 +1386,7 @@ class RDSampleSupplementReportForm(ProductionReportBaseForm):
     )
 
     class Meta:
-        model = OperatorSupplementReport
+        model = BackupOperatorSupplementReport
         fields = [
             "operator",
             "workorder",
@@ -1624,7 +1624,7 @@ class RDSampleSupplementReportForm(ProductionReportBaseForm):
         return instance
 
     class Meta:
-        model = OperatorSupplementReport
+        model = BackupOperatorSupplementReport
         fields = [
             "operator",
             "process",
@@ -1777,7 +1777,7 @@ class OperatorOnSiteReportForm(forms.ModelForm):
     )
 
     class Meta:
-        model = OperatorSupplementReport
+        model = BackupOperatorSupplementReport
         fields = [
             "operator",
             "workorder",

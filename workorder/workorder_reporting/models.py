@@ -1,13 +1,13 @@
 """
-報工管理子模組 - 模型定義
-負責報工管理功能，包括SMT報工、作業員補登報工、主管報工等
+備用的報工管理子模組 - 模型定義
+負責備用的報工管理功能，包括SMT報工、作業員補登報工、主管報工等
 """
 
 from django.db import models
 from django.utils import timezone
 
 
-class SMTSupplementReport(models.Model):
+class BackupSMTSupplementReport(models.Model):
     """
     SMT 補登報工記錄模型 (SMT Supplement Report Model)
     專為SMT設備的歷史報工記錄管理而設計，支援離線數據輸入、歷史數據修正和批量數據處理
@@ -218,9 +218,9 @@ class SMTSupplementReport(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
 
     class Meta:
-        verbose_name = "SMT補登報工記錄"
-        verbose_name_plural = "SMT補登報工記錄"
-        db_table = "workorder_smt_supplement_report"
+        verbose_name = "備用的SMT補登報工記錄"
+        verbose_name_plural = "備用的SMT補登報工記錄"
+        db_table = "backup_workorder_smt_supplement_report"
         ordering = ["-work_date", "-start_time"]
 
     def __str__(self):
@@ -416,7 +416,7 @@ class SMTSupplementReport(models.Model):
         return True
 
 
-class SMTRealtimeReport(models.Model):
+class BackupSMTRealtimeReport(models.Model):
     """
     SMT 現場報工記錄模型 (SMT Realtime Report Model)
     專為SMT設備現場即時報工而設計，支援快速數據輸入和狀態更新
@@ -549,9 +549,9 @@ class SMTRealtimeReport(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
 
     class Meta:
-        verbose_name = "SMT現場報工記錄"
-        verbose_name_plural = "SMT現場報工記錄"
-        db_table = "workorder_smt_realtime_report"
+        verbose_name = "備用的SMT現場報工記錄"
+        verbose_name_plural = "備用的SMT現場報工記錄"
+        db_table = "backup_workorder_smt_realtime_report"
         ordering = ["-work_date", "-start_time"]
 
     def __str__(self):
@@ -608,7 +608,7 @@ class SMTRealtimeReport(models.Model):
         return True
 
 
-class OperatorRealtimeReport(models.Model):
+class BackupOperatorRealtimeReport(models.Model):
     """
     作業員現場報工記錄模型 (Operator Realtime Report Model)
     專為作業員現場即時報工而設計，支援快速數據輸入和狀態更新
@@ -727,9 +727,9 @@ class OperatorRealtimeReport(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
 
     class Meta:
-        verbose_name = "作業員現場報工記錄"
-        verbose_name_plural = "作業員現場報工記錄"
-        db_table = "workorder_operator_realtime_report"
+        verbose_name = "備用的作業員現場報工記錄"
+        verbose_name_plural = "備用的作業員現場報工記錄"
+        db_table = "backup_workorder_operator_realtime_report"
         ordering = ["-work_date", "-start_time"]
 
     def __str__(self):
@@ -770,7 +770,7 @@ class OperatorRealtimeReport(models.Model):
         return 0.0
 
 
-class OperatorSupplementReport(models.Model):
+class BackupOperatorSupplementReport(models.Model):
     """
     作業員補登報工記錄模型 (Operator Supplement Report Model)
     專為作業員的歷史報工記錄管理而設計，支援離線數據輸入、歷史數據修正和批量數據處理
@@ -1107,9 +1107,9 @@ class OperatorSupplementReport(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
 
     class Meta:
-        verbose_name = "作業員補登報工記錄"
-        verbose_name_plural = "作業員補登報工記錄"
-        db_table = "workorder_operator_supplement_report"
+        verbose_name = "備用的作業員補登報工記錄"
+        verbose_name_plural = "備用的作業員補登報工記錄"
+        db_table = "backup_workorder_operator_supplement_report"
         ordering = ["-work_date", "-start_time"]
 
     def __str__(self):

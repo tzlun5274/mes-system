@@ -15,7 +15,7 @@ from datetime import datetime, time
 from io import BytesIO
 
 from workorder.models import WorkOrder
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
+from workorder.workorder_reporting.models import BackupOperatorSupplementReport, BackupSMTSupplementReport
 from process.models import Operator, ProcessName
 from equip.models import Equipment
 from erp_integration.models import CompanyConfig
@@ -1224,7 +1224,7 @@ def smt_report_export(request):
     支援篩選條件和Excel格式匯出
     """
     try:
-        from workorder.workorder_reporting.models import SMTSupplementReport
+        from workorder.workorder_reporting.models import BackupSMTSupplementReport as SMTSupplementReport
         
         reports = SMTSupplementReport.objects.all().order_by('-work_date')
         

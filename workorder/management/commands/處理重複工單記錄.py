@@ -6,7 +6,7 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from workorder.models import WorkOrder, WorkOrderProductionDetail
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
+from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
 import logging
 
 logger = logging.getLogger(__name__)

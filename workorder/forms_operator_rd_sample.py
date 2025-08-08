@@ -4,7 +4,7 @@
 """
 
 from django import forms
-from workorder.workorder_reporting.models import OperatorSupplementReport
+from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
 
 
 class OperatorRDSampleSupplementReportForm(forms.ModelForm):

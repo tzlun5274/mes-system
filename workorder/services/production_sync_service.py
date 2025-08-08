@@ -8,7 +8,7 @@ from datetime import datetime
 from django.db import transaction
 from django.utils import timezone
 from workorder.models import WorkOrder, WorkOrderProduction, WorkOrderProductionDetail
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
+from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
 
 logger = logging.getLogger(__name__)
 

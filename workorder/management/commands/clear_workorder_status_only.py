@@ -5,7 +5,7 @@
 import logging
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
+from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
 
 # 移除主管報工相關程式碼，避免混淆
 # 主管職責：監督、審核、管理，不代為報工

@@ -172,14 +172,14 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
                     <i class="fas fa-clock text-warning"></i>
-                    作業員補登報工
+                    備用的作業員補登報工
                 </h2>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_report_index' %}">作業員報工</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">補登報工</li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">備用報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:operator_supplement_report_index' %}">備用作業員報工</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">備用補登報工</li>
                     </ol>
                 </nav>
             </div>
@@ -214,7 +214,7 @@
             <div class="card operator-supplement-card">
                 <div class="card-header bg-warning text-dark">
                     <h5 class="mb-0">
-                        <i class="fas fa-tools"></i> 作業員補登報工功能
+                        <i class="fas fa-tools"></i> 備用的作業員補登報工功能
                     </h5>
                 </div>
                 <div class="card-body">
@@ -232,7 +232,7 @@
                         {% if user.is_staff or user.is_superuser %}
                         <div class="col-md-3">
                             <a href="{% url 'workorder:operator_on_site_report' %}" class="btn btn-info btn-lg btn-block mb-2">
-                                <i class="fas fa-user-clock"></i> 作業員現場報工
+                                <i class="fas fa-user-clock"></i> 備用作業員現場報工
                             </a>
                         </div>
 
@@ -240,7 +240,7 @@
                         {% if user.is_superuser %}
                         <div class="col-md-3 ml-auto">
                             <a href="{% url 'workorder:operator_supplement_batch' %}" class="btn btn-primary btn-lg btn-block mb-2">
-                                <i class="fas fa-upload"></i> 作業員報工資料維護
+                                <i class="fas fa-upload"></i> 備用作業員報工資料維護
                             </a>
                         </div>
                         {% endif %}
@@ -338,7 +338,7 @@
             <div class="card operator-supplement-card">
                 <div class="card-header bg-secondary text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-clock"></i> 待核准作業員補登報工列表
+                        <i class="fas fa-clock"></i> 待核准備用作業員補登報工列表
                     </h5>
                 </div>
                 <div class="card-body">
@@ -445,7 +445,7 @@
 
 {% block extra_js %}
 <script>
-    // 作業員補登報工專用 JavaScript
+    // 備用的作業員補登報工專用 JavaScript
     document.addEventListener('DOMContentLoaded', function() {
         // 卡片懸停效果
         const cards = document.querySelectorAll('.operator-supplement-card');

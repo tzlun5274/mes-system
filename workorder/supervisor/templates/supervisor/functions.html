@@ -185,16 +185,16 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
                     <i class="fas fa-cogs text-warning"></i>
-                    主管功能首頁
+                    備用主管功能首頁
                 </h2>
                 <div class="d-flex align-items-center">
                     <a href="{% url 'workorder:report_index' %}" class="btn btn-outline-primary me-3">
-                        <i class="fas fa-arrow-left me-2"></i>返回報工管理
+                        <i class="fas fa-arrow-left me-2"></i>返回備用的報工管理
                     </a>
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb">
                             <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                            <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                            <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">備用的報工管理</a></li>
                             <li class="breadcrumb-item active" aria-current="page">主管功能</li>
                         </ol>
                     </nav>
@@ -207,19 +207,19 @@
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-number">{{ stats.total_reports_today|default:0 }}</div>
-            <div class="stat-label">今日報工總數</div>
+            <div class="stat-label">今日備用報工總數</div>
         </div>
         <div class="stat-card">
             <div class="stat-number">{{ stats.total_reports_month|default:0 }}</div>
-            <div class="stat-label">本月報工總數</div>
+            <div class="stat-label">本月備用報工總數</div>
         </div>
         <div class="stat-card">
             <div class="stat-number">{{ stats.pending_reports|default:0 }}</div>
-            <div class="stat-label">待審核報工</div>
+            <div class="stat-label">待審核備用報工</div>
         </div>
         <div class="stat-card">
             <div class="stat-number">{{ stats.abnormal_reports|default:0 }}</div>
-            <div class="stat-label">異常報工</div>
+            <div class="stat-label">備用異常報工</div>
         </div>
     </div>
 
@@ -230,9 +230,9 @@
             <div class="function-icon">
                 <i class="fas fa-chart-bar"></i>
             </div>
-            <div class="function-title">報工統計分析</div>
+            <div class="function-title">備用報工統計分析</div>
             <div class="function-description">
-                查看各類型報工的詳細統計資訊，包含產能分析、效率評估等。
+                查看各類型備用報工的詳細統計資訊，包含產能分析、效率評估等。
             </div>
             <button class="function-button" onclick="location.href='{% url 'workorder:supervisor:report_statistics' %}'">
                 <i class="fas fa-chart-line"></i> 進入統計
@@ -244,9 +244,9 @@
             <div class="function-icon">
                 <i class="fas fa-exclamation-triangle"></i>
             </div>
-            <div class="function-title">異常處理</div>
+            <div class="function-title">備用異常處理</div>
             <div class="function-description">
-                處理報工異常情況，包含異常原因分析、處理方案制定等。
+                處理備用報工異常情況，包含異常原因分析、處理方案制定等。
             </div>
             <button class="function-button" onclick="location.href='{% url 'workorder:supervisor:abnormal_management' %}'">
                 <i class="fas fa-tools"></i> 處理異常
@@ -258,9 +258,9 @@
             <div class="function-icon">
                 <i class="fas fa-user-check"></i>
             </div>
-            <div class="function-title">審核管理</div>
+            <div class="function-title">備用審核管理</div>
             <div class="function-description">
-                管理報工審核流程，包含批量審核、審核歷史等。
+                管理備用報工審核流程，包含批量審核、審核歷史等。
             </div>
             <button class="function-button" onclick="location.href='{% url 'workorder:supervisor:supervisor_report_index' %}'">
                 <i class="fas fa-clipboard-check"></i> 進入審核
@@ -272,9 +272,9 @@
             <div class="function-icon">
                 <i class="fas fa-database"></i>
             </div>
-            <div class="function-title">資料維護</div>
+            <div class="function-title">備用資料維護</div>
             <div class="function-description">
-                維護報工相關資料，包含資料清理、備份還原等。
+                維護備用報工相關資料，包含資料清理、備份還原等。
             </div>
             <button class="function-button" onclick="location.href='{% url 'workorder:supervisor:data_maintenance' %}'">
                 <i class="fas fa-wrench"></i> 資料維護
@@ -286,9 +286,9 @@
             <div class="function-icon">
                 <i class="fas fa-robot"></i>
             </div>
-            <div class="function-title">完工自動化管理</div>
+            <div class="function-title">備用完工自動化管理</div>
             <div class="function-description">
-                管理完工相關的自動化功能，包含完工判斷、智能分配、自動核准等，可設定執行間隔和監控執行狀態。
+                管理備用報工完工相關的自動化功能，包含完工判斷、智能分配、自動核准等，可設定執行間隔和監控執行狀態。
             </div>
             <div class="function-buttons">
                 <a href="{% url 'workorder:completion_automation_management' %}" class="function-button">

@@ -6,7 +6,7 @@ SMT設備作業員名稱服務
 from typing import Optional, Dict, List
 from equip.models import Equipment
 from process.models import Operator
-from workorder.workorder_reporting.models import SMTSupplementReport
+from workorder.workorder_reporting.models import BackupSMTSupplementReport as SMTSupplementReport
 
 
 class SMTOperatorService:

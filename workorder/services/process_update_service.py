@@ -7,7 +7,7 @@ import logging
 from django.db import transaction
 from django.db.models import Sum
 from workorder.models import WorkOrder, WorkOrderProcess
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
+from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
 
 logger = logging.getLogger(__name__)
 

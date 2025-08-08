@@ -22,10 +22,11 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.contrib.auth.decorators import login_required
 
-from ..workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
+from ..workorder_reporting.models import BackupOperatorSupplementReport, BackupSMTSupplementReport
 from ..forms import (
     SMTSupplementReportForm,
-    OperatorSupplementReportForm,
+    BackupOperatorSupplementReportForm,
+    BackupRDSampleSupplementReportForm,
     # 移除主管報工相關的 form，避免混淆
     # 主管職責：監督、審核、管理，不代為報工
 )
@@ -38,8 +39,8 @@ from production.models import ProductionLine
 
 class ReportIndexView(LoginRequiredMixin, ListView):
     """
-    報工管理首頁視圖
-    顯示報工功能的總覽
+    生產環境報工管理首頁視圖
+    顯示生產環境的報工功能總覽
     """
 
     template_name = "workorder/report/index.html"
@@ -47,7 +48,7 @@ class ReportIndexView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         """取得最近的報工記錄"""
-        return OperatorSupplementReport.objects.all()[:10]
+        return BackupOperatorSupplementReport.objects.all()[:10]
 
     def get_context_data(self, **kwargs):
         """提供模板所需的上下文數據"""
@@ -69,7 +70,7 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
     顯示所有待核准的作業員補登報工記錄
     """
 
-    model = OperatorSupplementReport
+    model = BackupOperatorSupplementReport
     template_name = "workorder/report/operator/supplement/index.html"
     context_object_name = "supplement_reports"
     paginate_by = 20  # 每頁顯示20筆記錄
@@ -135,28 +136,28 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
         }
 
         # 計算統計數據
-        context["pending_count"] = OperatorSupplementReport.objects.filter(
+        context["pending_count"] = BackupOperatorSupplementReport.objects.filter(
             approval_status="pending"
         ).count()
 
-        context["approved_count"] = OperatorSupplementReport.objects.filter(
+        context["approved_count"] = BackupOperatorSupplementReport.objects.filter(
             approval_status="approved"
         ).count()
 
-        context["rejected_count"] = OperatorSupplementReport.objects.filter(
+        context["rejected_count"] = BackupOperatorSupplementReport.objects.filter(
             approval_status="rejected"
         ).count()
 
         # 添加選項數據供篩選下拉選單使用
         context["operators"] = (
-            Operator.objects.filter(operatorsupplementreport__approval_status="pending")
+            Operator.objects.filter(backupoperatorsupplementreport__approval_status="pending")
             .distinct()
             .order_by("name")
         )
 
         context["processes"] = (
             ProcessName.objects.filter(
-                operatorsupplementreport__approval_status="pending"
+                backupoperatorsupplementreport__approval_status="pending"
             )
             .distinct()
             .order_by("name")
@@ -164,7 +165,7 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
 
         context["workorders"] = (
             WorkOrder.objects.filter(
-                operatorsupplementreport__approval_status="pending"
+                backupoperatorsupplementreport__approval_status="pending"
             )
             .distinct()
             .order_by("-created_at")[:50]
@@ -180,12 +181,12 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
 
 class OperatorSupplementReportCreateView(LoginRequiredMixin, CreateView):
     """
-    作業員補登報工新增視圖
+    備用的作業員補登報工新增視圖
     用於建立新的作業員補登報工記錄
     """
 
-    model = OperatorSupplementReport
-    form_class = OperatorSupplementReportForm
+    model = BackupOperatorSupplementReport
+    form_class = BackupOperatorSupplementReportForm
     template_name = "workorder/report/operator/supplement/form.html"
     success_url = reverse_lazy("workorder:operator_supplement_report_index")
 
@@ -203,12 +204,12 @@ class OperatorSupplementReportCreateView(LoginRequiredMixin, CreateView):
 
 class OperatorSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
     """
-    作業員補登報工編輯視圖
+    備用的作業員補登報工編輯視圖
     用於編輯現有作業員補登報工記錄
     """
 
-    model = OperatorSupplementReport
-    form_class = OperatorSupplementReportForm
+    model = BackupOperatorSupplementReport
+    form_class = BackupOperatorSupplementReportForm
     template_name = "workorder/report/operator/supplement/form.html"
     success_url = reverse_lazy("workorder:operator_supplement_report_index")
 
@@ -225,11 +226,11 @@ class OperatorSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
 
 class OperatorSupplementReportDetailView(LoginRequiredMixin, DetailView):
     """
-    作業員補登報工詳情視圖
+    備用的作業員補登報工詳情視圖
     顯示單一作業員補登報工記錄的詳細資訊
     """
 
-    model = OperatorSupplementReport
+    model = BackupOperatorSupplementReport
     template_name = "workorder/report/operator/supplement/detail.html"
     context_object_name = "report"
 
@@ -258,11 +259,11 @@ class OperatorSupplementReportDetailView(LoginRequiredMixin, DetailView):
 
 class SMTSupplementReportListView(LoginRequiredMixin, ListView):
     """
-    SMT補登報工列表視圖
+    備用的SMT補登報工列表視圖
     顯示所有SMT補登報工記錄
     """
 
-    model = SMTSupplementReport
+    model = BackupSMTSupplementReport
     template_name = "workorder/report/smt/supplement/index.html"
     context_object_name = "reports"
     paginate_by = 20
@@ -309,19 +310,19 @@ class SMTSupplementReportListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
 
         # 計算統計數據
-        context["pending_count"] = SMTSupplementReport.objects.filter(
+        context["pending_count"] = BackupSMTSupplementReport.objects.filter(
             approval_status="pending"
         ).count()
 
-        context["approved_count"] = SMTSupplementReport.objects.filter(
+        context["approved_count"] = BackupSMTSupplementReport.objects.filter(
             approval_status="approved"
         ).count()
 
-        context["rejected_count"] = SMTSupplementReport.objects.filter(
+        context["rejected_count"] = BackupSMTSupplementReport.objects.filter(
             approval_status="rejected"
         ).count()
 
-        context["total_count"] = SMTSupplementReport.objects.count()
+        context["total_count"] = BackupSMTSupplementReport.objects.count()
 
         # 添加篩選參數到上下文，用於保持表單狀態
         context["filters"] = {
@@ -359,11 +360,11 @@ class SMTSupplementReportListView(LoginRequiredMixin, ListView):
 
 class SMTSupplementReportCreateView(LoginRequiredMixin, CreateView):
     """
-    SMT補登報工新增視圖
+    備用的SMT補登報工新增視圖
     用於建立新的SMT補登報工記錄
     """
 
-    model = SMTSupplementReport
+    model = BackupSMTSupplementReport
     form_class = SMTSupplementReportForm
     template_name = "workorder/report/smt/supplement/form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -382,14 +383,20 @@ class SMTSupplementReportCreateView(LoginRequiredMixin, CreateView):
 
 class SMTSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
     """
-    SMT補登報工編輯視圖
+    備用的SMT補登報工編輯視圖
     用於編輯現有SMT補登報工記錄
     """
 
-    model = SMTSupplementReport
+    model = BackupSMTSupplementReport
     form_class = SMTSupplementReportForm
     template_name = "workorder/report/smt/supplement/form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
+
+    def get_context_data(self, **kwargs):
+        """添加備用系統標記"""
+        context = super().get_context_data(**kwargs)
+        context["is_backup"] = True
+        return context
 
     def form_valid(self, form):
         """表單驗證成功時的處理"""
@@ -404,11 +411,11 @@ class SMTSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
 
 class SMTSupplementReportDetailView(LoginRequiredMixin, DetailView):
     """
-    SMT補登報工詳情視圖
+    備用的SMT補登報工詳情視圖
     顯示單一SMT補登報工記錄的詳細資訊
     """
 
-    model = SMTSupplementReport
+    model = BackupSMTSupplementReport
     template_name = "workorder/report/smt/supplement/detail.html"
     context_object_name = "supplement_report"
 
@@ -443,11 +450,11 @@ class SMTSupplementReportDeleteView(
     LoginRequiredMixin, UserPassesTestMixin, DeleteView
 ):
     """
-    SMT補登報工刪除視圖
+    備用的SMT補登報工刪除視圖
     用於刪除SMT補登報工記錄，僅限管理員使用
     """
 
-    model = SMTSupplementReport
+    model = BackupSMTSupplementReport
     template_name = "workorder/report/smt/supplement/delete_confirm.html"
     context_object_name = "supplement_report"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -517,11 +524,11 @@ class OperatorSupplementReportDeleteView(
     LoginRequiredMixin, UserPassesTestMixin, DeleteView
 ):
     """
-    作業員補登報工刪除視圖
+    備用的作業員補登報工刪除視圖
     僅允許建立者本人或超級用戶刪除
     """
 
-    model = OperatorSupplementReport
+    model = BackupOperatorSupplementReport
     template_name = "workorder/report/operator/supplement/delete_confirm.html"
     context_object_name = "supplement_report"
     success_url = reverse_lazy("workorder:operator_supplement_report_index")
@@ -544,11 +551,11 @@ class OperatorSupplementReportDeleteView(
 
 class SMTRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView):
     """
-    SMT RD樣品補登報工新增視圖
+    備用的SMT RD樣品補登報工新增視圖
     用於建立新的SMT RD樣品補登報工記錄
     """
 
-    model = SMTSupplementReport
+    model = BackupSMTSupplementReport
     form_class = SMTRDSampleSupplementReportForm
     template_name = "workorder/report/smt/rd_sample/form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -567,11 +574,11 @@ class SMTRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView):
 
 class SMTRDSampleSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
     """
-    SMT RD樣品補登報工編輯視圖
+    備用的SMT RD樣品補登報工編輯視圖
     用於編輯現有SMT RD樣品補登報工記錄
     """
 
-    model = SMTSupplementReport
+    model = BackupSMTSupplementReport
     form_class = SMTRDSampleSupplementReportForm
     template_name = "workorder/report/smt/rd_sample/form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -592,12 +599,12 @@ class SMTRDSampleSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
 
 class OperatorRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView):
     """
-    作業員RD樣品補登報工新增視圖
+    備用的作業員RD樣品補登報工新增視圖
     使用專用的RD樣品表單
     """
 
-    model = OperatorSupplementReport
-    form_class = OperatorRDSampleSupplementReportForm
+    model = BackupOperatorSupplementReport
+    form_class = BackupRDSampleSupplementReportForm
     template_name = "workorder/report/operator/rd_sample_supplement/form.html"
 
     def get_success_url(self):
@@ -619,12 +626,12 @@ class OperatorRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView)
 
 class OperatorRDSampleSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
     """
-    作業員RD樣品補登報工編輯視圖
+    備用的作業員RD樣品補登報工編輯視圖
     使用專用的RD樣品表單
     """
 
-    model = OperatorSupplementReport
-    form_class = OperatorRDSampleSupplementReportForm
+    model = BackupOperatorSupplementReport
+    form_class = BackupRDSampleSupplementReportForm
     template_name = "workorder/report/operator/rd_sample_supplement/form.html"
 
     def get_success_url(self):
@@ -714,3 +721,17 @@ def reject_report(request, report_id):
         messages.error(request, f"駁回失敗：{str(e)}")
 
     return redirect("workorder:report_index")
+
+
+class BackupReportIndexView(ReportIndexView):
+    """
+    測試環境報工管理首頁視圖
+    使用與 ReportIndexView 相同的邏輯，但顯示測試環境標題
+    """
+    template_name = 'workorder/report/backup_index.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # 添加備用標識
+        context['is_backup'] = True
+        return context

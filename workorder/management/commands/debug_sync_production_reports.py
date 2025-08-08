@@ -6,7 +6,7 @@
 from django.core.management.base import BaseCommand
 from workorder.services import ProductionReportSyncService
 from workorder.models import WorkOrderProduction, WorkOrderProductionDetail
-from workorder.workorder_reporting.models import OperatorSupplementReport, SMTSupplementReport
+from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
 import logging
 from django.utils import timezone
 

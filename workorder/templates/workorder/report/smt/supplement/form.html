@@ -3,7 +3,7 @@
 {% load static %}
 
 {% block title %}
-    {% if supplement_report %}編輯SMT補登報工{% else %}新增SMT補登報工{% endif %}
+    {% if supplement_report %}編輯備用SMT補登報工{% else %}新增備用SMT補登報工{% endif %}
 {% endblock %}
 
 {% block extra_css %}
@@ -229,20 +229,20 @@
                     <div>
                     <h2>
                             <i class="fas fa-edit"></i> 
-                            {% if supplement_report %}編輯SMT補登報工{% else %}新增SMT補登報工{% endif %}
+                            {% if supplement_report %}編輯備用SMT補登報工{% else %}新增備用SMT補登報工{% endif %}
                         </h2>
                     <p>
                             {% if supplement_report %}
-                                修改SMT補登報工記錄的詳細資訊
+                                修改備用SMT補登報工記錄的詳細資訊
                             {% else %}
-                                建立新的SMT補登報工記錄
+                                建立新的備用SMT補登報工記錄
                             {% endif %}
                         </p>
                     </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
-                    <!-- 新增SMT RD樣品補登報工按鈕 -->
+                    <!-- 新增備用SMT RD樣品補登報工按鈕 -->
                     <a href="{% url 'workorder:smt_rd_sample_report_create' %}" class="btn btn-success">
-                        <i class="fas fa-flask"></i> 新增SMT RD樣品補登報工
+                        <i class="fas fa-flask"></i> 新增備用SMT RD樣品補登報工
                     </a>
                     <!-- 返回按鈕 -->
                     <a href="{% url 'workorder:smt_supplement_report_index' %}" class="btn btn-secondary">

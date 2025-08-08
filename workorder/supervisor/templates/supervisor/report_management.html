@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}審核管理{% endblock %}
+{% block title %}備用審核管理{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -147,13 +147,13 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
                     <i class="fas fa-user-check text-primary"></i>
-                    審核管理
+                    備用審核管理
                 </h2>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor:supervisor_functions' %}">主管功能</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">審核管理</li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor:supervisor_functions' %}">備用主管功能</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">備用審核管理</li>
                     </ol>
                 </nav>
             </div>
@@ -164,19 +164,19 @@
     <div class="stats-grid">
         <a href="{% url 'workorder:supervisor:pending_approval_list' %}" class="stat-card pending" style="text-decoration: none; cursor: pointer;">
             <div class="stat-number">{{ stats.pending_reports|default:0 }}</div>
-            <div class="stat-label">待審核報工</div>
+            <div class="stat-label">待審核備用報工</div>
         </a>
         <a href="{% url 'workorder:supervisor:approved_reports_list' %}" class="stat-card approved" style="text-decoration: none; cursor: pointer;">
             <div class="stat-number">{{ stats.approved_operator|default:0|add:stats.approved_smt|default:0|add:stats.approved_supervisor|default:0 }}</div>
-            <div class="stat-label">已審核報工</div>
+            <div class="stat-label">已審核備用報工</div>
         </a>
         <a href="{% url 'workorder:supervisor:abnormal_management' %}" class="stat-card rejected" style="text-decoration: none; cursor: pointer;">
             <div class="stat-number">{{ stats.rejected_operator|default:0|add:stats.rejected_smt|default:0|add:stats.rejected_supervisor|default:0 }}</div>
-            <div class="stat-label">已拒絕報工</div>
+            <div class="stat-label">已拒絕備用報工</div>
         </a>
         <div class="stat-card total">
             <div class="stat-number">{{ stats.total_reports_today|default:0 }}</div>
-            <div class="stat-label">今日報工總數</div>
+            <div class="stat-label">今日備用報工總數</div>
         </div>
     </div>
 
@@ -189,7 +189,7 @@
                 <div class="card-header">
                     <h5 class="mb-0">
                         <i class="fas fa-history text-info"></i>
-                        最近審核記錄
+                        最近備用審核記錄
                     </h5>
                 </div>
                 <div class="card-body">
@@ -228,7 +228,7 @@
                     {% else %}
                         <div class="text-center text-muted py-4">
                             <i class="fas fa-inbox fa-3x mb-3"></i>
-                            <p>目前沒有審核記錄</p>
+                            <p>目前沒有備用審核記錄</p>
                         </div>
                     {% endif %}
                 </div>
@@ -241,7 +241,7 @@
                 <div class="card-header">
                     <h5 class="mb-0">
                         <i class="fas fa-times-circle text-danger"></i>
-                        最近拒絕記錄
+                        最近備用拒絕記錄
                     </h5>
                 </div>
                 <div class="card-body">
@@ -276,7 +276,7 @@
                     {% else %}
                         <div class="text-center text-muted py-4">
                             <i class="fas fa-check-circle fa-2x mb-3 text-success"></i>
-                            <p>目前沒有拒絕記錄</p>
+                            <p>目前沒有備用拒絕記錄</p>
                         </div>
                     {% endif %}
                 </div>

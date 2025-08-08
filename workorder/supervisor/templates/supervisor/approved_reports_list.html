@@ -104,11 +104,11 @@
         </div>
         <div class="stat-card">
             <div class="stat-number">{{ operator_count }}</div>
-            <div class="stat-label">作業員報工</div>
+                                <div class="stat-label">備用作業員報工</div>
         </div>
         <div class="stat-card">
             <div class="stat-number">{{ smt_count }}</div>
-            <div class="stat-label">SMT報工</div>
+                                <div class="stat-label">備用SMT報工</div>
         </div>
     </div>
 
@@ -165,7 +165,7 @@
                         {% for report in page_obj %}
                         <tr>
                             <td>
-                                <span class="report-type-badge {% if report.type == '作業員報工' %}badge-operator{% else %}badge-smt{% endif %}">
+                                <span class="report-type-badge {% if report.type == '備用作業員報工' %}badge-operator{% else %}badge-smt{% endif %}">
                                     {{ report.type }}
                                 </span>
                             </td>

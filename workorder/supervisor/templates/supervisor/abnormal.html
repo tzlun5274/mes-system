@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}異常處理{% endblock %}
+{% block title %}備用異常處理{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -132,7 +132,7 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
                     <i class="fas fa-exclamation-triangle text-warning"></i>
-                    異常處理
+                    備用異常處理
                 </h2>
                 <div class="d-flex align-items-center">
                     {% if user.is_superuser %}
@@ -143,9 +143,9 @@
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb">
                             <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                            <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
+                            <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">備用報工管理</a></li>
                             <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor:supervisor_functions' %}">主管功能</a></li>
-                            <li class="breadcrumb-item active" aria-current="page">異常處理</li>
+                            <li class="breadcrumb-item active" aria-current="page">備用異常處理</li>
                         </ol>
                     </nav>
                 </div>

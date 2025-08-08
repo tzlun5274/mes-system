@@ -8,7 +8,7 @@ from .views.workorder_views import (
     get_company_order_info
 )
 from .views.report_views import (
-    ReportIndexView, OperatorSupplementReportListView, OperatorSupplementReportCreateView,
+    ReportIndexView, BackupReportIndexView, OperatorSupplementReportListView, OperatorSupplementReportCreateView,
     OperatorSupplementReportUpdateView, OperatorSupplementReportDetailView, 
     OperatorSupplementReportDeleteView, SMTSupplementReportListView, SMTSupplementReportCreateView,
     SMTSupplementReportUpdateView, SMTSupplementReportDetailView, SMTSupplementReportDeleteView,
@@ -64,33 +64,34 @@ urlpatterns = [
     path("api/process/<int:process_id>/edit/", api_views.edit_process, name="edit_process"),
     path("api/process/<int:process_id>/delete/", api_views.delete_process, name="delete_process"),
     
-    # 報工管理首頁 - 使用新的類別視圖
-    path("report/", ReportIndexView.as_view(), name="report_index"),
+    # 備用報工管理首頁 - 完全轉換現有系統
+    path("report/", BackupReportIndexView.as_view(), name="report_index"),
+    path("backup/report/", BackupReportIndexView.as_view(), name="backup_report_index"),
     
-    # 作業員補登報工功能 - 使用新的類別視圖
+    # 作業員補登報工功能 - 完全轉換為備用系統
     path("report/operator/supplement/", OperatorSupplementReportListView.as_view(), name="operator_supplement_report_index"),
     path("report/operator/supplement/create/", OperatorSupplementReportCreateView.as_view(), name="operator_supplement_report_create"),
     path("report/operator/supplement/edit/<int:pk>/", OperatorSupplementReportUpdateView.as_view(), name="operator_supplement_report_edit"),
     path("report/operator/supplement/detail/<int:pk>/", OperatorSupplementReportDetailView.as_view(), name="operator_supplement_report_detail"),
     path("report/operator/supplement/delete/<int:pk>/", OperatorSupplementReportDeleteView.as_view(), name="operator_supplement_report_delete"),
     
-    # 作業員RD樣品補登報工功能 - 只保留新增功能
+    # 作業員RD樣品補登報工功能 - 完全轉換為備用系統
     path("report/operator/rd_sample_supplement/create/", OperatorRDSampleSupplementReportCreateView.as_view(), name="operator_rd_sample_supplement_create"),
     
-    # 作業員補登報工批量匯入功能
+    # 作業員補登報工批量匯入功能 - 完全轉換為備用系統
     path("report/operator/supplement/batch/", import_views.operator_report_import_page, name="operator_supplement_batch"),
     path("report/operator/supplement/batch/file/", import_views.operator_report_import_file, name="operator_supplement_batch_file"),
     path("report/operator/supplement/batch/template/", import_views.download_import_template, name="operator_supplement_batch_template"),
     path("report/operator/supplement/batch/export/", import_views.operator_report_export, name="operator_supplement_batch_export"),
     
-    # SMT補登報工功能 - 使用新的類別視圖
+    # SMT補登報工功能 - 完全轉換為備用系統
     path("report/smt/supplement/", SMTSupplementReportListView.as_view(), name="smt_supplement_report_index"),
     path("report/smt/supplement/create/", SMTSupplementReportCreateView.as_view(), name="smt_supplement_report_create"),
     path("report/smt/supplement/edit/<int:pk>/", SMTSupplementReportUpdateView.as_view(), name="smt_supplement_report_edit"),
     path("report/smt/supplement/delete/<int:pk>/", SMTSupplementReportDeleteView.as_view(), name="smt_supplement_report_delete"),
     path("report/smt/supplement/detail/<int:pk>/", SMTSupplementReportDetailView.as_view(), name="smt_supplement_report_detail"),
     
-    # SMT RD樣品補登報工功能
+    # SMT RD樣品補登報工功能 - 完全轉換為備用系統
     path("report/smt/rd_sample/create/", SMTRDSampleSupplementReportCreateView.as_view(), name="smt_rd_sample_report_create"),
     path("report/smt/rd_sample/edit/<int:pk>/", SMTRDSampleSupplementReportUpdateView.as_view(), name="smt_rd_sample_report_edit"),
     
@@ -145,14 +146,14 @@ urlpatterns = [
     path("supervisor/", include('workorder.supervisor.urls')),
     path("report/approved/", workorder_views.approved_reports_list, name="approved_reports_list"),
     
-    # 作業員報工資料匯入功能
+    # 作業員報工資料匯入功能 - 完全轉換為備用系統
     path("import/operator_report/", import_views.operator_report_import_page, name="operator_report_import_page"),
     path("import/operator_report/file/", import_views.operator_report_import_file, name="operator_report_import_file"),
     path("export/operator_report/", import_views.operator_report_export, name="operator_report_export"),
     path("import/operator_report/template/", import_views.download_import_template, name="download_import_template"),
     path("import/operator_report/field_guide/", import_views.get_import_field_guide, name="get_import_field_guide"),
     
-    # SMT設備報工資料匯入功能
+    # SMT設備報工資料匯入功能 - 完全轉換為備用系統
     path("import/smt_report/", import_views.smt_report_import_page, name="smt_report_import_page"),
     path("import/smt_report/file/", import_views.smt_report_import_file, name="smt_report_import_file"),
     path("import/smt_report/template/", import_views.download_smt_import_template, name="download_smt_import_template"),

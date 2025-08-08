@@ -4,7 +4,7 @@ SMT RD樣品補登報工表單模組
 """
 
 from django import forms
-from workorder.workorder_reporting.models import SMTSupplementReport
+from workorder.workorder_reporting.models import BackupSMTSupplementReport as SMTSupplementReport
 
 
 class SMTRDSampleSupplementReportForm(forms.ModelForm):

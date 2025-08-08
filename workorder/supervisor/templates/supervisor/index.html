@@ -2,7 +2,7 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}主管功能首頁 - MES系統{% endblock %}
+{% block title %}備用主管功能首頁 - MES系統{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -70,11 +70,11 @@
             <div class="d-flex justify-content-between align-items-center">
                 <h2 class="mb-0">
                     <i class="fas fa-chart-line text-primary"></i>
-                    主管功能首頁
+                    備用主管功能首頁
                 </h2>
                 <div class="d-flex align-items-center">
                     <a href="{% url 'workorder:report_index' %}" class="btn btn-outline-primary me-3">
-                        <i class="fas fa-arrow-left me-2"></i>返回報工管理
+                        <i class="fas fa-arrow-left me-2"></i>返回備用的報工管理
                     </a>
                     <div class="btn-group">
                         <a href="{% url 'workorder:supervisor:report_statistics' %}" class="btn btn-outline-info">
@@ -97,7 +97,7 @@
             <div class="card stats-card bg-warning text-white">
                 <div class="card-body text-center">
                     <div class="stats-number">{{ stats.pending_reports|default:0 }}</div>
-                    <div class="stats-label">待審核報工</div>
+                    <div class="stats-label">待審核備用報工</div>
                     <small>
                         主管: {{ stats.pending_supervisor|default:0 }} | 
                         作業員: {{ stats.pending_operator|default:0 }} | 
@@ -112,7 +112,7 @@
             <div class="card stats-card bg-success text-white">
                 <div class="card-body text-center">
                     <div class="stats-number">{{ stats.total_reports_today|default:0 }}</div>
-                    <div class="stats-label">今日報工</div>
+                    <div class="stats-label">今日備用報工</div>
                     <small>
                         主管: {{ stats.supervisor_reports_today|default:0 }} | 
                         作業員: {{ stats.operator_reports_today|default:0 }} | 
@@ -127,7 +127,7 @@
             <div class="card stats-card bg-info text-white">
                 <div class="card-body text-center">
                     <div class="stats-number">{{ stats.total_reports_week|default:0 }}</div>
-                    <div class="stats-label">本週報工</div>
+                    <div class="stats-label">本週備用報工</div>
                     <small>
                         主管: {{ stats.supervisor_reports_week|default:0 }} | 
                         作業員: {{ stats.operator_reports_week|default:0 }} | 
@@ -142,7 +142,7 @@
             <div class="card stats-card bg-primary text-white">
                 <div class="card-body text-center">
                     <div class="stats-number">{{ stats.total_reports_month|default:0 }}</div>
-                    <div class="stats-label">本月報工</div>
+                    <div class="stats-label">本月備用報工</div>
                     <small>
                         主管: {{ stats.supervisor_reports_month|default:0 }} | 
                         作業員: {{ stats.operator_reports_month|default:0 }} | 

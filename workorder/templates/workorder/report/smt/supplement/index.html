@@ -130,14 +130,14 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
                     <i class="fas fa-history text-warning"></i>
-                    SMT補登報工
+                    備用的SMT補登報工
                 </h2>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">報工管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:smt_supplement_report_index' %}">SMT報工</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">補登報工</li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">備用報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:smt_supplement_report_index' %}">備用SMT報工</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">備用補登報工</li>
                     </ol>
                 </nav>
             </div>
@@ -178,7 +178,7 @@
             <div class="card smt-supplement-card">
                 <div class="card-header bg-warning text-dark">
                     <h5 class="mb-0">
-                        <i class="fas fa-tools"></i> SMT補登報工功能
+                        <i class="fas fa-tools"></i> 備用的SMT補登報工功能
                     </h5>
                 </div>
                 <div class="card-body">
@@ -204,7 +204,7 @@
                         {% if user.is_superuser %}
                         <div class="col-md-3 ml-auto">
                             <a href="{% url 'workorder:smt_report_import_page' %}" class="btn btn-secondary btn-lg btn-block mb-2">
-                                <i class="fas fa-cogs"></i> SMT報工資料維護
+                                <i class="fas fa-cogs"></i> 備用SMT報工資料維護
                             </a>
                         </div>
                         {% endif %}
@@ -289,7 +289,7 @@
             <div class="card smt-supplement-card">
                 <div class="card-header bg-secondary text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-list"></i> 待核准SMT補登報工列表
+                        <i class="fas fa-list"></i> 待核准備用SMT補登報工列表
                     </h5>
                 </div>
                 <div class="card-body">

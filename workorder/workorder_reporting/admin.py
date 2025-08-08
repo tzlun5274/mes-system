@@ -6,13 +6,13 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import SMTSupplementReport, OperatorSupplementReport
+from .models import BackupSMTSupplementReport, BackupOperatorSupplementReport
 
 
-@admin.register(SMTSupplementReport)
+@admin.register(BackupSMTSupplementReport)
 class SMTSupplementReportAdmin(admin.ModelAdmin):
     """
-    SMT補登報工記錄管理介面
+    備用的SMT補登報工記錄管理介面
     """
     list_display = [
         'workorder_number', 'operation', 'equipment_name', 'work_date',
@@ -45,10 +45,10 @@ class SMTSupplementReportAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(OperatorSupplementReport)
+@admin.register(BackupOperatorSupplementReport)
 class OperatorSupplementReportAdmin(admin.ModelAdmin):
     """
-    作業員補登報工記錄管理介面
+    備用的作業員補登報工記錄管理介面
     """
     list_display = [
         'operator_name', 'workorder_number', 'process_name', 'work_date',

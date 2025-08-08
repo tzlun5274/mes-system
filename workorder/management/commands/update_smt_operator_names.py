@@ -4,7 +4,7 @@
 """
 
 from django.core.management.base import BaseCommand
-from workorder.workorder_reporting.models import SMTSupplementReport
+from workorder.workorder_reporting.models import BackupSMTSupplementReport as SMTSupplementReport
 from workorder.services.smt_operator_service import SMTOperatorService
 
 
