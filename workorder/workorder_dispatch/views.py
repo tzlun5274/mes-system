@@ -100,7 +100,7 @@ class DispatchCreateView(LoginRequiredMixin, CreateView):
     model = WorkOrderDispatch
     form_class = WorkOrderDispatchForm
     template_name = 'workorder_dispatch/dispatch_form.html'
-    success_url = reverse_lazy('workorder_dispatch:dispatch_list')
+    success_url = reverse_lazy('workorder:workorder_dispatch:dispatch_list')
 
     def form_valid(self, form):
         """表單驗證成功時的處理"""
@@ -126,7 +126,7 @@ class DispatchUpdateView(LoginRequiredMixin, UpdateView):
     model = WorkOrderDispatch
     form_class = WorkOrderDispatchForm
     template_name = 'workorder_dispatch/dispatch_form.html'
-    success_url = reverse_lazy('workorder_dispatch:dispatch_list')
+    success_url = reverse_lazy('workorder:workorder_dispatch:dispatch_list')
 
     def form_valid(self, form):
         """表單驗證成功時的處理"""
@@ -161,7 +161,7 @@ class DispatchDeleteView(LoginRequiredMixin, DeleteView):
     """
     model = WorkOrderDispatch
     template_name = 'workorder_dispatch/dispatch_confirm_delete.html'
-    success_url = reverse_lazy('workorder_dispatch:dispatch_list')
+    success_url = reverse_lazy('workorder:workorder_dispatch:dispatch_list')
 
     def delete(self, request, *args, **kwargs):
         """刪除成功時的處理"""

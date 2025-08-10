@@ -18,10 +18,10 @@
                             <i class="bi bi-clipboard-data"></i> 派工單詳情
                         </h3>
                         <div>
-                            <a href="{% url 'workorder_dispatch:dispatch_edit' dispatch.id %}" class="btn btn-primary me-2">
+                            <a href="{% url 'workorder:workorder_dispatch:dispatch_edit' dispatch.id %}" class="btn btn-primary me-2">
                                 <i class="bi bi-pencil"></i> 編輯
                             </a>
-                            <a href="{% url 'workorder_dispatch:dispatch_list' %}" class="btn btn-secondary">
+                            <a href="{% url 'workorder:workorder_dispatch:dispatch_list' %}" class="btn btn-secondary">
                                 <i class="bi bi-arrow-left"></i> 返回列表
                             </a>
                         </div>
@@ -136,11 +136,11 @@
                                 <i class="bi bi-tools"></i> 操作
                             </h5>
                             <div class="btn-group" role="group">
-                                <a href="{% url 'workorder_dispatch:dispatch_edit' dispatch.id %}" 
+                                <a href="{% url 'workorder:workorder_dispatch:dispatch_edit' dispatch.id %}" 
                                    class="btn btn-primary">
                                     <i class="bi bi-pencil"></i> 編輯派工單
                                 </a>
-                                <a href="{% url 'workorder_dispatch:dispatch_delete' dispatch.id %}" 
+                                <a href="{% url 'workorder:workorder_dispatch:dispatch_delete' dispatch.id %}" 
                                    class="btn btn-danger"
                                    onclick="return confirm('確定要刪除這個派工單嗎？此操作無法復原。')">
                                     <i class="bi bi-trash"></i> 刪除派工單

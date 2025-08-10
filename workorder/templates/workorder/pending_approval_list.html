@@ -93,7 +93,7 @@
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">備用報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:backup_report_index' %}">備用報工管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor_report_index' %}">主管功能</a></li>
                         <li class="breadcrumb-item active" aria-current="page">待審核列表</li>
                     </ol>
@@ -333,13 +333,13 @@ function viewDetail(reportType, reportId) {
     let url = '';
     switch(reportType) {
         case 'supervisor':
-            url = `/workorder/report/supervisor/production/detail/${reportId}/`;
+            url = `/workorder/supervisor/report_detail/${reportId}/`;
             break;
         case 'operator':
-            url = `/workorder/report/operator/supplement/detail/${reportId}/`;
+            url = `/workorder/backup_report/operator/supplement/detail/${reportId}/`;
             break;
         case 'smt':
-            url = `/workorder/report/smt/supplement/detail/${reportId}/`;
+            url = `/workorder/backup_report/smt/supplement/detail/${reportId}/`;
             break;
     }
     if (url) {
@@ -398,13 +398,13 @@ function confirmApprove() {
     
     switch(currentReportType) {
         case 'supervisor':
-            url = `/workorder/report/supervisor/production/approve-ajax/${currentReportId}/`;
+            url = `/workorder/supervisor/approve_report/${currentReportId}/`;
             break;
         case 'operator':
-            url = `/workorder/report/operator/supplement/approve/${currentReportId}/`;
+            url = `/workorder/backup_report/operator/supplement/approve/${currentReportId}/`;
             break;
         case 'smt':
-            url = `/workorder/report/smt/supplement/approve/${currentReportId}/`;
+            url = `/workorder/backup_report/smt/supplement/approve/${currentReportId}/`;
             break;
     }
     
@@ -457,13 +457,13 @@ function confirmReject() {
     let url = '';
     switch(currentReportType) {
         case 'supervisor':
-            url = `/workorder/report/supervisor/production/reject-ajax/${currentReportId}/`;
+            url = `/workorder/supervisor/reject_report/${currentReportId}/`;
             break;
         case 'operator':
-            url = `/workorder/report/operator/supplement/reject/${currentReportId}/`;
+            url = `/workorder/backup_report/operator/supplement/reject/${currentReportId}/`;
             break;
         case 'smt':
-            url = `/workorder/report/smt/supplement/reject/${currentReportId}/`;
+            url = `/workorder/backup_report/smt/supplement/reject/${currentReportId}/`;
             break;
     }
     

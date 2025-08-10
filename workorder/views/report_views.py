@@ -43,7 +43,7 @@ class ReportIndexView(LoginRequiredMixin, ListView):
     顯示生產環境的報工功能總覽
     """
 
-    template_name = "workorder/report/index.html"
+    template_name = "workorder/backup_report/backup_index.html"
     context_object_name = "reports"
 
     def get_queryset(self):
@@ -71,7 +71,7 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
     """
 
     model = BackupOperatorSupplementReport
-    template_name = "workorder/report/operator/supplement/index.html"
+    template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_index.html"
     context_object_name = "supplement_reports"
     paginate_by = 20  # 每頁顯示20筆記錄
 
@@ -187,7 +187,7 @@ class OperatorSupplementReportCreateView(LoginRequiredMixin, CreateView):
 
     model = BackupOperatorSupplementReport
     form_class = BackupOperatorSupplementReportForm
-    template_name = "workorder/report/operator/supplement/form.html"
+    template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_form.html"
     success_url = reverse_lazy("workorder:operator_supplement_report_index")
 
     def form_valid(self, form):
@@ -210,7 +210,7 @@ class OperatorSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
 
     model = BackupOperatorSupplementReport
     form_class = BackupOperatorSupplementReportForm
-    template_name = "workorder/report/operator/supplement/form.html"
+    template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_form.html"
     success_url = reverse_lazy("workorder:operator_supplement_report_index")
 
     def form_valid(self, form):
@@ -231,7 +231,7 @@ class OperatorSupplementReportDetailView(LoginRequiredMixin, DetailView):
     """
 
     model = BackupOperatorSupplementReport
-    template_name = "workorder/report/operator/supplement/detail.html"
+    template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_detail.html"
     context_object_name = "report"
 
     def get_context_data(self, **kwargs):
@@ -264,7 +264,7 @@ class SMTSupplementReportListView(LoginRequiredMixin, ListView):
     """
 
     model = BackupSMTSupplementReport
-    template_name = "workorder/report/smt/supplement/index.html"
+    template_name = "workorder/backup_report/backup_smt/backup_supplement/backup_index.html"
     context_object_name = "reports"
     paginate_by = 20
     ordering = ["-work_date", "-start_time"]
@@ -366,7 +366,7 @@ class SMTSupplementReportCreateView(LoginRequiredMixin, CreateView):
 
     model = BackupSMTSupplementReport
     form_class = SMTSupplementReportForm
-    template_name = "workorder/report/smt/supplement/form.html"
+    template_name = "workorder/backup_report/backup_smt/backup_supplement/backup_form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
 
     def form_valid(self, form):
@@ -389,7 +389,7 @@ class SMTSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
 
     model = BackupSMTSupplementReport
     form_class = SMTSupplementReportForm
-    template_name = "workorder/report/smt/supplement/form.html"
+    template_name = "workorder/backup_report/backup_smt/backup_supplement/backup_form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
 
     def get_context_data(self, **kwargs):
@@ -416,7 +416,7 @@ class SMTSupplementReportDetailView(LoginRequiredMixin, DetailView):
     """
 
     model = BackupSMTSupplementReport
-    template_name = "workorder/report/smt/supplement/detail.html"
+    template_name = "workorder/backup_report/backup_smt/backup_supplement/backup_detail.html"
     context_object_name = "supplement_report"
 
     def get_context_data(self, **kwargs):
@@ -455,7 +455,7 @@ class SMTSupplementReportDeleteView(
     """
 
     model = BackupSMTSupplementReport
-    template_name = "workorder/report/smt/supplement/delete_confirm.html"
+    template_name = "workorder/backup_report/backup_smt/backup_supplement/backup_delete_confirm.html"
     context_object_name = "supplement_report"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
 
@@ -529,7 +529,7 @@ class OperatorSupplementReportDeleteView(
     """
 
     model = BackupOperatorSupplementReport
-    template_name = "workorder/report/operator/supplement/delete_confirm.html"
+    template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_delete_confirm.html"
     context_object_name = "supplement_report"
     success_url = reverse_lazy("workorder:operator_supplement_report_index")
 
@@ -557,7 +557,7 @@ class SMTRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView):
 
     model = BackupSMTSupplementReport
     form_class = SMTRDSampleSupplementReportForm
-    template_name = "workorder/report/smt/rd_sample/form.html"
+    template_name = "workorder/backup_report/backup_smt/backup_rd_sample/backup_form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
 
     def form_valid(self, form):
@@ -580,7 +580,7 @@ class SMTRDSampleSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
 
     model = BackupSMTSupplementReport
     form_class = SMTRDSampleSupplementReportForm
-    template_name = "workorder/report/smt/rd_sample/form.html"
+    template_name = "workorder/backup_report/backup_smt/backup_rd_sample/backup_form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
 
     def form_valid(self, form):
@@ -605,7 +605,7 @@ class OperatorRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView)
 
     model = BackupOperatorSupplementReport
     form_class = BackupRDSampleSupplementReportForm
-    template_name = "workorder/report/operator/rd_sample_supplement/form.html"
+    template_name = "workorder/backup_report/backup_operator/backup_rd_sample_supplement/backup_form.html"
 
     def get_success_url(self):
         return reverse_lazy("workorder:operator_supplement_report_index")
@@ -632,7 +632,7 @@ class OperatorRDSampleSupplementReportUpdateView(LoginRequiredMixin, UpdateView)
 
     model = BackupOperatorSupplementReport
     form_class = BackupRDSampleSupplementReportForm
-    template_name = "workorder/report/operator/rd_sample_supplement/form.html"
+    template_name = "workorder/backup_report/backup_operator/backup_rd_sample_supplement/backup_form.html"
 
     def get_success_url(self):
         return reverse_lazy("workorder:operator_rd_sample_supplement_report_index")
@@ -664,7 +664,7 @@ def approve_report(request, report_id):
             report = get_object_or_404(SMTSupplementReport, id=report_id)
         else:
             messages.error(request, "無效的報工記錄類型！")
-            return redirect("workorder:report_index")
+            return redirect("workorder:backup_report_index")
 
         if report.can_approve(request.user):
             report.approve(request.user, request.POST.get("remarks", ""))
@@ -691,7 +691,7 @@ def approve_report(request, report_id):
     except Exception as e:
         messages.error(request, f"核准失敗：{str(e)}")
 
-    return redirect("workorder:report_index")
+    return redirect("workorder:backup_report_index")
 
 
 @require_POST
@@ -709,7 +709,7 @@ def reject_report(request, report_id):
             report = get_object_or_404(SMTSupplementReport, id=report_id)
         else:
             messages.error(request, "無效的報工記錄類型！")
-            return redirect("workorder:report_index")
+            return redirect("workorder:backup_report_index")
 
         if report.can_approve(request.user):
             report.reject(request.user, request.POST.get("reason", ""))
@@ -720,7 +720,7 @@ def reject_report(request, report_id):
     except Exception as e:
         messages.error(request, f"駁回失敗：{str(e)}")
 
-    return redirect("workorder:report_index")
+    return redirect("workorder:backup_report_index")
 
 
 class BackupReportIndexView(ReportIndexView):
@@ -728,7 +728,7 @@ class BackupReportIndexView(ReportIndexView):
     測試環境報工管理首頁視圖
     使用與 ReportIndexView 相同的邏輯，但顯示測試環境標題
     """
-    template_name = 'workorder/report/backup_index.html'
+    template_name = 'workorder/backup_report/backup_index.html'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

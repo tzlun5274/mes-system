@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     "ai.apps.AiConfig",
     "production",
     "reporting",
-    "unified_work_reporting",
+    "work_reporting_management",  # 原 unified_work_reporting 改名
     "django.contrib.humanize",
 ]
 

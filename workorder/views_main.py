@@ -282,10 +282,10 @@ def delete_pending_workorders(request):
                     request, 
                     f"成功刪除所有未派工工單！共刪除 {pending_count} 個工單"
                 )
-            return redirect("workorder:dispatch_list")
+            return redirect("workorder_dispatch:dispatch_list")
         except Exception as e:
             messages.error(request, f"刪除工單時發生錯誤：{str(e)}")
-            return redirect("workorder:dispatch_list")
+            return redirect("workorder_dispatch:dispatch_list")
 
     # GET 請求顯示確認頁面
     pending_count = WorkOrder.objects.filter(status="pending").count()
@@ -328,13 +328,13 @@ def delete_in_progress_workorders(request):
             if is_ajax:
                 return JsonResponse({"status": "success", "message": msg})
             messages.success(request, msg)
-            return redirect("workorder:dispatch_list")
+            return redirect("workorder_dispatch:dispatch_list")
         except Exception as e:
             msg = f"停止所有生產中工單時發生錯誤：{str(e)}"
             if is_ajax:
                 return JsonResponse({"status": "danger", "message": msg})
             messages.error(request, msg)
-            return redirect("workorder:dispatch_list")
+            return redirect("workorder_dispatch:dispatch_list")
 
     # GET 請求顯示確認頁面
     in_progress_count = WorkOrder.objects.filter(status="in_progress").count()
@@ -1211,11 +1211,11 @@ def start_production(request, pk):
     """
     if not (request.user.is_staff or request.user.is_superuser):
         messages.error(request, "只有管理員可以執行此操作")
-        return redirect("workorder:dispatch_list")
+        return redirect("workorder_dispatch:dispatch_list")
 
     if request.method != "POST":
         messages.error(request, "無效的請求方法")
-        return redirect("workorder:dispatch_list")
+        return redirect("workorder_dispatch:dispatch_list")
 
     try:
         # 取得工單
@@ -1226,7 +1226,7 @@ def start_production(request, pk):
             messages.error(
                 request, f"工單 {workorder.order_number} 狀態不是待生產，無法開始生產"
             )
-            return redirect("workorder:dispatch_list")
+            return redirect("workorder_dispatch:dispatch_list")
 
         # 檢查是否有工序路線
         from process.models import ProductProcessRoute
@@ -1239,7 +1239,7 @@ def start_production(request, pk):
             messages.error(
                 request, f"工單 {workorder.order_number} 尚未設定工序路線，無法開始生產"
             )
-            return redirect("workorder:dispatch_list")
+            return redirect("workorder_dispatch:dispatch_list")
 
         # 更新工單狀態
         workorder.status = "in_progress"
@@ -1264,7 +1264,7 @@ def start_production(request, pk):
     except Exception as e:
         messages.error(request, f"開始生產失敗：{str(e)}")
 
-    return redirect("workorder:dispatch_list")
+    return redirect("workorder_dispatch:dispatch_list")
 
 
 def stop_production(request, pk):
@@ -1274,11 +1274,11 @@ def stop_production(request, pk):
     """
     if not (request.user.is_staff or request.user.is_superuser):
         messages.error(request, "只有管理員可以執行此操作")
-        return redirect("workorder:dispatch_list")
+        return redirect("workorder_dispatch:dispatch_list")
 
     if request.method != "POST":
         messages.error(request, "無效的請求方法")
-        return redirect("workorder:dispatch_list")
+        return redirect("workorder_dispatch:dispatch_list")
 
     try:
         # 取得工單
@@ -1289,7 +1289,7 @@ def stop_production(request, pk):
             messages.error(
                 request, f"工單 {workorder.order_number} 狀態不是生產中，無法停止生產"
             )
-            return redirect("workorder:dispatch_list")
+            return redirect("workorder_dispatch:dispatch_list")
 
         # 更新工單狀態
         workorder.status = "pending"
@@ -1313,7 +1313,7 @@ def stop_production(request, pk):
     except Exception as e:
         messages.error(request, f"停止生產失敗：{str(e)}")
 
-    return redirect("workorder:dispatch_list")
+    return redirect("workorder_dispatch:dispatch_list")
 
 
 def selective_revert_orders(request):
@@ -3016,7 +3016,7 @@ def test_report_page(request):
         }
     }
     
-    return render(request, 'workorder/report/index.html', context)
+    return render(request, 'workorder/backup_report/backup_index.html', context)
 
 def report_index(request):
     """
@@ -3035,7 +3035,7 @@ def report_index(request):
     context = StatisticsService.get_report_index_statistics()
     context['recent_reports'] = []
     
-    return render(request, 'workorder/report/index.html', context)
+    return render(request, 'workorder/backup_report/backup_index.html', context)
 
 @login_required
 def supervisor_report_index(request):
@@ -3092,7 +3092,7 @@ def supervisor_report_index(request):
         'recent_reviews': recent_reviews,
     }
     
-    return render(request, 'workorder/report/supervisor/index.html', context)
+    return render(request, 'supervisor/index.html', context)
 
 @login_required
 def supervisor_functions(request):
@@ -3184,7 +3184,7 @@ def supervisor_functions(request):
         'recent_abnormal': recent_abnormal,
     }
     
-    return render(request, 'workorder/report/supervisor/functions.html', context)
+    return render(request, 'supervisor/functions.html', context)
 
 @login_required
 def report_statistics(request):
@@ -3316,7 +3316,7 @@ def report_statistics(request):
         'smt_reports_30d': smt_reports_30d,
     }
     
-    return render(request, 'workorder/report/supervisor/statistics.html', context)
+    return render(request, 'supervisor/statistics.html', context)
 
 @login_required
 def abnormal_management(request):
@@ -3380,7 +3380,7 @@ def abnormal_management(request):
         'abnormal_stats': abnormal_stats,
     }
     
-    return render(request, 'workorder/report/supervisor/abnormal.html', context)
+    return render(request, 'supervisor/abnormal.html', context)
 
 @require_POST
 @login_required
@@ -3488,10 +3488,10 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
     try:
         if abnormal_type == 'operator':
             abnormal = get_object_or_404(OperatorSupplementReport, id=abnormal_id)
-            template_name = 'workorder/report/supervisor/abnormal_detail_operator.html'
+            template_name = 'supervisor/abnormal_detail_operator.html'
         elif abnormal_type == 'smt':
             abnormal = get_object_or_404(SMTSupplementReport, id=abnormal_id)
-            template_name = 'workorder/report/supervisor/abnormal_detail_smt.html'
+            template_name = 'supervisor/abnormal_detail_smt.html'
         else:
             messages.error(request, '無效的異常類型')
             return redirect('workorder:abnormal_management')
@@ -3611,7 +3611,7 @@ def data_maintenance(request):
         'maintenance_options': maintenance_options,
         'system_status': system_status,
     }
-    return render(request, 'workorder/report/supervisor/maintenance.html', context)
+    return render(request, 'supervisor/maintenance.html', context)
 
 @require_POST
 @login_required
@@ -3986,7 +3986,7 @@ def operator_report_index(request):
         approval_status='approved'
     ).count()
     
-    return render(request, 'workorder/report/operator/index.html', context)
+    return render(request, 'workorder/backup_report/backup_operator/backup_index.html', context)
 
 def smt_report_index(request):
     """
@@ -4032,7 +4032,7 @@ def smt_report_index(request):
         'recent_reports': recent_reports,
     })
     
-    return render(request, 'workorder/report/smt/index.html', context)
+    return render(request, 'workorder/backup_report/backup_smt/backup_index.html', context)
 
 def smt_on_site_report(request):
     """
@@ -4121,7 +4121,7 @@ def smt_on_site_report(request):
         'today_reports_list': today_reports_list,
     }
     
-    return render(request, 'workorder/report/smt/on_site/index.html', context)
+    return render(request, 'workorder/backup_report/backup_smt/backup_on_site/backup_index.html', context)
 
 
 @require_POST
@@ -4303,7 +4303,7 @@ def operator_on_site_report(request):
         'operator_status_list': [],  # 可以根據需求實作作業員狀態
         'recent_reports': [],  # 可以根據需求實作最近報工記錄
     }
-    return render(request, 'workorder/report/operator/on_site.html', context)
+    return render(request, 'workorder/backup_report/backup_operator/backup_on_site.html', context)
 
 # ============================================================================
 # SMT補登報工功能視圖函數
@@ -4353,7 +4353,7 @@ def supervisor_approve_reports(request):
         'search': search,
         'total_count': pending_reports.count(),
     }
-    return render(request, 'workorder/report/supervisor/approve.html', context)
+    return render(request, 'supervisor/pending_approval_list.html', context)
 
 @login_required
 def approve_report(request, report_id):
@@ -4757,7 +4757,7 @@ def operator_supplement_batch(request):
         return redirect('workorder:operator_supplement_report_index')
     
     # GET 請求：顯示批次匯入頁面
-    return render(request, 'workorder/report/operator/supplement/batch.html')
+    return render(request, 'workorder/backup_report/backup_operator/backup_supplement/backup_batch.html')
 
 def operator_supplement_import_file(request):
     """作業員補登報工檔案匯入處理"""
@@ -5015,7 +5015,7 @@ def smt_supplement_batch(request):
         return redirect('workorder:smt_supplement_report_index')
     
     # GET 請求：顯示批次匯入頁面
-    return render(request, 'workorder/report/smt/supplement/batch.html')
+    return render(request, 'workorder/backup_report/backup_smt/backup_supplement/backup_batch.html')
 
 # ============================================================================
 # 匯出功能視圖函數
@@ -5767,7 +5767,7 @@ def dispatch_add(request):
             form.instance.created_by = request.user.username
             form.save()
             messages.success(request, '派工單建立成功！')
-            return redirect('workorder:dispatch_list')
+            return redirect('workorder_dispatch:dispatch_list')
     else:
         form = WorkOrderDispatchForm()
     
@@ -5791,7 +5791,7 @@ def dispatch_edit(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, '派工單更新成功！')
-            return redirect('workorder:dispatch_list')
+            return redirect('workorder_dispatch:dispatch_list')
     else:
         form = WorkOrderDispatchForm(instance=dispatch)
     
@@ -5825,7 +5825,7 @@ def dispatch_delete(request, pk):
     if request.method == 'POST':
         dispatch.delete()
         messages.success(request, '派工單刪除成功！')
-        return redirect('workorder:dispatch_list')
+        return redirect('workorder_dispatch:dispatch_list')
     
     context = {
         'dispatch': dispatch

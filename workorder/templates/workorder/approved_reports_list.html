@@ -94,7 +94,7 @@
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:report_index' %}">備用報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:backup_report_index' %}">備用報工管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor_report_index' %}">主管功能</a></li>
                         <li class="breadcrumb-item active" aria-current="page">已核准列表</li>
                     </ol>
@@ -241,9 +241,9 @@
 function viewDetail(reportType, reportId) {
     // 根據報工類型跳轉到對應的詳情頁面
     if (reportType === 'operator') {
-        window.location.href = `/workorder/report/operator/supplement/detail/${reportId}/`;
+        window.location.href = `/workorder/backup_report/operator/supplement/detail/${reportId}/`;
     } else if (reportType === 'smt') {
-        window.location.href = `/workorder/report/smt/supplement/detail/${reportId}/`;
+        window.location.href = `/workorder/backup_report/smt/supplement/detail/${reportId}/`;
     } else {
         alert('不支援的報工類型');
     }
