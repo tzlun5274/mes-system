@@ -47,12 +47,33 @@ urlpatterns = [
     path("list/", WorkOrderListView.as_view(), name="list"),
     path("active/", workorder_views.active_workorders, name="active_workorders"),
     path("completion-check/", workorder_views.check_workorder_completion, name="completion_check"),
+    path("process/<int:workorder_id>/", workorder_views.workorder_process_detail, name="workorder_process_detail"),
+    path("delete-in-progress/", workorder_views.delete_in_progress_workorders, name="delete_in_progress_workorders"),
+    path("start-production/<int:pk>/", workorder_views.start_production, name="start_production"),
+    path("stop-production/<int:pk>/", workorder_views.stop_production, name="stop_production"),
+    path("manual-sync-orders/", workorder_views.manual_sync_orders, name="manual_sync_orders"),
+    path("manual-convert-orders/", workorder_views.manual_convert_orders, name="manual_convert_orders"),
+    path("selective-revert-orders/", workorder_views.selective_revert_orders, name="selective_revert_orders"),
+    path("delete-pending-workorders/", workorder_views.delete_pending_workorders, name="delete_pending_workorders"),
     
     # 完工自動化管理
     path("completion-automation/", CompletionAutomationManagementView.as_view(), name="completion_automation_management"),
     
     # 自動管理功能設定
     path("auto-management/", AutoManagementConfigListView.as_view(), name="auto_management_config_list"),
+    path("auto-management/create/", AutoManagementConfigCreateView.as_view(), name="auto_management_config_create"),
+    path("auto-management/edit/<int:pk>/", AutoManagementConfigUpdateView.as_view(), name="auto_management_config_update"),
+    path("auto-management/delete/<int:pk>/", AutoManagementConfigDeleteView.as_view(), name="auto_management_config_delete"),
+    path("api/auto-management/execute/", execute_auto_function, name="execute_auto_function"),
+    path("api/auto-management/toggle/", toggle_auto_function, name="toggle_auto_function"),
+    
+    # 自動分配 API 路由
+    path("api/auto-allocation/status/", auto_allocation_status, name="auto_allocation_status"),
+    path("api/auto-allocation/settings/", auto_allocation_settings, name="auto_allocation_settings"),
+    path("api/auto-allocation/execute/", auto_allocation_execute, name="auto_allocation_execute"),
+    path("api/auto-allocation/stop/", auto_allocation_stop, name="auto_allocation_stop"),
+    path("api/auto-allocation/log/", auto_allocation_log, name="auto_allocation_log"),
+    path("api/auto-allocation/summary/", auto_allocation_summary, name="auto_allocation_summary"),
     
     # 已完工工單相關 URL
     path('completed/', CompletedWorkOrderListView.as_view(), name='completed_workorder_list'),
@@ -65,6 +86,14 @@ urlpatterns = [
     
     # API 路由
     path("api/company_order_info/", get_company_order_info, name="get_company_order_info"),
+    path("api/get_workorders_by_product/", workorder_views.get_workorders_by_product, name="get_workorders_by_product"),
+    path("api/get_product_by_workorder/", workorder_views.get_product_by_workorder, name="get_product_by_workorder"),
+    path("api/create_workorder_processes/<int:workorder_id>/", workorder_views.create_workorder_processes, name="create_workorder_processes"),
+    path("api/get_operators_and_equipments/", workorder_views.get_operators_and_equipments, name="get_operators_and_equipments"),
+    path("api/get_operators_only/", workorder_views.get_operators_only, name="get_operators_only"),
+    path("api/get_equipments_only/", workorder_views.get_equipments_only, name="get_equipments_only"),
+    path("api/add_process/<int:workorder_id>/", workorder_views.add_process, name="add_process"),
+    path("api/move_process/", workorder_views.move_process, name="move_process"),
     
     # 工序 API 路由
     path("api/process/<int:process_id>/", api_views.get_process_detail, name="get_process_detail"),

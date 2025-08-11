@@ -1249,11 +1249,11 @@ def smt_report_export(request):
         ws = wb.active
         ws.title = "SMT設備報工記錄"
         
-        # 設定標題（移除審核相關欄位）
+        # 設定標題（增加正常工時和加班工時欄位）
         headers = [
             '設備名稱', '公司代號', '報工日期', '開始時間', '結束時間', 
             '工單號', '產品編號', '工序名稱', '報工數量', 
-            '不良品數量', '備註', '異常紀錄'
+            '不良品數量', '正常工時', '加班工時', '備註', '異常紀錄'
         ]
         
         for col, header in enumerate(headers, 1):
@@ -1292,8 +1292,11 @@ def smt_report_export(request):
             ws.cell(row=row, column=8, value=report.operation)
             ws.cell(row=row, column=9, value=report.work_quantity or 0)
             ws.cell(row=row, column=10, value=report.defect_quantity or 0)
-            ws.cell(row=row, column=11, value=report.remarks or '')
-            ws.cell(row=row, column=12, value=report.abnormal_notes or '')
+            # 新增正常工時和加班工時欄位
+            ws.cell(row=row, column=11, value=float(report.work_hours_calculated) if report.work_hours_calculated else 0)
+            ws.cell(row=row, column=12, value=float(report.overtime_hours_calculated) if report.overtime_hours_calculated else 0)
+            ws.cell(row=row, column=13, value=report.remarks or '')
+            ws.cell(row=row, column=14, value=report.abnormal_notes or '')
         
         # 調整欄寬
         for column in ws.columns:
@@ -1326,7 +1329,7 @@ def smt_report_export(request):
         
     except Exception as e:
         messages.error(request, f'SMT匯出失敗：{str(e)}')
-        return redirect('workorder:smt_report_import_page') 
+        return redirect('workorder:smt_report_import_page')
 
 
 @login_required
@@ -1411,6 +1414,8 @@ def operator_report_export(request):
                 '設備名稱': report.equipment.name if report.equipment else '',  # 直接從 BackupOperatorSupplementReport 的 equipment 欄位取得
                 '報工數量': report.work_quantity,
                 '不良品數量': report.defect_quantity,
+                '正常工時': float(report.work_hours_calculated) if report.work_hours_calculated else 0,  # 新增：正常工時
+                '加班工時': float(report.overtime_hours_calculated) if report.overtime_hours_calculated else 0,  # 新增：加班工時
                 '備註': report.remarks or '',
                 '異常紀錄': report.abnormal_notes or '',
             })
@@ -1457,7 +1462,7 @@ def operator_report_export(request):
         return JsonResponse({
             'success': False,
             'message': f'匯出失敗: {str(e)}'
-        }) 
+        })
 
 
 

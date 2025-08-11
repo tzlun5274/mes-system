@@ -16,6 +16,7 @@ from django.views.decorators.http import require_GET
 from datetime import date
 
 from .models import FillWork
+from .forms import FillWorkForm
 
 
 class FillWorkIndexView(LoginRequiredMixin, ListView):
@@ -260,17 +261,13 @@ class OperatorBackfillView(LoginRequiredMixin, CreateView):
     
     model = FillWork
     template_name = "workorder/fill_work/operator_backfill.html"
-    fields = ['operator', 'company_name', 'workorder', 'product_id', 'planned_quantity', 'process', 'operation', 'equipment', 'work_date', 'start_time', 'end_time', 'has_break', 'break_start_time', 'break_end_time', 'break_hours', 'work_quantity', 'defect_quantity', 'is_completed', 'remarks', 'abnormal_notes']
+    form_class = FillWorkForm
     success_url = reverse_lazy('workorder:fill_work:operator_fill_index')
 
     def get_context_data(self, **kwargs):
         """提供模板所需的上下文數據"""
         context = super().get_context_data(**kwargs)
-        from process.models import ProcessName
-        from equip.models import Equipment
-        
-        context['processes'] = ProcessName.objects.all()
-        context['equipments'] = Equipment.objects.all()
+        context['form'] = self.get_form()
         context['today_date'] = date.today().isoformat()
         return context
 
@@ -289,17 +286,13 @@ class OperatorRDBackfillView(LoginRequiredMixin, CreateView):
     
     model = FillWork
     template_name = "workorder/fill_work/operator_rd_backfill.html"
-    fields = ['operator', 'company_name', 'workorder', 'product_id', 'planned_quantity', 'process', 'operation', 'equipment', 'work_date', 'start_time', 'end_time', 'has_break', 'break_start_time', 'break_end_time', 'break_hours', 'work_quantity', 'defect_quantity', 'is_completed', 'remarks', 'abnormal_notes']
+    form_class = FillWorkForm
     success_url = reverse_lazy('workorder:fill_work:fill_work_list')
 
     def get_context_data(self, **kwargs):
         """提供模板所需的上下文數據"""
         context = super().get_context_data(**kwargs)
-        from process.models import ProcessName
-        from equip.models import Equipment
-        
-        context['processes'] = ProcessName.objects.all()
-        context['equipments'] = Equipment.objects.all()
+        context['form'] = self.get_form()
         context['today_date'] = date.today().isoformat()
         return context
 
@@ -413,19 +406,33 @@ def reject_fill_work(request, work_id):
 
 @require_GET
 def get_workorder_info(request):
-    """取得工單資訊的API"""
-    product_id = request.GET.get('product_id')
-    if product_id:
+    """取得工單資訊的API - 當選擇工單號碼時自動帶出產品編號和公司名稱"""
+    workorder_id = request.GET.get('workorder_id')
+    if workorder_id:
         from workorder.models import WorkOrder
         try:
-            workorder = WorkOrder.objects.filter(product_id=product_id).first()
-            if workorder:
-                return JsonResponse({
-                    'success': True,
-                    'workorder_number': workorder.workorder_number,
-                    'planned_quantity': workorder.total_order_quantity
-                })
+            workorder = WorkOrder.objects.get(id=workorder_id)
+            
+            # 根據公司代號獲取公司名稱
+            company_name = workorder.company_code
+            try:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
+                if company_config:
+                    company_name = company_config.company_name
+            except:
+                pass  # 如果無法獲取公司名稱，使用公司代號
+            
+            return JsonResponse({
+                'success': True,
+                'workorder_number': workorder.order_number,
+                'product_id': workorder.product_code,  # 新增：產品編號
+                'company_name': company_name,  # 新增：公司名稱
+                'planned_quantity': workorder.quantity
+            })
+        except WorkOrder.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '找不到對應的工單'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     
-    return JsonResponse({'success': False, 'error': '找不到對應的工單'}) 
+    return JsonResponse({'success': False, 'error': '請提供工單ID'}) 

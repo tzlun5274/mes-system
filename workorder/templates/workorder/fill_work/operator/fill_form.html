@@ -402,6 +402,62 @@ $(document).ready(function() {
 
     // 產品編號手動輸入
     $('#id_product_id').attr('readonly', false);
+    
+    // 工單號碼選擇時自動帶出產品編號和公司名稱
+    $('#id_workorder').on('change', function() {
+        var workorderId = $(this).val();
+        var productIdField = $('#id_product_id');
+        var companyNameField = $('#id_company_name');
+        var plannedQuantityField = $('#id_planned_quantity');
+        
+        if (workorderId) {
+            // 顯示載入中訊息
+            productIdField.val('載入中...');
+            companyNameField.val('載入中...');
+            plannedQuantityField.val('載入中...');
+            
+            // 發送 AJAX 請求獲取工單資訊
+            $.ajax({
+                url: '{% url "workorder:fill_work:get_workorder_info" %}',
+                type: 'GET',
+                data: {
+                    'workorder_id': workorderId
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // 自動填入產品編號
+                        productIdField.val(response.product_id);
+                        
+                        // 自動填入公司名稱
+                        companyNameField.val(response.company_name);
+                        
+                        // 自動填入工單預設生產數量
+                        plannedQuantityField.val(response.planned_quantity);
+                        
+                        console.log('工單資訊載入成功:', response);
+                    } else {
+                        // 顯示錯誤訊息
+                        productIdField.val('');
+                        companyNameField.val('');
+                        plannedQuantityField.val('');
+                        alert('錯誤：' + response.error);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX 請求失敗：', error);
+                    productIdField.val('');
+                    companyNameField.val('');
+                    plannedQuantityField.val('');
+                    alert('網路錯誤，請重試');
+                }
+            });
+        } else {
+            // 清空欄位
+            productIdField.val('');
+            companyNameField.val('');
+            plannedQuantityField.val('');
+        }
+    });
 });
 </script>
 {% endblock %} 
