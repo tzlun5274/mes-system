@@ -71,10 +71,13 @@ urlpatterns = [
     path("api/process/<int:process_id>/edit/", api_views.edit_process, name="edit_process"),
     path("api/process/<int:process_id>/delete/", api_views.delete_process, name="delete_process"),
     
-    # 舊路徑導向新路徑（報工主索引）
-    path("report/", RedirectView.as_view(url="/workorder/backup_report/", permanent=True)),
+    # 舊路徑導向新路徑（填報作業主索引）
+    path("report/", RedirectView.as_view(url="/workorder/fill_work/", permanent=True)),
     
-    # 備用報工管理首頁
+    # 填報作業管理首頁
+    path("fill_work/", include('workorder.fill_work.urls')),
+    
+    # 備用報工管理首頁（保留向後相容）
     path("backup_report/", BackupReportIndexView.as_view(), name="backup_report_index"),
     
     # 作業員補登報工功能（備用）
@@ -135,6 +138,9 @@ urlpatterns = [
     
     # 派工單子模組
     path("dispatch/", include(("workorder.workorder_dispatch.urls", "workorder_dispatch"), namespace="workorder_dispatch")),
+    
+    # 報工管理子模組（已移除新的報工管理系統）
+    # path("work-reporting/", include("work_reporting_management.urls", namespace="work_reporting_management")),
     
     # 其他功能保留
     path("import/operator_report/", import_views.operator_report_import_page, name="operator_report_import_page"),

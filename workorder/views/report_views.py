@@ -659,9 +659,9 @@ def approve_report(request, report_id):
     try:
         report_type = request.POST.get("report_type")
         if report_type == "operator":
-            report = get_object_or_404(OperatorSupplementReport, id=report_id)
+            report = get_object_or_404(BackupOperatorSupplementReport, id=report_id)
         elif report_type == "smt":
-            report = get_object_or_404(SMTSupplementReport, id=report_id)
+            report = get_object_or_404(BackupSMTSupplementReport, id=report_id)
         else:
             messages.error(request, "無效的報工記錄類型！")
             return redirect("workorder:backup_report_index")
@@ -704,9 +704,9 @@ def reject_report(request, report_id):
     try:
         report_type = request.POST.get("report_type")
         if report_type == "operator":
-            report = get_object_or_404(OperatorSupplementReport, id=report_id)
+            report = get_object_or_404(BackupOperatorSupplementReport, id=report_id)
         elif report_type == "smt":
-            report = get_object_or_404(SMTSupplementReport, id=report_id)
+            report = get_object_or_404(BackupSMTSupplementReport, id=report_id)
         else:
             messages.error(request, "無效的報工記錄類型！")
             return redirect("workorder:backup_report_index")

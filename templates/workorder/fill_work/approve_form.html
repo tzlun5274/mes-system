@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}核准填報作業{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h3 class="card-title">
+                        <i class="fas fa-check-circle"></i>
+                        核准填報作業
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle"></i> 核准說明</h5>
+                        <p>您即將核准以下填報作業記錄：</p>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>填報作業資訊</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="30%">作業員：</th>
+                                    <td>{{ fill_work.operator }}</td>
+                                </tr>
+                                <tr>
+                                    <th>工單號碼：</th>
+                                    <td>{{ fill_work.workorder.order_number|default:"-" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>產品編號：</th>
+                                    <td>{{ fill_work.product_id }}</td>
+                                </tr>
+                                <tr>
+                                    <th>工序：</th>
+                                    <td>{{ fill_work.process.name|default:"-" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>工作日期：</th>
+                                    <td>{{ fill_work.work_date }}</td>
+                                </tr>
+                                <tr>
+                                    <th>工作數量：</th>
+                                    <td>{{ fill_work.work_quantity }}</td>
+                                </tr>
+                                <tr>
+                                    <th>不良品數量：</th>
+                                    <td>{{ fill_work.defect_quantity }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="approval_remarks">核准備註（可選）</label>
+                            <textarea name="approval_remarks" id="approval_remarks" class="form-control" rows="3" placeholder="請輸入核准備註..."></textarea>
+                        </div>
+                        
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-success btn-lg" onclick="return confirm('確定要核准此填報作業嗎？')">
+                                <i class="fas fa-check"></i> 確認核准
+                            </button>
+                            <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-secondary btn-lg ml-2">
+                                <i class="fas fa-times"></i> 取消
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -387,7 +387,7 @@ def operator_report_import_file(request):
                     'original_workorder_number': workorder_number  # 直接使用匯入的工單號碼
                 }
                 
-                report = OperatorSupplementReport.objects.create(**report_data)
+                report = BackupOperatorSupplementReport.objects.create(**report_data)
                 
                 # 16. 自動計算工時
                 report.calculate_work_hours()
@@ -957,7 +957,7 @@ def smt_report_import_file(request):
                     'original_workorder_number': workorder_number  # 直接使用匯入的工單號碼
                 }
                 
-                report = SMTSupplementReport.objects.create(**report_data)
+                report = BackupSMTSupplementReport.objects.create(**report_data)
                 
                 # 15. 自動計算工時
                 report.calculate_work_hours()
@@ -1348,8 +1348,8 @@ def operator_report_export(request):
         process_name = request.GET.get('process_name')
         company_code = request.GET.get('company_code')
         
-        # 建立查詢 - 只針對 OperatorSupplementReport 模型
-        query = OperatorSupplementReport.objects.select_related(
+        # 建立查詢 - 只針對 BackupOperatorSupplementReport 模型
+        query = BackupOperatorSupplementReport.objects.select_related(
             'operator', 'process', 'equipment', 'workorder'
         ).all()
         
@@ -1374,7 +1374,7 @@ def operator_report_export(request):
         # 準備匯出資料
         export_data = []
         for report in query:
-            # 取得工單號碼 - 只從 OperatorSupplementReport 模型取得
+            # 取得工單號碼 - 只從 BackupOperatorSupplementReport 模型取得
             workorder_number = ''
             if report.workorder:
                 workorder_number = report.workorder.order_number
@@ -1383,7 +1383,7 @@ def operator_report_export(request):
             elif report.rd_workorder_number:
                 workorder_number = report.rd_workorder_number
             
-            # 取得產品編號 - 只從 OperatorSupplementReport 模型取得
+            # 取得產品編號 - 只從 BackupOperatorSupplementReport 模型取得
             product_code = ''
             if report.workorder and report.workorder.product_code:
                 product_code = report.workorder.product_code
@@ -1392,7 +1392,7 @@ def operator_report_export(request):
             elif report.rd_product_code:
                 product_code = report.rd_product_code
             
-            # 取得公司代號 - 優先從 OperatorSupplementReport 的 company_code 欄位取得
+            # 取得公司代號 - 優先從 BackupOperatorSupplementReport 的 company_code 欄位取得
             company_code_value = ''
             if report.company_code:
                 company_code_value = report.company_code
@@ -1408,7 +1408,7 @@ def operator_report_export(request):
                 '工單號': workorder_number,
                 '產品編號': product_code,
                 '工序名稱': report.process.name if report.process else '',
-                '設備名稱': report.equipment.name if report.equipment else '',  # 直接從 OperatorSupplementReport 的 equipment 欄位取得
+                '設備名稱': report.equipment.name if report.equipment else '',  # 直接從 BackupOperatorSupplementReport 的 equipment 欄位取得
                 '報工數量': report.work_quantity,
                 '不良品數量': report.defect_quantity,
                 '備註': report.remarks or '',

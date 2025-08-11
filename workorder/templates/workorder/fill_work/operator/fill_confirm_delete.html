@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}刪除作業員填報作業{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        確認刪除
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <h4 class="text-danger mb-4">確定要刪除這筆作業員填報作業記錄嗎？</h4>
+                    
+                    <div class="alert alert-warning">
+                        <strong>工單號碼：</strong>
+                        {% if object.workorder %}
+                            {{ object.workorder.workorder_number }}
+                        {% else %}
+                            {{ object.original_workorder_number }}
+                        {% endif %}
+                        <br>
+                        <strong>作業員：</strong>{{ object.operator.username }}
+                        <br>
+                        <strong>工序：</strong>{{ object.process.name }}
+                        <br>
+                        <strong>填報日期：</strong>{{ object.fill_date|date:"Y-m-d" }}
+                    </div>
+                    
+                    <p class="text-muted">此操作無法復原，請謹慎操作。</p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-danger mr-2">
+                                <i class="fas fa-trash mr-1"></i>
+                                確認刪除
+                            </button>
+                            <a href="{% url 'workorder:fill_work:fill_work_detail' object.id %}" class="btn btn-secondary">
+                                <i class="fas fa-times mr-1"></i>
+                                取消
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

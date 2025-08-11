@@ -38,17 +38,36 @@
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-warning text-dark">
                         <h4 class="mb-0">
-                            <i class="fas fa-clipboard-check"></i> 備用報工管理
+                            <i class="fas fa-clipboard-check"></i> 填報作業管理
                         </h4>
                     </div>
                     <div class="card-body">
                         <p class="card-text">
-                            備用報工記錄管理，包含生產進度回報。
+                            填報作業記錄管理，包含生產進度回報。
                             <br>
                             可查詢、統計、分析。
                         </p>
-                        <a href="{% url 'workorder:backup_report_index' %}" class="btn btn-warning">
-                            <i class="fas fa-tools"></i> 進入備用報工管理
+                        <a href="{% url 'workorder:fill_work:fill_work_index' %}" class="btn btn-warning">
+                            <i class="fas fa-tools"></i> 進入填報作業管理
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-edit"></i> 備用報工管理
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            備用報工管理，支援完整的報工資料記錄與核准流程。
+                            <br>
+                            可新增、核准、匯入匯出。
+                        </p>
+                        <a href="{% url 'workorder:backup_report_index' %}" class="btn btn-secondary">
+                            <i class="fas fa-edit"></i> 進入備用報工管理
                         </a>
                     </div>
                 </div>

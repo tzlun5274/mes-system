@@ -813,7 +813,7 @@ def generate_completed_workorder_processes(workorder):
     })
     
     # 1. 收集作業員報工資料
-    operator_reports = OperatorSupplementReport.objects.filter(
+    operator_reports = BackupOperatorSupplementReport.objects.filter(
         workorder=workorder,
         approval_status='approved'
     ).select_related('operator', 'process', 'equipment')
@@ -4728,7 +4728,7 @@ def operator_supplement_batch(request):
             return redirect('workorder:operator_supplement_report_index')
         
         try:
-            reports = OperatorSupplementReport.objects.filter(id__in=report_ids)
+            reports = BackupOperatorSupplementReport.objects.filter(id__in=report_ids)
             
             if action == 'approve':
                 reports.update(
@@ -4763,7 +4763,7 @@ def operator_supplement_import_file(request):
     """作業員補登報工檔案匯入處理"""
     from process.models import Operator, ProcessName
     from workorder.models import WorkOrder
-    from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
+    from workorder.workorder_reporting.models import BackupOperatorSupplementReport
     from datetime import datetime, time
     
     try:
@@ -4948,7 +4948,7 @@ def operator_supplement_import_file(request):
                     'original_workorder_number': workorder_number  # 直接使用匯入的工單號碼
                 }
                 
-                report = OperatorSupplementReport.objects.create(**report_data)
+                report = BackupOperatorSupplementReport.objects.create(**report_data)
                 
                 # 自動計算工時
                 report.calculate_work_hours()
@@ -5025,7 +5025,7 @@ def smt_supplement_batch(request):
 def operator_supplement_export(request):
     """匯出作業員補登報工記錄"""
     try:
-        reports = OperatorSupplementReport.objects.all().order_by('-work_date')
+        reports = BackupOperatorSupplementReport.objects.all().order_by('-work_date')
         
         # 篩選條件
         date_from = request.GET.get('date_from')
@@ -5240,7 +5240,7 @@ def operator_supplement_batch_create(request):
                         continue
                 
                 # 建立報工記錄
-                report = OperatorSupplementReport.objects.create(
+                report = BackupOperatorSupplementReport.objects.create(
                     operator_id=report_data['operator_id'],
                     workorder_id=report_data['workorder_id'],
                     process_id=report_data['process_id'],
@@ -5331,9 +5331,9 @@ def smt_supplement_batch_create(request):
 def supervisor_index(request):
     """主管功能首頁"""
     # 統計資料
-    total_operator_reports = OperatorSupplementReport.objects.count()
-    pending_operator_reports = OperatorSupplementReport.objects.filter(approval_status="pending").count()
-    approved_operator_reports = OperatorSupplementReport.objects.filter(approval_status="approved").count()
+    total_operator_reports = BackupOperatorSupplementReport.objects.count()
+    pending_operator_reports = BackupOperatorSupplementReport.objects.filter(approval_status="pending").count()
+    approved_operator_reports = BackupOperatorSupplementReport.objects.filter(approval_status="approved").count()
     
     total_smt_reports = SMTSupplementReport.objects.count()
     pending_smt_reports = SMTSupplementReport.objects.filter(approval_status="pending").count()
@@ -5445,7 +5445,7 @@ def submit_operator_report(request):
                 })
         
         # 建立報工記錄
-        report = OperatorSupplementReport.objects.create(
+        report = BackupOperatorSupplementReport.objects.create(
             operator_id=data['operator_id'],
             workorder_id=data['workorder_id'],
             process=data.get('process_name', ''),
@@ -5868,7 +5868,7 @@ def active_workorders(request):
             active_workorders.append(workorder)
     
     # 輔助統計：今日已核准報工記錄
-    today_operator_reports = OperatorSupplementReport.objects.filter(
+    today_operator_reports = BackupOperatorSupplementReport.objects.filter(
         work_date=today,
         approval_status='approved'
     ).values_list('workorder_id', flat=True).distinct()

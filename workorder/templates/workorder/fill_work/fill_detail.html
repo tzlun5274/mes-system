@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}填報作業詳情{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3 mb-0 text-gray-800">
+                    <i class="fas fa-eye mr-2"></i>
+                    填報作業詳情
+                </h1>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:fill_work:fill_work_index' %}">填報作業管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:fill_work:fill_work_list' %}">填報作業列表</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">詳情</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳情卡片 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clipboard-list mr-2"></i>
+                            填報作業資訊
+                        </h5>
+                        <div>
+                            <a href="{% url 'workorder:fill_work:fill_work_edit' fill_work.id %}" class="btn btn-light btn-sm">
+                                <i class="fas fa-edit mr-1"></i>
+                                編輯
+                            </a>
+                            {% if user.is_superuser %}
+                            <a href="{% url 'workorder:fill_work:fill_work_delete' fill_work.id %}" 
+                               class="btn btn-danger btn-sm"
+                               onclick="return confirm('確定要刪除這筆記錄嗎？')">
+                                <i class="fas fa-trash mr-1"></i>
+                                刪除
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- 基本資訊 -->
+                        <div class="col-md-6">
+                            <h6 class="text-primary mb-3">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                基本資訊
+                            </h6>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td class="font-weight-bold" style="width: 40%;">填報類型：</td>
+                                    <td>
+                                        {% if fill_work.work_type == 'operator' %}
+                                            <span class="badge badge-info">一般作業員</span>
+                                        {% elif fill_work.work_type == 'smt' %}
+                                            <span class="badge badge-success">SMT作業員</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">工單號碼：</td>
+                                    <td>
+                                        {% if fill_work.workorder %}
+                                            {{ fill_work.workorder.workorder_number }}
+                                        {% else %}
+                                            {{ fill_work.original_workorder_number }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">作業員：</td>
+                                    <td>
+                                        {% if fill_work.operator %}
+                                            {{ fill_work.operator.username }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">工序：</td>
+                                    <td>
+                                        {% if fill_work.process %}
+                                            {{ fill_work.process.name }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">填報日期：</td>
+                                    <td>{{ fill_work.fill_date|date:"Y-m-d" }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">狀態：</td>
+                                    <td>
+                                        {% if fill_work.status == 'draft' %}
+                                            <span class="badge badge-secondary">草稿</span>
+                                        {% elif fill_work.status == 'submitted' %}
+                                            <span class="badge badge-warning">已提交</span>
+                                        {% elif fill_work.status == 'approved' %}
+                                            <span class="badge badge-success">已核准</span>
+                                        {% elif fill_work.status == 'rejected' %}
+                                            <span class="badge badge-danger">已駁回</span>
+                                        {% elif fill_work.status == 'completed' %}
+                                            <span class="badge badge-info">已完成</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- 數量資訊 -->
+                        <div class="col-md-6">
+                            <h6 class="text-primary mb-3">
+                                <i class="fas fa-chart-bar mr-2"></i>
+                                數量資訊
+                            </h6>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td class="font-weight-bold" style="width: 40%;">良品數量：</td>
+                                    <td>{{ fill_work.quantity }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">不良品數量：</td>
+                                    <td>{{ fill_work.defect_quantity|default:"0" }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">總數量：</td>
+                                    <td>{{ fill_work.get_total_quantity }}</td>
+                                </tr>
+                                {% if fill_work.is_smt_work %}
+                                <tr>
+                                    <td class="font-weight-bold">運行時間：</td>
+                                    <td>{{ fill_work.run_time_minutes }} 分鐘</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">停機時間：</td>
+                                    <td>{{ fill_work.down_time_minutes }} 分鐘</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">設備效率：</td>
+                                    <td>{{ fill_work.get_efficiency|floatformat:2 }}%</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- SMT專用資訊 -->
+                    {% if fill_work.is_smt_work %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="text-primary mb-3">
+                                <i class="fas fa-cogs mr-2"></i>
+                                設備資訊
+                            </h6>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td class="font-weight-bold" style="width: 15%;">設備：</td>
+                                    <td>
+                                        {% if fill_work.equipment %}
+                                            {{ fill_work.equipment.name }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- 備註資訊 -->
+                    {% if fill_work.fill_notes %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="text-primary mb-3">
+                                <i class="fas fa-sticky-note mr-2"></i>
+                                備註
+                            </h6>
+                            <div class="alert alert-info">
+                                {{ fill_work.fill_notes|linebreaks }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- 異常記錄 -->
+                    {% if fill_work.abnormal_notes %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="text-danger mb-3">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                異常記錄
+                            </h6>
+                            <div class="alert alert-warning">
+                                {{ fill_work.abnormal_notes|linebreaks }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- 審核資訊 -->
+                    {% if fill_work.approved_by %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="text-primary mb-3">
+                                <i class="fas fa-user-check mr-2"></i>
+                                審核資訊
+                            </h6>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td class="font-weight-bold" style="width: 15%;">核准人員：</td>
+                                    <td>{{ fill_work.approved_by.username }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">核准時間：</td>
+                                    <td>{{ fill_work.approved_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                                {% if fill_work.approval_notes %}
+                                <tr>
+                                    <td class="font-weight-bold">核准備註：</td>
+                                    <td>{{ fill_work.approval_notes }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- 系統資訊 -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-3">
+                                <i class="fas fa-cog mr-2"></i>
+                                系統資訊
+                            </h6>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td class="font-weight-bold" style="width: 15%;">建立者：</td>
+                                    <td>{{ fill_work.created_by.username }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">建立時間：</td>
+                                    <td>{{ fill_work.created_at|date:"Y-m-d H:i:s" }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">更新時間：</td>
+                                    <td>{{ fill_work.updated_at|date:"Y-m-d H:i:s" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left mr-1"></i>
+                    返回列表
+                </a>
+                <div>
+                    {% if fill_work.status == 'submitted' %}
+                    <a href="{% url 'workorder:fill_work:approve_fill_work' fill_work.work_type fill_work.id %}" 
+                       class="btn btn-success">
+                        <i class="fas fa-check mr-1"></i>
+                        核准
+                    </a>
+                    <a href="{% url 'workorder:fill_work:reject_fill_work' fill_work.work_type fill_work.id %}" 
+                       class="btn btn-danger">
+                        <i class="fas fa-times mr-1"></i>
+                        駁回
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'workorder:fill_work:fill_work_edit' fill_work.id %}" class="btn btn-warning">
+                        <i class="fas fa-edit mr-1"></i>
+                        編輯
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -20,6 +20,6 @@ urlpatterns = [
     path("rosetta/", include("rosetta.urls")),
     path("workorder/", include("workorder.urls", namespace="workorder")),
     path("reporting/", include("reporting.urls", namespace="reporting")),
-    path("work-reporting-management/", include("work_reporting_management.urls", namespace="work_reporting_management")),  # 原 unified_work_reporting 改名
+    # path("work-reporting-management/", include("work_reporting_management.urls", namespace="work_reporting_management")),  # 已移除新的報工管理系統
     path("database-error/", views.database_error, name="database_error"),
 ]

@@ -43,12 +43,13 @@ INSTALLED_APPS = [
     "workorder.workorder_erp",
             # "workorder.workorder_completed",  # 已移除
     "workorder.workorder_reporting",
+    "workorder.fill_work",
     "kanban.apps.KanbanConfig",
     "erp_integration.apps.ErpIntegrationConfig",
     "ai.apps.AiConfig",
     "production",
     "reporting",
-    "work_reporting_management",  # 原 unified_work_reporting 改名
+    # "work_reporting_management",  # 已移除新的報工管理系統
     "django.contrib.humanize",
 ]
 

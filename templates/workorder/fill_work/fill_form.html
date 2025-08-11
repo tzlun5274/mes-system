@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}新增作業員填報{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'workorder:workorder_index' %}">工單管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'workorder:fill_work:fill_work_list' %}">填報作業管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'workorder:fill_work:fill_work_list' %}">填報作業列表</a></li>
+            <li class="breadcrumb-item active" aria-current="page">新增</li>
+        </ol>
+    </nav>
+
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <i class="fas fa-edit me-2"></i>新增作業員填報
+        </h2>
+    </div>
+
+    <!-- 填報作業資料表單 -->
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">填報作業資料</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" id="fillWorkForm">
+                {% csrf_token %}
+                
+                <!-- 基本資訊欄位 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">基本資訊欄位</h5>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.product_id.id_for_label }}" class="form-label">產品編號</label>
+                            <input type="text" class="form-control" id="{{ form.product_id.id_for_label }}" 
+                                   name="product_id" value="{{ form.product_id.value|default:'' }}" placeholder="請輸入產品編號">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.workorder.id_for_label }}" class="form-label">工單號碼</label>
+                            <select class="form-select" id="{{ form.workorder.id_for_label }}" name="workorder">
+                                <option value="">---------</option>
+                                {% for workorder in workorders %}
+                                <option value="{{ workorder.id }}" 
+                                        data-product="{{ workorder.product_id }}"
+                                        data-quantity="{{ workorder.total_order_quantity }}">
+                                    {{ workorder.workorder_number }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.company_name.id_for_label }}" class="form-label">公司名稱</label>
+                            <input type="text" class="form-control" id="{{ form.company_name.id_for_label }}" 
+                                   name="company_name" value="{{ form.company_name.value|default:'' }}">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.operator.id_for_label }}" class="form-label">
+                                作業員 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="{{ form.operator.id_for_label }}" 
+                                   name="operator" value="{{ form.operator.value|default:'' }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.process.id_for_label }}" class="form-label">
+                                工序 <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="{{ form.process.id_for_label }}" name="process" required>
+                                <option value="">---------</option>
+                                {% for process in processes %}
+                                <option value="{{ process.id }}">{{ process.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.equipment.id_for_label }}" class="form-label">使用的設備</label>
+                            <select class="form-select" id="{{ form.equipment.id_for_label }}" name="equipment">
+                                <option value="">---------</option>
+                                {% for equipment in equipments %}
+                                <option value="{{ equipment.id }}">{{ equipment.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 數量資訊欄位 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">數量資訊欄位</h5>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.planned_quantity.id_for_label }}" class="form-label">工單預設生產數量</label>
+                            <input type="number" class="form-control" id="{{ form.planned_quantity.id_for_label }}" 
+                                   name="planned_quantity" value="{{ form.planned_quantity.value|default:0 }}" min="0" readonly>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.work_quantity.id_for_label }}" class="form-label">
+                                工作數量 <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" class="form-control" id="{{ form.work_quantity.id_for_label }}" 
+                                   name="work_quantity" value="{{ form.work_quantity.value|default:0 }}" min="0" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.defect_quantity.id_for_label }}" class="form-label">不良品數量</label>
+                            <input type="number" class="form-control" id="{{ form.defect_quantity.id_for_label }}" 
+                                   name="defect_quantity" value="{{ form.defect_quantity.value|default:0 }}" min="0">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="{{ form.is_completed.id_for_label }}" 
+                                       name="is_completed" value="True" {% if form.is_completed.value %}checked{% endif %}>
+                                <label class="form-check-label" for="{{ form.is_completed.id_for_label }}">
+                                    是否已完工
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 時間日期欄位 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">時間日期欄位</h5>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.work_date.id_for_label }}" class="form-label">
+                                填報日期 <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" class="form-control" id="{{ form.work_date.id_for_label }}" 
+                                   name="work_date" value="{{ form.work_date.value|default:today_date }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.start_time.id_for_label }}" class="form-label">開始時間</label>
+                            <input type="text" class="form-control time-input" id="{{ form.start_time.id_for_label }}" 
+                                   name="start_time" value="{{ form.start_time.value|default:'' }}" 
+                                   placeholder="HH:MM" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="{{ form.end_time.id_for_label }}" class="form-label">結束時間</label>
+                            <input type="text" class="form-control time-input" id="{{ form.end_time.id_for_label }}" 
+                                   name="end_time" value="{{ form.end_time.value|default:'' }}" 
+                                   placeholder="HH:MM" pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 備註資訊欄位 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">備註資訊欄位</h5>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="{{ form.remarks.id_for_label }}" class="form-label">備註</label>
+                            <textarea class="form-control" id="{{ form.remarks.id_for_label }}" name="remarks" 
+                                      rows="3" placeholder="請輸入備註">{{ form.remarks.value|default:'' }}</textarea>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="{{ form.abnormal_notes.id_for_label }}" class="form-label">異常記錄</label>
+                            <textarea class="form-control" id="{{ form.abnormal_notes.id_for_label }}" name="abnormal_notes" 
+                                      rows="3" placeholder="請輸入異常記錄">{{ form.abnormal_notes.value|default:'' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 按鈕區域 -->
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>← 返回列表
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>儲存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript 功能 -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 時間輸入驗證
+    const timeInputs = document.querySelectorAll('.time-input');
+    timeInputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            const value = this.value.trim();
+            if (value && !/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(value)) {
+                alert('請輸入正確的時間格式 (HH:MM)');
+                this.focus();
+                return false;
+            }
+        });
+    });
+
+    // 工單選擇變更時自動填入產品編號和預設數量
+    const workorderSelect = document.getElementById('{{ form.workorder.id_for_label }}');
+    const productIdField = document.getElementById('{{ form.product_id.id_for_label }}');
+    const plannedQuantityField = document.getElementById('{{ form.planned_quantity.id_for_label }}');
+    
+    if (workorderSelect) {
+        workorderSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption.value) {
+                const productId = selectedOption.getAttribute('data-product');
+                const quantity = selectedOption.getAttribute('data-quantity');
+                
+                if (productIdField) productIdField.value = productId || '';
+                if (plannedQuantityField) plannedQuantityField.value = quantity || 0;
+            }
+        });
+    }
+
+    // 表單驗證
+    const form = document.getElementById('fillWorkForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const operator = document.getElementById('{{ form.operator.id_for_label }}').value;
+            const process = document.getElementById('{{ form.process.id_for_label }}').value;
+            const workDate = document.getElementById('{{ form.work_date.id_for_label }}').value;
+            const workQuantity = document.getElementById('{{ form.work_quantity.id_for_label }}').value;
+            
+            if (!operator || !process || !workDate || !workQuantity) {
+                e.preventDefault();
+                alert('請填寫所有必填欄位');
+                return false;
+            }
+            
+            // 時間格式驗證
+            const startTime = document.getElementById('{{ form.start_time.id_for_label }}').value;
+            const endTime = document.getElementById('{{ form.end_time.id_for_label }}').value;
+            
+            if (startTime && !/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(startTime)) {
+                e.preventDefault();
+                alert('開始時間格式不正確');
+                return false;
+            }
+            
+            if (endTime && !/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(endTime)) {
+                e.preventDefault();
+                alert('結束時間格式不正確');
+                return false;
+            }
+        });
+    }
+});
+</script>
+{% endblock %} 
