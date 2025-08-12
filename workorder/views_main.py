@@ -3835,7 +3835,7 @@ def execute_maintenance(request):
                 
                 duplicate_info['operator_duplicates'].append({
                     'operator_name': reports[0].operator.name if reports[0].operator else '未知',
-                    'workorder_number': reports[0].workorder.workorder_number if reports[0].workorder else '未知',
+                    'workorder_number': reports[0].workorder.order_number if reports[0].workorder else '未知',
                     'process_name': reports[0].process.name if reports[0].process else '未知',
                     'work_date': duplicate['work_date'].isoformat(),
                     'start_time': duplicate['start_time'].isoformat(),
@@ -3875,7 +3875,7 @@ def execute_maintenance(request):
                 
                 duplicate_info['smt_duplicates'].append({
                     'equipment_name': reports[0].equipment.name if reports[0].equipment else '未知',
-                    'workorder_number': reports[0].workorder.workorder_number if reports[0].workorder else '未知',
+                    'workorder_number': reports[0].workorder.order_number if reports[0].workorder else '未知',
                     'product_code': duplicate['rd_product_code'] or '未知',
                     'work_date': duplicate['work_date'].isoformat(),
                     'start_time': duplicate['start_time'].isoformat(),

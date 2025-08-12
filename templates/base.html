@@ -245,6 +245,141 @@
         setInterval(updateTime, 1000);
     </script>
     
+    <script>
+        // 全域日期格式正規化：接受 2025/08/12、2025.08.12、20250812、12/08/2025，統一轉成 2025-08-12
+        (function () {
+            function pad2(n) { return n.toString().padStart(2, '0'); }
+            function isValidYMD(y, m, d) {
+                const date = new Date(y, m - 1, d);
+                return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+            }
+            function normalizeDateToISO(value) {
+                if (!value) return value;
+                let v = String(value).trim();
+                if (!v) return v;
+                const digitsOnly = v.replace(/[^0-9]/g, '');
+                // YYYYMMDD
+                if (/^\d{8}$/.test(digitsOnly)) {
+                    const y = parseInt(digitsOnly.slice(0, 4), 10);
+                    const m = parseInt(digitsOnly.slice(4, 6), 10);
+                    const d = parseInt(digitsOnly.slice(6, 8), 10);
+                    if (isValidYMD(y, m, d)) return `${y}-${pad2(m)}-${pad2(d)}`;
+                }
+                // Y-M-D, Y/M/D, Y.M.D
+                let mYMD = v.match(/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})$/);
+                if (mYMD) {
+                    const y = parseInt(mYMD[1], 10);
+                    const m = parseInt(mYMD[2], 10);
+                    const d = parseInt(mYMD[3], 10);
+                    if (isValidYMD(y, m, d)) return `${y}-${pad2(m)}-${pad2(d)}`;
+                }
+                // D-M-Y, D/M/Y, D.M.Y
+                let mDMY = v.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
+                if (mDMY) {
+                    const d = parseInt(mDMY[1], 10);
+                    const m = parseInt(mDMY[2], 10);
+                    const y = parseInt(mDMY[3], 10);
+                    if (isValidYMD(y, m, d)) return `${y}-${pad2(m)}-${pad2(d)}`;
+                }
+                return v;
+            }
+            function normalizeInputEl(el) {
+                if (!el || el.type !== 'date') return;
+                const normalized = normalizeDateToISO(el.value);
+                if (normalized && normalized !== el.value) {
+                    el.value = normalized;
+                }
+            }
+            function attachHandlersTo(el) {
+                if (!el || el.dataset._dateNormalized === '1') return;
+                el.dataset._dateNormalized = '1';
+
+                // 避免瀏覽器嘗試設定不合法值而報警告：
+                // 1) 輸入 '/' 或 '.' 時，改為插入 '-'
+                el.addEventListener('beforeinput', function (e) {
+                    if (e.inputType === 'insertText' && (e.data === '/' || e.data === '.')) {
+                        e.preventDefault();
+                        const start = el.selectionStart || 0;
+                        const end = el.selectionEnd || 0;
+                        const v = el.value || '';
+                        const next = v.slice(0, start) + '-' + v.slice(end);
+                        // 僅在結果為可被瀏覽器接受的情況下再設定（否則保持原值，避免噪音警告）
+                        try { el.value = next; } catch (_) {}
+                        // 將游標移動到插入後的位置
+                        requestAnimationFrame(() => { try { el.setSelectionRange(start + 1, start + 1); } catch (_) {} });
+                    }
+                }, { passive: false });
+
+                // 2) 貼上時統一正規化
+                el.addEventListener('paste', function (e) {
+                    const text = (e.clipboardData || window.clipboardData).getData('text');
+                    if (text) {
+                        const normalized = normalizeDateToISO(text);
+                        if (normalized) {
+                            e.preventDefault();
+                            try { el.value = normalized; } catch (_) {}
+                        }
+                    }
+                });
+
+                // 3) 常規事件：blur/change/input 時再校正一次
+                ['blur','change','input'].forEach(evt => {
+                    el.addEventListener(evt, function () { normalizeInputEl(el); }, { passive: true });
+                });
+
+                // 初次載入也先正規化一次
+                normalizeInputEl(el);
+            }
+            function normalizeAllDatesInForm(form) {
+                const inputs = form.querySelectorAll('input[type="date"], input.date-input, input[data-date]');
+                inputs.forEach(el => {
+                    if (el.type === 'date') {
+                        normalizeInputEl(el);
+                    } else {
+                        // 對於文字輸入的日期欄位，也一併正規化
+                        const normalized = normalizeDateToISO(el.value);
+                        if (normalized && normalized !== el.value) el.value = normalized;
+                    }
+                });
+            }
+            // 盡早執行正規化，不等 DOMContentLoaded
+            function initializeDateNormalization() {
+                document.querySelectorAll('input[type="date"]').forEach(attachHandlersTo);
+                // 在表單提交前，統一正規化所有日期欄位，避免瀏覽器拒絕 "yyyy/MM/dd"
+                document.querySelectorAll('form').forEach(form => {
+                    form.addEventListener('submit', function () {
+                        normalizeAllDatesInForm(form);
+                    });
+                });
+            }
+            
+            // 多重時機執行，確保涵蓋所有情況
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initializeDateNormalization);
+            } else {
+                initializeDateNormalization();
+            }
+            
+            // 使用 MutationObserver 監控動態新增的日期欄位
+            if (window.MutationObserver) {
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        mutation.addedNodes.forEach(function(node) {
+                            if (node.nodeType === 1) { // Element node
+                                if (node.type === 'date') {
+                                    attachHandlersTo(node);
+                                } else if (node.querySelectorAll) {
+                                    node.querySelectorAll('input[type="date"]').forEach(attachHandlersTo);
+                                }
+                            }
+                        });
+                    });
+                });
+                observer.observe(document.body, { childList: true, subtree: true });
+            }
+        })();
+    </script>
+
     {% block extra_js %}
     {% endblock %}
 </body>

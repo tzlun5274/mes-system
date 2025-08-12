@@ -345,9 +345,7 @@
                             <label for="{{ form.start_time.id_for_label }}" class="form-label">
                                 開始時間 <span class="required">*</span>
                             </label>
-                            <input type="text" class="form-control" id="{{ form.start_time.id_for_label }}" 
-                                   name="{{ form.start_time.name }}" value="8:30" 
-                                   placeholder="例如：16:00" autocomplete="off">
+                            {{ form.start_time }}
                             {% if form.start_time.help_text %}
                                 <div class="help-text">{{ form.start_time.help_text }}</div>
                             {% endif %}
@@ -361,9 +359,7 @@
                             <label for="{{ form.end_time.id_for_label }}" class="form-label">
                                 結束時間 <span class="required">*</span>
                             </label>
-                            <input type="text" class="form-control" id="{{ form.end_time.id_for_label }}" 
-                                   name="{{ form.end_time.name }}" value="16:30" 
-                                   placeholder="例如：18:30" autocomplete="off">
+                            {{ form.end_time }}
                             {% if form.end_time.help_text %}
                                 <div class="help-text">{{ form.end_time.help_text }}</div>
                             {% endif %}
@@ -474,49 +470,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<style>
-.time-picker-container {
-    position: absolute;
-    background: white;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    z-index: 1000;
-    display: none;
-}
-
-.time-picker-container.show {
-    display: block;
-}
-
-.time-picker-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 5px;
-    padding: 10px;
-}
-
-.time-option {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    text-align: center;
-    cursor: pointer;
-    background: #f8f9fa;
-    transition: all 0.2s;
-}
-
-.time-option:hover {
-    background: #e9ecef;
-    border-color: #adb5bd;
-}
-
-.time-option.selected {
-    background: #007bff;
-    color: white;
-    border-color: #007bff;
-}
-</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -554,72 +507,7 @@ document.addEventListener('DOMContentLoaded', function() {
         workDateInput.value = today;
     }
     
-    // 時間選擇器功能
-    const startTimeInput = document.getElementById('{{ form.start_time.id_for_label }}');
-    const endTimeInput = document.getElementById('{{ form.end_time.id_for_label }}');
-    
-    // 為時間輸入框添加點擊事件
-    [startTimeInput, endTimeInput].forEach(input => {
-        if (input) {
-            input.addEventListener('click', function() {
-                showTimePicker(this);
-            });
-        }
-    });
-    
-    function showTimePicker(inputElement) {
-        // 移除現有的時間選擇器
-        const existingPicker = document.querySelector('.time-picker-container');
-        if (existingPicker) {
-            existingPicker.remove();
-        }
-        
-        // 創建時間選擇器
-        const picker = document.createElement('div');
-        picker.className = 'time-picker-container';
-        picker.style.left = inputElement.offsetLeft + 'px';
-        picker.style.top = (inputElement.offsetTop + inputElement.offsetHeight + 5) + 'px';
-        
-        // 生成時間選項
-        const timeGrid = document.createElement('div');
-        timeGrid.className = 'time-picker-grid';
-        
-        const times = [
-            '8:00', '8:30', '9:00', '9:30',
-            '10:00', '10:30', '11:00', '11:30',
-            '12:00', '12:30', '13:00', '13:30',
-            '14:00', '14:30', '15:00', '15:30',
-            '16:00', '16:30', '17:00', '17:30',
-            '18:00', '18:30', '19:00', '19:30',
-            '20:00', '20:30', '21:00', '21:30',
-            '22:00', '22:30', '23:00', '23:30'
-        ];
-        
-        times.forEach(time => {
-            const option = document.createElement('div');
-            option.className = 'time-option';
-            option.textContent = time;
-            option.addEventListener('click', function() {
-                inputElement.value = time;
-                picker.remove();
-            });
-            timeGrid.appendChild(option);
-        });
-        
-        picker.appendChild(timeGrid);
-        document.body.appendChild(picker);
-        
-        // 顯示選擇器
-        setTimeout(() => picker.classList.add('show'), 10);
-        
-        // 點擊外部關閉選擇器
-        document.addEventListener('click', function closePicker(e) {
-            if (!picker.contains(e.target) && e.target !== inputElement) {
-                picker.remove();
-                document.removeEventListener('click', closePicker);
-            }
-        });
-    }
+
 });
 </script>
 {% endblock %} 

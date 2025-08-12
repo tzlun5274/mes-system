@@ -10,12 +10,12 @@ from workorder.workorder_reporting.models import BackupOperatorSupplementReport 
 class OperatorRDSampleSupplementReportForm(forms.ModelForm):
     """
     【規範】作業員RD樣品補登報工表單
-    - 與作業員補登報工表單功能完全一致
-    - 只是產品編號預設為PFP-CCT，工單號碼預設為RD樣品
+    - 工單號碼統一固定為"RD樣品"
+    - 產品編號需要自行輸入，沒有下拉選單
     - 共用OperatorSupplementReport資料表
     """
     
-    # 產品編號欄位 - 手動輸入，預設值為PFP-CCT
+    # 產品編號欄位 - 手動輸入，沒有下拉選單
     product_id = forms.CharField(
         max_length=100,
         label="產品編號",
@@ -27,12 +27,11 @@ class OperatorRDSampleSupplementReportForm(forms.ModelForm):
             }
         ),
         required=True,
-        initial="PFP-CCT",
-        help_text="請輸入產品編號",
+        help_text="請輸入產品編號（RD樣品需要自行輸入）",
     )
     
-    # 原始工單號碼欄位 - 唯讀
-    original_workorder_number = forms.CharField(
+    # 工單號碼欄位 - 固定為"RD樣品"，唯讀
+    workorder_number = forms.CharField(
         max_length=100,
         label="工單號碼",
         widget=forms.TextInput(
@@ -41,10 +40,12 @@ class OperatorRDSampleSupplementReportForm(forms.ModelForm):
                 "id": "rd_workorder_number_input",
                 "placeholder": "RD樣品",
                 "readonly": "readonly",
+                "value": "RD樣品",
             }
         ),
         required=False,
-        help_text="工單號碼固定為「RD樣品」",
+        initial="RD樣品",
+        help_text="工單號碼統一固定為「RD樣品」",
     )
     
     # 作業員選擇
@@ -275,7 +276,7 @@ class OperatorRDSampleSupplementReportForm(forms.ModelForm):
         model = OperatorSupplementReport
         fields = [
             "product_id",
-            "original_workorder_number",
+            "workorder_number",
             "operator",
             "process",
             "equipment",
@@ -293,7 +294,7 @@ class OperatorRDSampleSupplementReportForm(forms.ModelForm):
         ]
         labels = {
             "product_id": "產品編號",
-            "original_workorder_number": "工單號碼",
+            "workorder_number": "工單號碼",
             "operator": "作業員",
             "process": "工序",
             "equipment": "使用的設備",
@@ -310,15 +311,15 @@ class OperatorRDSampleSupplementReportForm(forms.ModelForm):
             "approval_status": "核准狀態",
         }
         help_texts = {
-            "product_id": "請輸入產品編號",
-            "original_workorder_number": "工單號碼固定為「RD樣品」",
+            "product_id": "請輸入產品編號（RD樣品需要自行輸入）",
+            "workorder_number": "工單號碼統一固定為「RD樣品」",
             "operator": "請選擇進行補登報工的作業員",
             "process": "請選擇工序（排除SMT相關工序）",
             "equipment": "請選擇使用的設備（排除SMT相關設備）",
             "planned_quantity": "此為工單規劃的總生產數量，不可修改",
             "work_date": "請選擇報工日期",
-            "start_time": "請選擇或輸入實際開始時間 (24小時制)",
-            "end_time": "請選擇或輸入實際結束時間 (24小時制)",
+            "start_time": "請選擇或輸入實際開始時間 (24小時制，格式：HH:MM)",
+            "end_time": "請選擇或輸入實際結束時間 (24小時制，格式：HH:MM)",
             "work_quantity": "請輸入該時段內實際完成的合格產品數量",
             "defect_quantity": "請輸入本次生產中產生的不良品數量，若無則留空或填寫0",
             "is_completed": "若此工單在此工序上已全部完成，請勾選",
@@ -365,8 +366,8 @@ class OperatorRDSampleSupplementReportForm(forms.ModelForm):
         if "product_id" in self.fields:
             self.fields["product_id"].initial = ""
         
-        if "original_workorder_number" in self.fields:
-            self.fields["original_workorder_number"].initial = "RD樣品"
+        if "workorder_number" in self.fields:
+            self.fields["workorder_number"].initial = "RD樣品"
         
         if "planned_quantity" in self.fields:
             self.fields["planned_quantity"].initial = 0
@@ -381,7 +382,7 @@ class OperatorRDSampleSupplementReportForm(forms.ModelForm):
         cleaned_data = super().clean()
         
         # RD樣品模式下，設定預設值
-        cleaned_data['original_workorder_number'] = 'RD樣品'
+        cleaned_data['workorder_number'] = 'RD樣品'
         
         # 驗證時間
         start_time = cleaned_data.get('start_time')
@@ -444,7 +445,7 @@ class OperatorRDSampleSupplementReportForm(forms.ModelForm):
         instance = super().save(commit=False)
         
         # 設定RD樣品報工相關欄位
-        instance.original_workorder_number = 'RD樣品'
+        instance.workorder_number = 'RD樣品'
         instance.planned_quantity = 0  # RD樣品預設生產數量為0
         
         if commit:

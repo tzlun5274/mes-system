@@ -104,7 +104,7 @@ urlpatterns = [
     path("report/", RedirectView.as_view(url="/workorder/fill_work/", permanent=True)),
     
     # 填報作業管理首頁
-    path("fill_work/", include('workorder.fill_work.urls')),
+    path("fill_work/", include(('workorder.fill_work.urls', 'fill_work'), namespace='fill_work')),
     
     # 備用報工管理首頁（保留向後相容）
     path("backup_report/", BackupReportIndexView.as_view(), name="backup_report_index"),
@@ -143,7 +143,9 @@ urlpatterns = [
     # 舊函式式視圖向後相容（備用路徑）
     path("backup_report/operator/supplement/approve/<int:report_id>/", workorder_views.operator_supplement_report_approve, name="operator_supplement_report_approve"),
     path("backup_report/operator/supplement/reject/<int:report_id>/", workorder_views.operator_supplement_report_reject, name="operator_supplement_report_reject"),
-    path("backup_report/operator/supplement/batch/", workorder_views.operator_supplement_batch, name="operator_supplement_batch"),
+    # 移除重複的路由，使用新的 import_views 版本
+    # path("backup_report/operator/supplement/batch/", workorder_views.operator_supplement_batch, name="operator_supplement_batch"),
+    # path("backup_report/operator/supplement/batch/", workorder_views.operator_supplement_batch, name="operator_supplement_batch"),
     path("backup_report/operator/supplement/export/", workorder_views.operator_supplement_export, name="operator_supplement_export"),
     path("backup_report/operator/supplement/template/", workorder_views.operator_supplement_template, name="operator_supplement_template"),
     path("backup_report/smt/supplement/approve/<int:report_id>/", workorder_views.smt_supplement_report_approve, name="smt_supplement_report_approve"),

@@ -214,28 +214,7 @@
     
 
     
-    /* 時間選擇器樣式 */
-    .time-picker-container {
-        position: absolute;
-        background: white;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        z-index: 1000;
-        display: none;
-        padding: 10px;
-        min-width: 200px;
-    }
-    
-    .time-picker-container select {
-        width: 80px;
-        display: inline-block;
-        margin-right: 10px;
-    }
-    
-    .time-picker-container button {
-        margin-left: 5px;
-    }
+
     
     /* 強制覆蓋Bootstrap的響應式樣式 */
     @media (max-width: 768px) {
@@ -609,100 +588,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // ==================== 報工表單 JavaScript ====================
     
-    // 創建時間選擇器
-    function createTimePicker(inputElement) {
-        // 創建時間選擇器容器
-        const pickerContainer = document.createElement('div');
-        pickerContainer.className = 'time-picker-container';
-        
-        // 創建小時選擇器
-        const hourSelect = document.createElement('select');
-        hourSelect.className = 'form-control mb-2';
-        
-        for (let i = 0; i < 24; i++) {
-            const option = document.createElement('option');
-            option.value = i.toString().padStart(2, '0');
-            option.textContent = i.toString().padStart(2, '0');
-            hourSelect.appendChild(option);
-        }
-        
-        // 創建分鐘選擇器
-        const minuteSelect = document.createElement('select');
-        minuteSelect.className = 'form-control mb-2';
-        
-        for (let i = 0; i < 60; i += 5) {
-            const option = document.createElement('option');
-            option.value = i.toString().padStart(2, '0');
-            option.textContent = i.toString().padStart(2, '0');
-            minuteSelect.appendChild(option);
-        }
-        
-        // 創建確定按鈕
-        const confirmBtn = document.createElement('button');
-        confirmBtn.type = 'button';
-        confirmBtn.className = 'btn btn-primary btn-sm';
-        confirmBtn.textContent = '確定';
-        
-        // 創建取消按鈕
-        const cancelBtn = document.createElement('button');
-        cancelBtn.type = 'button';
-        cancelBtn.className = 'btn btn-secondary btn-sm';
-        cancelBtn.textContent = '取消';
-        
-        // 組裝選擇器
-        pickerContainer.appendChild(hourSelect);
-        pickerContainer.appendChild(minuteSelect);
-        pickerContainer.appendChild(confirmBtn);
-        pickerContainer.appendChild(cancelBtn);
-        
-        // 插入到頁面
-        inputElement.parentNode.style.position = 'relative';
-        inputElement.parentNode.appendChild(pickerContainer);
-        
-        // 點擊輸入框顯示選擇器
-        inputElement.addEventListener('click', function(e) {
-            e.preventDefault();
-            pickerContainer.style.display = 'block';
-            
-            // 設定當前值
-            const currentValue = inputElement.value;
-            if (currentValue) {
-                const [hour, minute] = currentValue.split(':');
-                hourSelect.value = hour;
-                minuteSelect.value = minute;
-            }
-        });
-        
-        // 確定按鈕事件
-        confirmBtn.addEventListener('click', function() {
-            const timeValue = `${hourSelect.value}:${minuteSelect.value}`;
-            inputElement.value = timeValue;
-            pickerContainer.style.display = 'none';
-        });
-        
-        // 取消按鈕事件
-        cancelBtn.addEventListener('click', function() {
-            pickerContainer.style.display = 'none';
-        });
-        
-        // 點擊外部關閉選擇器
-        document.addEventListener('click', function(e) {
-            if (!pickerContainer.contains(e.target) && e.target !== inputElement) {
-                pickerContainer.style.display = 'none';
-            }
-        });
-    }
-    
-    // 初始化時間選擇器
-    const startTimeInput = document.getElementById('{{ form.start_time.id_for_label }}');
-    const endTimeInput = document.getElementById('{{ form.end_time.id_for_label }}');
-    
-    if (startTimeInput) {
-        createTimePicker(startTimeInput);
-    }
-    if (endTimeInput) {
-        createTimePicker(endTimeInput);
-    }
+
     
     // 取得DOM元素
     const workorderSelect = document.getElementById('{{ form.workorder.id_for_label }}');

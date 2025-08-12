@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}填報管理{% endblock %}
+
+{% block extra_head %}
+<style>
+    .fill-work-container {
+        padding: 20px;
+    }
+    
+    .fill-work-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease-in-out;
+        height: 100%;
+    }
+    
+    .fill-work-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .fill-work-card .card-header {
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+        text-align: center;
+    }
+    
+    .fill-work-card .card-body {
+        text-align: center;
+        padding: 2rem;
+    }
+    
+    .fill-work-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+    
+    .operator-card {
+        border-left: 4px solid #007bff;
+    }
+    
+    .smt-card {
+        border-left: 4px solid #28a745;
+    }
+    
+    .supervisor-card {
+        border-left: 4px solid #ffc107;
+    }
+    
+    .btn-fill-work {
+        margin: 0.5rem;
+        min-width: 120px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fill-work-container">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-clipboard-list"></i>
+                填報管理
+            </h2>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- 作業員填報卡片 -->
+        <div class="col-md-4 mb-4">
+            <div class="card fill-work-card operator-card">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-user-cog"></i>
+                    作業員填報
+                </div>
+                <div class="card-body">
+                    <div class="fill-work-icon text-primary">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h5 class="card-title">作業員填報作業</h5>
+                    <p class="card-text">管理作業員的填報記錄，包含一般填報和RD樣品填報</p>
+                    <a href="{% url 'workorder:fill_work:operator_index' %}" class="btn btn-primary btn-fill-work">
+                        <i class="fas fa-arrow-right"></i>
+                        進入作業員填報
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- SMT填報卡片 -->
+        <div class="col-md-4 mb-4">
+            <div class="card fill-work-card smt-card">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-cogs"></i>
+                    SMT填報
+                </div>
+                <div class="card-body">
+                    <div class="fill-work-icon text-success">
+                        <i class="fas fa-industry"></i>
+                    </div>
+                    <h5 class="card-title">SMT設備填報作業</h5>
+                    <p class="card-text">管理SMT設備的填報記錄，包含一般填報和RD樣品填報</p>
+                    <a href="{% url 'workorder:fill_work:smt_index' %}" class="btn btn-success btn-fill-work">
+                        <i class="fas fa-arrow-right"></i>
+                        進入SMT填報
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 主管審核卡片 -->
+        <div class="col-md-4 mb-4">
+            <div class="card fill-work-card supervisor-card">
+                <div class="card-header bg-warning text-dark">
+                    <i class="fas fa-user-shield"></i>
+                    主管審核
+                </div>
+                <div class="card-body">
+                    <div class="fill-work-icon text-warning">
+                        <i class="fas fa-clipboard-check"></i>
+                    </div>
+                    <h5 class="card-title">填報審核作業</h5>
+                    <p class="card-text">審核所有填報記錄，包含待審核和已審核的記錄管理</p>
+                    <a href="{% url 'workorder:fill_work:supervisor_approval_index' %}" class="btn btn-warning btn-fill-work">
+                        <i class="fas fa-arrow-right"></i>
+                        進入主管審核
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 快速統計 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar"></i>
+                        填報統計
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            <div class="border rounded p-3">
+                                <h4 class="text-primary">{{ pending_count|default:0 }}</h4>
+                                <p class="mb-0">待審核</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="border rounded p-3">
+                                <h4 class="text-success">{{ approved_count|default:0 }}</h4>
+                                <p class="mb-0">已核准</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="border rounded p-3">
+                                <h4 class="text-danger">{{ rejected_count|default:0 }}</h4>
+                                <p class="mb-0">已駁回</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="border rounded p-3">
+                                <h4 class="text-info">{{ total_count|default:0 }}</h4>
+                                <p class="mb-0">總計</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 卡片懸停效果
+    const cards = document.querySelectorAll('.fill-work-card');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+});
+</script>
+{% endblock %} 

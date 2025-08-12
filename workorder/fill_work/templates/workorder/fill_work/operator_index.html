@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}作業員填報作業{% endblock %}
+
+{% block extra_head %}
+<style>
+    .operator-fill-container {
+        padding: 20px;
+    }
+    
+    .operator-fill-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease-in-out;
+        height: 100%;
+    }
+    
+    .operator-fill-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .operator-fill-card .card-header {
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+        text-align: center;
+    }
+    
+    .operator-fill-card .card-body {
+        text-align: center;
+        padding: 2rem;
+    }
+    
+    .operator-fill-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+    
+    .backfill-card {
+        border-left: 4px solid #007bff;
+    }
+    
+    .rd-backfill-card {
+        border-left: 4px solid #6f42c1;
+    }
+    
+    .maintenance-card {
+        border-left: 4px solid #fd7e14;
+    }
+    
+    .btn-operator-fill {
+        margin: 0.5rem;
+        min-width: 120px;
+    }
+    
+    .breadcrumb-nav {
+        background-color: #f8f9fa;
+        padding: 10px 20px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="operator-fill-container">
+    <!-- 麵包屑導航 -->
+    <div class="breadcrumb-nav">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item">
+                    <a href="{% url 'workorder:fill_work:fill_work_index' %}">
+                        <i class="fas fa-home"></i> 填報管理
+                    </a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">
+                    <i class="fas fa-users"></i> 作業員填報作業
+                </li>
+            </ol>
+        </nav>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-users"></i>
+                作業員填報作業
+            </h2>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- 新增作業員填報紀錄卡片 -->
+        <div class="col-md-4 mb-4">
+            <div class="card operator-fill-card backfill-card">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-plus-circle"></i>
+                    新增作業員填報紀錄
+                </div>
+                <div class="card-body">
+                    <div class="operator-fill-icon text-primary">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <h5 class="card-title">一般填報</h5>
+                    <p class="card-text">新增作業員的一般填報記錄，包含工單、工序、設備等資訊</p>
+                    <a href="{% url 'workorder:fill_work:operator_backfill_create' %}" class="btn btn-primary btn-operator-fill">
+                        <i class="fas fa-plus"></i>
+                        新增填報
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 新增作業員RD樣品填報紀錄卡片 -->
+        <div class="col-md-4 mb-4">
+            <div class="card operator-fill-card rd-backfill-card">
+                <div class="card-header bg-purple text-white">
+                    <i class="fas fa-flask"></i>
+                    新增作業員RD樣品填報紀錄
+                </div>
+                <div class="card-body">
+                    <div class="operator-fill-icon text-purple">
+                        <i class="fas fa-microscope"></i>
+                    </div>
+                    <h5 class="card-title">RD樣品填報</h5>
+                    <p class="card-text">新增作業員的RD樣品填報記錄，產品編號預設為PFP-CCT</p>
+                    <a href="{% url 'workorder:fill_work:operator_rd_backfill_create' %}" class="btn btn-purple btn-operator-fill">
+                        <i class="fas fa-flask"></i>
+                        新增RD樣品
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 作業員填報資料維護卡片 -->
+        <div class="col-md-4 mb-4">
+            <div class="card operator-fill-card maintenance-card">
+                <div class="card-header bg-orange text-white">
+                    <i class="fas fa-tools"></i>
+                    作業員填報資料維護
+                </div>
+                <div class="card-body">
+                    <div class="operator-fill-icon text-orange">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h5 class="card-title">資料維護</h5>
+                    <p class="card-text">查看、編輯、刪除作業員填報記錄，包含審核狀態管理</p>
+                    <a href="{% url 'workorder:fill_work:fill_work_list' %}?type=operator" class="btn btn-orange btn-operator-fill">
+                        <i class="fas fa-cog"></i>
+                        資料維護
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 作業員填報統計 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie"></i>
+                        作業員填報統計
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            <div class="border rounded p-3">
+                                <h4 class="text-primary">{{ operator_pending_count|default:0 }}</h4>
+                                <p class="mb-0">待審核</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="border rounded p-3">
+                                <h4 class="text-success">{{ operator_approved_count|default:0 }}</h4>
+                                <p class="mb-0">已核准</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="border rounded p-3">
+                                <h4 class="text-danger">{{ operator_rejected_count|default:0 }}</h4>
+                                <p class="mb-0">已駁回</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="border rounded p-3">
+                                <h4 class="text-info">{{ operator_total_count|default:0 }}</h4>
+                                <p class="mb-0">總計</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 最近填報記錄 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history"></i>
+                        最近作業員填報記錄
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_operator_records %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>作業員</th>
+                                        <th>工單號碼</th>
+                                        <th>產品編號</th>
+                                        <th>工序</th>
+                                        <th>設備</th>
+                                        <th>開始時間</th>
+                                        <th>結束時間</th>
+                                        <th>填報數量</th>
+                                        <th>不良品數量</th>
+                                        <th>狀態</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for record in recent_operator_records %}
+                                    <tr>
+                                        <td>{{ record.operator }}</td>
+                                        <td>{{ record.workorder }}</td>
+                                        <td>{{ record.product_id }}</td>
+                                        <td>{{ record.operation }}</td>
+                                        <td>{{ record.equipment }}</td>
+                                        <td>{{ record.start_time|time:"H:i" }}</td>
+                                        <td>{{ record.end_time|time:"H:i" }}</td>
+                                        <td>{{ record.work_quantity }}</td>
+                                        <td>{{ record.defect_quantity }}</td>
+                                        <td>
+                                            {% if record.approval_status == 'pending' %}
+                                                <span class="badge bg-warning">待審核</span>
+                                            {% elif record.approval_status == 'approved' %}
+                                                <span class="badge bg-success">已核准</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">已駁回</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'workorder:fill_work:fill_work_detail' record.id %}" class="btn btn-sm btn-outline-primary me-1">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if record.approval_status == 'pending' %}
+                                            <a href="{% url 'workorder:fill_work:operator_backfill_edit' record.id %}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <p>尚無作業員填報記錄</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 卡片懸停效果
+    const cards = document.querySelectorAll('.operator-fill-card');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+});
+</script>
+{% endblock %} 

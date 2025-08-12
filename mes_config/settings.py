@@ -290,11 +290,44 @@ mimetypes.add_type("text/css", ".css")
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("image/x-icon", ".ico")
 
-# 日期格式設定
+# 日期格式設定 - 支援多種輸入格式，統一輸出為標準格式
 DATE_FORMAT = 'Y-m-d'
-DATE_INPUT_FORMATS = ['%Y-%m-%d', '%Y/%m/%d', '%d/%m/%Y', '%d-%m-%Y']
+DATE_INPUT_FORMATS = [
+    '%Y-%m-%d',     # 2025-08-12 (ISO標準)
+    '%Y/%m/%d',     # 2025/08/12
+    '%Y.%m.%d',     # 2025.08.12
+    '%Y%m%d',       # 20250812
+    '%d/%m/%Y',     # 12/08/2025
+    '%d-%m-%Y',     # 12-08-2025
+    '%d.%m.%Y',     # 12.08.2025
+    '%m/%d/%Y',     # 08/12/2025 (美式)
+    '%m-%d-%Y',     # 08-12-2025 (美式)
+    '%m.%d.%Y',     # 08.12.2025 (美式)
+]
 DATETIME_FORMAT = 'Y-m-d H:i:s'
-DATETIME_INPUT_FORMATS = ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y/%m/%d %H:%M:%S', '%Y/%m/%d %H:%M']
+DATETIME_INPUT_FORMATS = [
+    '%Y-%m-%d %H:%M:%S',    # 2025-08-12 14:30:00
+    '%Y-%m-%d %H:%M',       # 2025-08-12 14:30
+    '%Y/%m/%d %H:%M:%S',    # 2025/08/12 14:30:00
+    '%Y/%m/%d %H:%M',       # 2025/08/12 14:30
+    '%Y.%m.%d %H:%M:%S',    # 2025.08.12 14:30:00
+    '%Y.%m.%d %H:%M',       # 2025.08.12 14:30
+    '%Y%m%d %H:%M:%S',      # 20250812 14:30:00
+    '%Y%m%d %H:%M',         # 20250812 14:30
+    '%d/%m/%Y %H:%M:%S',    # 12/08/2025 14:30:00
+    '%d/%m/%Y %H:%M',       # 12/08/2025 14:30
+    '%d-%m-%Y %H:%M:%S',    # 12-08-2025 14:30:00
+    '%d-%m-%Y %H:%M',       # 12-08-2025 14:30
+    '%m/%d/%Y %H:%M:%S',    # 08/12/2025 14:30:00 (美式)
+    '%m/%d/%Y %H:%M',       # 08/12/2025 14:30 (美式)
+]
+TIME_FORMAT = 'H:i'
+TIME_INPUT_FORMATS = [
+    '%H:%M:%S',     # 14:30:00
+    '%H:%M',        # 14:30
+    '%H.%M',        # 14.30
+    '%H%M',         # 1430
+]
 
 # 新增的 EMAIL 設置
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")

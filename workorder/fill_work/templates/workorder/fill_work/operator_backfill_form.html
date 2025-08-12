@@ -1,0 +1,466 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}新增作業員補登填報紀錄{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">新增作業員補登填報紀錄</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 訊息顯示區域 -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    <!-- 功能說明 -->
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle"></i> 功能說明</h5>
+                        <ul class="mb-0">
+                            <li>產品編號、工單號碼、公司名稱支援雙向關聯選擇</li>
+                            <li>選擇產品編號會自動更新工單號碼選項</li>
+                            <li>選擇工單號碼會自動填入公司名稱和預設生產數量</li>
+                            <li>工序和設備已過濾排除SMT相關項目</li>
+                            <li>休息時間：12:00-13:00，加班時間：17:30後</li>
+                        </ul>
+                    </div>
+
+                    <form method="post" id="fillWorkForm">
+                        {% csrf_token %}
+                        
+                        <!-- 基本資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">基本資訊</h5>
+                            </div>
+                            
+                            <!-- 產品編號 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="product_id" class="form-label">產品編號 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="product_id" name="product_id" required>
+                                    <option value="">請選擇產品編號</option>
+                                </select>
+                                <div class="form-text">選擇產品編號會自動更新相關的工單號碼選項</div>
+                            </div>
+
+                            <!-- 工單號碼 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="workorder" class="form-label">工單號碼 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="workorder" name="workorder" required>
+                                    <option value="">請選擇工單號碼</option>
+                                </select>
+                                <div class="form-text">選擇工單號碼會自動填入公司名稱和預設生產數量</div>
+                            </div>
+
+                            <!-- 公司名稱 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="company_name" class="form-label">公司名稱 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="company_name" name="company_name" required>
+                                    <option value="">請選擇公司名稱</option>
+                                    {% for value, label in form.fields.company_name.choices %}
+                                        {% if value %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">選擇公司名稱會更新相關的產品編號選項</div>
+                            </div>
+
+                            <!-- 作業員 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="operator" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="operator" name="operator" required>
+                                    <option value="">請選擇作業員</option>
+                                    {% for value, label in form.fields.operator.choices %}
+                                        {% if value %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- 工序 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="process" class="form-label">工序 <span class="text-danger">*</span></label>
+                                {{ form.process }}
+                                <div class="form-text">請選擇此次填報的工序</div>
+                            </div>
+
+                            <!-- 使用的設備 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="equipment" class="form-label">使用的設備</label>
+                                <select class="form-select" id="equipment" name="equipment">
+                                    <option value="">請選擇使用的設備</option>
+                                    {% for value, label in form.fields.equipment.choices %}
+                                        {% if value %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">請選擇此次填報使用的設備</div>
+                            </div>
+                        </div>
+
+                        <!-- 數量資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">數量資訊</h5>
+                            </div>
+                            
+                            <!-- 工單預設生產數量 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="planned_quantity" class="form-label">工單預設生產數量</label>
+                                <input type="number" class="form-control" id="planned_quantity" readonly>
+                                <div class="form-text">此為工單規劃的總生產數量，不可修改</div>
+                            </div>
+
+                            <!-- 工作數量 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="work_quantity" class="form-label">工作數量 <span class="text-danger">*</span></label>
+                                {{ form.work_quantity }}
+                                <div class="form-text">請輸入該時段內實際完成的合格產品數量</div>
+                            </div>
+
+                            <!-- 不良品數量 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="defect_quantity" class="form-label">不良品數量</label>
+                                {{ form.defect_quantity }}
+                                <div class="form-text">請輸入本次生產中產生的不良品數量，若無則留空或填寫0</div>
+                            </div>
+
+                            <!-- 是否已完工 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="is_completed" class="form-label">是否已完工</label>
+                                {{ form.is_completed }}
+                            </div>
+                        </div>
+
+                        <!-- 時間日期 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">時間日期</h5>
+                            </div>
+                            
+                            <!-- 填報日期 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="work_date" class="form-label">填報日期 <span class="text-danger">*</span></label>
+                                {{ form.work_date }}
+                                <div class="form-text">請選擇填報作業的日期</div>
+                            </div>
+
+                            <!-- 開始時間 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="start_time" class="form-label">開始時間 <span class="text-danger">*</span></label>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <select class="form-select" id="start_hour" required>
+                                            <option value="">時</option>
+                                            {% for hour in hours_range %}
+                                                <option value="{{ hour }}">{{ hour }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <select class="form-select" id="start_minute" required>
+                                            <option value="">分</option>
+                                            {% for minute in minutes_range %}
+                                                <option value="{{ minute }}">{{ minute }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="start_time" name="start_time">
+                                <div class="form-text">請選擇開始時間 (格式：HH:MM)</div>
+                            </div>
+
+                            <!-- 結束時間 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="end_time" class="form-label">結束時間 <span class="text-danger">*</span></label>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <select class="form-select" id="end_hour" required>
+                                            <option value="">時</option>
+                                            {% for hour in hours_range %}
+                                                <option value="{{ hour }}">{{ hour }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <select class="form-select" id="end_minute" required>
+                                            <option value="">分</option>
+                                            {% for minute in minutes_range %}
+                                                <option value="{{ minute }}">{{ minute }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="end_time" name="end_time">
+                                <div class="form-text">請選擇結束時間 (格式：HH:MM)</div>
+                            </div>
+                        </div>
+
+                        <!-- 備註資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">備註資訊</h5>
+                            </div>
+                            
+                            <!-- 備註 -->
+                            <div class="col-md-6 mb-3">
+                                <label for="remarks" class="form-label">備註</label>
+                                {{ form.remarks }}
+                                <div class="form-text">請輸入任何需要補充的資訊，如設備標記、操作說明等</div>
+                            </div>
+
+                            <!-- 異常記錄 -->
+                            <div class="col-md-6 mb-3">
+                                <label for="abnormal_notes" class="form-label">異常記錄</label>
+                                {{ form.abnormal_notes }}
+                                <div class="form-text">記錄生產過程中的異常情況，如設備故障、品質問題等</div>
+                            </div>
+                        </div>
+
+                        <!-- 提交按鈕 -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'workorder:fill_work:operator_index' %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> 返回列表
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> 儲存填報紀錄
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 載入指示器 -->
+<div id="loadingIndicator" class="position-fixed top-50 start-50 translate-middle" style="display: none; z-index: 9999;">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">載入中...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 設定預設日期為今天
+    const today = new Date().toISOString().split('T')[0];
+    $('#id_work_date').val(today);
+
+    // 初始化 product/workorder
+    $('#product_id').html('<option value="">請選擇產品編號</option>');
+    $('#workorder').html('<option value="">請選擇工單號碼</option>');
+
+    // 載入全部產品清單
+    $.ajax({
+        url: '{% url "workorder:fill_work:get_product_list" %}',
+        success: function(data){
+            updateProductOptions(data);
+        }
+    });
+    // 載入全部工單號碼
+    $.ajax({
+        url: '{% url "workorder:fill_work:get_all_workorder_numbers" %}',
+        success: function(data){
+            const arr = (data && data.workorders) ? data.workorders : [];
+            let options = '<option value="">請選擇工單號碼</option>';
+            arr.forEach(function(no){ options += `<option value="${no}">${no}</option>`; });
+            $('#workorder').html(options);
+        }
+    });
+
+    // 設定預設時間
+    $('#start_hour').val('08');
+    $('#start_minute').val('30');
+    $('#end_hour').val('17');
+    $('#end_minute').val('30');
+
+    // 更新隱藏的時間欄位
+    updateTimeFields();
+
+    // 時間選擇變更事件
+    $('#start_hour, #start_minute, #end_hour, #end_minute').change(function() {
+        updateTimeFields();
+    });
+
+    // 當產品選好後，依產品載入工單清單
+    $('#product_id').on('change', function() {
+        const productId = $(this).val();
+        if (!productId) {
+            $('#workorder').html('<option value="">請選擇工單號碼</option>');
+            $('#planned_quantity').val('');
+            return;
+        }
+        showLoading();
+        $.ajax({
+            url: '{% url "workorder:fill_work:get_workorder_by_product" %}',
+            data: { product_id: productId },
+            success: function(data) {
+                const items = data && data.workorders ? data.workorders : [];
+                updateWorkorderOptions(items);
+                // 自動選擇第一筆工單並觸發帶入公司與數量
+                if (items.length > 0) {
+                    const firstNo = items[0].workorder;
+                    $('#workorder').val(firstNo).trigger('change');
+                }
+                hideLoading();
+            },
+            error: function() {
+                hideLoading();
+                alert('獲取工單資料失敗');
+            }
+        });
+    });
+
+    // 工單號碼變更事件：帶出公司與預設數量，並回填產品
+    $('#workorder').change(function() {
+        const workorderId = $(this).val();
+        if (workorderId) {
+            showLoading();
+            $.ajax({
+                url: '{% url "workorder:fill_work:get_workorder_info" %}',
+                data: { workorder_id: workorderId },
+                success: function(data) {
+                    // 回填公司與數量
+                    if (data.company_name) { $('#company_name').val(data.company_name); }
+                    if (data.planned_quantity !== undefined) { $('#planned_quantity').val(data.planned_quantity); }
+                    // 回填產品（若清單中不存在，附加後選中）
+                    if (data.product_id) {
+                        if ($(`#product_id option[value='${data.product_id}']`).length === 0) {
+                            $('#product_id').append(`<option value="${data.product_id}">${data.product_id}</option>`);
+                        }
+                        $('#product_id').val(data.product_id);
+                    }
+                    hideLoading();
+                },
+                error: function() {
+                    hideLoading();
+                    alert('獲取工單資訊失敗');
+                }
+            });
+        } else {
+            $('#planned_quantity').val('');
+        }
+    });
+
+    // 取消公司→產品的聯動（依規範雙向為 產品←→工單）
+});
+
+// 更新工單選項
+function updateWorkorderOptions(workorders) {
+    let options = '<option value="">請選擇工單號碼</option>';
+    workorders.forEach(function(workorder) {
+        // 僅顯示工單號碼
+        options += `<option value="${workorder.workorder}" data-planned-quantity="${workorder.planned_quantity}" data-company-name="${workorder.company_name}">${workorder.workorder}</option>`;
+    });
+    $('#workorder').html(options);
+}
+
+// 更新產品選項
+function updateProductOptions(data) {
+    const products = (data && data.products) ? data.products : [];
+    let options = '<option value="">請選擇產品編號</option>';
+    products.forEach(function(pid) {
+        options += `<option value="${pid}">${pid}</option>`;
+    });
+    $('#product_id').html(options);
+}
+
+// 更新隱藏的時間欄位
+function updateTimeFields() {
+    const startHour = $('#start_hour').val();
+    const startMinute = $('#start_minute').val();
+    const endHour = $('#end_hour').val();
+    const endMinute = $('#end_minute').val();
+    
+    if (startHour && startMinute) {
+        const startTime = `${startHour}:${startMinute}`;
+        $('#start_time').val(startTime);
+    }
+    
+    if (endHour && endMinute) {
+        const endTime = `${endHour}:${endMinute}`;
+        $('#end_time').val(endTime);
+    }
+}
+
+// 同步下拉選單到手動輸入欄位
+function syncToManualInput() {
+    const startHour = $('#start_hour').val();
+    const startMinute = $('#start_minute').val();
+    const endHour = $('#end_hour').val();
+    const endMinute = $('#end_minute').val();
+    
+    if (startHour && startMinute) {
+        $('#start_time_manual').val(`${startHour}:${startMinute}`);
+    }
+    
+    if (endHour && endMinute) {
+        $('#end_time_manual').val(`${endHour}:${endMinute}`);
+    }
+}
+
+
+
+// 顯示載入指示器
+function showLoading() {
+    $('#loadingIndicator').show();
+}
+
+// 隱藏載入指示器
+function hideLoading() {
+    $('#loadingIndicator').hide();
+}
+
+// 表單驗證
+function validateForm() {
+    const requiredFields = ['product_id', 'workorder', 'company_name', 'operator', 'process', 'work_quantity'];
+    
+    for (let field of requiredFields) {
+        const value = $(`#${field}`).val();
+        if (!value) {
+            alert(`請填寫必填欄位：${$(`#${field}`).prev('label').text().replace(' *', '')}`);
+            $(`#${field}`).focus();
+            return false;
+        }
+    }
+    
+    const startHour = $('#start_hour').val();
+    const startMinute = $('#start_minute').val();
+    const endHour = $('#end_hour').val();
+    const endMinute = $('#end_minute').val();
+    
+    if (!startHour || !startMinute || !endHour || !endMinute) {
+        alert('請選擇完整的開始時間和結束時間');
+        return false;
+    }
+    
+    const startMinutes = parseInt(startHour) * 60 + parseInt(startMinute);
+    const endMinutes = parseInt(endHour) * 60 + parseInt(endMinute);
+    
+    if (endMinutes <= startMinutes) {
+        alert('結束時間必須晚於開始時間');
+        return false;
+    }
+    
+    return true;
+}
+</script>
+{% endblock %}

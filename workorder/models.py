@@ -31,6 +31,12 @@ class WorkOrder(models.Model):
         ("completed", "已完成"),
     ]
 
+    # 工單來源選項定義
+    ORDER_SOURCE_CHOICES = [
+        ("erp", "ERP系統"),
+        ("mes", "MES手動建立"),
+    ]
+
     company_code = models.CharField(
         max_length=10, verbose_name="公司代號", null=True, blank=True
     )  # 例如 01、02、03，可為空，方便資料庫遷移
@@ -45,6 +51,16 @@ class WorkOrder(models.Model):
         default="pending",
         verbose_name="狀態",
     )
+    
+    # 新增：工單來源欄位
+    order_source = models.CharField(
+        max_length=10,
+        choices=ORDER_SOURCE_CHOICES,
+        default="erp",
+        verbose_name="工單來源",
+        help_text="工單來源：ERP系統同步或MES手動建立"
+    )
+    
     created_at = models.DateTimeField(default=timezone.now, verbose_name="建立時間")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name="完工時間")
@@ -64,11 +80,13 @@ class WorkOrder(models.Model):
         return f"[{formatted_company_code}] 工單 {self.order_number}"
 
     @classmethod
-    def generate_order_number(cls, company_code):
+    def generate_order_number(cls, company_code, order_source="mes"):
         """
         自動生成工單號碼
-        格式：WO-{公司代號}-{年份}{月份}{序號}
-        例如：WO-01-202501001
+        格式：
+        - ERP工單：保持原有格式
+        - MES工單：RD-{公司代號}-{年份}{月份}{序號}
+        例如：RD-01-202501001
         """
         # 格式化公司代號，確保是兩位數格式（例如：2 -> 02）
         formatted_company_code = company_code
@@ -78,11 +96,17 @@ class WorkOrder(models.Model):
         today = datetime.now()
         year_month = today.strftime("%Y%m")
 
+        # 根據工單來源決定前綴
+        if order_source == "mes":
+            prefix = f"RD-{formatted_company_code}-{year_month}"
+        else:
+            prefix = f"WO-{formatted_company_code}-{year_month}"
+
         # 取得當月最後一個工單號碼
         last_order = (
             cls.objects.filter(
                 company_code=company_code,
-                order_number__startswith=f"WO-{formatted_company_code}-{year_month}",
+                order_number__startswith=prefix,
             )
             .order_by("-order_number")
             .first()
@@ -101,7 +125,7 @@ class WorkOrder(models.Model):
         # 格式化序號為3位數
         sequence_str = f"{new_sequence:03d}"
 
-        return f"WO-{formatted_company_code}-{year_month}{sequence_str}"
+        return f"{prefix}{sequence_str}"
 
     @property
     def completed_quantity(self):
@@ -156,6 +180,16 @@ class WorkOrder(models.Model):
 
         # 如果都沒有，則顯示工單建立時間
         return self.created_at
+
+    @property
+    def is_rd_sample(self):
+        """判斷是否為RD樣品工單"""
+        return self.order_source == "mes"
+
+    @property
+    def is_erp_order(self):
+        """判斷是否為ERP工單"""
+        return self.order_source == "erp"
 
 
 

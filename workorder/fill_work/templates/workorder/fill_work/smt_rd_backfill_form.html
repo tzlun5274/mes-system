@@ -1,0 +1,334 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}新增SMT RD樣品補登填報紀錄{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">新增SMT RD樣品補登填報紀錄</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 訊息顯示區域 -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    <!-- 前端驗證錯誤顯示區域 -->
+                    <div id="clientError" class="alert alert-danger d-none" role="alert"></div>
+                    <!-- 功能說明 -->
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle"></i> 功能說明</h5>
+                        <ul class="mb-0">
+                            <li>產品編號預設填入：PFP-CCT</li>
+                            <li>工單號碼固定為：RD樣品</li>
+                            <li>工序和設備已過濾只顯示SMT相關項目</li>
+                            <li>選擇設備時作業員欄位會自動填入設備名稱</li>
+                            <li>無休息時間，加班時間：16:30後</li>
+                        </ul>
+                    </div>
+
+                    <form method="post" id="fillWorkForm">
+                        {% csrf_token %}
+                        
+                        <!-- 基本資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">基本資訊</h5>
+                            </div>
+                            
+                            <!-- 產品編號 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="product_id" class="form-label">產品編號 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="product_id" name="product_id" value="PFP-CCT" placeholder="請輸入產品編號">
+                                <div class="form-text">RD樣品固定產品編號</div>
+                            </div>
+
+                            <!-- 工單號碼 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="workorder" class="form-label">工單號碼 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="workorder" name="workorder" value="RD樣品" readonly>
+                                <div class="form-text">RD樣品固定工單號碼</div>
+                            </div>
+
+                            <!-- 公司名稱 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="company_name" class="form-label">公司名稱 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="company_name" name="company_name" required>
+                                    <option value="">請選擇公司名稱</option>
+                                    {% for value, label in form.fields.company_name.choices %}
+                                        {% if value %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- 作業員 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="operator_display" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="operator_display" value="" readonly>
+                                <input type="hidden" id="operator" name="operator" value="">
+                            </div>
+
+                            <!-- 工序 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="process" class="form-label">工序 <span class="text-danger">*</span></label>
+                                {{ form.process }}
+                                <div class="form-text">請選擇此次填報的工序</div>
+                            </div>
+
+                            <!-- 使用的設備 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="equipment" class="form-label">使用的設備 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="equipment" name="equipment" required>
+                                    <option value="">請選擇使用的設備</option>
+                                    {% for value, label in form.fields.equipment.choices %}
+                                        {% if value %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">請選擇此次填報使用的設備，選擇後會自動填入作業員欄位</div>
+                            </div>
+                        </div>
+
+                        <!-- 數量資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">數量資訊</h5>
+                            </div>
+                            
+                            <!-- 工單預設生產數量 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="planned_quantity" class="form-label">工單預設生產數量</label>
+                                <input type="number" class="form-control" id="planned_quantity" value="0" readonly>
+                                <div class="form-text">RD樣品預設數量為0</div>
+                            </div>
+
+                            <!-- 工作數量 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="work_quantity" class="form-label">工作數量 <span class="text-danger">*</span></label>
+                                {{ form.work_quantity }}
+                                <div class="form-text">請輸入該時段內實際完成的合格產品數量</div>
+                            </div>
+
+                            <!-- 不良品數量 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="defect_quantity" class="form-label">不良品數量</label>
+                                {{ form.defect_quantity }}
+                                <div class="form-text">請輸入本次生產中產生的不良品數量，若無則留空或填寫0</div>
+                            </div>
+
+                            <!-- 是否已完工 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="is_completed" class="form-label">是否已完工</label>
+                                {{ form.is_completed }}
+                            </div>
+                        </div>
+
+                        <!-- 時間日期 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">時間日期</h5>
+                            </div>
+                            
+                            <!-- 填報日期 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="work_date" class="form-label">填報日期 <span class="text-danger">*</span></label>
+                                {{ form.work_date }}
+                                <div class="form-text">請選擇填報作業的日期</div>
+                            </div>
+
+                            <!-- 開始時間 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="start_time" class="form-label">開始時間 <span class="text-danger">*</span></label>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <select class="form-select" id="start_hour" required>
+                                            <option value="">時</option>
+                                            {% for hour in hours_range %}
+                                                <option value="{{ hour }}">{{ hour }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <select class="form-select" id="start_minute" required>
+                                            <option value="">分</option>
+                                            {% for minute in minutes_range %}
+                                                <option value="{{ minute }}">{{ minute }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="start_time" name="start_time">
+                                <div class="form-text">請選擇開始時間</div>
+                            </div>
+
+                            <!-- 結束時間 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="end_time" class="form-label">結束時間 <span class="text-danger">*</span></label>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <select class="form-select" id="end_hour" required>
+                                            <option value="">時</option>
+                                            {% for hour in hours_range %}
+                                                <option value="{{ hour }}">{{ hour }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <select class="form-select" id="end_minute" required>
+                                            <option value="">分</option>
+                                            {% for minute in minutes_range %}
+                                                <option value="{{ minute }}">{{ minute }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="end_time" name="end_time">
+                                <div class="form-text">請選擇結束時間</div>
+                            </div>
+                        </div>
+
+                        <!-- 備註資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">備註資訊</h5>
+                            </div>
+                            
+                            <!-- 備註 -->
+                            <div class="col-md-6 mb-3">
+                                <label for="remarks" class="form-label">備註</label>
+                                {{ form.remarks }}
+                                <div class="form-text">請輸入任何需要補充的資訊，如設備標記、操作說明等</div>
+                            </div>
+
+                            <!-- 異常記錄 -->
+                            <div class="col-md-6 mb-3">
+                                <label for="abnormal_notes" class="form-label">異常記錄</label>
+                                {{ form.abnormal_notes }}
+                                <div class="form-text">記錄生產過程中的異常情況，如設備故障、品質問題等</div>
+                            </div>
+                        </div>
+
+                        <!-- 提交按鈕 -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'workorder:fill_work:smt_index' %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> 返回列表
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> 儲存填報紀錄
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 設定預設日期為今天
+    const today = new Date().toISOString().split('T')[0];
+    $('#id_work_date').val(today);
+    
+    // 設定預設時間
+    $('#start_hour').val('08');
+    $('#start_minute').val('30');
+    $('#end_hour').val('16');
+    $('#end_minute').val('30');
+    
+    // 更新隱藏時間欄位
+    updateTimeFields();
+    $('#start_hour, #start_minute, #end_hour, #end_minute').change(updateTimeFields);
+
+    // 設備選擇變更事件 - 自動填入作業員
+    $('#equipment').change(function() {
+        const equipmentName = $(this).val();
+        if (equipmentName) {
+            $('#operator_display').val(equipmentName);
+            $('#operator').val(equipmentName);
+        } else {
+            $('#operator_display').val('');
+            $('#operator').val('');
+        }
+    });
+    
+    // 表單提交前驗證
+    $('#fillWorkForm').submit(function(e) {
+        if (!validateForm()) {
+            e.preventDefault();
+            return false;
+        }
+    });
+});
+
+function updateTimeFields() {
+    const sh = $('#start_hour').val();
+    const sm = $('#start_minute').val();
+    const eh = $('#end_hour').val();
+    const em = $('#end_minute').val();
+    if (sh && sm) { $('#start_time').val(`${sh}:${sm}`); }
+    if (eh && em) { $('#end_time').val(`${eh}:${em}`); }
+}
+
+// 表單驗證（頂部顯示詳細錯誤）
+function validateForm() {
+    // 依實際元素 id 對應選擇器（Django 自動產生 id_*）
+    const selectors = {
+        company_name: '#company_name',
+        process: '#id_process',
+        equipment: '#equipment',
+        work_quantity: '#id_work_quantity'
+    };
+    const labelMap = {
+        company_name: '公司名稱',
+        process: '工序',
+        equipment: '使用的設備',
+        work_quantity: '工作數量'
+    };
+    const missing = [];
+    Object.keys(selectors).forEach(key => {
+        const sel = selectors[key];
+        const v = (($(sel).val()) || '').toString().trim();
+        if (!v) missing.push(labelMap[key] || key);
+    });
+    const startTime = $('#start_time').val();
+    const endTime = $('#end_time').val();
+    let timeError = '';
+    if (!startTime || !endTime) {
+        timeError = '請選擇完整的開始時間與結束時間';
+    } else {
+        const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
+        const endMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
+        if (endMinutes <= startMinutes) timeError = '結束時間必須晚於開始時間';
+    }
+    if (missing.length || timeError) {
+        const parts = [];
+        if (missing.length) parts.push('請填寫必填欄位：' + missing.join('、'));
+        if (timeError) parts.push(timeError);
+        $('#clientError').removeClass('d-none').text(parts.join('；'));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return false;
+    }
+    $('#clientError').addClass('d-none').text('');
+    return true;
+}
+</script>
+{% endblock %}

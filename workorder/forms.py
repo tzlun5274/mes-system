@@ -15,12 +15,13 @@ from process.models import Operator
 from equip.models import Equipment
 from datetime import datetime, date, timedelta
 from django.contrib.auth.models import User
+from workorder.workorder_dispatch.models import WorkOrderDispatch
 
 
 class TimeInputWidget(forms.Widget):
     """
     自定義時間輸入元件
-    支援下拉式選單和手動輸入兩種方式
+    支援小時和分鐘各自獨立的下拉式選單，以及手動輸入兩種方式
     """
 
     template_name = "workorder/widgets/time_input.html"
@@ -31,7 +32,7 @@ class TimeInputWidget(forms.Widget):
         # 設定預設屬性
         default_attrs = {
             "class": "form-control time-input",
-            "type": "text",
+            "type": "hidden",
             "placeholder": "請選擇或輸入時間 (HH:MM)",
             "autocomplete": "off",
         }
@@ -41,14 +42,14 @@ class TimeInputWidget(forms.Widget):
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
 
-        # 生成時間選項（每30分鐘一個選項）
-        time_options = []
-        for hour in range(24):
-            for minute in [0, 30]:
-                time_str = f"{hour:02d}:{minute:02d}"
-                time_options.append(time_str)
+        # 生成小時選項 (00-23)
+        hour_options = [f"{hour:02d}" for hour in range(24)]
+        
+        # 生成分鐘選項 (00, 05, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55)
+        minute_options = [f"{minute:02d}" for minute in [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]]
 
-        context["time_options"] = time_options
+        context["hour_options"] = hour_options
+        context["minute_options"] = minute_options
         return context
 
 
@@ -676,6 +677,7 @@ class BackupOperatorSupplementReportForm(ProductionReportBaseForm):
     【規範】作業員補登報工表單
     - 繼承共用表單，專門用於作業員補登報工
     - 工序和設備排除SMT相關
+    - 工單號碼和產品編號都是下拉選單，綁定派工單
     """
 
     # 作業員選擇（繼承自父類別，但需要自定義查詢集）
@@ -693,11 +695,40 @@ class BackupOperatorSupplementReportForm(ProductionReportBaseForm):
         help_text="請選擇進行補登報工的作業員",
     )
 
+    # 工單號碼欄位 - 下拉選單，只顯示ERP工單
+    workorder = forms.ModelChoiceField(
+        queryset=None,
+        label="工單號碼",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "workorder_select",
+                "placeholder": "請選擇工單號碼",
+            }
+        ),
+        required=True,
+        help_text="請選擇工單號碼（從ERP系統同步的正式工單）",
+    )
+
+    # 產品編號欄位 - 下拉選單，從工單中選擇
+    product_id = forms.ChoiceField(
+        choices=[],
+        label="產品編號",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "product_id_select",
+                "placeholder": "請選擇產品編號",
+            }
+        ),
+        required=True,
+        help_text="請選擇產品編號（從工單中自動帶出）",
+    )
+
     class Meta:
         model = BackupOperatorSupplementReport
         fields = [
             "operator",
-            "report_type",
             "workorder",
             "product_id",
             "process",
@@ -715,7 +746,6 @@ class BackupOperatorSupplementReportForm(ProductionReportBaseForm):
         ]
         labels = {
             "operator": "作業員",
-            "report_type": "報工類型",
             "workorder": "工單號碼",
             "product_id": "產品編號",
             "process": "工序",
@@ -733,8 +763,8 @@ class BackupOperatorSupplementReportForm(ProductionReportBaseForm):
         }
         help_texts = {
             "operator": "請選擇進行補登報工的作業員",
-            "workorder": "請選擇工單號碼，或透過產品編號自動帶出",
-            "product_id": "請選擇產品編號，將自動帶出相關工單號碼",
+            "workorder": "請選擇工單號碼（從ERP系統同步的正式工單）",
+            "product_id": "請選擇產品編號（從工單中自動帶出）",
             "process": "請選擇此次補登的工序（排除SMT相關工序）",
             "equipment": "請選擇此次補登使用的設備（排除SMT相關設備）",
             "work_date": "請選擇報工日期",
@@ -776,19 +806,17 @@ class BackupOperatorSupplementReportForm(ProductionReportBaseForm):
         )
         self.fields["equipment"].queryset = equipments
 
-        # 設定工單查詢集（直接從工單表取得，排除RD樣品相關工單）
+        # 載入工單選項（只顯示ERP工單，排除RD樣品）
         from .models import WorkOrder
 
         workorders = (
-            WorkOrder.objects.exclude(status="completed")
-            .exclude(order_number__icontains="RD樣品")
-            .exclude(order_number__icontains="RD-樣品")
-            .exclude(order_number__icontains="RD樣本")
+            WorkOrder.objects.filter(order_source='erp')
+            .exclude(status="completed")
             .order_by("-created_at")
         )
         self.fields["workorder"].queryset = workorders
 
-        # 載入產品編號選項
+        # 載入產品編號選項（從ERP工單中取得）
         product_choices = self.get_product_choices()
         self.fields["product_id"].choices = product_choices
 
@@ -799,15 +827,13 @@ class BackupOperatorSupplementReportForm(ProductionReportBaseForm):
             self.fields["work_date"].initial = date.today()
 
     def get_product_choices(self):
-        """獲取產品編號選項（直接從工單表取得，排除RD樣品相關產品）"""
+        """獲取產品編號選項（從ERP工單中取得）"""
         from .models import WorkOrder
 
-        # 直接從工單表中獲取所有產品編號，排除RD樣品相關工單
+        # 從ERP工單中獲取所有產品編號
         products = (
-            WorkOrder.objects.exclude(status="completed")
-            .exclude(order_number__icontains="RD樣品")
-            .exclude(order_number__icontains="RD-樣品")
-            .exclude(order_number__icontains="RD樣本")
+            WorkOrder.objects.filter(order_source='erp')
+            .exclude(status="completed")
             .values_list("product_code", flat=True)
             .distinct()
             .order_by("product_code")
@@ -997,28 +1023,22 @@ class BackupOperatorSupplementReportForm(ProductionReportBaseForm):
         return choices
 
     def get_workorder_queryset(self, product_code=None):
-        """取得工單查詢集（從工單表取得）"""
-        from .models import WorkOrder
+        """取得工單查詢集（從派工單表取得）"""
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
         try:
-            # 直接從工單表取得資料
-            queryset = (
-                WorkOrder.objects.filter(
-                    status__in=["pending", "in_progress"]  # 只選擇待處理或進行中的工單
-                )
-                .exclude(order_number__icontains="RD樣品")
-                .exclude(order_number__icontains="RD-樣品")
-                .exclude(order_number__icontains="RD樣本")
-                .exclude(status="completed")
-            )
+            # 從派工單表取得資料
+            queryset = WorkOrderDispatch.objects.filter(
+                status__in=['pending', 'dispatched', 'in_production']
+            ).order_by('-created_at')
 
             if product_code:
                 queryset = queryset.filter(product_code=product_code)
 
             return queryset
         except Exception as e:
-            print(f"從工單取得工單查詢集失敗: {e}")
-            return WorkOrder.objects.none()
+            print(f"從派工單取得工單查詢集失敗: {e}")
+            return WorkOrderDispatch.objects.none()
 
     def get_operation_choices(self):
         """取得工序選項"""
@@ -1877,3 +1897,137 @@ class AutoManagementConfigForm(forms.ModelForm):
                 raise forms.ValidationError('執行間隔不能超過1440分鐘（24小時）')
         
         return interval_minutes
+
+# ==================== RD樣品工單建立表單 ====================
+
+class RDSampleWorkOrderForm(forms.ModelForm):
+    """
+    RD樣品工單建立表單
+    用於手動建立RD樣品工單，不從ERP系統同步
+    """
+    
+    # 公司代號欄位
+    company_code = forms.CharField(
+        max_length=10,
+        label="公司代號",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "請輸入公司代號，例如：01",
+            }
+        ),
+        required=True,
+        help_text="請輸入公司代號",
+    )
+    
+    # 產品編號欄位（手動輸入）
+    product_code = forms.CharField(
+        max_length=100,
+        label="產品編號",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "請輸入產品編號",
+            }
+        ),
+        required=True,
+        help_text="請輸入RD樣品的產品編號",
+    )
+    
+    # 數量欄位
+    quantity = forms.IntegerField(
+        label="數量",
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": "1",
+                "placeholder": "請輸入數量",
+            }
+        ),
+        required=True,
+        min_value=1,
+        help_text="請輸入RD樣品的數量",
+    )
+    
+    # 狀態欄位（預設為待生產）
+    status = forms.ChoiceField(
+        choices=[
+            ("pending", "待生產"),
+            ("in_progress", "生產中"),
+            ("paused", "暫停"),
+            ("completed", "已完成"),
+        ],
+        label="狀態",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+            }
+        ),
+        required=True,
+        initial="pending",
+        help_text="請選擇工單狀態",
+    )
+
+    class Meta:
+        model = WorkOrder
+        fields = ["company_code", "product_code", "quantity", "status"]
+        labels = {
+            "company_code": "公司代號",
+            "product_code": "產品編號",
+            "quantity": "數量",
+            "status": "狀態",
+        }
+        help_texts = {
+            "company_code": "請輸入公司代號",
+            "product_code": "請輸入RD樣品的產品編號",
+            "quantity": "請輸入RD樣品的數量",
+            "status": "請選擇工單狀態",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # 設定預設公司代號
+        if not self.instance.pk:
+            self.fields["company_code"].initial = "01"
+
+    def save(self, commit=True):
+        """儲存RD樣品工單"""
+        instance = super().save(commit=False)
+        
+        # 設定工單來源為MES手動建立
+        instance.order_source = "mes"
+        
+        # 自動生成RD樣品工單號碼
+        if not instance.order_number:
+            instance.order_number = WorkOrder.generate_order_number(
+                instance.company_code, 
+                order_source="mes"
+            )
+        
+        if commit:
+            instance.save()
+        
+        return instance
+
+    def clean(self):
+        """表單驗證"""
+        cleaned_data = super().clean()
+        
+        # 檢查產品編號是否已存在（同一公司內）
+        company_code = cleaned_data.get("company_code")
+        product_code = cleaned_data.get("product_code")
+        
+        if company_code and product_code:
+            existing_workorder = WorkOrder.objects.filter(
+                company_code=company_code,
+                product_code=product_code,
+                order_source="mes"
+            ).first()
+            
+            if existing_workorder and not self.instance.pk:
+                raise forms.ValidationError(
+                    f"該公司代號下已存在產品編號為 {product_code} 的RD樣品工單"
+                )
+        
+        return cleaned_data

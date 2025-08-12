@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}填報記錄詳情{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12 d-flex justify-content-between align-items-center">
+            <h2 class="mb-0"><i class="fas fa-file-alt text-primary"></i> 填報記錄詳情</h2>
+            <div>
+                <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-list"></i> 返回列表
+                </a>
+                <a href="{% url 'workorder:fill_work:operator_index' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-home"></i> 返回首頁
+                </a>
+                {% if fill_work.approval_status == 'pending' %}
+                <a href="{% url 'workorder:fill_work:fill_work_delete' fill_work.id %}"
+                   class="btn btn-outline-danger ms-2"
+                   onclick="return confirm('確認刪除？刪除後無法復原。');">
+                    <i class="fas fa-trash-alt"></i> 刪除
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">作業員</label>
+                    <div class="form-control">{{ fill_work.operator }}</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">工單號碼</label>
+                    <div class="form-control">{{ fill_work.workorder }}</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">產品編號</label>
+                    <div class="form-control">{{ fill_work.product_id }}</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">公司名稱</label>
+                    <div class="form-control">{{ fill_work.company_name }}</div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">工序</label>
+                    <div class="form-control">{{ fill_work.process.name }}</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">設備</label>
+                    <div class="form-control">{{ fill_work.equipment }}</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">工作日期</label>
+                    <div class="form-control">{{ fill_work.work_date|date:"Y-m-d" }}</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">開始/結束</label>
+                    <div class="form-control">{{ fill_work.start_time|time:"H:i" }} ~ {{ fill_work.end_time|time:"H:i" }}</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">工作時數</label>
+                    <div class="form-control">{{ fill_work.work_hours_calculated }} 小時</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">加班時數</label>
+                    <div class="form-control">{{ fill_work.overtime_hours_calculated }} 小時</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">數量</label>
+                    <div class="form-control">{{ fill_work.work_quantity }}（不良：{{ fill_work.defect_quantity }}）</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">狀態</label>
+                    <div class="form-control">{{ fill_work.get_approval_status_display }}</div>
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label">備註</label>
+                    <div class="form-control">{{ fill_work.remarks }}</div>
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label">異常記錄</label>
+                    <div class="form-control">{{ fill_work.abnormal_notes }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

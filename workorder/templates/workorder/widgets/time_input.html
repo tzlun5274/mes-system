@@ -1,37 +1,66 @@
 {% comment %}
 時間輸入元件模板
-支援下拉式選單和手動輸入兩種方式
+支援小時和分鐘各自獨立的下拉式選單，以及手動輸入兩種方式
 {% endcomment %}
 
 <div class="time-input-container">
     <div class="input-group">
-        <input type="text" 
+        <!-- 小時下拉選單 -->
+        <select class="form-select hour-select" style="width: 80px;" title="選擇小時">
+            <option value="">時</option>
+            {% for hour in hour_options %}
+            <option value="{{ hour }}">{{ hour }}</option>
+            {% endfor %}
+        </select>
+        
+        <span class="input-group-text">:</span>
+        
+        <!-- 分鐘下拉選單 -->
+        <select class="form-select minute-select" style="width: 80px;" title="選擇分鐘">
+            <option value="">分</option>
+            {% for minute in minute_options %}
+            <option value="{{ minute }}">{{ minute }}</option>
+            {% endfor %}
+        </select>
+        
+        <!-- 隱藏的完整時間輸入欄位 -->
+        <input type="hidden" 
                name="{{ widget.name }}" 
                value="{{ widget.value|default:'' }}"
                class="{{ widget.attrs.class }}"
-               placeholder="{{ widget.attrs.placeholder }}"
-               autocomplete="off"
                data-time-input="true">
         
-        <button class="btn btn-outline-secondary dropdown-toggle" 
+        <!-- 手動輸入按鈕 -->
+        <button class="btn btn-outline-secondary manual-input-btn" 
                 type="button" 
-                data-bs-toggle="dropdown" 
-                aria-expanded="false"
-                title="選擇時間">
-            <i class="fas fa-clock"></i>
+                title="手動輸入時間">
+            <i class="fas fa-edit"></i>
         </button>
-        
-        <ul class="dropdown-menu time-dropdown" style="max-height: 200px; overflow-y: auto;">
-            {% for time_option in time_options %}
-            <li>
-                <a class="dropdown-item time-option" 
-                   href="#" 
-                   data-time="{{ time_option }}">
-                    {{ time_option }}
-                </a>
-            </li>
-            {% endfor %}
-        </ul>
+    </div>
+    
+    <!-- 手動輸入模態框 -->
+    <div class="modal fade manual-input-modal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">手動輸入時間</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">時間格式 (HH:MM)</label>
+                        <input type="text" class="form-control manual-time-input" 
+                               placeholder="例如：16:30" 
+                               pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$">
+                        <div class="form-text">請使用24小時制格式，例如：08:30、16:45</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary confirm-manual-input">確定</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -40,82 +69,139 @@
     position: relative;
 }
 
-.time-dropdown {
-    min-width: 100px;
+.hour-select, .minute-select {
+    border-radius: 0;
 }
 
-.time-option {
-    cursor: pointer;
-    padding: 0.25rem 0.75rem;
+.hour-select {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
 }
 
-.time-option:hover {
+.minute-select {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.manual-input-btn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.input-group-text {
+    border-radius: 0;
     background-color: #f8f9fa;
+    border-color: #ced4da;
 }
 
-.time-option.selected {
-    background-color: #0d6efd;
-    color: white;
+/* 下拉選單樣式 */
+.hour-select option, .minute-select option {
+    text-align: center;
+}
+
+/* 模態框樣式 */
+.manual-input-modal .modal-dialog {
+    max-width: 300px;
+}
+
+.manual-time-input {
+    text-align: center;
+    font-size: 1.1em;
 }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 為所有時間輸入欄位添加事件監聽
-    document.querySelectorAll('[data-time-input="true"]').forEach(function(input) {
-        const container = input.closest('.time-input-container');
-        const dropdown = container.querySelector('.time-dropdown');
-        const options = dropdown.querySelectorAll('.time-option');
+    // 為所有時間輸入容器添加事件監聽
+    document.querySelectorAll('.time-input-container').forEach(function(container) {
+        const hourSelect = container.querySelector('.hour-select');
+        const minuteSelect = container.querySelector('.minute-select');
+        const hiddenInput = container.querySelector('[data-time-input="true"]');
+        const manualBtn = container.querySelector('.manual-input-btn');
+        const modal = container.querySelector('.manual-input-modal');
+        const manualInput = container.querySelector('.manual-time-input');
+        const confirmBtn = container.querySelector('.confirm-manual-input');
         
-        // 點擊時間選項時設定值
-        options.forEach(function(option) {
-            option.addEventListener('click', function(e) {
-                e.preventDefault();
-                const timeValue = this.getAttribute('data-time');
-                input.value = timeValue;
-                
-                // 移除其他選項的選中狀態
-                options.forEach(opt => opt.classList.remove('selected'));
-                // 添加當前選項的選中狀態
-                this.classList.add('selected');
-                
+        // 初始化時間值
+        function initializeTimeValue() {
+            const currentValue = hiddenInput.value;
+            if (currentValue) {
+                const [hour, minute] = currentValue.split(':');
+                if (hour) hourSelect.value = hour;
+                if (minute) minuteSelect.value = minute;
+            }
+        }
+        
+        // 更新隱藏的輸入欄位
+        function updateHiddenInput() {
+            const hour = hourSelect.value;
+            const minute = minuteSelect.value;
+            
+            if (hour && minute) {
+                hiddenInput.value = `${hour}:${minute}`;
                 // 觸發 change 事件
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-            });
+                hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+            } else {
+                hiddenInput.value = '';
+            }
+        }
+        
+        // 小時選擇事件
+        hourSelect.addEventListener('change', updateHiddenInput);
+        
+        // 分鐘選擇事件
+        minuteSelect.addEventListener('change', updateHiddenInput);
+        
+        // 手動輸入按鈕事件
+        manualBtn.addEventListener('click', function() {
+            // 設定當前值到模態框
+            manualInput.value = hiddenInput.value || '';
+            // 顯示模態框
+            const modalInstance = new bootstrap.Modal(modal);
+            modalInstance.show();
         });
         
-        // 手動輸入時驗證格式
-        input.addEventListener('input', function() {
-            const value = this.value;
+        // 確認手動輸入
+        confirmBtn.addEventListener('click', function() {
+            const inputValue = manualInput.value.trim();
             
-            // 移除所有選項的選中狀態
-            options.forEach(opt => opt.classList.remove('selected'));
-            
-            // 如果輸入的值在選項中，標記為選中
-            options.forEach(function(option) {
-                if (option.getAttribute('data-time') === value) {
-                    option.classList.add('selected');
-                }
-            });
-        });
-        
-        // 失去焦點時格式化時間
-        input.addEventListener('blur', function() {
-            const value = this.value.trim();
-            if (value) {
-                // 嘗試格式化時間
-                const timeMatch = value.match(/^(\d{1,2}):?(\d{2})?$/);
-                if (timeMatch) {
-                    let hour = parseInt(timeMatch[1]);
-                    let minute = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
-                    
-                    // 驗證範圍
-                    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
-                        this.value = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-                    }
-                }
+            // 驗證時間格式
+            const timeMatch = inputValue.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/);
+            if (timeMatch) {
+                const hour = timeMatch[1].padStart(2, '0');
+                const minute = timeMatch[2];
+                
+                // 更新下拉選單
+                hourSelect.value = hour;
+                minuteSelect.value = minute;
+                
+                // 更新隱藏輸入欄位
+                hiddenInput.value = `${hour}:${minute}`;
+                hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+                
+                // 關閉模態框
+                const modalInstance = bootstrap.Modal.getInstance(modal);
+                modalInstance.hide();
+            } else {
+                alert('請輸入正確的時間格式 (HH:MM)，例如：16:30');
+                manualInput.focus();
             }
         });
+        
+        // 模態框顯示時聚焦到輸入欄位
+        modal.addEventListener('shown.bs.modal', function() {
+            manualInput.focus();
+        });
+        
+        // 模態框中的 Enter 鍵確認
+        manualInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                confirmBtn.click();
+            }
+        });
+        
+        // 初始化時間值
+        initializeTimeValue();
     });
 });
 </script> 
