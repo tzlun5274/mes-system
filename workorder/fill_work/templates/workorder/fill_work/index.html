@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load auth_extras %}
 
 {% block title %}填報管理{% endblock %}
 
@@ -112,6 +113,7 @@
         </div>
         
         <!-- 主管審核卡片 -->
+        {% if request.user.is_superuser or request.user|has_group:'主管' %}
         <div class="col-md-4 mb-4">
             <div class="card fill-work-card supervisor-card">
                 <div class="card-header bg-warning text-dark">
@@ -131,6 +133,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
     
     <!-- 快速統計 -->

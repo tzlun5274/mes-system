@@ -25,6 +25,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from ..models import WorkOrder
 from ..workorder_erp.models import CompanyOrder
 from ..forms import WorkOrderForm
+from erp_integration.models import CompanyConfig
 
 
 class WorkOrderListView(LoginRequiredMixin, ListView):
@@ -75,6 +76,41 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         workorder = self.get_object()
 
+        # 取得公司名稱（若 company_code 為空，嘗試推導）
+        company_name = workorder.company_code or '-'
+        code = workorder.company_code
+        if not code:
+            # 1) 嘗試從 CompanyOrder 推導
+            try:
+                from ..workorder_erp.models import CompanyOrder
+                co = CompanyOrder.objects.filter(mkordno=workorder.order_number).first()
+                if co and co.company_code:
+                    code = co.company_code
+            except Exception:
+                pass
+            # 2) 若仍無，保留 None
+        if code:
+            config = CompanyConfig.objects.filter(company_code=code).first()
+            if config:
+                company_name = config.company_name
+        # 3) 最後後備：從填報記錄直接取公司名稱（以實際填報為準）
+        if company_name in (None, '-', ''):
+            try:
+                from workorder.fill_work.models import FillWork
+                fw = (
+                    FillWork.objects
+                    .filter(workorder=workorder.order_number)
+                    .exclude(company_name__isnull=True)
+                    .exclude(company_name__exact='')
+                    .order_by('-created_at')
+                    .first()
+                )
+                if fw:
+                    company_name = fw.company_name
+            except Exception:
+                pass
+        context['company_name'] = company_name
+
         # 計算已完成工序數量
         completed_processes_count = workorder.processes.filter(
             status="completed"
@@ -90,8 +126,8 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
 
         # 獲取所有已核准的報工記錄
         from workorder.workorder_reporting.models import (
-            OperatorSupplementReport,
-            SMTSupplementReport,
+            BackupOperatorSupplementReport as OperatorSupplementReport,
+            BackupSMTSupplementReport as SMTSupplementReport,
         )
 
         # 作業員補登報工記錄（已核准）

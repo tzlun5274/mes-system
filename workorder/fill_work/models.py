@@ -96,9 +96,12 @@ class FillWork(models.Model):
         return f"{self.operator} - {self.workorder} - {self.work_date}"
     
     def save(self, *args, **kwargs):
-        """儲存時自動計算工時"""
-        # 計算工作時數和加班時數
-        self.calculate_work_hours()
+        """儲存時自動計算工時
+        若實體有臨時屬性 `_skip_auto_hours_calculation=True`，則跳過自動計算（例如：匯入時已提供工時）。
+        """
+        # 計算工作時數和加班時數（允許在匯入時以臨時旗標跳過）
+        if not getattr(self, '_skip_auto_hours_calculation', False):
+            self.calculate_work_hours()
         super().save(*args, **kwargs)
     
     def calculate_work_hours(self):
@@ -116,32 +119,29 @@ class FillWork(models.Model):
             if end_minutes <= start_minutes:
                 end_minutes += 24 * 60  # 跨日處理
             
-            total_minutes = end_minutes - start_minutes
+            # 判斷是否為作業員填報（有午休機制）
+            is_operator_fill = bool(self.has_break)
             
-            # 扣除休息時間（若有且休息區間大於0）
-            break_minutes = 0
-            has_valid_break = False
-            if self.has_break and self.break_start_time and self.break_end_time:
-                break_start_minutes = self.break_start_time.hour * 60 + self.break_start_time.minute
-                break_end_minutes = self.break_end_time.hour * 60 + self.break_end_time.minute
-                
-                # 休息開始與結束相同 → 視為沒有休息（符合 SMT 12:00~12:00 的設計）
-                if break_end_minutes != break_start_minutes:
-                    if break_end_minutes <= break_start_minutes:
-                        break_end_minutes += 24 * 60
-                    break_minutes = break_end_minutes - break_start_minutes
-                    has_valid_break = break_minutes > 0
-                
-                self.break_hours = Decimal(str(break_minutes / 60))
-            
-            # 判斷是否為作業員填報（有真正休息時段）
-            is_operator_fill = has_valid_break
-            
+            # 固定午休區間（12:00~13:00），僅作業員適用
+            lunch_deduction_minutes = 0
             if is_operator_fill:
-                # 作業員填報：12:00-13:00休息，17:30後加班
+                lunch_start = 12 * 60
+                lunch_end = 13 * 60
+                overlaps_lunch = (start_minutes < lunch_end and end_minutes > lunch_start)
+                if overlaps_lunch:
+                    lunch_deduction_minutes = 60
+                    self.break_hours = Decimal('1.00')
+                else:
+                    self.break_hours = Decimal('0.00')
+            else:
+                self.break_hours = Decimal('0.00')
+            
+            # 決定加班起算時間
+            if is_operator_fill:
+                # 作業員填報：17:30後加班
                 overtime_start_minutes = 17 * 60 + 30
             else:
-                # SMT填報：無休息時間，16:30後加班
+                # SMT填報：16:30後加班
                 overtime_start_minutes = 16 * 60 + 30
             
             # 計算正常工時和加班時數
@@ -156,16 +156,9 @@ class FillWork(models.Model):
                     overtime_minutes += 1
                 current_minutes += 1
             
-            # 從正常工時中扣除休息時間（僅在有有效休息時段時扣除）
-            if has_valid_break:
-                break_start_minutes = self.break_start_time.hour * 60 + self.break_start_time.minute
-                break_end_minutes = self.break_end_time.hour * 60 + self.break_end_time.minute
-                if break_end_minutes <= break_start_minutes:
-                    break_end_minutes += 24 * 60
-                # 從正常工時中扣除休息時間（如落在加班前時段）
-                if break_start_minutes < overtime_start_minutes:
-                    break_in_normal = min(break_end_minutes, overtime_start_minutes) - break_start_minutes
-                    normal_minutes -= max(break_in_normal, 0)
+            # 作業員：若與午休有交集，固定扣除1小時（僅扣正常工時，且不低於0）
+            if is_operator_fill and lunch_deduction_minutes > 0:
+                normal_minutes = max(0, normal_minutes - lunch_deduction_minutes)
             
             self.work_hours_calculated = Decimal(str(normal_minutes / 60))
             self.overtime_hours_calculated = Decimal(str(overtime_minutes / 60))

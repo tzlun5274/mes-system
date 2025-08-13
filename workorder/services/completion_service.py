@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.db.models import Sum, Count, Q
 from workorder.models import WorkOrder, WorkOrderProduction, WorkOrderProductionDetail, CompletedWorkOrder
 from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
+from erp_integration.models import CompanyConfig
 
 # 移除主管報工引用，避免混淆
 # 主管職責：監督、審核、管理，不代為報工
@@ -173,6 +174,11 @@ class WorkOrderCompletionService:
                     order_number=workorder.order_number,
                     product_code=workorder.product_code,
                     company_code=workorder.company_code,
+                    company_name=(
+                        CompanyConfig.objects.filter(company_code=workorder.company_code).first().company_name
+                        if workorder.company_code and CompanyConfig.objects.filter(company_code=workorder.company_code).exists()
+                        else ""
+                    ),
                     planned_quantity=workorder.quantity,
                     completed_quantity=stats['total_good_quantity'],
                     status='completed',

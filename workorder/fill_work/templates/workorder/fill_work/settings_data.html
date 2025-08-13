@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}填報資料匯入/匯出{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+	<nav aria-label="breadcrumb" class="mb-2">
+		<ol class="breadcrumb mb-2">
+			<li class="breadcrumb-item"><a href="{% url 'workorder:fill_work:fill_work_index' %}"><i class="fas fa-home"></i> 填報管理</a></li>
+			<li class="breadcrumb-item"><a href="{% url 'workorder:fill_work:fill_work_settings' %}">填報功能設定</a></li>
+			<li class="breadcrumb-item active" aria-current="page">填報資料匯入/匯出</li>
+		</ol>
+	</nav>
+	<div class="row mb-3">
+		<div class="col-12 d-flex justify-content-between align-items-center">
+			<h2 class="mb-0"><i class="fas fa-file-import text-primary"></i> 填報資料匯入/匯出</h2>
+			
+		</div>
+	</div>
+
+	<div class="row">
+		<div class="col-md-6 mb-4">
+			<div class="card h-100">
+				<div class="card-header bg-warning text-dark">
+					<i class="fas fa-user-cog"></i> 作業員資料維護
+				</div>
+				<div class="card-body text-center">
+					<p class="text-muted">針對作業員填報的資料匯入/匯出與資料維護，使用作業員工時計算規則。</p>
+					<a href="{% url 'workorder:fill_work:fill_work_settings_data_operator' %}" class="btn btn-warning">
+						<i class="fas fa-arrow-right"></i> 進入
+					</a>
+				</div>
+			</div>
+		</div>
+		<div class="col-md-6 mb-4">
+			<div class="card h-100">
+				<div class="card-header bg-success text-white">
+					<i class="fas fa-microchip"></i> SMT資料維護
+				</div>
+				<div class="card-body text-center">
+					<p class="text-muted">針對 SMT 填報的資料匯入/匯出與資料維護，使用 SMT 工時計算規則。</p>
+					<a href="{% url 'workorder:fill_work:fill_work_settings_data_smt' %}" class="btn btn-success">
+						<i class="fas fa-arrow-right"></i> 進入
+					</a>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %} 

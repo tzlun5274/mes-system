@@ -18,8 +18,10 @@ urlpatterns = [
     # 記錄詳情 / 核准 / 駁回
     path("detail/<int:pk>/", views.FillWorkDetailView.as_view(), name="fill_work_detail"),
     path("approve/<int:pk>/", views.approve_fill_work, name="approve_fill_work"),
+    path("cancel-approve/<int:pk>/", views.cancel_approve_fill_work, name="cancel_approve_fill_work"),
     path("reject/<int:pk>/", views.reject_fill_work, name="reject_fill_work"),
     path("delete/<int:pk>/", views.delete_fill_work, name="fill_work_delete"),
+    path("delete-all/", views.delete_all_fill_work_records, name="fill_work_delete_all"),
     
     # 作業員填報首頁
     path("operator/", views.OperatorIndexView.as_view(), name="operator_index"),
@@ -39,6 +41,24 @@ urlpatterns = [
     
     # 主管審核首頁
     path("supervisor/", views.SupervisorApprovalIndexView.as_view(), name="supervisor_approval_index"),
+    path("supervisor/pending/", views.SupervisorPendingListView.as_view(), name="supervisor_pending_list"),
+    path("supervisor/reviewed/", views.SupervisorReviewedListView.as_view(), name="supervisor_reviewed_list"),
+    # 填報功能設定
+    path("settings/", views.FillWorkSettingsView.as_view(), name="fill_work_settings"),
+    path("settings/data/", views.FillWorkDataSettingsView.as_view(), name="fill_work_settings_data"),
+    path("settings/data/operator/", views.FillWorkDataOperatorView.as_view(), name="fill_work_settings_data_operator"),
+    path("settings/data/smt/", views.FillWorkDataSMTView.as_view(), name="fill_work_settings_data_smt"),
+    # 匯入/匯出與範本
+    path("settings/data/operator/download-template/", views.download_fill_work_template_operator, name="fill_work_template_operator"),
+    path("settings/data/smt/download-template/", views.download_fill_work_template_smt, name="fill_work_template_smt"),
+    path("settings/data/operator/download-template-xlsx/", views.download_fill_work_template_operator_xlsx, name="fill_work_template_operator_xlsx"),
+    path("settings/data/smt/download-template-xlsx/", views.download_fill_work_template_smt_xlsx, name="fill_work_template_smt_xlsx"),
+    path("settings/data/operator/import/", views.import_fill_work_records_operator, name="fill_work_import_operator"),
+    path("settings/data/smt/import/", views.import_fill_work_records_smt, name="fill_work_import_smt"),
+    path("settings/data/operator/export/", views.export_fill_work_records_operator, name="fill_work_export_operator"),
+    path("settings/data/smt/export/", views.export_fill_work_records_smt, name="fill_work_export_smt"),
+    path("settings/data/operator/export-xlsx/", views.export_fill_work_records_operator_xlsx, name="fill_work_export_operator_xlsx"),
+    path("settings/data/smt/export-xlsx/", views.export_fill_work_records_smt_xlsx, name="fill_work_export_smt_xlsx"),
     
     # API 功能
     path("api/workorder-data/", views.get_workorder_data, name="get_workorder_data"),

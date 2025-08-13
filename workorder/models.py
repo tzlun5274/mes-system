@@ -559,6 +559,8 @@ class WorkOrderProductionDetail(models.Model):
     # 報工人員和設備
     operator = models.CharField(max_length=100, verbose_name="作業員", null=True, blank=True)
     equipment = models.CharField(max_length=100, verbose_name="設備", null=True, blank=True)
+    # 公司名稱（顯示用，來自填報或 CompanyConfig 對照）
+    company_name = models.CharField(max_length=100, verbose_name="公司名稱", null=True, blank=True)
     
     # 報工來源
     REPORT_SOURCE_CHOICES = [
@@ -651,6 +653,7 @@ class CompletedWorkOrder(models.Model):
     order_number = models.CharField(max_length=100, verbose_name="工單號")
     product_code = models.CharField(max_length=100, verbose_name="產品編號")
     company_code = models.CharField(max_length=10, verbose_name="公司代號")
+    company_name = models.CharField(max_length=100, verbose_name="公司名稱", default="")
     
     # 工單基本資訊
     planned_quantity = models.IntegerField(verbose_name="計劃數量")
@@ -693,6 +696,7 @@ class CompletedWorkOrder(models.Model):
             models.Index(fields=['order_number']),
             models.Index(fields=['product_code']),
             models.Index(fields=['company_code']),
+            models.Index(fields=['company_name']),
             models.Index(fields=['completed_at']),
         ]
 

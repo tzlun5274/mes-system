@@ -4,8 +4,8 @@
 """
 
 from django.shortcuts import render, redirect, get_object_or_404
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView, TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db.models import Q
@@ -18,12 +18,24 @@ from mes_config.date_utils import get_today_string, convert_date_for_html_input,
 from mes_config.custom_fields import smart_time_field
 from django.views.decorators.http import require_POST
 from django.utils.decorators import method_decorator
+from django.contrib.auth.decorators import login_required
+import csv
+from io import StringIO
+from django.http import HttpResponse
+from io import StringIO, BytesIO
+from django.utils import timezone
+try:
+    import openpyxl
+except Exception:
+    openpyxl = None
 
 from .models import FillWork
 from workorder.workorder_dispatch.models import WorkOrderDispatch
 from erp_integration.models import CompanyConfig
 from process.models import ProcessName, Operator
 from equip.models import Equipment
+from workorder.models import WorkOrder
+from workorder.services.production_sync_service import ProductionReportSyncService
 
 
 # ==================== 表單類別定義 ====================
@@ -667,6 +679,16 @@ class FillWorkIndexView(LoginRequiredMixin, ListView):
     
     def get_queryset(self):
         return FillWork.objects.all().order_by('-created_at')
+    
+    def get_context_data(self, **kwargs):
+        """提供首頁統計卡用的統計數據。"""
+        context = super().get_context_data(**kwargs)
+        base_qs = FillWork.objects.all()
+        context['pending_count'] = base_qs.filter(approval_status='pending').count()
+        context['approved_count'] = base_qs.filter(approval_status='approved').count()
+        context['rejected_count'] = base_qs.filter(approval_status='rejected').count()
+        context['total_count'] = base_qs.count()
+        return context
 
 
 class OperatorIndexView(LoginRequiredMixin, ListView):
@@ -691,7 +713,7 @@ class OperatorIndexView(LoginRequiredMixin, ListView):
         context['operator_approved_count'] = base_qs.filter(approval_status='approved').count()
         context['operator_rejected_count'] = base_qs.filter(approval_status='rejected').count()
         context['operator_total_count'] = base_qs.count()
-        context['recent_operator_records'] = base_qs.order_by('-created_at')[:10]
+        context['recent_operator_records'] = base_qs.order_by('-work_date', '-start_time', '-created_at')[:10]
         return context
 
 
@@ -949,7 +971,7 @@ class SMTBackfillUpdateView(LoginRequiredMixin, UpdateView):
         except Exception as e:
             messages.error(self.request, f'儲存失敗：{str(e)}')
             return self.form_invalid(form)
-
+    
     def form_invalid(self, form):
         if form.errors:
             details = []
@@ -1042,18 +1064,17 @@ class FillWorkListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['fill_type'] = self.request.GET.get('type', '')
         context['status'] = self.request.GET.get('status', '')
+        # 統計區塊：以 type 篩選為主，不受 status 影響
+        base_qs = FillWork.objects.all()
+        fill_type = self.request.GET.get('type')
+        if fill_type == 'operator':
+            base_qs = base_qs.exclude(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT'))
+        elif fill_type == 'smt':
+            base_qs = base_qs.filter(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT'))
+        context['pending_count'] = base_qs.filter(approval_status='pending').count()
+        context['approved_count'] = base_qs.filter(approval_status='approved').count()
+        context['rejected_count'] = base_qs.filter(approval_status='rejected').count()
         return context
-
-
-class SupervisorApprovalIndexView(LoginRequiredMixin, ListView):
-    """主管審核首頁"""
-    model = FillWork
-    template_name = 'workorder/fill_work/supervisor_approval_index.html'
-    context_object_name = 'fill_works'
-    paginate_by = 20
-    
-    def get_queryset(self):
-        return FillWork.objects.all().order_by('-created_at')
 
 
 class FillWorkDetailView(LoginRequiredMixin, DetailView):
@@ -1094,12 +1115,110 @@ def approve_fill_work(request, pk: int):
     from django.shortcuts import redirect
     try:
         record = FillWork.objects.get(pk=pk)
+        # 若已核准，避免重複核准與重複同步
+        if record.approval_status == 'approved':
+            messages.info(request, '此筆填報記錄已核准，已略過重複操作')
+            return redirect('workorder:fill_work:fill_work_list')
         record.approval_status = 'approved'
         record.save(update_fields=['approval_status', 'updated_at'])
         messages.success(request, '已核准該筆填報記錄')
+
+        # 嘗試同步到生產執行監控
+        try:
+            workorder = WorkOrder.objects.filter(order_number=record.workorder).first()
+            if workorder:
+                # 判斷類型：SMT 或 作業員
+                is_smt = False
+                try:
+                    if (record.operator and 'SMT' in record.operator.upper()) or (record.process and 'SMT' in record.process.name.upper()):
+                        is_smt = True
+                except Exception:
+                    is_smt = False
+                report_type = 'smt' if is_smt else 'operator'
+
+                ProductionReportSyncService._create_or_update_production_detail(
+                    workorder=workorder,
+                    process_name=(record.process.name if record.process else record.operation or ''),
+                    report_date=record.work_date,
+                    report_time=timezone.now(),
+                    work_quantity=record.work_quantity or 0,
+                    defect_quantity=record.defect_quantity or 0,
+                    operator=(record.operator or None),
+                    equipment=(record.equipment or None),
+                    report_source='fill_work',
+                    start_time=record.start_time,
+                    end_time=record.end_time,
+                    remarks=record.remarks,
+                    abnormal_notes=record.abnormal_notes,
+                    original_report_id=record.id,
+                    original_report_type='fill_work',
+                    work_hours=float(record.work_hours_calculated or 0),
+                    overtime_hours=float(record.overtime_hours_calculated or 0),
+                    has_break=bool(record.has_break),
+                    break_start_time=record.break_start_time,
+                    break_end_time=record.break_end_time,
+                    break_hours=float(record.break_hours or 0),
+                    report_type=report_type,
+                    allocated_quantity=0,
+                    quantity_source='original',
+                    allocation_notes='',
+                    is_completed=bool(record.is_completed),
+                    completion_method='manual',
+                    auto_completed=False,
+                    completion_time=None,
+                    cumulative_quantity=0,
+                    cumulative_hours=float(record.work_hours_calculated or 0),
+                    approval_status=record.approval_status,
+                    approved_by=request.user.username,
+                    approved_at=timezone.now(),
+                    approval_remarks=record.approval_remarks or ''
+                )
+        except Exception:
+            # 同步錯誤不阻斷使用者操作
+            pass
     except FillWork.DoesNotExist:
         messages.error(request, '記錄不存在')
     return redirect('workorder:fill_work:fill_work_list')
+
+
+def cancel_approve_fill_work(request, pk: int):
+    """取消核准：將記錄狀態從已核准改回待審核，並移除對應的生產監控明細（若存在）。
+    僅限主管與超級管理員使用。
+    """
+    from django.shortcuts import redirect
+    record = get_object_or_404(FillWork, pk=pk)
+    if not (request.user.is_superuser or request.user.groups.filter(name='主管').exists()):
+        messages.error(request, '無權限取消核准')
+        return redirect('workorder:fill_work:fill_work_detail', pk=pk)
+
+    if record.approval_status != 'approved':
+        messages.info(request, '此筆記錄目前非已核准狀態，無需取消')
+        return redirect('workorder:fill_work:fill_work_detail', pk=pk)
+
+    try:
+        # 1) 回復狀態
+        record.approval_status = 'pending'
+        record.save(update_fields=['approval_status', 'updated_at'])
+
+        # 2) 嘗試移除對應生產監控的明細（以來源鍵對應）
+        try:
+            workorder = WorkOrder.objects.filter(order_number=record.workorder).first()
+            if workorder:
+                from workorder.models import WorkOrderProduction, WorkOrderProductionDetail
+                production_record = WorkOrderProduction.objects.filter(workorder=workorder).first()
+                if production_record:
+                    WorkOrderProductionDetail.objects.filter(
+                        workorder_production=production_record,
+                        original_report_id=record.id,
+                        original_report_type='fill_work'
+                    ).delete()
+        except Exception:
+            pass
+
+        messages.success(request, '已取消核准，記錄已回到待審核')
+    except Exception as e:
+        messages.error(request, f'取消核准失敗：{e}')
+    return redirect('workorder:fill_work:fill_work_detail', pk=pk)
 
 
 def reject_fill_work(request, pk: int):
@@ -1340,3 +1459,754 @@ def get_all_workorder_numbers(request):
         return JsonResponse({'workorders': list(numbers_qs)})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+
+
+class FillWorkSettingsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    template_name = 'workorder/fill_work/settings.html'
+
+    def test_func(self) -> bool:
+        user = self.request.user
+        return bool(getattr(user, 'is_superuser', False) or user.groups.filter(name='主管').exists())
+
+    def handle_no_permission(self):
+        messages.error(self.request, '無權限存取填報功能設定')
+        return redirect('workorder:fill_work:fill_work_index')
+
+
+class FillWorkDataSettingsView(FillWorkSettingsView):
+    template_name = 'workorder/fill_work/settings_data.html'
+
+
+class FillWorkDataOperatorView(FillWorkSettingsView):
+    template_name = 'workorder/fill_work/settings_data_operator.html'
+
+
+class FillWorkDataSMTView(FillWorkSettingsView):
+    template_name = 'workorder/fill_work/settings_data_smt.html'
+
+
+@require_POST
+@login_required
+def import_fill_work_records(request):
+    """示意：匯入填報資料時的工時計算策略。
+    - 若匯入資料已提供 work_hours_calculated / overtime_hours_calculated（其中一個或兩個），則以匯入值為準，並跳過自動計算。
+    - 若未提供，則根據 start_time/end_time 等欄位呼叫 calculate_work_hours() 自動計算。
+    注意：此為示意接口，實務上需加入檔案解析與欄位驗證。
+    """
+    # 這裡省略檔案解析，假設已得到一筆或多筆資料 dicts
+    records = []  # TODO: 從上傳檔案解析而來
+    created = 0
+    for data in records:
+        obj = FillWork(
+            operator=data.get('operator',''),
+            company_name=data.get('company_name',''),
+            workorder=data.get('workorder',''),
+            product_id=data.get('product_id',''),
+            planned_quantity=data.get('planned_quantity') or 0,
+            process_id=data.get('process_id'),
+            operation=data.get('operation',''),
+            equipment=data.get('equipment',''),
+            work_date=data.get('work_date'),
+            start_time=data.get('start_time'),
+            end_time=data.get('end_time'),
+            has_break=data.get('has_break') or False,
+            break_start_time=data.get('break_start_time'),
+            break_end_time=data.get('break_end_time'),
+            work_quantity=data.get('work_quantity') or 0,
+            defect_quantity=data.get('defect_quantity') or 0,
+            approval_status=data.get('approval_status') or 'pending',
+            created_by=request.user.username,
+        )
+        # 判斷是否已有工時計算數值
+        has_hours = ('work_hours_calculated' in data and data['work_hours_calculated'] is not None)
+        has_overtime = ('overtime_hours_calculated' in data and data['overtime_hours_calculated'] is not None)
+        if has_hours or has_overtime:
+            if has_hours:
+                obj.work_hours_calculated = data['work_hours_calculated']
+            if has_overtime:
+                obj.overtime_hours_calculated = data['overtime_hours_calculated']
+            # 設定臨時旗標，讓 save() 略過自動計算
+            obj._skip_auto_hours_calculation = True
+            obj.save()
+        else:
+            # 未提供則自動計算
+            obj.calculate_work_hours()
+            obj.save()
+        created += 1
+    messages.success(request, f'匯入完成，共建立 {created} 筆資料')
+    return redirect('workorder:fill_work:fill_work_list')
+
+
+TEMPLATE_HEADERS = [
+    '作業員名稱','公司名稱','報工日期','開始時間','結束時間','工單號','產品編號','工序名稱','設備名稱','報工數量','不良品數量','備註','異常紀錄','工作時數','加班時數'
+]
+
+
+def _build_csv_response(filename: str, rows: list[list[str]]):
+    output = StringIO()
+    writer = csv.writer(output)
+    for row in rows:
+        writer.writerow(row)
+    resp = HttpResponse(output.getvalue(), content_type='text/csv; charset=utf-8')
+    resp['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return resp
+
+
+@login_required
+def download_fill_work_template_operator(request):
+    rows = [TEMPLATE_HEADERS]
+    return _build_csv_response('operator_fill_work_template.csv', rows)
+
+
+@login_required
+def download_fill_work_template_smt(request):
+    rows = [TEMPLATE_HEADERS]
+    return _build_csv_response('smt_fill_work_template.csv', rows)
+
+
+# 匯入（CSV：UTF-8，含標頭）
+@login_required
+def import_fill_work_records_operator(request):
+    if request.method != 'POST':
+        messages.error(request, '請使用表單上傳檔案')
+        return redirect('workorder:fill_work:fill_work_settings_data_operator')
+    file = request.FILES.get('file')
+    if not file:
+        messages.error(request, '未選擇檔案')
+        return redirect('workorder:fill_work:fill_work_settings_data_operator')
+    created, errors = _import_any(file, is_smt=False, username=request.user.username)
+    if errors:
+        if created > 0:
+            preview = '；'.join(errors[:5])
+            more = '' if len(errors) <= 5 else f'（另有 {len(errors) - 5} 筆錯誤省略）'
+            messages.warning(request, f'部分匯入成功：成功 {created} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
+        else:
+            messages.error(request, f'匯入失敗：{errors[0]}')
+    else:
+        messages.success(request, f'匯入完成，共建立 {created} 筆')
+    return redirect('workorder:fill_work:fill_work_settings_data_operator')
+
+
+@login_required
+def import_fill_work_records_smt(request):
+    if request.method != 'POST':
+        messages.error(request, '請使用表單上傳檔案')
+        return redirect('workorder:fill_work:fill_work_settings_data_smt')
+    file = request.FILES.get('file')
+    if not file:
+        messages.error(request, '未選擇檔案')
+        return redirect('workorder:fill_work:fill_work_settings_data_smt')
+    created, errors = _import_any(file, is_smt=True, username=request.user.username)
+    if errors:
+        if created > 0:
+            preview = '；'.join(errors[:5])
+            more = '' if len(errors) <= 5 else f'（另有 {len(errors) - 5} 筆錯誤省略）'
+            messages.warning(request, f'部分匯入成功：成功 {created} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
+        else:
+            messages.error(request, f'匯入失敗：{errors[0]}')
+    else:
+        messages.success(request, f'匯入完成，共建立 {created} 筆')
+    return redirect('workorder:fill_work:fill_work_settings_data_smt')
+
+
+# 匯出（目前依照 type 參數）
+@login_required
+def export_fill_work_records_operator(request):
+    qs = FillWork.objects.exclude(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).order_by('-created_at')
+    return _export_fill_work_qs(qs, 'operator_fill_work_export.csv')
+
+
+@login_required
+def export_fill_work_records_smt(request):
+    qs = FillWork.objects.filter(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).order_by('-created_at')
+    return _export_fill_work_qs(qs, 'smt_fill_work_export.csv')
+
+
+def _export_fill_work_qs(qs, filename: str):
+    rows = [TEMPLATE_HEADERS]
+    for r in qs:
+        rows.append([
+            r.operator,
+            r.company_name,
+            r.work_date.strftime('%Y-%m-%d') if r.work_date else '',
+            r.start_time.strftime('%H:%M') if r.start_time else '',
+            r.end_time.strftime('%H:%M') if r.end_time else '',
+            r.workorder,
+            r.product_id,
+            r.operation,
+            r.equipment,
+            r.work_quantity,
+            r.defect_quantity,
+            r.remarks or '',
+            r.abnormal_notes or '',
+            str(r.work_hours_calculated),
+            str(r.overtime_hours_calculated),
+        ])
+    return _build_csv_response(filename, rows)
+
+
+def _parse_time(value: str):
+    from datetime import datetime, time as time_cls
+    if value is None or value == "":
+        return None
+    # 允許直接給 datetime.time / datetime.datetime
+    if isinstance(value, time_cls):
+        return value
+    if isinstance(value, datetime):
+        return value.time()
+    s = str(value).strip()
+    for fmt in ('%H:%M', '%H%M', '%H.%M', '%H:%M:%S'):
+        try:
+            return datetime.strptime(s, fmt).time()
+        except Exception:
+            pass
+    raise ValueError(f'時間格式錯誤：{value}（需 HH:MM）')
+
+
+def _parse_date(value):
+    from datetime import datetime, date as date_cls
+    if value is None or value == "":
+        return None
+    if isinstance(value, date_cls):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    s = str(value).strip()
+    for fmt in ('%Y-%m-%d', '%Y/%m/%d', '%Y.%m.%d', '%Y%m%d'):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except Exception:
+            pass
+    raise ValueError(f'日期格式錯誤：{value}（需 YYYY-MM-DD）')
+
+
+def _to_int(val, default=0):
+    if val in (None, ""):
+        return default
+    try:
+        return int(val)
+    except Exception:
+        try:
+            return int(float(val))
+        except Exception:
+            raise ValueError(f'整數欄位格式錯誤：{val}')
+
+
+def _to_decimal(val):
+    if val in (None, ""):
+        return None
+    try:
+        return Decimal(str(val))
+    except Exception:
+        raise ValueError(f'數值欄位格式錯誤：{val}')
+
+
+def _create_fillwork_from_row(row: dict, is_smt: bool, username: str) -> FillWork:
+    from datetime import datetime
+    # 讀取欄位（依指定格式）
+    operator_raw = row.get('作業員名稱')
+    company_name_raw = row.get('公司名稱')
+    work_date_raw = row.get('報工日期')
+    start_time_raw = row.get('開始時間')
+    end_time_raw = row.get('結束時間')
+    workorder_raw = row.get('工單號')
+    product_id_raw = row.get('產品編號')
+    operation_raw = row.get('工序名稱')
+    equipment_raw = row.get('設備名稱')
+    work_qty_raw = row.get('報工數量')
+    defect_qty_raw = row.get('不良品數量')
+    remarks_raw = row.get('備註')
+    abnormal_raw = row.get('異常紀錄')
+    work_hours_raw = row.get('工作時數')
+    overtime_hours_raw = row.get('加班時數')
+
+    # 必要欄位檢查
+    required = {
+        '公司名稱': company_name_raw,
+        '報工日期': work_date_raw,
+        '開始時間': start_time_raw,
+        '結束時間': end_time_raw,
+        '工單號': workorder_raw,
+        '產品編號': product_id_raw,
+        '工序名稱': operation_raw,
+        '報工數量': work_qty_raw,
+    }
+    missing = [k for k, v in required.items() if v in (None, "")]
+    if missing:
+        raise ValueError(f"必要欄位缺漏：{', '.join(missing)}")
+
+    # 正規化日期/時間/數值
+    work_date = _parse_date(work_date_raw)
+    start_time = _parse_time(start_time_raw)
+    end_time = _parse_time(end_time_raw)
+    work_quantity = _to_int(work_qty_raw, 0)
+    defect_quantity = _to_int(defect_qty_raw, 0)
+
+    operator = (str(operator_raw).strip() if operator_raw not in (None, "") else "")
+    company_name = str(company_name_raw).strip()
+    workorder = str(workorder_raw).strip()
+    product_id = str(product_id_raw).strip()
+    operation = str(operation_raw).strip()
+    equipment = str(equipment_raw).strip() if equipment_raw not in (None, "") else ""
+    remarks = "" if remarks_raw in (None, "") else str(remarks_raw)
+    abnormal_notes = "" if abnormal_raw in (None, "") else str(abnormal_raw)
+
+    # 公司名稱轉公司代號（統一使用 CompanyConfig）
+    company_code = None
+    from erp_integration.models import CompanyConfig
+    cfg = CompanyConfig.objects.filter(company_name=company_name).first()
+    if cfg:
+        company_code = cfg.company_code
+    else:
+        # 若名稱找不到，嘗試用代號本身（使用者可能直接填代號）
+        cfg2 = CompanyConfig.objects.filter(company_code=company_name).first()
+        if cfg2:
+            company_code = cfg2.company_code
+        else:
+            raise ValueError(f"找不到公司設定：{company_name}")
+
+    # 智能判斷是否為 SMT 類型
+    is_smt = is_smt or ('SMT' in (operation.upper() if operation else '')) or ('SMT' in (equipment.upper() if equipment else '')) or ('SMT' in (operator.upper() if operator else ''))
+
+    # 建立 FillWork
+    # 對應工序名稱到 ProcessName.id（若不存在則自動建立）
+    process_obj = ProcessName.objects.filter(name=operation).first()
+    if not process_obj:
+        process_obj = ProcessName.objects.create(name=operation)
+    obj = FillWork(
+        operator=operator or (equipment if is_smt else operator),
+        company_name=company_name,
+        workorder=workorder,
+        product_id=product_id,
+        planned_quantity=0,
+        operation=operation,
+        equipment=equipment,
+        work_date=work_date,
+        start_time=start_time,
+        end_time=end_time,
+        has_break=(not is_smt),
+        break_start_time=(None if is_smt else _parse_time('12:00')),
+        break_end_time=(None if is_smt else _parse_time('13:00')),
+        work_quantity=work_quantity,
+        defect_quantity=defect_quantity,
+        approval_status='pending',
+        created_by=username,
+        process_id=process_obj.id,
+        remarks=remarks,
+        abnormal_notes=abnormal_notes,
+    )
+
+    # 若匯入有提供工時數值 → 直接使用並跳過自動計算
+    provided_hours = False
+    if work_hours_raw not in (None, ""):
+        obj.work_hours_calculated = _to_decimal(work_hours_raw) or Decimal('0')
+        provided_hours = True
+    if overtime_hours_raw not in (None, ""):
+        obj.overtime_hours_calculated = _to_decimal(overtime_hours_raw) or Decimal('0')
+        provided_hours = True
+
+    if provided_hours:
+        obj._skip_auto_hours_calculation = True
+        obj.save()
+    else:
+        # 未提供則自動計算（依 has_break 決定規則）
+        obj.calculate_work_hours()
+        obj.save()
+    return obj
+
+
+@login_required
+def download_fill_work_template_operator_xlsx(request):
+    if openpyxl is None:
+        messages.error(request, '系統未安裝 openpyxl，無法產生 Excel 範本')
+        return redirect('workorder:fill_work:fill_work_settings_data_operator')
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'OperatorTemplate'
+    ws.append(TEMPLATE_HEADERS)
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    resp = HttpResponse(buf.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = 'attachment; filename="operator_fill_work_template.xlsx"'
+    return resp
+
+
+@login_required
+def download_fill_work_template_smt_xlsx(request):
+    if openpyxl is None:
+        messages.error(request, '系統未安裝 openpyxl，無法產生 Excel 範本')
+        return redirect('workorder:fill_work:fill_work_settings_data_smt')
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'SMTTemplate'
+    ws.append(TEMPLATE_HEADERS)
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    resp = HttpResponse(buf.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = 'attachment; filename="smt_fill_work_template.xlsx"'
+    return resp
+
+
+# 匯入：支援 CSV 與 XLSX
+@login_required
+def import_fill_work_records_operator(request):
+    if request.method != 'POST':
+        messages.error(request, '請使用表單上傳檔案')
+        return redirect('workorder:fill_work:fill_work_settings_data_operator')
+    file = request.FILES.get('file')
+    if not file:
+        messages.error(request, '未選擇檔案')
+        return redirect('workorder:fill_work:fill_work_settings_data_operator')
+    created, errors = _import_any(file, is_smt=False, username=request.user.username)
+    if errors:
+        if created > 0:
+            preview = '；'.join(errors[:5])
+            more = '' if len(errors) <= 5 else f'（另有 {len(errors) - 5} 筆錯誤省略）'
+            messages.warning(request, f'部分匯入成功：成功 {created} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
+        else:
+            messages.error(request, f'匯入失敗：{errors[0]}')
+    else:
+        messages.success(request, f'匯入完成，共建立 {created} 筆')
+    return redirect('workorder:fill_work:fill_work_settings_data_operator')
+
+
+@login_required
+def import_fill_work_records_smt(request):
+    if request.method != 'POST':
+        messages.error(request, '請使用表單上傳檔案')
+        return redirect('workorder:fill_work:fill_work_settings_data_smt')
+    file = request.FILES.get('file')
+    if not file:
+        messages.error(request, '未選擇檔案')
+        return redirect('workorder:fill_work:fill_work_settings_data_smt')
+    created, errors = _import_any(file, is_smt=True, username=request.user.username)
+    if errors:
+        if created > 0:
+            preview = '；'.join(errors[:5])
+            more = '' if len(errors) <= 5 else f'（另有 {len(errors) - 5} 筆錯誤省略）'
+            messages.warning(request, f'部分匯入成功：成功 {created} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
+        else:
+            messages.error(request, f'匯入失敗：{errors[0]}')
+    else:
+        messages.success(request, f'匯入完成，共建立 {created} 筆')
+    return redirect('workorder:fill_work:fill_work_settings_data_smt')
+
+
+def _import_any(file, is_smt: bool, username: str):
+    name = (file.name or '').lower()
+    created = 0
+    errors: list[str] = []
+    try:
+        if file.size == 0:
+            return 0, ['上傳檔案為空']
+        if name.endswith('.xlsx'):
+            if openpyxl is None:
+                return 0, ['系統未安裝 openpyxl，無法解析 Excel']
+            wb = openpyxl.load_workbook(file)
+            ws = wb.active
+            headers = [str(c.value).strip() if c.value is not None else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
+            header_map = {h: i for i, h in enumerate(headers)}
+            missing = [h for h in TEMPLATE_HEADERS if h not in header_map]
+            if missing:
+                return 0, [f"必要欄位缺漏：{', '.join(missing)}"]
+            if ws.max_row <= 1:
+                return 0, ['Excel 無資料內容']
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                # 跳過整列空白
+                if row is None or all((cell is None or str(cell).strip() == '') for cell in row):
+                    continue
+                try:
+                    data = {h: (row[header_map[h]] if header_map[h] < len(row) else '') for h in TEMPLATE_HEADERS}
+                    # 再次檢查必要欄位是否皆空，若皆空則忽略
+                    if all((data.get(h) in (None, '') or str(data.get(h)).strip() == '') for h in TEMPLATE_HEADERS):
+                        continue
+                    _create_fillwork_from_row(data, is_smt=is_smt, username=username)
+                    created += 1
+                except Exception as e:
+                    errors.append(f'第 {idx} 列：{e}')
+            return created, errors
+        else:
+            # CSV
+            try:
+                decoded = file.read().decode('utf-8')
+            except Exception:
+                return 0, ['CSV 編碼非 UTF-8，請轉存為 UTF-8 後再上傳']
+            reader = csv.DictReader(StringIO(decoded))
+            headers = [h.strip() for h in (reader.fieldnames or [])]
+            header_map = {h: i for i, h in enumerate(headers)}
+            missing = [h for h in TEMPLATE_HEADERS if h not in header_map]
+            if missing:
+                return 0, [f"必要欄位缺漏：{', '.join(missing)}"]
+            any_row = False
+            for idx, row in enumerate(reader, start=2):
+                # 跳過整列空白
+                if all((row.get(h) in (None, '') or str(row.get(h)).strip() == '') for h in row.keys()):
+                    continue
+                any_row = True
+                try:
+                    # 若必要欄位皆空白，忽略
+                    if all((str(row.get(h, '')).strip() == '') for h in TEMPLATE_HEADERS):
+                        continue
+                    _create_fillwork_from_row(row, is_smt=is_smt, username=username)
+                    created += 1
+                except Exception as e:
+                    errors.append(f'第 {idx} 列：{e}')
+            if not any_row:
+                return 0, ['CSV 無資料內容']
+            return created, errors
+    except Exception as e:
+        errors.append(f'匯入過程發生未預期錯誤：{e}')
+        return created, errors
+
+
+# 匯出：新增 XLSX
+@login_required
+def export_fill_work_records_operator_xlsx(request):
+    qs = FillWork.objects.exclude(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).order_by('-created_at')
+    return _export_fill_work_qs_xlsx(qs, 'operator_fill_work_export.xlsx')
+
+
+@login_required
+def export_fill_work_records_smt_xlsx(request):
+    qs = FillWork.objects.filter(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).order_by('-created_at')
+    return _export_fill_work_qs_xlsx(qs, 'smt_fill_work_export.xlsx')
+
+
+def _export_fill_work_qs_xlsx(qs, filename: str):
+    if openpyxl is None:
+        messages.error(request, '系統未安裝 openpyxl，無法匯出 Excel')
+        return redirect('workorder:fill_work:fill_work_settings')
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'FillWork'
+    ws.append(TEMPLATE_HEADERS)
+    for r in qs:
+        ws.append([
+            r.operator,
+            r.company_name,
+            r.work_date.strftime('%Y-%m-%d') if r.work_date else '',
+            r.start_time.strftime('%H:%M') if r.start_time else '',
+            r.end_time.strftime('%H:%M') if r.end_time else '',
+            r.workorder,
+            r.product_id,
+            r.operation,
+            r.equipment,
+            r.work_quantity,
+            r.defect_quantity,
+            r.remarks or '',
+            r.abnormal_notes or '',
+            float(r.work_hours_calculated or 0),
+            float(r.overtime_hours_calculated or 0),
+        ])
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    resp = HttpResponse(buf.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return resp
+
+
+def delete_all_fill_work_records(request):
+    """刪除所有填報記錄（僅限超級管理員）
+    注意：為了與前端一致，允許在 GET 觸發刪除（前端已彈出確認）。
+    """
+    if not request.user.is_authenticated:
+        return redirect('workorder:fill_work:fill_work_list')
+    if not request.user.is_superuser:
+        messages.error(request, '只有超級管理員可以執行全部刪除')
+        return redirect('workorder:fill_work:fill_work_list')
+    try:
+        total = FillWork.objects.count()
+        FillWork.objects.all().delete()
+        messages.success(request, f'已刪除全部填報記錄，共 {total} 筆。')
+    except Exception as exc:
+        messages.error(request, f'刪除失敗：{exc}')
+    return redirect('workorder:fill_work:fill_work_list')
+
+
+class SupervisorApprovalOperatorView(LoginRequiredMixin, ListView):
+    """主管審核（作業員專用）列表視圖
+    僅顯示非SMT的填報紀錄，提供統計與最近待審核清單。
+    """
+    model = FillWork
+    template_name = 'workorder/fill_work/supervisor_approval_operator.html'
+    context_object_name = 'fill_works'
+    paginate_by = 20
+
+    def get_queryset(self):
+        return FillWork.objects.exclude(
+            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+        ).order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_qs = FillWork.objects.exclude(
+            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+        )
+        context['pending_count'] = base_qs.filter(approval_status='pending').count()
+        context['approved_count'] = base_qs.filter(approval_status='approved').count()
+        context['rejected_count'] = base_qs.filter(approval_status='rejected').count()
+        context['total_count'] = base_qs.count()
+        context['recent_pending_records'] = base_qs.filter(approval_status='pending').order_by('-created_at')[:10]
+        return context
+
+
+class SupervisorApprovalSMTView(LoginRequiredMixin, ListView):
+    """主管審核（SMT專用）列表視圖
+    僅顯示SMT相關的填報紀錄，提供統計與最近待審核清單。
+    """
+    model = FillWork
+    template_name = 'workorder/fill_work/supervisor_approval_smt.html'
+    context_object_name = 'fill_works'
+    paginate_by = 20
+
+    def get_queryset(self):
+        return FillWork.objects.filter(
+            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+        ).order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_qs = FillWork.objects.filter(
+            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+        )
+        context['pending_count'] = base_qs.filter(approval_status='pending').count()
+        context['approved_count'] = base_qs.filter(approval_status='approved').count()
+        context['rejected_count'] = base_qs.filter(approval_status='rejected').count()
+        context['total_count'] = base_qs.count()
+        context['recent_pending_records'] = base_qs.filter(approval_status='pending').order_by('-created_at')[:10]
+        return context
+
+
+class SupervisorApprovalIndexView(LoginRequiredMixin, ListView):
+    """主管審核首頁"""
+    model = FillWork
+    template_name = 'workorder/fill_work/supervisor_approval_index.html'
+    context_object_name = 'fill_works'
+    paginate_by = 20
+    
+    def get_queryset(self):
+        return FillWork.objects.all().order_by('-created_at')
+    
+    def get_context_data(self, **kwargs):
+        """提供主管首頁統計資訊與最近待審核清單。"""
+        from django.utils import timezone
+        from datetime import timedelta
+        context = super().get_context_data(**kwargs)
+        base_qs = FillWork.objects.all()
+        # 統計卡
+        context['pending_count'] = base_qs.filter(approval_status='pending').count()
+        context['approved_count'] = base_qs.filter(approval_status='approved').count()
+        context['rejected_count'] = base_qs.filter(approval_status='rejected').count()
+        context['total_count'] = base_qs.count()
+        # 最近待審核清單
+        context['recent_pending_records'] = base_qs.filter(approval_status='pending').order_by('-created_at')[:10]
+        # 今日核准/駁回
+        today = timezone.localdate()
+        start_today = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time()))
+        end_today = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.max.time()))
+        context['today_approved'] = base_qs.filter(approval_status='approved', approved_at__range=(start_today, end_today)).count()
+        context['today_rejected'] = base_qs.filter(approval_status='rejected', rejected_at__range=(start_today, end_today)).count()
+        # 近7天平均審核時間（分鐘）
+        seven_days_ago = timezone.now() - timedelta(days=7)
+        samples = list(base_qs.filter(
+            Q(approval_status='approved', approved_at__gte=seven_days_ago) |
+            Q(approval_status='rejected', rejected_at__gte=seven_days_ago)
+        ).values('created_at', 'approved_at', 'rejected_at'))
+        total_minutes = 0
+        count = 0
+        for s in samples:
+            created_at = s.get('created_at')
+            approved_at = s.get('approved_at')
+            rejected_at = s.get('rejected_at')
+            decision_at = approved_at or rejected_at
+            if created_at and decision_at:
+                diff = decision_at - created_at
+                total_minutes += max(int(diff.total_seconds() // 60), 0)
+                count += 1
+        context['avg_approval_time'] = round(total_minutes / count) if count else 0
+        return context
+
+
+class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
+    """主管審核－待審核列表（獨立模板）"""
+    model = FillWork
+    template_name = 'workorder/fill_work/supervisor_pending_list.html'
+    context_object_name = 'fill_works'
+    paginate_by = 20
+
+    def test_func(self):
+        user = self.request.user
+        return user.is_superuser or user.groups.filter(name='主管').exists()
+
+    def get_queryset(self):
+        from datetime import datetime
+        qs = FillWork.objects.filter(approval_status='pending')
+        operator = self.request.GET.get('operator', '').strip()
+        workorder = self.request.GET.get('workorder', '').strip()
+        product_id = self.request.GET.get('product_id', '').strip()
+        operation = self.request.GET.get('operation', '').strip()
+        start_date = self.request.GET.get('start_date', '').strip()
+        end_date = self.request.GET.get('end_date', '').strip()
+        if operator:
+            qs = qs.filter(operator__icontains=operator)
+        if workorder:
+            qs = qs.filter(workorder__icontains=workorder)
+        if product_id:
+            qs = qs.filter(product_id__icontains=product_id)
+        if operation:
+            qs = qs.filter(Q(operation__icontains=operation) | Q(process__name__icontains=operation))
+        if start_date:
+            try:
+                d1 = datetime.strptime(start_date, '%Y-%m-%d').date()
+                qs = qs.filter(work_date__gte=d1)
+            except ValueError:
+                pass
+        if end_date:
+            try:
+                d2 = datetime.strptime(end_date, '%Y-%m-%d').date()
+                qs = qs.filter(work_date__lte=d2)
+            except ValueError:
+                pass
+        return qs.order_by('-work_date', '-start_time', '-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_qs = FillWork.objects.filter(approval_status='pending')
+        context['total_count'] = base_qs.count()
+        context['operator_count'] = base_qs.exclude(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).count()
+        context['smt_count'] = base_qs.filter(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).count()
+        # 回填查詢值
+        request_get = self.request.GET
+        context['filter_operator'] = request_get.get('operator', '').strip()
+        context['filter_workorder'] = request_get.get('workorder', '').strip()
+        context['filter_product_id'] = request_get.get('product_id', '').strip()
+        context['filter_operation'] = request_get.get('operation', '').strip()
+        context['filter_start_date'] = request_get.get('start_date', '').strip()
+        context['filter_end_date'] = request_get.get('end_date', '').strip()
+        return context
+
+
+class SupervisorReviewedListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
+    """主管審核－已審核列表（獨立模板，含核准與駁回）"""
+    model = FillWork
+    template_name = 'workorder/fill_work/supervisor_reviewed_list.html'
+    context_object_name = 'fill_works'
+    paginate_by = 20
+
+    def test_func(self):
+        user = self.request.user
+        return user.is_superuser or user.groups.filter(name='主管').exists()
+
+    def get_queryset(self):
+        return FillWork.objects.exclude(approval_status='pending').order_by('-work_date', '-start_time', '-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        base_qs = FillWork.objects.exclude(approval_status='pending')
+        context['total_count'] = base_qs.count()
+        context['approved_count'] = base_qs.filter(approval_status='approved').count()
+        context['rejected_count'] = base_qs.filter(approval_status='rejected').count()
+        return context

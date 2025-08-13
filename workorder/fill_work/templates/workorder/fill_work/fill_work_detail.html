@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load auth_extras %}
 
 {% block title %}填報記錄詳情{% endblock %}
 
@@ -9,6 +10,11 @@
         <div class="col-12 d-flex justify-content-between align-items-center">
             <h2 class="mb-0"><i class="fas fa-file-alt text-primary"></i> 填報記錄詳情</h2>
             <div>
+                {% if request.user.is_superuser or request.user|has_group:'主管' %}
+                <a href="{% url 'workorder:fill_work:supervisor_pending_list' %}" class="btn btn-warning me-2">
+                    <i class="fas fa-user-check"></i> 返回 主管待審核填報作業
+                </a>
+                {% endif %}
                 <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-secondary">
                     <i class="fas fa-list"></i> 返回列表
                 </a>
@@ -76,7 +82,18 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">狀態</label>
-                    <div class="form-control">{{ fill_work.get_approval_status_display }}</div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="form-control">{{ fill_work.get_approval_status_display }}</div>
+                        {% if fill_work.approval_status == 'approved' %}
+                            {% if request.user.is_superuser or request.user|has_group:'主管' %}
+                            <a href="{% url 'workorder:fill_work:cancel_approve_fill_work' fill_work.id %}"
+                               class="btn btn-outline-warning"
+                               onclick="return confirm('確定要取消核准？取消後此筆將回到待審核，並自生產監控移除對應明細。');">
+                                <i class="fas fa-undo"></i> 取消核准
+                            </a>
+                            {% endif %}
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="col-md-12">
                     <label class="form-label">備註</label>

@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from workorder.models import WorkOrder, WorkOrderProduction, WorkOrderProductionDetail
 from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
+from erp_integration.models import CompanyConfig
 
 logger = logging.getLogger(__name__)
 
@@ -193,17 +194,40 @@ class ProductionReportSyncService:
                 }
             )
             
+            # 解析公司名稱（用於顯示）
+            company_name_value = None
+            try:
+                if workorder and workorder.company_code:
+                    cfg = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
+                    if cfg:
+                        company_name_value = cfg.company_name
+            except Exception:
+                company_name_value = None
+
             # 檢查是否已存在相同的報工記錄（避免重複）
-            existing_detail = WorkOrderProductionDetail.objects.filter(
-                workorder_production=production_record,
-                process_name=process_name,
-                report_date=report_date,
-                operator=operator or '',
-                equipment=equipment or '',
-                work_quantity=work_quantity,
-                defect_quantity=defect_quantity,
-                report_source=report_source
-            ).first()
+            # 1) 以來源紀錄唯一鍵判斷（最可靠）
+            existing_detail = None
+            if original_report_id is not None and original_report_type:
+                existing_detail = WorkOrderProductionDetail.objects.filter(
+                    workorder_production=production_record,
+                    original_report_id=original_report_id,
+                    original_report_type=original_report_type,
+                ).first()
+            # 2) 退而求其次：以主要欄位比對（需處理 None 與空字串差異）
+            if existing_detail is None:
+                from django.db.models import Q
+                operator_q = Q(operator__isnull=True) if operator in (None, '') else Q(operator=operator)
+                equipment_q = Q(equipment__isnull=True) if equipment in (None, '') else Q(equipment=equipment)
+                existing_detail = WorkOrderProductionDetail.objects.filter(
+                    Q(workorder_production=production_record),
+                    Q(process_name=process_name),
+                    Q(report_date=report_date),
+                    operator_q,
+                    equipment_q,
+                    Q(work_quantity=work_quantity),
+                    Q(defect_quantity=defect_quantity),
+                    Q(report_source=report_source)
+                ).first()
             
             if existing_detail:
                 # 如果記錄已存在，更新所有欄位
@@ -235,6 +259,8 @@ class ProductionReportSyncService:
                 existing_detail.rejected_at = rejected_at
                 existing_detail.remarks = remarks or existing_detail.remarks
                 existing_detail.abnormal_notes = abnormal_notes or existing_detail.abnormal_notes
+                if company_name_value:
+                    existing_detail.company_name = company_name_value
                 existing_detail.updated_at = timezone.now()
                 existing_detail.save()
                 logger.debug(f"更新已存在的報工記錄: {workorder.order_number} - {process_name}")
@@ -250,6 +276,7 @@ class ProductionReportSyncService:
                     defect_quantity=defect_quantity,
                     operator=operator,
                     equipment=equipment,
+                    company_name=company_name_value,
                     report_source=report_source,
                     start_time=start_time,
                     end_time=end_time,

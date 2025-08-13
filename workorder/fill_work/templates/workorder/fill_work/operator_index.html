@@ -252,11 +252,6 @@
                                             <a href="{% url 'workorder:fill_work:fill_work_detail' record.id %}" class="btn btn-sm btn-outline-primary me-1">
                                                 <i class="fas fa-eye"></i>
                                             </a>
-                                            {% if record.approval_status == 'pending' %}
-                                            <a href="{% url 'workorder:fill_work:operator_backfill_edit' record.id %}" class="btn btn-sm btn-outline-secondary">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            {% endif %}
                                         </td>
                                     </tr>
                                     {% endfor %}

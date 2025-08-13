@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}填報功能設定{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+	<nav aria-label="breadcrumb" class="mb-2">
+		<ol class="breadcrumb mb-2">
+			<li class="breadcrumb-item"><a href="{% url 'workorder:fill_work:fill_work_index' %}"><i class="fas fa-home"></i> 填報管理</a></li>
+			<li class="breadcrumb-item active" aria-current="page">填報功能設定</li>
+		</ol>
+	</nav>
+	<div class="row mb-3">
+		<div class="col-12 d-flex justify-content-between align-items-center">
+			<h2 class="mb-0"><i class="fas fa-sliders-h text-info"></i> 填報功能設定</h2>
+			
+		</div>
+	</div>
+
+	<div class="row">
+		<div class="col-md-4 mb-4">
+			<div class="card h-100">
+				<div class="card-header bg-primary text-white">
+					<i class="fas fa-file-import"></i> 填報資料匯入/匯出
+				</div>
+				<div class="card-body text-center">
+					<p class="text-muted">管理填報資料的匯入與匯出，並分為作業員與SMT兩個獨立功能。</p>
+					<a href="{% url 'workorder:fill_work:fill_work_settings_data' %}" class="btn btn-primary">
+						<i class="fas fa-arrow-right"></i> 進入
+					</a>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %} 

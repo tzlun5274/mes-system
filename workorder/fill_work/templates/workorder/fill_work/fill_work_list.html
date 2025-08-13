@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load auth_extras %}
 
 {% block title %}填報記錄列表{% endblock %}
 
@@ -29,7 +30,10 @@
     
     .table-responsive {
         border-radius: 8px;
-        overflow: hidden;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
     }
     
     .btn-action {
@@ -133,26 +137,31 @@
     <div class="row">
         <div class="col-12">
             <div class="card fill-work-list-card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="fas fa-table"></i>
+                        <i class="fas fa-list"></i>
                         填報記錄
                     </h5>
+                    <div class="d-flex gap-2"></div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
+                        <table class="table table-hover table-bordered mb-0" style="white-space: nowrap;">
                             <thead class="table-light">
                                 <tr>
                                     <th>作業員</th>
                                     <th>工單號碼</th>
                                     <th>產品編號</th>
                                     <th>工序</th>
+                                    <th>設備</th>
                                     <th>工作日期</th>
+                                    <th>開始時間</th>
+                                    <th>結束時間</th>
                                     <th>工作時數</th>
-                                    <th>工作數量</th>
-                                    <th>審核狀態</th>
-                                    <th>建立時間</th>
+                                    <th>加班時數</th>
+                                    <th>填報數量</th>
+                                    <th>不良品數量</th>
+                                    <th>狀態</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -163,9 +172,14 @@
                                     <td>{{ fill_work.workorder }}</td>
                                     <td>{{ fill_work.product_id }}</td>
                                     <td>{{ fill_work.process.name }}</td>
+                                    <td>{{ fill_work.equipment }}</td>
                                     <td>{{ fill_work.work_date|date:"Y-m-d" }}</td>
+                                    <td>{{ fill_work.start_time|time:"H:i" }}</td>
+                                    <td>{{ fill_work.end_time|time:"H:i" }}</td>
                                     <td>{{ fill_work.work_hours_calculated }}小時</td>
+                                    <td>{{ fill_work.overtime_hours_calculated }}小時</td>
                                     <td>{{ fill_work.work_quantity }}</td>
+                                    <td>{{ fill_work.defect_quantity }}</td>
                                     <td>
                                         {% if fill_work.approval_status == 'pending' %}
                                             <span class="badge bg-warning status-badge">待審核</span>
@@ -175,23 +189,12 @@
                                             <span class="badge bg-danger status-badge">已駁回</span>
                                         {% endif %}
                                     </td>
-                                    <td>{{ fill_work.created_at|date:"Y-m-d H:i" }}</td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <button type="button" class="btn btn-sm btn-outline-primary btn-action" 
-                                                    onclick="viewDetail({{ fill_work.id }})">
+                                            <a href="{% url 'workorder:fill_work:fill_work_detail' fill_work.id %}"
+                                               class="btn btn-sm btn-outline-primary btn-action">
                                                 <i class="fas fa-eye"></i>
-                                            </button>
-                                            {% if fill_work.approval_status == 'pending' %}
-                                            <button type="button" class="btn btn-sm btn-outline-success btn-action" 
-                                                    onclick="approveRecord({{ fill_work.id }})">
-                                                <i class="fas fa-check"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-outline-danger btn-action" 
-                                                    onclick="rejectRecord({{ fill_work.id }})">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                            {% endif %}
+                                            </a>
                                         </div>
                                     </td>
                                 </tr>
@@ -280,24 +283,12 @@
 {% block extra_js %}
 <script>
 function viewDetail(id) {
-    // 這裡可以實現查看詳情的功能
-    alert('查看詳情功能：記錄ID ' + id);
+    // 導向到詳情頁
+    var url = '{% url "workorder:fill_work:fill_work_detail" 0 %}'.replace('/0/','/'+id+'/');
+    window.location.href = url;
 }
 
-function approveRecord(id) {
-    if (confirm('確定要核准這筆填報記錄嗎？')) {
-        // 這裡可以實現核准功能
-        alert('核准功能：記錄ID ' + id);
-    }
-}
-
-function rejectRecord(id) {
-    const reason = prompt('請輸入駁回原因：');
-    if (reason !== null) {
-        // 這裡可以實現駁回功能
-        alert('駁回功能：記錄ID ' + id + '，原因：' + reason);
-    }
-}
+// 核准/駁回功能僅在「主管待審核填報作業」頁面提供，這裡不再提供對應操作
 
 // 自動提交過濾表單
 document.addEventListener('DOMContentLoaded', function() {

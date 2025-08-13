@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load auth_extras %}
+
+{% block title %}主管待審核填報作業{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+	<div class="mb-2">
+		<nav aria-label="breadcrumb">
+			<ol class="breadcrumb mb-2">
+				<li class="breadcrumb-item">
+					<a href="{% url 'workorder:fill_work:fill_work_index' %}"><i class="fas fa-home"></i> 填報管理</a>
+				</li>
+				<li class="breadcrumb-item">
+					<a href="{% url 'workorder:fill_work:supervisor_approval_index' %}"><i class="fas fa-user-shield"></i> 主管審核</a>
+				</li>
+				<li class="breadcrumb-item active" aria-current="page">待審核</li>
+			</ol>
+		</nav>
+	</div>
+	<h4 class="mb-3"><i class="fas fa-clipboard-check me-2"></i>主管待審核填報作業</h4>
+	<div class="mb-3 text-muted">共 {{ total_count }} 筆，其中 作業員 {{ operator_count }} 筆、SMT {{ smt_count }} 筆</div>
+	<form method="get" class="row g-2 align-items-end mb-3">
+		<div class="col-sm-2">
+			<label class="form-label">作業員</label>
+			<input type="text" name="operator" value="{{ filter_operator }}" class="form-control" placeholder="輸入作業員">
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">工單號碼</label>
+			<input type="text" name="workorder" value="{{ filter_workorder }}" class="form-control" placeholder="輸入工單號碼">
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">產品編號</label>
+			<input type="text" name="product_id" value="{{ filter_product_id }}" class="form-control" placeholder="輸入產品編號">
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">工序</label>
+			<input type="text" name="operation" value="{{ filter_operation }}" class="form-control" placeholder="輸入工序名稱">
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">開始日期</label>
+			<input type="date" name="start_date" value="{{ filter_start_date }}" class="form-control">
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">結束日期</label>
+			<input type="date" name="end_date" value="{{ filter_end_date }}" class="form-control">
+		</div>
+		<div class="col-12 d-flex justify-content-between align-items-center mt-2">
+			<div class="d-flex gap-2">
+				<button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> 搜尋</button>
+				<a href="?" class="btn btn-secondary"><i class="fas fa-undo"></i> 重置</a>
+			</div>
+			<div class="d-flex gap-2">
+				{% if request.user.is_superuser %}
+				<button id="btnDeleteAll" class="btn btn-outline-danger"><i class="fas fa-trash"></i> 全部記錄刪除</button>
+				<button id="btnBatchDelete" class="btn btn-danger"><i class="fas fa-trash-alt"></i> 批次刪除</button>
+				{% endif %}
+				{% if request.user.is_superuser or request.user|has_group:'主管' %}
+				<button id="btnBatchApprove" class="btn btn-success"><i class="fas fa-check-double"></i> 批次核准</button>
+				{% endif %}
+			</div>
+		</div>
+	</form>
+	<div class="card">
+		<div class="card-body p-0">
+			<div class="table-responsive">
+				<table class="table table-hover table-sm mb-0">
+					<thead>
+						<tr>
+							<th>作業員</th>
+							<th>工單號碼</th>
+							<th>產品編號</th>
+							<th>工序</th>
+							<th>設備</th>
+							<th>工作日期</th>
+							<th>開始時間</th>
+							<th>結束時間</th>
+							<th>工作時數</th>
+							<th>加班時數</th>
+							<th>填報數量</th>
+							<th>不良品數量</th>
+							<th class="text-end">操作</th>
+						</tr>
+					</thead>
+					<tbody>
+					{% for r in fill_works %}
+						<tr data-id="{{ r.id }}">
+							<td>{{ r.operator }}</td>
+							<td>{{ r.workorder }}</td>
+							<td>{{ r.product_id }}</td>
+							<td>{% if r.operation %}{{ r.operation }}{% else %}{{ r.process.name }}{% endif %}</td>
+							<td>{{ r.equipment }}</td>
+							<td>{{ r.work_date|date:'Y-m-d' }}</td>
+							<td>{{ r.start_time|time:'H:i' }}</td>
+							<td>{{ r.end_time|time:'H:i' }}</td>
+							<td>{{ r.work_hours_calculated }}</td>
+							<td>{{ r.overtime_hours_calculated }}</td>
+							<td>{{ r.work_quantity }}</td>
+							<td>{{ r.defect_quantity }}</td>
+							<td class="text-end">
+								<a href="{% url 'workorder:fill_work:fill_work_detail' r.id %}" class="btn btn-outline-primary btn-sm"><i class="fas fa-eye"></i></a>
+								<a href="{% url 'workorder:fill_work:approve_fill_work' r.id %}" class="btn btn-outline-success btn-sm"><i class="fas fa-check"></i></a>
+								<a href="{% url 'workorder:fill_work:reject_fill_work' r.id %}" class="btn btn-outline-danger btn-sm"><i class="fas fa-times"></i></a>
+							</td>
+						</tr>
+					{% empty %}
+						<tr><td colspan="13" class="text-center text-muted py-3">目前沒有待審核的填報</td></tr>
+					{% endfor %}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+    {% include 'includes/pagination.html' with page_obj=page_obj %}
+</div>
+
+<script>
+// 取得目前列表的所有ID
+function getAllRowIds(){
+	return Array.from(document.querySelectorAll('tbody tr[data-id]')).map(tr=>tr.getAttribute('data-id'))
+}
+
+// 全部記錄刪除（超級管理員）
+document.getElementById('btnDeleteAll')?.addEventListener('click', function(){
+	if(!confirm('警告：這將刪除「全部」填報記錄，且無法復原！\n\n是否確定要刪除？')) return;
+	window.location.href = '{% url "workorder:fill_work:fill_work_delete_all" %}';
+});
+
+// 批次刪除（超級管理員）
+document.getElementById('btnBatchDelete')?.addEventListener('click', async function(){
+	if(!confirm('是否批次刪除目前列表中的所有待審核資料？此動作無法復原。')) return;
+	const ids = getAllRowIds();
+	const delTpl = '{% url "workorder:fill_work:fill_work_delete" 0 %}';
+	for(const id of ids){
+		await fetch(delTpl.replace('/0/','/'+id+'/'));
+	}
+	window.location.reload();
+});
+
+// 批次核准（主管/超級管理員）
+document.getElementById('btnBatchApprove')?.addEventListener('click', async function(){
+	if(!confirm('是否批次核准目前列表中的所有待審核資料？')) return;
+	const ids = getAllRowIds();
+	const approveTpl = '{% url "workorder:fill_work:approve_fill_work" 0 %}';
+	for(const id of ids){
+		await fetch(approveTpl.replace('/0/','/'+id+'/'));
+	}
+	window.location.reload();
+});
+</script>
+{% endblock %} 
