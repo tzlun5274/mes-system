@@ -2836,74 +2836,7 @@ def update_process_status(request, process_id):
         print(f"❌ 分配過程發生錯誤：{str(e)}")
         return JsonResponse({"status": "error", "message": f"更新失敗：{str(e)}"})
 
-def test_report_page(request):
-    """
-    測試報工頁面 - 不需要登入
-    用於測試前端模板是否正常顯示
-    """
-    context = {
-        'today_reports': 15,
-        'month_reports': 245,
-        'pending_reports': 8,
-        'abnormal_reports': 3,
-        'recent_reports': [
-            {
-                'report_time': '2025-07-24 12:30:00',
-                'operator': '張小明',
-                'workorder': 'WO-2025-001',
-                'process': 'SMT',
-                'quantity': 100,
-                'work_hours': '2.5',
-                'status': '已核准',
-                'type': '作業員報工'
-            },
-            {
-                'report_time': '2025-07-24 11:45:00',
-                'operator': 'SMT設備',
-                'workorder': 'WO-2025-002',
-                'process': 'DIP',
-                'quantity': 150,
-                'work_hours': '3.0',
-                'status': '待審核',
-                'type': 'SMT報工'
-            }
-        ],
-        'stats': {
-            'total_pending': 8,
-            'total_today': 15,
-            'total_month': 245,
-            'total_abnormal': 3,
-            'pending_operator': 5,
-            'pending_smt': 3,
-            'today_operator': 10,
-            'today_smt': 5,
-            'month_operator': 180,
-            'month_smt': 65,
-            'abnormal_operator': 2,
-            'abnormal_smt': 1,
-        }
-    }
-    
-    return render(request, 'workorder/backup_report/backup_index.html', context)
 
-def report_index(request):
-    """
-    報工管理首頁視圖 - 重新設計版本
-    顯示報工管理的主要功能卡片和統計資訊
-    """
-    from django.contrib.auth.decorators import login_required
-    from django.shortcuts import redirect
-    from .services.statistics_service import StatisticsService
-    
-    # 檢查用戶權限
-    if not request.user.is_authenticated:
-        return redirect('login')
-    
-    # 使用統一的統計服務
-    context = StatisticsService.get_report_index_statistics()
-    context['recent_reports'] = []
-    
-    return render(request, 'workorder/backup_report/backup_index.html', context)
 
 @login_required
 def supervisor_report_index(request):
@@ -3598,153 +3531,11 @@ def execute_maintenance(request):
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'執行失敗：{str(e)}'})
 
-def operator_report_index(request):
-    """
-    作業員報工首頁視圖
-    顯示作業員報工的主要功能卡片和統計資訊
-    """
-    from .services.statistics_service import StatisticsService
-    
-    # 使用統一的統計服務 - 僅作業員數據
-    context = StatisticsService.get_operator_only_statistics()
-    
-    # 注意：OperatorSupplementReport 模型已棄用
-    context['recent_reports'] = []
-    context['pending_reviews'] = 0
-    context['approved_reports'] = 0
-    
-    return render(request, 'workorder/backup_report/backup_operator/backup_index.html', context)
 
-def smt_report_index(request):
-    """
-    SMT報工首頁視圖
-    顯示SMT報工的主要功能卡片和統計資訊
-    """
-    from equip.models import Equipment
-    from .services.statistics_service import StatisticsService
-    
-    # 使用統一的統計服務 - 僅SMT數據
-    context = StatisticsService.get_smt_only_statistics()
-    
-    # 取得 SMT 設備列表
-    equipment_list = Equipment.objects.filter(
-        models.Q(name__icontains='SMT') | 
-        models.Q(name__icontains='貼片') |
-        models.Q(name__icontains='Pick') |
-        models.Q(name__icontains='Place')
-    ).order_by('name')
-    
-    # 計算設備相關統計
-    running_equipment = equipment_list.filter(status='running').count()
-    abnormal_equipment = equipment_list.filter(status='maintenance').count()
-    
-    # 計算設備效率（運轉中設備的平均效率）
-    if running_equipment > 0:
-        equipment_efficiency = 95  # 假設運轉中設備效率為95%
-    else:
-        equipment_efficiency = 0
-    
-    # 注意：SMTSupplementReport 模型已棄用
-    recent_reports = []
-    
-    # 添加設備相關統計到context
-    context.update({
-        'running_equipment': running_equipment,
-        'equipment_efficiency': equipment_efficiency,
-        'abnormal_equipment': abnormal_equipment,
-        'equipment_list': equipment_list,
-        'recent_reports': recent_reports,
-    })
-    
-    return render(request, 'workorder/backup_report/backup_smt/backup_index.html', context)
 
-def smt_on_site_report(request):
-    """
-    SMT現場報工首頁視圖
-    顯示SMT現場報工的主要功能，包含即時報工表單和設備狀態
-    SMT設備為自動化運作，不需要作業員
-    """
-    from equip.models import Equipment
-    from datetime import date
-    
-    # 取得 SMT 設備列表（假設設備名稱包含 'SMT' 或 '貼片'）
-    equipment_list = Equipment.objects.filter(
-        models.Q(name__icontains='SMT') | 
-        models.Q(name__icontains='貼片') |
-        models.Q(name__icontains='Pick') |
-        models.Q(name__icontains='Place')
-    ).order_by('name')
-    
-    # 準備設備狀態資料（使用真實設備資料）
-    equipment_status = []
-    active_count = 0
-    
-    for equipment in equipment_list:
-        # 使用真實的設備狀態
-        status = equipment.status
-        
-        if status == 'running':
-            active_count += 1
-        
-        # 查詢該設備的當前工單
-        current_workorder = None
-        try:
-            # 查找分配給該設備且正在進行的工序
-            current_process = WorkOrderProcess.objects.filter(
-                assigned_equipment=equipment.name,
-                status='in_progress'
-            ).select_related('workorder').first()
-            
-            if current_process:
-                current_workorder = current_process.workorder.order_number
-        except:
-            pass
-        
-            # 計算今日該設備的產出數量
-    today_output = 0
-    try:
-        today_reports = SMTSupplementReport.objects.filter(
-            equipment=equipment,
-            work_date=today
-        )
-        today_output = sum(report.work_quantity for report in today_reports)
-    except:
-        pass
-        
-        equipment_status.append({
-            'id': equipment.id,
-            'name': equipment.name,
-            'status': status,
-            'status_display': equipment.get_status_display(),
-            'current_workorder': current_workorder,
-            'running_hours': 0,  # 暫時設為0，實際應該從設備監控系統取得
-            'output_quantity': today_output,
-            'efficiency': 95 if status == 'running' else (85 if status == 'idle' else 0),  # 運轉中95%，閒置85%，維修0%
-            'last_update': equipment.updated_at
-        })
-    
-    # 取得今日的 SMT 報工記錄
-    today = date.today()
-    today_reports_list = SMTSupplementReport.objects.filter(
-        work_date=today
-    ).select_related('equipment', 'workorder').order_by('-created_at')
-    
-    # 計算統計資料
-    today_reports_count = today_reports_list.count()
-    current_shift_output = sum(report.work_quantity for report in today_reports_list)
-    
-    # 準備統計資料
-    context = {
-        'active_equipment': active_count,
-        'today_reports': today_reports_count,
-        'current_shift_output': current_shift_output,
-        'pending_reports': 0,  # 待處理報工（目前為0）
-        'equipment_list': equipment_list,
-        'equipment_status': equipment_status,
-        'today_reports_list': today_reports_list,
-    }
-    
-    return render(request, 'workorder/backup_report/backup_smt/backup_on_site/backup_index.html', context)
+
+
+
 
 @require_POST
 @login_required
@@ -3873,54 +3664,7 @@ def submit_smt_report(request):
 # 此函數已被移除，請使用 OperatorSupplementReportDetailView 類別視圖
 # 位置：workorder/views/report_views.py
 
-@login_required
-def operator_on_site_report(request):
-    """作業員現場報工"""
-    if request.method == 'POST':
-        form = OperatorOnSiteReportForm(request.POST)
-        if form.is_valid():
-            report = form.save(commit=False)
-            report.created_by = request.user.username
-            report.work_date = timezone.now().date()
-            report.save()
-            messages.success(request, '現場報工記錄提交成功！')
-            return redirect('workorder:operator_on_site_report')
-    else:
-        form = OperatorOnSiteReportForm()
-    
-    # 獲取作業員列表 - 使用真正的作業員模型，而不是 Django User 模型
-    from process.models import Operator
-    operator_list = Operator.objects.all().order_by('name')
-    
-    # 獲取設備列表
-    from equip.models import Equipment
-    equipment_list = Equipment.objects.all()  # 獲取所有設備，因為 Equipment 模型沒有 is_active 欄位
 
-    # 獲取統計資料
-    # 注意：OperatorSupplementReport 模型已棄用
-    today_reports = 0
-    
-    # 獲取進行中的工單數量
-    from workorder.models import WorkOrder
-    active_workorders = WorkOrder.objects.filter(status='in_progress').count()
-    pending_workorders = WorkOrder.objects.filter(status='pending').count()
-    
-    # 獲取工作中作業員數量（這裡可以根據實際需求調整邏輯）
-    working_operators = operator_list.count()  # 簡化計算，實際應該根據報工狀態
-    
-    context = {
-        'form': form,
-        'title': '備用作業員現場報工',
-        'operator_list': operator_list,
-        'equipment_list': equipment_list,
-        'working_operators': working_operators,
-        'today_reports': today_reports,
-        'active_workorders': active_workorders,
-        'pending_workorders': pending_workorders,
-        'operator_status_list': [],  # 可以根據需求實作作業員狀態
-        'recent_reports': [],  # 可以根據需求實作最近報工記錄
-    }
-    return render(request, 'workorder/backup_report/backup_operator/backup_on_site.html', context)
 
 # ============================================================================
 # SMT補登報工功能視圖函數
@@ -4091,28 +3835,7 @@ def smt_supplement_report_reject(request, report_id):
 # 批次處理功能視圖函數
 # ============================================================================
 
-@login_required
-def operator_supplement_batch(request):
-    """作業員補登報工批次處理"""
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        
-        # 處理檔案匯入
-        if action == 'import_file':
-            return operator_supplement_import_file(request)
-        
-        # 處理批次操作
-        report_ids = request.POST.getlist('report_ids')
-        
-        if not report_ids:
-            messages.error(request, '請選擇要處理的報工記錄！')
-            return redirect('workorder:operator_supplement_report_index')
-        
-        messages.warning(request, '此功能已棄用，請使用新的報工系統')
-        return redirect('workorder:index')
-    
-    # GET 請求：顯示批次匯入頁面
-    return render(request, 'workorder/backup_report/backup_operator/backup_supplement/backup_batch.html')
+
 
 def operator_supplement_import_file(request):
     """作業員補登報工檔案匯入處理
@@ -4328,48 +4051,7 @@ def operator_supplement_import_file(request):
             'message': f'匯入失敗：{str(e)}'
         })
 
-@login_required
-def smt_supplement_batch(request):
-    """SMT補登報工批次處理"""
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        report_ids = request.POST.getlist('report_ids')
-        
-        if not report_ids:
-            messages.error(request, '請選擇要處理的SMT報工記錄！')
-            return redirect('workorder:smt_supplement_report_index')
-        
-        try:
-            reports = SMTSupplementReport.objects.filter(id__in=report_ids)
-            
-            if action == 'approve':
-                reports.update(
-                    approval_status='approved',
-                    approved_by=request.user.username,
-                    approved_at=timezone.now()
-                )
-                messages.success(request, f'已審核 {len(reports)} 筆SMT報工記錄！')
-            elif action == 'reject':
-                reports.update(
-                    approval_status='rejected',
-                    approved_by=request.user.username,
-                    approved_at=timezone.now()
-                )
-                messages.success(request, f'已駁回 {len(reports)} 筆SMT報工記錄！')
-            elif action == 'delete':
-                count = reports.count()
-                reports.delete()
-                messages.success(request, f'已刪除 {count} 筆SMT報工記錄！')
-            else:
-                messages.error(request, '無效的操作！')
-                
-        except Exception as e:
-            messages.error(request, f'批次處理失敗：{str(e)}')
-        
-        return redirect('workorder:smt_supplement_report_index')
-    
-    # GET 請求：顯示批次匯入頁面
-    return render(request, 'workorder/backup_report/backup_smt/backup_supplement/backup_batch.html')
+
 
 # ============================================================================
 # 匯出功能視圖函數

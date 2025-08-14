@@ -71,32 +71,108 @@ class WorkOrderCompletionService:
     @staticmethod
     def _get_packaging_quantity(workorder):
         """
-        獲取出貨包裝工序的報工數量
+        獲取工單的出貨包裝累積數量（良品+不良品，從生產中工單詳情資料表）
         
         Args:
-            workorder: 工單實例
+            workorder: WorkOrder 實例
             
         Returns:
-            int: 出貨包裝數量
+            int: 出貨包裝累積總數量（良品+不良品）
         """
         try:
-            # 從填報記錄中查詢出貨包裝數量
-            packaging_reports = FillWork.objects.filter(
-                workorder=workorder.order_number,
-                process__name=WorkOrderCompletionService.PACKAGING_PROCESS_NAME,
-                approval_status='approved'
+            # 從生產中工單詳情資料表查詢出貨包裝的報工記錄
+            packaging_reports = WorkOrderProductionDetail.objects.filter(
+                workorder_production__workorder=workorder,
+                process_name="出貨包裝"
             )
             
-            total_quantity = packaging_reports.aggregate(
+            # 計算良品累積數量
+            good_quantity = packaging_reports.aggregate(
                 total=Sum('work_quantity')
             )['total'] or 0
             
-            logger.debug(f"工單 {workorder.order_number} 出貨包裝數量: {total_quantity}")
+            # 計算不良品累積數量
+            defect_quantity = packaging_reports.aggregate(
+                total=Sum('defect_quantity')
+            )['total'] or 0
+            
+            # 總數量 = 良品 + 不良品
+            total_quantity = good_quantity + defect_quantity
+            
+            # 記錄日誌
+            logger.info(f"工單 {workorder.order_number} 出貨包裝累積數量: 良品={good_quantity}, 不良品={defect_quantity}, 總計={total_quantity}")
+            
             return total_quantity
             
         except Exception as e:
-            logger.error(f"獲取出貨包裝合格品累積數量時發生錯誤: {str(e)}")
+            logger.error(f"獲取工單 {workorder.order_number} 出貨包裝累積數量時發生錯誤: {str(e)}")
             return 0
+
+    @staticmethod
+    def get_completion_summary(workorder_id):
+        """
+        獲取工單的完工判斷摘要資訊
+        
+        Args:
+            workorder_id: 工單ID
+            
+        Returns:
+            dict: 完工判斷摘要資訊
+        """
+        try:
+            workorder = WorkOrder.objects.get(id=workorder_id)
+            
+            # 獲取出貨包裝累計數量
+            packaging_quantity = WorkOrderCompletionService._get_packaging_quantity(workorder)
+            
+            # 判斷是否達到完工條件
+            can_complete = packaging_quantity >= workorder.quantity
+            
+            # 計算完工進度百分比
+            completion_percentage = (packaging_quantity / workorder.quantity * 100) if workorder.quantity > 0 else 0
+            
+            # 獲取出貨包裝報工記錄詳情
+            packaging_reports = WorkOrderProductionDetail.objects.filter(
+                workorder_production__workorder=workorder,
+                process_name="出貨包裝"
+            ).order_by('-report_date', '-start_time')
+            
+            packaging_details = []
+            for report in packaging_reports:
+                packaging_details.append({
+                    'report_date': report.report_date,
+                    'operator': report.operator or '-',
+                    'equipment': report.equipment or '-',
+                    'work_quantity': report.work_quantity or 0,
+                    'defect_quantity': report.defect_quantity or 0,
+                    'work_hours': float(report.work_hours or 0),
+                    'start_time': report.start_time,
+                    'end_time': report.end_time,
+                    'approval_status': report.approval_status,
+                })
+            
+            return {
+                'workorder_id': workorder_id,
+                'order_number': workorder.order_number,
+                'planned_quantity': workorder.quantity,
+                'packaging_quantity': packaging_quantity,
+                'can_complete': can_complete,
+                'completion_percentage': round(completion_percentage, 1),
+                'packaging_details': packaging_details,
+                'packaging_count': len(packaging_details),
+                'reason': f"出貨包裝累計數量: {packaging_quantity}/{workorder.quantity}",
+                'error': None
+            }
+            
+        except WorkOrder.DoesNotExist:
+            return {
+                'error': f'工單 {workorder_id} 不存在'
+            }
+        except Exception as e:
+            logger.error(f"獲取工單 {workorder_id} 完工摘要時發生錯誤: {str(e)}")
+            return {
+                'error': f'獲取完工摘要失敗: {str(e)}'
+            }
     
     @staticmethod
     def _complete_workorder(workorder):

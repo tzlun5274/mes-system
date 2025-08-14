@@ -26,15 +26,7 @@ from .views.workorder_clear_views import (
 from .views.workorder_import_views import (
     workorder_import_page, workorder_import_file, download_workorder_template
 )
-from .views.report_views import (
-    ReportIndexView, BackupReportIndexView, OperatorSupplementReportListView, OperatorSupplementReportCreateView,
-    OperatorSupplementReportUpdateView, OperatorSupplementReportDetailView, 
-    OperatorSupplementReportDeleteView, SMTSupplementReportListView, SMTSupplementReportCreateView,
-    SMTSupplementReportUpdateView, SMTSupplementReportDetailView, SMTSupplementReportDeleteView,
-    SMTRDSampleSupplementReportCreateView, SMTRDSampleSupplementReportUpdateView,
-    OperatorRDSampleSupplementReportCreateView,
-    approve_report, reject_report
-)
+
 from .views.completed_workorder_views import (
     CompletedWorkOrderListView, CompletedWorkOrderDetailView,
     transfer_workorder_to_completed, batch_transfer_completed_workorders
@@ -142,60 +134,8 @@ urlpatterns = [
     # 填報作業管理首頁
     path("fill_work/", include(('workorder.fill_work.urls', 'fill_work'), namespace='fill_work')),
     
-    # 備用報工管理首頁（保留向後相容）
-    path("backup_report/", BackupReportIndexView.as_view(), name="backup_report_index"),
-    
-    # 作業員補登報工功能（備用）
-    path("backup_report/operator/supplement/", OperatorSupplementReportListView.as_view(), name="operator_supplement_report_index"),
-    path("backup_report/operator/supplement/create/", OperatorSupplementReportCreateView.as_view(), name="operator_supplement_report_create"),
-    path("backup_report/operator/supplement/edit/<int:pk>/", OperatorSupplementReportUpdateView.as_view(), name="operator_supplement_report_edit"),
-    path("backup_report/operator/supplement/detail/<int:pk>/", OperatorSupplementReportDetailView.as_view(), name="operator_supplement_report_detail"),
-    path("backup_report/operator/supplement/delete/<int:pk>/", OperatorSupplementReportDeleteView.as_view(), name="operator_supplement_report_delete"),
-    
-    # 作業員RD樣品補登報工（備用）
-    path("backup_report/operator/rd_sample_supplement/create/", OperatorRDSampleSupplementReportCreateView.as_view(), name="operator_rd_sample_supplement_create"),
-    
-    # 作業員補登報工批量匯入（備用）
-    path("backup_report/operator/supplement/batch/", import_views.operator_report_import_page, name="operator_supplement_batch"),
-    path("backup_report/operator/supplement/batch/file/", import_views.operator_report_import_file, name="operator_supplement_batch_file"),
-    path("backup_report/operator/supplement/batch/template/", import_views.download_import_template, name="operator_supplement_batch_template"),
-    path("backup_report/operator/supplement/batch/export/", import_views.operator_report_export, name="operator_supplement_batch_export"),
-    
-    # SMT 補登報工（備用）
-    path("backup_report/smt/supplement/", SMTSupplementReportListView.as_view(), name="smt_supplement_report_index"),
-    path("backup_report/smt/supplement/create/", SMTSupplementReportCreateView.as_view(), name="smt_supplement_report_create"),
-    path("backup_report/smt/supplement/edit/<int:pk>/", SMTSupplementReportUpdateView.as_view(), name="smt_supplement_report_edit"),
-    path("backup_report/smt/supplement/delete/<int:pk>/", SMTSupplementReportDeleteView.as_view(), name="smt_supplement_report_delete"),
-    path("backup_report/smt/supplement/detail/<int:pk>/", SMTSupplementReportDetailView.as_view(), name="smt_supplement_report_detail"),
-    
-    # SMT RD 樣品（備用）
-    path("backup_report/smt/rd_sample/create/", SMTRDSampleSupplementReportCreateView.as_view(), name="smt_rd_sample_report_create"),
-    path("backup_report/smt/rd_sample/edit/<int:pk>/", SMTRDSampleSupplementReportUpdateView.as_view(), name="smt_rd_sample_report_edit"),
-    
-    # 報工核准/駁回（備用）
-    path("backup_report/approve/<int:report_id>/", approve_report, name="approve_report"),
-    path("backup_report/reject/<int:report_id>/", reject_report, name="reject_report"),
-    
-    # 舊函式式視圖向後相容（備用路徑）
-    path("backup_report/operator/supplement/approve/<int:report_id>/", workorder_views.operator_supplement_report_approve, name="operator_supplement_report_approve"),
-    path("backup_report/operator/supplement/reject/<int:report_id>/", workorder_views.operator_supplement_report_reject, name="operator_supplement_report_reject"),
-    # 移除重複的路由，使用新的 import_views 版本
-    # path("backup_report/operator/supplement/batch/", workorder_views.operator_supplement_batch, name="operator_supplement_batch"),
-    # path("backup_report/operator/supplement/batch/", workorder_views.operator_supplement_batch, name="operator_supplement_batch"),
-    path("backup_report/operator/supplement/export/", workorder_views.operator_supplement_export, name="operator_supplement_export"),
-    path("backup_report/operator/supplement/template/", workorder_views.operator_supplement_template, name="operator_supplement_template"),
-    path("backup_report/smt/supplement/approve/<int:report_id>/", workorder_views.smt_supplement_report_approve, name="smt_supplement_report_approve"),
-    path("backup_report/smt/supplement/reject/<int:report_id>/", workorder_views.smt_supplement_report_reject, name="smt_supplement_report_reject"),
-    path("backup_report/smt/supplement/batch/", workorder_views.smt_supplement_batch, name="smt_supplement_batch"),
-
-    # 備用：即時報工與主管頁
-    path("backup_report/operator/on_site/", workorder_views.operator_on_site_report, name="operator_on_site_report"),
-    path("backup_report/smt/on_site/", workorder_views.smt_on_site_report, name="smt_on_site_report"),
-    path("backup_report/supervisor/", workorder_views.supervisor_index, name="supervisor_index"),
-
     # 主管功能子模組（原路徑保留）
     path("supervisor/", include('workorder.supervisor.urls')),
-    path("backup_report/approved/", workorder_views.approved_reports_list, name="approved_reports_list"),
     
     # 系統維護：清除數據（管理員專用）
     path("clear-data/", workorder_views.clear_data, name="clear_data"),

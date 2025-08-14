@@ -280,6 +280,39 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
             workorder_logger.error(f"獲取工單 {workorder.order_number} 完工摘要失敗: {str(e)}")
             context["completion_summary"] = {'error': '獲取完工摘要失敗'}
 
+        # 計算出貨包裝累計數量（良品+不良品，用於顯示）
+        try:
+            from workorder.models import WorkOrderProductionDetail
+            from django.db.models import Sum
+            packaging_reports = WorkOrderProductionDetail.objects.filter(
+                workorder_production__workorder=workorder,
+                process_name="出貨包裝"
+            )
+            
+            # 計算良品數量
+            good_quantity = packaging_reports.aggregate(
+                total=Sum('work_quantity')
+            )['total'] or 0
+            
+            # 計算不良品數量
+            defect_quantity = packaging_reports.aggregate(
+                total=Sum('defect_quantity')
+            )['total'] or 0
+            
+            # 總數量 = 良品 + 不良品
+            packaging_quantity = good_quantity + defect_quantity
+            
+            context["packaging_quantity"] = packaging_quantity
+            context["packaging_good_quantity"] = good_quantity
+            context["packaging_defect_quantity"] = defect_quantity
+            context["can_complete"] = packaging_quantity >= workorder.quantity
+        except Exception as e:
+            workorder_logger.error(f"計算出貨包裝數量失敗: {str(e)}")
+            context["packaging_quantity"] = 0
+            context["packaging_good_quantity"] = 0
+            context["packaging_defect_quantity"] = 0
+            context["can_complete"] = False
+
         return context
 
 class WorkOrderCreateView(LoginRequiredMixin, CreateView):

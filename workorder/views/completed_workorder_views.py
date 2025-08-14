@@ -54,6 +54,22 @@ class CompletedWorkOrderListView(LoginRequiredMixin, ListView):
         queryset = self.get_queryset()
         context['total_completed'] = queryset.count()
         
+        # 為每個工單添加公司名稱
+        try:
+            from erp_integration.models import CompanyConfig
+            company_configs = {config.company_code: config.company_name 
+                             for config in CompanyConfig.objects.all()}
+            
+            for workorder in context['completed_workorders']:
+                workorder.company_name_display = (
+                    workorder.company_name or 
+                    company_configs.get(workorder.company_code, workorder.company_code)
+                )
+        except Exception:
+            # 如果查詢公司配置失敗，使用公司代號作為備用
+            for workorder in context['completed_workorders']:
+                workorder.company_name_display = workorder.company_code
+        
         return context
 
 
@@ -70,6 +86,20 @@ class CompletedWorkOrderDetailView(LoginRequiredMixin, DetailView):
         """添加上下文資料，包括工序統計和所有報工記錄"""
         context = super().get_context_data(**kwargs)
         completed_workorder = self.get_object()
+        
+        # 獲取公司名稱
+        company_name = completed_workorder.company_name or '-'
+        if not company_name or company_name == '-':
+            try:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(
+                    company_code=completed_workorder.company_code
+                ).first()
+                if company_config:
+                    company_name = company_config.company_name
+            except Exception:
+                pass
+        context['company_name'] = company_name
         
         # 計算已完成工序數量
         completed_processes_count = completed_workorder.processes.filter(status='completed').count()

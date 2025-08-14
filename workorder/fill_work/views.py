@@ -14,6 +14,7 @@ from django.forms import ModelForm
 from django import forms
 from datetime import datetime, time
 from decimal import Decimal
+from django.conf import settings
 from mes_config.date_utils import get_today_string, convert_date_for_html_input, normalize_date_string
 from mes_config.custom_fields import smart_time_field
 from django.views.decorators.http import require_POST
@@ -2174,10 +2175,45 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        
+        # 使用與 get_queryset 相同的過濾邏輯來計算統計資料
+        from datetime import datetime
         base_qs = FillWork.objects.filter(approval_status='pending')
+        
+        # 應用相同的過濾條件
+        operator = self.request.GET.get('operator', '').strip()
+        workorder = self.request.GET.get('workorder', '').strip()
+        product_id = self.request.GET.get('product_id', '').strip()
+        operation = self.request.GET.get('operation', '').strip()
+        start_date = self.request.GET.get('start_date', '').strip()
+        end_date = self.request.GET.get('end_date', '').strip()
+        
+        if operator:
+            base_qs = base_qs.filter(operator__icontains=operator)
+        if workorder:
+            base_qs = base_qs.filter(workorder__icontains=workorder)
+        if product_id:
+            base_qs = base_qs.filter(product_id__icontains=product_id)
+        if operation:
+            base_qs = base_qs.filter(Q(operation__icontains=operation) | Q(process__name__icontains=operation))
+        if start_date:
+            try:
+                d1 = datetime.strptime(start_date, '%Y-%m-%d').date()
+                base_qs = base_qs.filter(work_date__gte=d1)
+            except ValueError:
+                pass
+        if end_date:
+            try:
+                d2 = datetime.strptime(end_date, '%Y-%m-%d').date()
+                base_qs = base_qs.filter(work_date__lte=d2)
+            except ValueError:
+                pass
+        
+        # 計算過濾後的統計資料
         context['total_count'] = base_qs.count()
         context['operator_count'] = base_qs.exclude(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).count()
         context['smt_count'] = base_qs.filter(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).count()
+        
         # 回填查詢值
         request_get = self.request.GET
         context['filter_operator'] = request_get.get('operator', '').strip()
@@ -2186,6 +2222,23 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
         context['filter_operation'] = request_get.get('operation', '').strip()
         context['filter_start_date'] = request_get.get('start_date', '').strip()
         context['filter_end_date'] = request_get.get('end_date', '').strip()
+        
+        # 加入除錯資訊（僅在開發環境）
+        if settings.DEBUG:
+            context['debug_info'] = {
+                'total_records': context['total_count'],
+                'current_page': context.get('page_obj', {}).number if context.get('page_obj') else 1,
+                'total_pages': context.get('page_obj', {}).paginator.num_pages if context.get('page_obj') else 1,
+                'filters_applied': {
+                    'operator': operator,
+                    'workorder': workorder,
+                    'product_id': product_id,
+                    'operation': operation,
+                    'start_date': start_date,
+                    'end_date': end_date,
+                }
+            }
+        
         return context
 
 

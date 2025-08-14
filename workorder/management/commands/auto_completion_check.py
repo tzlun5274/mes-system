@@ -184,33 +184,41 @@ class Command(BaseCommand):
     
     def _get_packaging_quantity(self, workorder):
         """
-        獲取工單的出貨包裝合格品累積數量（從生產中工單詳情資料表）
+        獲取工單的出貨包裝累積數量（良品+不良品，從生產中工單詳情資料表）
         
         Args:
             workorder: WorkOrder 實例
             
         Returns:
-            int: 出貨包裝合格品累積總數量
+            int: 出貨包裝累積總數量（良品+不良品）
         """
         try:
-            # 從生產中工單詳情資料表查詢出貨包裝的合格品數量
+            # 從生產中工單詳情資料表查詢出貨包裝的報工記錄
             packaging_reports = WorkOrderProductionDetail.objects.filter(
                 workorder_production__workorder=workorder,
                 process_name="出貨包裝"
             )
             
-            # 計算合格品累積數量（只計算良品數量，不包含不良品）
-            total_quantity = packaging_reports.aggregate(
+            # 計算良品累積數量
+            good_quantity = packaging_reports.aggregate(
                 total=Sum('work_quantity')
             )['total'] or 0
             
+            # 計算不良品累積數量
+            defect_quantity = packaging_reports.aggregate(
+                total=Sum('defect_quantity')
+            )['total'] or 0
+            
+            # 總數量 = 良品 + 不良品
+            total_quantity = good_quantity + defect_quantity
+            
             # 記錄日誌
-            logger.info(f"工單 {workorder.order_number} 出貨包裝合格品累積數量: {total_quantity}")
+            logger.info(f"工單 {workorder.order_number} 出貨包裝累積數量: 良品={good_quantity}, 不良品={defect_quantity}, 總計={total_quantity}")
             
             return total_quantity
             
         except Exception as e:
-            logger.error(f"獲取工單 {workorder.order_number} 出貨包裝合格品累積數量時發生錯誤: {str(e)}")
+            logger.error(f"獲取工單 {workorder.order_number} 出貨包裝累積數量時發生錯誤: {str(e)}")
             return 0
     
     def _transfer_to_completed(self, workorder):
@@ -237,12 +245,25 @@ class Command(BaseCommand):
                     logger.warning(f"工單 {workorder.order_number} 已經轉寫過，刪除舊記錄重新轉寫")
                     existing_completed.delete()
                 
+                # 獲取公司名稱
+                company_name = ''
+                try:
+                    from erp_integration.models import CompanyConfig
+                    company_config = CompanyConfig.objects.filter(
+                        company_code=workorder.company_code
+                    ).first()
+                    if company_config:
+                        company_name = company_config.company_name
+                except Exception:
+                    pass
+                
                 # 建立已完工工單記錄
                 completed_workorder = CompletedWorkOrder.objects.create(
                     original_workorder_id=workorder.id,
                     order_number=workorder.order_number,
                     product_code=workorder.product_code,
                     company_code=workorder.company_code,
+                    company_name=company_name,
                     planned_quantity=workorder.quantity,
                     completed_quantity=workorder.quantity,  # 完工數量等於計劃數量
                     status='completed',

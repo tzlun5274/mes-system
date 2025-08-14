@@ -369,8 +369,8 @@
         </h2>
         <div class="info-grid">
             <div class="info-item">
-                <div class="info-label">公司代號</div>
-                <div class="info-value">{{ completed_workorder.company_code }}</div>
+                <div class="info-label">公司名稱</div>
+                <div class="info-value">{{ company_name }}</div>
             </div>
             <div class="info-item">
                 <div class="info-label">產品編號</div>
@@ -435,10 +435,6 @@
             <div class="progress-stat">
                 <div class="progress-stat-value">{{ completed_workorder.processes.count }}</div>
                 <div class="progress-stat-label">工序數量</div>
-            </div>
-            <div class="progress-stat">
-                <div class="progress-stat-value">{{ completed_processes_count }}</div>
-                <div class="progress-stat-label">已完成工序</div>
             </div>
             <div class="progress-stat">
                 <div class="progress-stat-value">{{ completed_workorder.total_report_count }}</div>

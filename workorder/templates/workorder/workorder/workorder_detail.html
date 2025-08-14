@@ -574,6 +574,21 @@
             </div>
             <div class="info-item">
                 <div class="info-label">
+                    <i class="fas fa-box me-1"></i>出貨包裝累計
+                </div>
+                <div class="info-value">
+                    <span class="{% if can_complete %}text-success{% else %}text-warning{% endif %}">
+                        {{ packaging_quantity|floatformat:0 }} / {{ workorder.quantity|floatformat:0 }}
+                    </span>
+                    <br>
+                    <small class="text-muted">
+                        良品: {{ packaging_good_quantity|floatformat:0 }} | 
+                        不良品: {{ packaging_defect_quantity|floatformat:0 }}
+                    </small>
+                </div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">
                     <i class="fas fa-info-circle me-1"></i>工單狀態
                 </div>
                 <div class="info-value">
@@ -1250,14 +1265,27 @@ function transferToCompleted() {
     if (confirm('確定要將此工單轉移到已完工模組嗎？轉移後將無法復原。')) {
         const workorderId = {{ workorder.id }};
         
+        // 取得 CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+        
+        if (!csrfToken) {
+            alert('無法取得安全驗證碼，請重新載入頁面後再試');
+            return;
+        }
+        
         fetch(`/workorder/completed/transfer/${workorderId}/`, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'X-CSRFToken': csrfToken,
                 'Content-Type': 'application/json'
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 alert('工單成功轉移到已完工模組！');
@@ -1268,8 +1296,8 @@ function transferToCompleted() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('網路錯誤，請重試');
+            console.error('轉移錯誤：', error);
+            alert('網路錯誤，請重試\n\n錯誤詳情：' + error.message);
         });
     }
 }
@@ -1278,14 +1306,33 @@ function forceCompleteWorkorder() {
     if (confirm('確定要強制完工此工單嗎？\n\n此操作將：\n1. 將工單狀態改為完工\n2. 將完成數量設為計劃數量（如果當前為0）\n3. 轉移所有資料到已完工工單模組\n\n此操作無法復原！')) {
         const workorderId = {{ workorder.id }};
         
+        // 取得 CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+        
+        if (!csrfToken) {
+            alert('無法取得安全驗證碼，請重新載入頁面後再試');
+            return;
+        }
+        
+        // 顯示載入中提示
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>處理中...';
+        button.disabled = true;
+        
         fetch(`/workorder/force-complete/${workorderId}/`, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'X-CSRFToken': csrfToken,
                 'Content-Type': 'application/json'
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 alert('工單強制完工成功！\n\n' + data.message);
@@ -1296,8 +1343,13 @@ function forceCompleteWorkorder() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('網路錯誤，請重試');
+            console.error('強制完工錯誤：', error);
+            alert('網路錯誤，請重試\n\n錯誤詳情：' + error.message);
+        })
+        .finally(() => {
+            // 恢復按鈕狀態
+            button.innerHTML = originalText;
+            button.disabled = false;
         });
     }
 }
@@ -1306,14 +1358,33 @@ function autoCompleteWorkorder() {
     if (confirm('確定要自動完工此工單嗎？\n\n此操作將：\n1. 檢查完工條件\n2. 如果達到條件，自動將工單標記為完工\n3. 轉移所有資料到已完工工單模組\n\n此操作無法復原！')) {
         const workorderId = {{ workorder.id }};
         
+        // 取得 CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+        
+        if (!csrfToken) {
+            alert('無法取得安全驗證碼，請重新載入頁面後再試');
+            return;
+        }
+        
+        // 顯示載入中提示
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>處理中...';
+        button.disabled = true;
+        
         fetch(`/workorder/auto-complete/${workorderId}/`, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'X-CSRFToken': csrfToken,
                 'Content-Type': 'application/json'
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 alert('工單自動完工成功！\n\n' + data.message);
@@ -1324,8 +1395,13 @@ function autoCompleteWorkorder() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('網路錯誤，請重試');
+            console.error('自動完工錯誤：', error);
+            alert('網路錯誤，請重試\n\n錯誤詳情：' + error.message);
+        })
+        .finally(() => {
+            // 恢復按鈕狀態
+            button.innerHTML = originalText;
+            button.disabled = false;
         });
     }
 }

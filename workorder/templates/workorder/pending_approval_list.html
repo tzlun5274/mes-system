@@ -93,7 +93,7 @@
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'workorder:backup_report_index' %}">備用報工管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'workorder:fill_work:fill_work_index' %}">填報管理</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'workorder:supervisor_report_index' %}">主管功能</a></li>
                         <li class="breadcrumb-item active" aria-current="page">待審核列表</li>
                     </ol>
@@ -336,10 +336,10 @@ function viewDetail(reportType, reportId) {
             url = `/workorder/supervisor/report_detail/${reportId}/`;
             break;
         case 'operator':
-            url = `/workorder/backup_report/operator/supplement/detail/${reportId}/`;
+            url = `/workorder/fill_work/detail/${reportId}/`;
             break;
         case 'smt':
-            url = `/workorder/backup_report/smt/supplement/detail/${reportId}/`;
+            url = `/workorder/fill_work/detail/${reportId}/`;
             break;
     }
     if (url) {
@@ -401,10 +401,10 @@ function confirmApprove() {
             url = `/workorder/supervisor/approve_report/${currentReportId}/`;
             break;
         case 'operator':
-            url = `/workorder/backup_report/operator/supplement/approve/${currentReportId}/`;
+            url = `/workorder/fill_work/approve/${currentReportId}/`;
             break;
         case 'smt':
-            url = `/workorder/backup_report/smt/supplement/approve/${currentReportId}/`;
+            url = `/workorder/fill_work/approve/${currentReportId}/`;
             break;
     }
     
@@ -460,10 +460,10 @@ function confirmReject() {
             url = `/workorder/supervisor/reject_report/${currentReportId}/`;
             break;
         case 'operator':
-            url = `/workorder/backup_report/operator/supplement/reject/${currentReportId}/`;
+            url = `/workorder/fill_work/reject/${currentReportId}/`;
             break;
         case 'smt':
-            url = `/workorder/backup_report/smt/supplement/reject/${currentReportId}/`;
+            url = `/workorder/fill_work/reject/${currentReportId}/`;
             break;
     }
     
