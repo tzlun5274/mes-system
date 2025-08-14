@@ -65,7 +65,10 @@ def auto_backup_database():
 
         try:
             schedule = BackupSchedule.objects.get(id=1)
-            retain_count = schedule.retain_count
+            retention_days = schedule.retention_days
+            cutoff_date = timezone.now() - datetime.timedelta(days=retention_days)
+            
+            # 清理超過保留天數的備份文件
             backup_files = [
                 f
                 for f in os.listdir(backup_dir)
@@ -73,15 +76,25 @@ def auto_backup_database():
                 and f.startswith("auto_backup_")
                 and f.endswith(".sql")
             ]
-            backup_files.sort(
-                key=lambda x: os.path.getmtime(os.path.join(backup_dir, x))
-            )
-            while len(backup_files) > retain_count:
-                oldest_file = backup_files.pop(0)
-                os.remove(os.path.join(backup_dir, oldest_file))
-                logger.info(f"刪除舊備份文件以符合保留份數: {oldest_file}")
+            
+            deleted_count = 0
+            for backup_file in backup_files:
+                backup_path = os.path.join(backup_dir, backup_file)
+                file_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(backup_path))
+                # 將文件時間轉換為時區感知的datetime
+                file_mtime = timezone.make_aware(file_mtime)
+                if file_mtime < cutoff_date:
+                    os.remove(backup_path)
+                    deleted_count += 1
+                    logger.info(f"刪除超過保留天數的備份文件: {backup_file}")
+            
+            if deleted_count > 0:
+                logger.info(f"清理完成，共刪除 {deleted_count} 個超過 {retention_days} 天的備份文件")
+            else:
+                logger.info(f"沒有需要清理的備份文件（保留天數：{retention_days}天）")
+                
         except BackupSchedule.DoesNotExist:
-            logger.error("未找到自動備份排程設定，無法管理保留份數")
+            logger.error("未找到自動備份排程設定，無法管理保留天數")
     except Exception as e:
         logger.error(f"自動資料庫備份失敗: {str(e)}")
 

@@ -21,7 +21,13 @@ urlpatterns = [
     path('detail/<int:pk>/', views.DispatchDetailView.as_view(), name='dispatch_detail'),
     path('delete/<int:pk>/', views.DispatchDeleteView.as_view(), name='dispatch_delete'),
     
+    # 批量派工
+    path('bulk/', views.bulk_dispatch_view, name='bulk_dispatch'),
+    
+    # 匯出功能
+    path('export/', views.export_dispatches, name='export_dispatches'),
+    
     # AJAX 端點
     path('api/work-order-info/', views.get_work_order_info, name='get_work_order_info'),
-    path('api/bulk-dispatch/', views.bulk_dispatch, name='bulk_dispatch'),
+    path('api/update-status/<int:pk>/', views.update_dispatch_status, name='update_dispatch_status'),
 ] 

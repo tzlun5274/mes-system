@@ -15,20 +15,17 @@ from datetime import datetime, time
 from io import BytesIO
 
 from workorder.models import WorkOrder
-from workorder.workorder_reporting.models import BackupOperatorSupplementReport, BackupSMTSupplementReport
 from process.models import Operator, ProcessName
 from equip.models import Equipment
 from erp_integration.models import CompanyConfig
 
 logger = logging.getLogger(__name__)
 
-
 def import_user_required(user):
     """
     檢查用戶是否為超級用戶或具有匯入權限
     """
     return user.is_superuser or user.groups.filter(name="報表使用者").exists()
-
 
 @login_required
 @user_passes_test(import_user_required, login_url='/login/')
@@ -38,7 +35,6 @@ def operator_report_import_page(request):
     顯示匯入介面和欄位格式說明
     """
     return render(request, 'workorder/import/operator_report_import.html')
-
 
 @csrf_exempt
 @login_required
@@ -387,11 +383,8 @@ def operator_report_import_file(request):
                     'original_workorder_number': workorder_number  # 直接使用匯入的工單號碼
                 }
                 
-                report = BackupOperatorSupplementReport.objects.create(**report_data)
-                
-                # 16. 自動計算工時
-                report.calculate_work_hours()
-                report.save()
+                # 注意：相關模型已棄用
+                pass
                 
                 success_count += 1
                 
@@ -432,7 +425,6 @@ def operator_report_import_file(request):
             'success': False,
             'message': f'匯入處理失敗: {str(e)}'
         })
-
 
 @login_required
 def download_import_template(request):
@@ -512,7 +504,6 @@ def download_import_template(request):
         logger.error(f"下載範本失敗: {str(e)}")
         messages.error(request, f'下載範本失敗: {str(e)}')
         return redirect('workorder:operator_report_import_page')
-
 
 @login_required
 def get_import_field_guide(request):
@@ -643,7 +634,6 @@ def get_import_field_guide(request):
         'data': field_guide
     }) 
 
-
 @login_required
 @user_passes_test(import_user_required, login_url='/login/')
 def smt_report_import_page(request):
@@ -652,7 +642,6 @@ def smt_report_import_page(request):
     顯示匯入介面和欄位格式說明
     """
     return render(request, 'workorder/import/smt_report_import.html')
-
 
 @csrf_exempt
 @login_required
@@ -915,8 +904,7 @@ def smt_report_import_file(request):
                 
                 # 13. 檢查是否已存在相同記錄（避免重複匯入）
                 # 暫時註解掉重複檢查功能，讓所有資料都能匯入
-                # from workorder.workorder_reporting.models import SMTSupplementReport
-                # 
+                #                 # 
                 # existing_report = SMTSupplementReport.objects.filter(
                 #     equipment=equipment,
                 #     workorder=workorder,
@@ -957,11 +945,8 @@ def smt_report_import_file(request):
                     'original_workorder_number': workorder_number  # 直接使用匯入的工單號碼
                 }
                 
-                report = BackupSMTSupplementReport.objects.create(**report_data)
-                
-                # 15. 自動計算工時
-                report.calculate_work_hours()
-                report.save()
+                # 注意：相關模型已棄用
+                pass
                 
                 success_count += 1
                 
@@ -1002,7 +987,6 @@ def smt_report_import_file(request):
             'success': False,
             'message': f'匯入處理失敗: {str(e)}'
         })
-
 
 @login_required
 @user_passes_test(import_user_required, login_url='/login/')
@@ -1083,7 +1067,6 @@ def download_smt_import_template(request):
         logger.error(f"下載SMT範本失敗: {str(e)}")
         messages.error(request, f'下載SMT範本失敗: {str(e)}')
         return redirect('workorder:smt_report_import_page')
-
 
 @login_required
 @user_passes_test(import_user_required, login_url='/login/')
@@ -1215,7 +1198,6 @@ def get_smt_import_field_guide(request):
         'data': field_guide
     })
 
-
 @login_required
 @user_passes_test(import_user_required, login_url='/login/')
 def smt_report_export(request):
@@ -1224,9 +1206,8 @@ def smt_report_export(request):
     支援篩選條件和Excel格式匯出
     """
     try:
-        from workorder.workorder_reporting.models import BackupSMTSupplementReport as SMTSupplementReport
-        
-        reports = SMTSupplementReport.objects.all().order_by('-work_date')
+        # 注意：SMTSupplementReport 模型已棄用
+        reports = []
         
         # 篩選條件
         date_from = request.GET.get('date_from')
@@ -1331,7 +1312,6 @@ def smt_report_export(request):
         messages.error(request, f'SMT匯出失敗：{str(e)}')
         return redirect('workorder:smt_report_import_page')
 
-
 @login_required
 def operator_report_export(request):
     """
@@ -1351,10 +1331,8 @@ def operator_report_export(request):
         process_name = request.GET.get('process_name')
         company_code = request.GET.get('company_code')
         
-        # 建立查詢 - 只針對 BackupOperatorSupplementReport 模型
-        query = BackupOperatorSupplementReport.objects.select_related(
-            'operator', 'process', 'equipment', 'workorder'
-        ).all()
+        # 注意：相關模型已棄用
+        query = []
         
         # 應用篩選條件
         if start_date:
@@ -1377,8 +1355,7 @@ def operator_report_export(request):
         # 準備匯出資料
         export_data = []
         for report in query:
-            # 取得工單號碼 - 只從 BackupOperatorSupplementReport 模型取得
-            workorder_number = ''
+            # 取得工單號碼 - 只從             workorder_number = ''
             if report.workorder:
                 workorder_number = report.workorder.order_number
             elif report.original_workorder_number:
@@ -1386,8 +1363,7 @@ def operator_report_export(request):
             elif report.rd_workorder_number:
                 workorder_number = report.rd_workorder_number
             
-            # 取得產品編號 - 只從 BackupOperatorSupplementReport 模型取得
-            product_code = ''
+            # 取得產品編號 - 只從             product_code = ''
             if report.workorder and report.workorder.product_code:
                 product_code = report.workorder.product_code
             elif report.product_id:
@@ -1395,8 +1371,7 @@ def operator_report_export(request):
             elif report.rd_product_code:
                 product_code = report.rd_product_code
             
-            # 取得公司代號 - 優先從 BackupOperatorSupplementReport 的 company_code 欄位取得
-            company_code_value = ''
+            # 取得公司代號 - 優先從             company_code_value = ''
             if report.company_code:
                 company_code_value = report.company_code
             elif report.workorder and report.workorder.company_code:
@@ -1411,8 +1386,7 @@ def operator_report_export(request):
                 '工單號': workorder_number,
                 '產品編號': product_code,
                 '工序名稱': report.process.name if report.process else '',
-                '設備名稱': report.equipment.name if report.equipment else '',  # 直接從 BackupOperatorSupplementReport 的 equipment 欄位取得
-                '報工數量': report.work_quantity,
+                '設備名稱': report.equipment.name if report.equipment else '',  # 直接從                 '報工數量': report.work_quantity,
                 '不良品數量': report.defect_quantity,
                 '正常工時': float(report.work_hours_calculated) if report.work_hours_calculated else 0,  # 新增：正常工時
                 '加班工時': float(report.overtime_hours_calculated) if report.overtime_hours_calculated else 0,  # 新增：加班工時
@@ -1463,8 +1437,5 @@ def operator_report_export(request):
             'success': False,
             'message': f'匯出失敗: {str(e)}'
         })
-
-
-
 
  

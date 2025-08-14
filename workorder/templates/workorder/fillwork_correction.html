@@ -1,0 +1,375 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}填報紀錄修正{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        transition: transform 0.2s;
+    }
+    .stats-card:hover {
+        transform: translateY(-2px);
+    }
+    .correction-preview {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .correction-item {
+        border-left: 4px solid #28a745;
+        padding-left: 15px;
+        margin-bottom: 10px;
+    }
+    .correction-type-card {
+        border-left: 4px solid #007bff;
+    }
+    .correction-type-card.type1 {
+        border-left-color: #28a745;
+    }
+    .correction-type-card.type2 {
+        border-left-color: #ffc107;
+    }
+    .correction-type-card.type3 {
+        border-left-color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-tools text-primary"></i>
+                填報紀錄修正
+            </h1>
+            <p class="text-muted mb-0">三種獨立修正類型，避免相互干擾</p>
+        </div>
+        <div>
+            <a href="{% url 'workorder:fillwork_consistency_check' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left"></i>
+                返回檢查頁面
+            </a>
+        </div>
+    </div>
+
+    <!-- 檢查時間 -->
+    <div class="alert alert-info">
+        <i class="fas fa-clock"></i>
+        最後檢查時間：<span id="checkTime">{{ check_time|date:"Y-m-d H:i:s" }}</span>
+    </div>
+
+    <!-- 三種修正類型 -->
+    <div class="row mb-4">
+        <!-- 類型1: 修復產品編號 -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card correction-type-card type1 shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">
+                        <i class="fas fa-tag"></i>
+                        類型1: 修復產品編號
+                    </h6>
+                    <small class="text-muted">公司代號+工單號碼一樣，修復產品編號</small>
+                </div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center mb-3">
+                        <div class="col mr-2">
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ analysis.type1_product.count }}
+                            </div>
+                            <div class="text-xs text-gray-600">可修正記錄</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-tag fa-2x text-success"></i>
+                        </div>
+                    </div>
+                    <div class="btn-group-vertical w-100">
+                        <button class="btn btn-sm btn-outline-success mb-1" onclick="showPreview('product_codes')">
+                            <i class="fas fa-eye"></i> 預覽修正
+                        </button>
+                        <button class="btn btn-sm btn-success" onclick="executeCorrection('product_codes')">
+                            <i class="fas fa-check"></i> 執行修正
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 類型2: 修復工單號碼 -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card correction-type-card type2 shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="fas fa-clipboard-list"></i>
+                        類型2: 修復工單號碼
+                    </h6>
+                    <small class="text-muted">公司代號+產品編號一樣，修復工單號碼</small>
+                </div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center mb-3">
+                        <div class="col mr-2">
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ analysis.type2_workorder.count }}
+                            </div>
+                            <div class="text-xs text-gray-600">可修正記錄</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-list fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                    <div class="btn-group-vertical w-100">
+                        <button class="btn btn-sm btn-outline-warning mb-1" onclick="showPreview('workorder_numbers')">
+                            <i class="fas fa-eye"></i> 預覽修正
+                        </button>
+                        <button class="btn btn-sm btn-warning" onclick="executeCorrection('workorder_numbers')">
+                            <i class="fas fa-check"></i> 執行修正
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 類型3: 修復公司代號 -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card correction-type-card type3 shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-danger">
+                        <i class="fas fa-building"></i>
+                        類型3: 修復公司代號
+                    </h6>
+                    <small class="text-muted">工單號碼+產品編號一樣，修復公司代號</small>
+                </div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center mb-3">
+                        <div class="col mr-2">
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ analysis.type3_company.count }}
+                            </div>
+                            <div class="text-xs text-gray-600">可修正記錄</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-building fa-2x text-danger"></i>
+                        </div>
+                    </div>
+                    <div class="btn-group-vertical w-100">
+                        <button class="btn btn-sm btn-outline-danger mb-1" onclick="showPreview('company_codes')">
+                            <i class="fas fa-eye"></i> 預覽修正
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="executeCorrection('company_codes')">
+                            <i class="fas fa-check"></i> 執行修正
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-chart-bar"></i>
+                        修正統計
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="h4 text-success">{{ analysis.type1_product.count }}</div>
+                                <div class="text-muted">修復產品編號</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="h4 text-warning">{{ analysis.type2_workorder.count }}</div>
+                                <div class="text-muted">修復工單號碼</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="h4 text-danger">{{ analysis.type3_company.count }}</div>
+                                <div class="text-muted">修復公司代號</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="h4 text-info">{{ analysis.total_records }}</div>
+                                <div class="text-muted">總記錄數</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修正預覽模態框 -->
+    <div class="modal fade" id="correctionPreviewModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-eye"></i>
+                        修正預覽
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="previewContent">
+                        <!-- 預覽內容將在這裡動態載入 -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">關閉</button>
+                    <button type="button" class="btn btn-success" id="confirmCorrectionBtn">
+                        <i class="fas fa-check"></i>
+                        確認修正
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentCorrectionType = '';
+
+function showPreview(correctionType) {
+    currentCorrectionType = correctionType;
+    
+    // 顯示修正預覽
+    $.ajax({
+        url: '{% url "workorder:fillwork_correction_ajax" %}',
+        method: 'POST',
+        data: {
+            action: 'preview',
+            correction_type: correctionType,
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        },
+        success: function(response) {
+            if (response.success) {
+                displayPreview(response.results, correctionType);
+                $('#correctionPreviewModal').modal('show');
+            } else {
+                alert('預覽失敗：' + response.error);
+            }
+        },
+        error: function() {
+            alert('預覽請求失敗');
+        }
+    });
+}
+
+function displayPreview(results, correctionType) {
+    let typeNames = {
+        'product_codes': '產品編號',
+        'workorder_numbers': '工單號碼',
+        'company_codes': '公司代號'
+    };
+    
+    let content = `
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            將會修正 <strong>${results.total_corrected}</strong> 筆記錄的${typeNames[correctionType]}
+        </div>
+        <div class="correction-preview">
+    `;
+    
+    if (results.corrections.length > 0) {
+        content += '<h6>修正清單：</h6>';
+        results.corrections.forEach(function(correction) {
+            content += `
+                <div class="correction-item">
+                    <strong>填報ID: ${correction.fillwork_id}</strong><br>
+            `;
+            
+            if (correctionType === 'product_codes') {
+                content += `
+                    工單: ${correction.workorder}<br>
+                    作業員: ${correction.operator}<br>
+                    產品編號: <span class="text-danger">${correction.old_product}</span> → <span class="text-success">${correction.new_product}</span><br>
+                    工作日期: ${correction.work_date}<br>
+                    <small class="text-muted">${correction.reason}</small>
+                `;
+            } else if (correctionType === 'workorder_numbers') {
+                content += `
+                    作業員: ${correction.operator}<br>
+                    產品編號: ${correction.product_code}<br>
+                    工單號碼: <span class="text-danger">${correction.old_workorder}</span> → <span class="text-success">${correction.new_workorder}</span><br>
+                    工作日期: ${correction.work_date}<br>
+                    <small class="text-muted">${correction.reason}</small>
+                `;
+            } else if (correctionType === 'company_codes') {
+                content += `
+                    工單: ${correction.workorder}<br>
+                    作業員: ${correction.operator}<br>
+                    產品編號: ${correction.product_code}<br>
+                    公司名稱: <span class="text-danger">${correction.old_company_name}</span> → <span class="text-success">${correction.new_company_name}</span><br>
+                    工作日期: ${correction.work_date}<br>
+                    <small class="text-muted">${correction.reason}</small>
+                `;
+            }
+            
+            content += '</div>';
+        });
+    }
+    
+    content += '</div>';
+    
+    if (results.errors.length > 0) {
+        content += `
+            <div class="alert alert-warning mt-3">
+                <h6>錯誤記錄：</h6>
+                <ul>
+        `;
+        results.errors.forEach(function(error) {
+            content += `<li>填報ID ${error.fillwork_id}: ${error.error}</li>`;
+        });
+        content += '</ul></div>';
+    }
+    
+    $('#previewContent').html(content);
+}
+
+function executeCorrection(correctionType) {
+    if (confirm('確定要執行修正嗎？此操作無法撤銷。')) {
+        $.ajax({
+            url: '{% url "workorder:fillwork_correction_ajax" %}',
+            method: 'POST',
+            data: {
+                action: 'execute',
+                correction_type: correctionType,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert('修正完成！' + response.message);
+                    location.reload();
+                } else {
+                    alert('修正失敗：' + response.error);
+                }
+            },
+            error: function() {
+                alert('修正請求失敗');
+            }
+        });
+    }
+}
+
+// 確認修正按鈕事件
+$('#confirmCorrectionBtn').click(function() {
+    if (currentCorrectionType) {
+        executeCorrection(currentCorrectionType);
+        $('#correctionPreviewModal').modal('hide');
+    }
+});
+</script>
+{% endblock %} 

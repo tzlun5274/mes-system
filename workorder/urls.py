@@ -6,7 +6,25 @@ from .supervisor import views as supervisor_views
 from .views.workorder_views import (
     WorkOrderListView, WorkOrderDetailView, WorkOrderCreateView, 
     WorkOrderUpdateView, WorkOrderDeleteView, CompanyOrderListView,
-    get_company_order_info
+    get_company_order_info, MesOrderListView, mes_orders_bulk_dispatch,
+    mes_order_dispatch, mes_order_delete, mes_orders_auto_dispatch,
+    mes_orders_set_auto_dispatch_interval, CreateMissingWorkOrdersView
+)
+from .views.fillwork_validation_views import (
+    FillWorkConsistencyCheckView, FillWorkConsistencyAjaxView,
+    MissingWorkOrdersView, ProductMismatchView, WorkorderMismatchView,
+    CompanyMismatchView, RDSampleStatisticsView
+)
+from .views.fillwork_correction_views import (
+    FillWorkCorrectionView, FillWorkCorrectionAjaxView,
+    FillWorkCorrectionAnalysisView, FillWorkCorrectionPreviewView,
+    execute_correction_view
+)
+from .views.workorder_clear_views import (
+    WorkOrderClearView, WorkOrderClearAjaxView
+)
+from .views.workorder_import_views import (
+    workorder_import_page, workorder_import_file, download_workorder_template
 )
 from .views.report_views import (
     ReportIndexView, BackupReportIndexView, OperatorSupplementReportListView, OperatorSupplementReportCreateView,
@@ -22,10 +40,7 @@ from .views.completed_workorder_views import (
     transfer_workorder_to_completed, batch_transfer_completed_workorders
 )
 from .views import api_views
-from .views.auto_allocation_views import (
-    auto_allocation_status, auto_allocation_settings, auto_allocation_execute,
-    auto_allocation_stop, auto_allocation_log, auto_allocation_summary
-)
+# 自動分配功能已移除
 from .views.auto_management_views import (
     AutoManagementConfigListView, AutoManagementConfigCreateView,
     AutoManagementConfigUpdateView, AutoManagementConfigDeleteView,
@@ -44,6 +59,8 @@ urlpatterns = [
     path("edit/<int:pk>/", WorkOrderUpdateView.as_view(), name="edit"),
     path("delete/<int:pk>/", WorkOrderDeleteView.as_view(), name="delete"),
     path("detail/<int:pk>/", WorkOrderDetailView.as_view(), name="detail"),
+    path("force-complete/<int:pk>/", workorder_views.force_complete_workorder, name="force_complete_workorder"),
+    path("auto-complete/<int:pk>/", workorder_views.auto_complete_workorder, name="auto_complete_workorder"),
     path("list/", WorkOrderListView.as_view(), name="list"),
     path("active/", workorder_views.active_workorders, name="active_workorders"),
     path("completion-check/", workorder_views.check_workorder_completion, name="completion_check"),
@@ -55,6 +72,31 @@ urlpatterns = [
     path("manual-convert-orders/", workorder_views.manual_convert_orders, name="manual_convert_orders"),
     path("selective-revert-orders/", workorder_views.selective_revert_orders, name="selective_revert_orders"),
     path("delete-pending-workorders/", workorder_views.delete_pending_workorders, name="delete_pending_workorders"),
+    path("create-missing-workorders/", CreateMissingWorkOrdersView.as_view(), name="create_missing_workorders"),
+    
+    # 填報紀錄相符性檢查
+    path("fillwork-consistency-check/", FillWorkConsistencyCheckView.as_view(), name="fillwork_consistency_check"),
+    path("fillwork-consistency-check/ajax/", FillWorkConsistencyAjaxView.as_view(), name="fillwork_consistency_check_ajax"),
+    path("missing-workorders/", MissingWorkOrdersView.as_view(), name="missing_workorders"),
+    path("product-mismatch/", ProductMismatchView.as_view(), name="product_mismatch"),
+    path("workorder-mismatch/", WorkorderMismatchView.as_view(), name="workorder_mismatch"),
+    path("company-mismatch/", CompanyMismatchView.as_view(), name="company_mismatch"),
+    path("rd-sample-statistics/", RDSampleStatisticsView.as_view(), name="rd_sample_statistics"),
+    
+    # 填報紀錄修正
+    path("fillwork-correction/", FillWorkCorrectionView.as_view(), name="fillwork_correction"),
+    path("fillwork-correction/ajax/", FillWorkCorrectionAjaxView.as_view(), name="fillwork_correction_ajax"),
+    path("fillwork-correction/analysis/", FillWorkCorrectionAnalysisView.as_view(), name="fillwork_correction_analysis"),
+    path("fillwork-correction/preview/", FillWorkCorrectionPreviewView.as_view(), name="fillwork_correction_preview"),
+    path("fillwork-correction/execute/", execute_correction_view, name="fillwork_correction_execute"),
+    
+    # 工單清除功能
+    path("clear-workorders/", WorkOrderClearView.as_view(), name="clear_workorders"),
+    path("clear-workorders-ajax/", WorkOrderClearAjaxView.as_view(), name="clear_workorders_ajax"),
+    
+    path("import/", workorder_import_page, name="workorder_import"),
+    path("import/file/", workorder_import_file, name="workorder_import_file"),
+    path("import/template/", download_workorder_template, name="download_workorder_template"),
     
     # 完工自動化管理
     path("completion-automation/", CompletionAutomationManagementView.as_view(), name="completion_automation_management"),
@@ -67,13 +109,7 @@ urlpatterns = [
     path("api/auto-management/execute/", execute_auto_function, name="execute_auto_function"),
     path("api/auto-management/toggle/", toggle_auto_function, name="toggle_auto_function"),
     
-    # 自動分配 API 路由
-    path("api/auto-allocation/status/", auto_allocation_status, name="auto_allocation_status"),
-    path("api/auto-allocation/settings/", auto_allocation_settings, name="auto_allocation_settings"),
-    path("api/auto-allocation/execute/", auto_allocation_execute, name="auto_allocation_execute"),
-    path("api/auto-allocation/stop/", auto_allocation_stop, name="auto_allocation_stop"),
-    path("api/auto-allocation/log/", auto_allocation_log, name="auto_allocation_log"),
-    path("api/auto-allocation/summary/", auto_allocation_summary, name="auto_allocation_summary"),
+    # 自動分配功能已移除
     
     # 已完工工單相關 URL
     path('completed/', CompletedWorkOrderListView.as_view(), name='completed_workorder_list'),
@@ -187,4 +223,10 @@ urlpatterns = [
     path("import/smt_report/export/", import_views.smt_report_export, name="smt_report_export"),
     
     # 其餘路由維持不變...
+    path("mes-orders/", MesOrderListView.as_view(), name="mes_orders"),
+    path("mes-orders/bulk-dispatch/", mes_orders_bulk_dispatch, name="mes_orders_bulk_dispatch"),
+    path("mes-orders/dispatch/", mes_order_dispatch, name="mes_order_dispatch"),
+    path("mes-orders/delete/", mes_order_delete, name="mes_order_delete"),
+    path("mes-orders/auto-dispatch/", mes_orders_auto_dispatch, name="mes_orders_auto_dispatch"),
+    path("mes-orders/set-auto-dispatch-interval/", mes_orders_set_auto_dispatch_interval, name="mes_orders_set_auto_dispatch_interval"),
 ]

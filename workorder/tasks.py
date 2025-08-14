@@ -19,14 +19,80 @@ import psycopg2
 workorder_logger = logging.getLogger("workorder")
 
 
-# 完工判斷任務已移除，避免資料汙染
-# @shared_task
-# def auto_check_workorder_completion():
-#     """
-#     自動檢查工單完工狀態
-#     定期檢查所有生產中工單是否達到完工條件
-#     """
-#     此任務已移除
+@shared_task
+def auto_check_workorder_completion():
+    """
+    自動檢查工單完工狀態
+    定期檢查所有生產中工單是否達到完工條件
+    支援兩種完工判斷方式：
+    1. 累計出貨包裝數量達到計劃數量
+    2. 手動勾選「已完工」
+    """
+    try:
+        workorder_logger.info("=== 開始自動檢查工單完工狀態 ===")
+        
+        # 導入完工判斷服務
+        from .services.completion_service import WorkOrderCompletionService
+        
+        # 取得所有生產中的工單
+        in_progress_workorders = WorkOrder.objects.filter(
+            status__in=['pending', 'in_progress', 'paused']
+        )
+        
+        if not in_progress_workorders.exists():
+            workorder_logger.info("沒有需要檢查的生產中工單")
+            return {
+                "status": "success",
+                "message": "沒有需要檢查的生產中工單",
+                "timestamp": timezone.now().isoformat(),
+            }
+        
+        completed_count = 0
+        checked_count = 0
+        
+        for workorder in in_progress_workorders:
+            try:
+                checked_count += 1
+                
+                # 檢查完工條件
+                completion_check = WorkOrderCompletionService.check_workorder_completion(workorder.id)
+                
+                if completion_check['can_complete']:
+                    workorder_logger.info(f"工單 {workorder.order_number} 達到完工條件：{completion_check['reason']}")
+                    
+                    # 執行自動完工
+                    completion_result = WorkOrderCompletionService.auto_complete_workorder(workorder.id)
+                    
+                    if completion_result['success']:
+                        completed_count += 1
+                        workorder_logger.info(f"工單 {workorder.order_number} 自動完工成功")
+                    else:
+                        workorder_logger.error(f"工單 {workorder.order_number} 自動完工失敗：{completion_result['message']}")
+                else:
+                    # 記錄未完工的詳細原因（僅在調試模式下）
+                    if workorder_logger.isEnabledFor(logging.DEBUG):
+                        workorder_logger.debug(f"工單 {workorder.order_number} 未達到完工條件：{completion_check['reason']}")
+                        
+            except Exception as e:
+                workorder_logger.error(f"檢查工單 {workorder.order_number} 完工狀態時發生錯誤：{str(e)}")
+        
+        workorder_logger.info(f"自動完工檢查完成，檢查 {checked_count} 個工單，完工 {completed_count} 個工單")
+        
+        return {
+            "status": "success",
+            "message": f"自動完工檢查完成，檢查 {checked_count} 個工單，完工 {completed_count} 個工單",
+            "timestamp": timezone.now().isoformat(),
+            "checked_count": checked_count,
+            "completed_count": completed_count
+        }
+        
+    except Exception as e:
+        workorder_logger.error(f"自動檢查工單完工狀態失敗：{str(e)}")
+        return {
+            "status": "error",
+            "message": f"自動檢查工單完工狀態失敗：{str(e)}",
+            "timestamp": timezone.now().isoformat(),
+        }
 
 
 @shared_task
@@ -187,8 +253,13 @@ def auto_convert_orders():
                     quantity=company_order.prodt_qty,  # 使用 prodt_qty
                     status="pending",
                     company_code=company_order.company_code,
+                    order_source="erp",  # 明確指定工單來源為 ERP
                 )
                 count_converted += 1
+                
+                # 標記製令單為已轉換
+                company_order.is_converted = True
+                company_order.save()
 
                 # 建立工序明細
                 try:
@@ -245,8 +316,10 @@ def auto_convert_orders():
                 )
 
         # 更新 CompanyOrder 的轉換狀態
+        # 只更新實際轉換成功的製令單
         if count_converted > 0:
-            CompanyOrder.objects.filter(is_converted=False).update(is_converted=True)
+            # 這裡不需要額外更新，因為在轉換過程中已經更新了 is_converted=True
+            pass
 
         workorder_logger.info(
             f"自動轉換完成，轉換 {count_converted} 筆製令單，建立 {count_processes_created} 個工序明細"
@@ -263,6 +336,76 @@ def auto_convert_orders():
         return {
             "status": "error",
             "message": f"自動轉換失敗：{str(e)}",
+            "timestamp": timezone.now().isoformat(),
+        }
+
+
+@shared_task
+def auto_batch_dispatch_orders():
+    """
+    自動批次派工任務
+    定期自動為所有未派工的工單建立派工單
+    從 SystemConfig 讀取自動批次派工間隔設定
+    """
+    try:
+        workorder_logger.info("=== 開始自動批次派工任務 ===")
+
+        # 讀取自動批次派工間隔設定（預設 60 分鐘）
+        auto_dispatch_interval = 60
+        try:
+            config = SystemConfig.objects.get(key="auto_batch_dispatch_interval")
+            auto_dispatch_interval = int(config.value)
+            workorder_logger.info(
+                f"讀取到自動批次派工間隔設定：{auto_dispatch_interval} 分鐘"
+            )
+        except SystemConfig.DoesNotExist:
+            workorder_logger.warning("未找到自動批次派工間隔設定，使用預設值 60 分鐘")
+
+        # 取得所有未派工的工單
+        from .workorder_dispatch.models import WorkOrderDispatch
+        undispatched_orders = WorkOrder.objects.exclude(
+            order_number__in=WorkOrderDispatch.objects.values_list("order_number", flat=True)
+        )
+        
+        if not undispatched_orders.exists():
+            workorder_logger.info("沒有需要派工的工單")
+            return {
+                "status": "success",
+                "message": "沒有需要派工的工單",
+                "timestamp": timezone.now().isoformat(),
+            }
+
+        created = 0
+        for wo in undispatched_orders:
+            try:
+                WorkOrderDispatch.objects.create(
+                    company_code=getattr(wo, "company_code", None),
+                    order_number=wo.order_number,
+                    product_code=wo.product_code,
+                    planned_quantity=wo.quantity,
+                    status="pending",
+                    created_by="system",
+                )
+                created += 1
+                workorder_logger.info(f"自動建立派工單：{wo.order_number}")
+            except Exception as e:
+                workorder_logger.error(f"建立派工單失敗 (工單: {wo.order_number}): {e}")
+
+        workorder_logger.info(
+            f"自動批次派工完成，共建立 {created} 筆派工單"
+        )
+
+        return {
+            "status": "success",
+            "message": f"自動批次派工完成，共建立 {created} 筆派工單，間隔設定：{auto_dispatch_interval} 分鐘",
+            "timestamp": timezone.now().isoformat(),
+        }
+
+    except Exception as e:
+        workorder_logger.error(f"自動批次派工失敗：{str(e)}")
+        return {
+            "status": "error",
+            "message": f"自動批次派工失敗：{str(e)}",
             "timestamp": timezone.now().isoformat(),
         }
 

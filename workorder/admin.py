@@ -9,9 +9,7 @@ from .models import (
 )
 
 # 導入子模組的模型
-from .workorder_reporting.models import BackupSMTSupplementReport, BackupOperatorSupplementReport
-from django.utils import timezone
-
+# from django.utils import timezone
 
 # 將工單管理模型註冊到 Django 後台，方便管理
 @admin.register(WorkOrder)
@@ -28,7 +26,6 @@ class WorkOrderAdmin(admin.ModelAdmin):
     search_fields = ["order_number", "product_code", "status"]
     ordering = ["-created_at"]
 
-
 @admin.register(WorkOrderProcess)
 class WorkOrderProcessAdmin(admin.ModelAdmin):
     list_display = [
@@ -42,14 +39,12 @@ class WorkOrderProcessAdmin(admin.ModelAdmin):
     list_filter = ["status", "step_order"]
     search_fields = ["workorder__order_number", "process_name"]
 
-
 @admin.register(WorkOrderProcessLog)
 class WorkOrderProcessLogAdmin(admin.ModelAdmin):
     list_display = ["workorder_process", "action", "created_at"]
     list_filter = ["action", "created_at"]
     search_fields = ["workorder_process__workorder__order_number"]
     ordering = ["-created_at"]
-
 
 @admin.register(WorkOrderAssignment)
 class WorkOrderAssignmentAdmin(admin.ModelAdmin):
@@ -64,22 +59,9 @@ class WorkOrderAssignmentAdmin(admin.ModelAdmin):
     search_fields = ["workorder__order_number", "equipment_id", "operator_id"]
     ordering = ["-assigned_at"]
 
-
-
-
-
-
-
-
-
-
-
-
-
 # ============================================================================
 # 重新設計的工單模組 Admin 管理介面
 # ============================================================================
-
 
 @admin.register(WorkOrderProduction)
 class WorkOrderProductionAdmin(admin.ModelAdmin):
@@ -96,7 +78,6 @@ class WorkOrderProductionAdmin(admin.ModelAdmin):
     search_fields = ["workorder__order_number", "status", "current_process"]
     ordering = ["-created_at"]
     readonly_fields = ["created_at", "updated_at"]
-
 
 @admin.register(WorkOrderProductionDetail)
 class WorkOrderProductionDetailAdmin(admin.ModelAdmin):
@@ -127,6 +108,4 @@ class WorkOrderProductionDetailAdmin(admin.ModelAdmin):
     ]
     ordering = ["-report_date", "-report_time"]
     readonly_fields = ["created_at", "updated_at", "created_by"]
-
-
 

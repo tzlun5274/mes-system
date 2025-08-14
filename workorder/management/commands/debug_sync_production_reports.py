@@ -6,12 +6,11 @@
 from django.core.management.base import BaseCommand
 from workorder.services import ProductionReportSyncService
 from workorder.models import WorkOrderProduction, WorkOrderProductionDetail
-from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
+from workorder.models import CompletedProductionReport as OperatorSupplementReport
 import logging
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
-
 
 class Command(BaseCommand):
     help = '調試版：將所有已核准的報工記錄複製到生產中工單詳情資料表'

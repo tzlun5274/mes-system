@@ -17,7 +17,7 @@ django.setup()
 from django.contrib.auth.models import User
 from django.utils import timezone
 from workorder.models import WorkOrder, WorkOrderProcess
-from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
+from workorder.models import CompletedProductionReport as OperatorSupplementReport
 from workorder.services.completion_service import WorkOrderCompletionService
 
 
@@ -75,21 +75,21 @@ def demo_packaging_quantity_calculation(workorder, user):
     print(f"1. 沒有報工記錄時: {quantity}")
     
     # 測試2: 建立未核准的報工記錄
-            # 需要先建立或獲取出貨包裝工序
-        from process.models import ProcessName
-        packaging_process, _ = ProcessName.objects.get_or_create(
-            name='出貨包裝',
-            defaults={'description': '出貨包裝工序'}
-        )
+    # 需要先建立或獲取出貨包裝工序
+    from process.models import ProcessName
+    packaging_process, _ = ProcessName.objects.get_or_create(
+        name='出貨包裝',
+        defaults={'description': '出貨包裝工序'}
+    )
         
-        OperatorSupplementReport.objects.create(
-            workorder=workorder,
-            operator=user,
-            process=packaging_process,
-            work_date=timezone.now().date(),
-            work_quantity=50,
-            approval_status='pending'
-        )
+    OperatorSupplementReport.objects.create(
+        workorder=workorder,
+        operator=user,
+        process=packaging_process,
+        work_date=timezone.now().date(),
+        work_quantity=50,
+        approval_status='pending'
+    )
     quantity = WorkOrderCompletionService._get_packaging_quantity(workorder)
     print(f"2. 只有未核准報工記錄時: {quantity}")
     

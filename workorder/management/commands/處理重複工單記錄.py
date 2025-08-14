@@ -6,11 +6,10 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from workorder.models import WorkOrder, WorkOrderProductionDetail
-from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
+from workorder.models import CompletedProductionReport as OperatorSupplementReport
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 class Command(BaseCommand):
     help = '處理重複的工單記錄，將錯誤格式的記錄合併到正確格式的記錄中'

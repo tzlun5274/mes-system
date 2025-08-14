@@ -421,10 +421,75 @@
     .stats-table tbody tr:hover {
         background-color: #f8f9fa;
     }
+    
+    /* 完工判斷區域樣式 */
+    .completion-section {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+    }
+    
+    .completion-section h4 {
+        color: #333;
+        font-weight: 600;
+        margin-bottom: 15px;
+        font-size: 1.2rem;
+    }
+    
+    .completion-status .alert {
+        border-radius: 6px;
+        padding: 12px 15px;
+        margin-bottom: 15px;
+    }
+    
+    .completion-details {
+        background-color: #f8f9fa;
+        border-radius: 6px;
+        padding: 15px;
+    }
+    
+    .completion-details h6 {
+        color: #495057;
+        font-weight: 600;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+    }
+    
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+    
+    .detail-item .label {
+        color: #6c757d;
+        font-weight: 500;
+        font-size: 0.85rem;
+    }
+    
+    .detail-item .value {
+        color: #333;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .completion-actions {
+        text-align: center;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container-fluid workorder-detail-container">
     <!-- 頁面標題區域 -->
     <div class="page-header">
@@ -443,6 +508,10 @@
                 {% if workorder.status == 'completed' %}
                 <button type="button" class="btn btn-success" onclick="transferToCompleted()">
                     <i class="fas fa-arrow-right me-1"></i>轉移到已完工
+                </button>
+                {% elif workorder.status != 'completed' and user.is_staff %}
+                <button type="button" class="btn btn-warning" onclick="forceCompleteWorkorder()">
+                    <i class="fas fa-check-double me-1"></i>強制完工
                 </button>
                 {% endif %}
                 <nav aria-label="breadcrumb">
@@ -549,6 +618,79 @@
             </div>
         </div>
     </div>
+
+    <!-- 完工判斷區域 -->
+    {% if completion_summary and not completion_summary.error %}
+    <div class="completion-section">
+        <h4>
+            <i class="fas fa-clipboard-check text-primary me-2"></i>
+            完工判斷
+        </h4>
+        
+        <div class="completion-status">
+            {% if completion_summary.completion_status.can_complete %}
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>可以完工！</strong> 此工單已達到完工條件
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                <i class="fas fa-clock me-2"></i>
+                <strong>尚未完工</strong> {{ completion_summary.completion_status.reason }}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="completion-details">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-box me-1"></i>出貨包裝資訊</h6>
+                    <div class="detail-item">
+                        <span class="label">出貨包裝數量：</span>
+                        <span class="value">{{ completion_summary.packaging_info.packaging_quantity|floatformat:0 }} / {{ completion_summary.packaging_info.threshold_quantity|floatformat:0 }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">完成率：</span>
+                        <span class="value">{{ completion_summary.packaging_info.completion_rate|floatformat:1 }}%</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">閾值設定：</span>
+                        <span class="value">{{ completion_summary.config.packaging_quantity_threshold|floatformat:0 }}%</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-tasks me-1"></i>工序完成狀況</h6>
+                    <div class="detail-item">
+                        <span class="label">總工序數：</span>
+                        <span class="value">{{ completion_summary.completion_status.details.total_processes }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">已完成工序：</span>
+                        <span class="value">{{ completion_summary.completion_status.details.completed_processes }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">出貨包裝工序：</span>
+                        <span class="value">
+                            {% if completion_summary.completion_status.details.packaging_process_exists %}
+                            <i class="fas fa-check text-success"></i> 已設定
+                            {% else %}
+                            <i class="fas fa-times text-danger"></i> 未設定
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if completion_summary.completion_status.can_complete and user.is_staff %}
+        <div class="completion-actions mt-3">
+            <button type="button" class="btn btn-success" onclick="autoCompleteWorkorder()">
+                <i class="fas fa-magic me-1"></i>自動完工
+            </button>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
 
     <!-- 進度條 -->
     <div class="progress-section">
@@ -746,7 +888,7 @@
                         </tbody>
                         <tfoot class="table-dark">
                             <tr>
-                                <td colspan="6" class="text-end fw-bold">
+                                <td colspan="7" class="text-end fw-bold">
                                     <strong>總計：</strong>
                                 </td>
                                 <td class="text-center">
@@ -757,7 +899,7 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td colspan="6" class="text-end fw-bold">
+                                <td colspan="7" class="text-end fw-bold">
                                     <strong>全部總時數：</strong>
                                 </td>
                                 <td colspan="2" class="text-center">
@@ -1123,6 +1265,62 @@ function transferToCompleted() {
                 window.location.href = `/workorder/completed/${data.completed_workorder_id}/`;
             } else {
                 alert('轉移失敗：' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('網路錯誤，請重試');
+        });
+    }
+}
+
+function forceCompleteWorkorder() {
+    if (confirm('確定要強制完工此工單嗎？\n\n此操作將：\n1. 將工單狀態改為完工\n2. 將完成數量設為計劃數量（如果當前為0）\n3. 轉移所有資料到已完工工單模組\n\n此操作無法復原！')) {
+        const workorderId = {{ workorder.id }};
+        
+        fetch(`/workorder/force-complete/${workorderId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('工單強制完工成功！\n\n' + data.message);
+                // 重新載入頁面以顯示更新後的狀態
+                location.reload();
+            } else {
+                alert('強制完工失敗：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('網路錯誤，請重試');
+        });
+    }
+}
+
+function autoCompleteWorkorder() {
+    if (confirm('確定要自動完工此工單嗎？\n\n此操作將：\n1. 檢查完工條件\n2. 如果達到條件，自動將工單標記為完工\n3. 轉移所有資料到已完工工單模組\n\n此操作無法復原！')) {
+        const workorderId = {{ workorder.id }};
+        
+        fetch(`/workorder/auto-complete/${workorderId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('工單自動完工成功！\n\n' + data.message);
+                // 重新載入頁面以顯示更新後的狀態
+                location.reload();
+            } else {
+                alert('自動完工失敗：' + data.message);
             }
         })
         .catch(error => {

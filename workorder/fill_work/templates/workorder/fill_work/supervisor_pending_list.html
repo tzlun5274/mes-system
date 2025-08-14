@@ -4,6 +4,47 @@
 
 {% block title %}主管待審核填報作業{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* 勾選框樣式 */
+    .form-check-input {
+        cursor: pointer;
+    }
+    
+    .form-check-input:checked {
+        background-color: #007bff;
+        border-color: #007bff;
+    }
+    
+    /* 表格行勾選效果 */
+    .table tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+    
+    /* 勾選行高亮 */
+    .table tbody tr.selected {
+        background-color: rgba(0, 123, 255, 0.1);
+    }
+    
+    /* 操作按鈕樣式 */
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    /* 禁用按鈕樣式 */
+    .btn.disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-3">
 	<div class="mb-2">
@@ -22,6 +63,7 @@
 	<h4 class="mb-3"><i class="fas fa-clipboard-check me-2"></i>主管待審核填報作業</h4>
 	<div class="mb-3 text-muted">共 {{ total_count }} 筆，其中 作業員 {{ operator_count }} 筆、SMT {{ smt_count }} 筆</div>
 	<form method="get" class="row g-2 align-items-end mb-3">
+		{% csrf_token %}
 		<div class="col-sm-2">
 			<label class="form-label">作業員</label>
 			<input type="text" name="operator" value="{{ filter_operator }}" class="form-control" placeholder="輸入作業員">
@@ -57,7 +99,7 @@
 				<button id="btnBatchDelete" class="btn btn-danger"><i class="fas fa-trash-alt"></i> 批次刪除</button>
 				{% endif %}
 				{% if request.user.is_superuser or request.user|has_group:'主管' %}
-				<button id="btnBatchApprove" class="btn btn-success"><i class="fas fa-check-double"></i> 批次核准</button>
+				<button id="btnBatchApprove" class="btn btn-success" disabled><i class="fas fa-check-double"></i> 批次核准</button>
 				{% endif %}
 			</div>
 		</div>
@@ -68,6 +110,9 @@
 				<table class="table table-hover table-sm mb-0">
 					<thead>
 						<tr>
+							<th style="width: 40px;">
+								<input type="checkbox" id="selectAll" class="form-check-input">
+							</th>
 							<th>作業員</th>
 							<th>工單號碼</th>
 							<th>產品編號</th>
@@ -86,6 +131,9 @@
 					<tbody>
 					{% for r in fill_works %}
 						<tr data-id="{{ r.id }}">
+							<td>
+								<input type="checkbox" class="form-check-input row-checkbox" value="{{ r.id }}">
+							</td>
 							<td>{{ r.operator }}</td>
 							<td>{{ r.workorder }}</td>
 							<td>{{ r.product_id }}</td>
@@ -105,7 +153,7 @@
 							</td>
 						</tr>
 					{% empty %}
-						<tr><td colspan="13" class="text-center text-muted py-3">目前沒有待審核的填報</td></tr>
+						<tr><td colspan="14" class="text-center text-muted py-3">目前沒有待審核的填報</td></tr>
 					{% endfor %}
 					</tbody>
 				</table>
@@ -116,6 +164,72 @@
 </div>
 
 <script>
+// 全選/取消全選功能
+document.getElementById('selectAll')?.addEventListener('change', function() {
+	const checkboxes = document.querySelectorAll('.row-checkbox');
+	checkboxes.forEach(checkbox => {
+		checkbox.checked = this.checked;
+		updateRowHighlight(checkbox);
+	});
+});
+
+// 單行勾選功能
+document.querySelectorAll('.row-checkbox').forEach(checkbox => {
+	checkbox.addEventListener('change', function() {
+		updateRowHighlight(this);
+		updateSelectAllState();
+	});
+});
+
+// 更新行高亮
+function updateRowHighlight(checkbox) {
+	const row = checkbox.closest('tr');
+	if (checkbox.checked) {
+		row.classList.add('selected');
+	} else {
+		row.classList.remove('selected');
+	}
+}
+
+// 更新全選狀態
+function updateSelectAllState() {
+	const checkboxes = document.querySelectorAll('.row-checkbox');
+	const selectAllCheckbox = document.getElementById('selectAll');
+	const checkedCount = document.querySelectorAll('.row-checkbox:checked').length;
+	const batchApproveBtn = document.getElementById('btnBatchApprove');
+	
+	if (checkedCount === 0) {
+		selectAllCheckbox.checked = false;
+		selectAllCheckbox.indeterminate = false;
+		// 禁用批次核准按鈕
+		if (batchApproveBtn) {
+			batchApproveBtn.disabled = true;
+			batchApproveBtn.classList.add('disabled');
+		}
+	} else if (checkedCount === checkboxes.length) {
+		selectAllCheckbox.checked = true;
+		selectAllCheckbox.indeterminate = false;
+		// 啟用批次核准按鈕
+		if (batchApproveBtn) {
+			batchApproveBtn.disabled = false;
+			batchApproveBtn.classList.remove('disabled');
+		}
+	} else {
+		selectAllCheckbox.checked = false;
+		selectAllCheckbox.indeterminate = true;
+		// 啟用批次核准按鈕
+		if (batchApproveBtn) {
+			batchApproveBtn.disabled = false;
+			batchApproveBtn.classList.remove('disabled');
+		}
+	}
+}
+
+// 取得勾選的ID
+function getSelectedIds() {
+	return Array.from(document.querySelectorAll('.row-checkbox:checked')).map(checkbox => checkbox.value);
+}
+
 // 取得目前列表的所有ID
 function getAllRowIds(){
 	return Array.from(document.querySelectorAll('tbody tr[data-id]')).map(tr=>tr.getAttribute('data-id'))
@@ -129,24 +243,101 @@ document.getElementById('btnDeleteAll')?.addEventListener('click', function(){
 
 // 批次刪除（超級管理員）
 document.getElementById('btnBatchDelete')?.addEventListener('click', async function(){
-	if(!confirm('是否批次刪除目前列表中的所有待審核資料？此動作無法復原。')) return;
-	const ids = getAllRowIds();
-	const delTpl = '{% url "workorder:fill_work:fill_work_delete" 0 %}';
-	for(const id of ids){
-		await fetch(delTpl.replace('/0/','/'+id+'/'));
+	const selectedIds = getSelectedIds();
+	if(selectedIds.length === 0) {
+		alert('請先勾選要刪除的記錄！');
+		return;
 	}
-	window.location.reload();
+	if(!confirm(`是否批次刪除已勾選的 ${selectedIds.length} 筆待審核資料？此動作無法復原。`)) return;
+	
+	// 顯示載入中提示
+	const button = this;
+	const originalText = button.innerHTML;
+	button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
+	button.disabled = true;
+	
+	try {
+		// 建立表單資料
+		const formData = new FormData();
+		selectedIds.forEach(id => {
+			formData.append('record_ids', id);
+		});
+		
+		// 發送批次刪除請求
+		const response = await fetch('{% url "workorder:fill_work:batch_delete_fill_work" %}', {
+			method: 'POST',
+			body: formData,
+			headers: {
+				'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value || '{{ csrf_token }}'
+			}
+		});
+		
+		if (response.ok) {
+			// 重新載入頁面以顯示更新後的狀態
+			window.location.reload();
+		} else {
+			throw new Error('網路請求失敗');
+		}
+	} catch (error) {
+		console.error('批次刪除失敗：', error);
+		alert('批次刪除失敗，請稍後再試');
+	} finally {
+		// 恢復按鈕狀態
+		button.innerHTML = originalText;
+		button.disabled = false;
+	}
 });
 
 // 批次核准（主管/超級管理員）
 document.getElementById('btnBatchApprove')?.addEventListener('click', async function(){
-	if(!confirm('是否批次核准目前列表中的所有待審核資料？')) return;
-	const ids = getAllRowIds();
-	const approveTpl = '{% url "workorder:fill_work:approve_fill_work" 0 %}';
-	for(const id of ids){
-		await fetch(approveTpl.replace('/0/','/'+id+'/'));
+	const selectedIds = getSelectedIds();
+	if(selectedIds.length === 0) {
+		alert('請先勾選要核准的記錄！');
+		return;
 	}
-	window.location.reload();
+	if(!confirm(`是否批次核准已勾選的 ${selectedIds.length} 筆待審核資料？`)) return;
+	
+	// 顯示載入中提示
+	const button = this;
+	const originalText = button.innerHTML;
+	button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
+	button.disabled = true;
+	
+	try {
+		// 建立表單資料
+		const formData = new FormData();
+		selectedIds.forEach(id => {
+			formData.append('record_ids', id);
+		});
+		
+		// 發送批次核准請求
+		const response = await fetch('{% url "workorder:fill_work:batch_approve_fill_work" %}', {
+			method: 'POST',
+			body: formData,
+			headers: {
+				'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value || '{{ csrf_token }}'
+			}
+		});
+		
+		if (response.ok) {
+			// 重新載入頁面以顯示更新後的狀態
+			window.location.reload();
+		} else {
+			throw new Error('網路請求失敗');
+		}
+	} catch (error) {
+		console.error('批次核准失敗：', error);
+		alert('批次核准失敗，請稍後再試');
+	} finally {
+		// 恢復按鈕狀態
+		button.innerHTML = originalText;
+		button.disabled = false;
+	}
+});
+
+// 頁面載入時初始化按鈕狀態
+document.addEventListener('DOMContentLoaded', function() {
+	updateSelectAllState();
 });
 </script>
 {% endblock %} 

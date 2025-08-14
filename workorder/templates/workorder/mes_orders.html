@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+{% block title %}MES 工單管理{% endblock %}
+{% block content %}
+
+<!-- 麵包屑導航 -->
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+        <li class="breadcrumb-item active" aria-current="page">MES 工單管理</li>
+    </ol>
+</nav>
+
+<div class="container mt-4">
+  <h2>MES 工單管理</h2>
+
+  <!-- 統計卡片 -->
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <div class="card bg-primary text-white">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <div>
+              <h4 class="card-title">{{ total_orders }}</h4>
+              <p class="card-text">全部工單</p>
+            </div>
+            <div class="align-self-center">
+              <i class="fas fa-clipboard-list fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card bg-success text-white">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <div>
+              <h4 class="card-title">{{ dispatched_orders }}</h4>
+              <p class="card-text">已派工</p>
+            </div>
+            <div class="align-self-center">
+              <i class="fas fa-check-circle fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card bg-warning text-dark">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <div>
+              <h4 class="card-title">{{ undispatched_orders }}</h4>
+              <p class="card-text">未派工</p>
+            </div>
+            <div class="align-self-center">
+              <i class="fas fa-clock fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 搜尋和操作區域 -->
+  <div class="row mb-3">
+    <div class="col-md-6">
+      <form class="row g-2" method="get">
+        <div class="col-md-4">
+          <input class="form-control" name="search" placeholder="搜尋工單號/產品/公司代號" value="{{ search }}" />
+        </div>
+        <div class="col-md-3">
+          <select class="form-select" name="dispatch_status">
+            <option value="all" {% if dispatch_status == 'all' %}selected{% endif %}>全部狀態</option>
+            <option value="undispatched" {% if dispatch_status == 'undispatched' %}selected{% endif %}>未派工</option>
+            <option value="dispatched" {% if dispatch_status == 'dispatched' %}selected{% endif %}>已派工</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-primary" type="submit">查詢</button>
+        </div>
+      </form>
+    </div>
+    <div class="col-md-6 text-end">
+      <button id="btn-auto-dispatch" class="btn btn-info me-2">
+        <i class="fas fa-magic"></i> 自動批次派工
+      </button>
+      <button id="btn-bulk-dispatch" class="btn btn-success me-2" disabled>
+        <i class="fas fa-tasks"></i> 批量派工
+      </button>
+      <button id="btn-settings" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#settingsModal">
+        <i class="fas fa-cog"></i> 設定
+      </button>
+    </div>
+  </div>
+
+  <!-- 工單表格 -->
+  <div class="table-responsive">
+    <table class="table table-striped table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th style="width:40px"><input type="checkbox" id="chk-all" /></th>
+          <th>公司代號</th>
+          <th>工單號</th>
+          <th>產品編號</th>
+          <th>數量</th>
+          <th>建立時間</th>
+          <th>派工狀態</th>
+          <th style="width:150px">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td><input type="checkbox" class="row-chk" value="{{ o.order_number }}" {% if o.order_number in dispatched_map %}disabled{% endif %} /></td>
+          <td>{{ o.company_code|default:'-' }}</td>
+          <td>{{ o.order_number }}</td>
+          <td>{{ o.product_code }}</td>
+          <td>{{ o.quantity }}</td>
+          <td>{{ o.created_at|date:'Y-m-d H:i' }}</td>
+          <td>
+            {% if o.order_number in dispatched_map %}
+              <span class="badge bg-success">已派工</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">未派工</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if o.order_number not in dispatched_map %}
+              <button class="btn btn-sm btn-primary dispatch-btn" data-order="{{ o.order_number }}" title="派工">
+                <i class="fas fa-tasks"></i>
+              </button>
+            {% endif %}
+            <button class="btn btn-sm btn-danger delete-btn" data-order="{{ o.order_number }}" title="刪除">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted">目前沒有 MES 工單</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% include 'includes/pagination.html' with page_obj=page_obj %}
+  </div>
+</div>
+
+<!-- 設定模態框 -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="settingsModalLabel">自動批次派工設定</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="auto-dispatch-settings-form">
+          <div class="mb-3">
+            <label for="auto-dispatch-interval" class="form-label">自動批次派工間隔（分鐘）</label>
+            <input type="number" class="form-control" id="auto-dispatch-interval" 
+                   name="interval" min="1" max="1440" value="{{ auto_dispatch_interval|default:60 }}" required>
+            <div class="form-text">設定範圍：1-1440分鐘（1分鐘到24小時）</div>
+          </div>
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            <strong>說明：</strong>系統會根據設定的間隔時間，自動為所有未派工的工單建立派工單。
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="btn-save-settings">儲存設定</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const chkAll = document.getElementById('chk-all');
+  const rowChks = () => Array.from(document.querySelectorAll('.row-chk'));
+  const btnBulkDispatch = document.getElementById('btn-bulk-dispatch');
+  const btnAutoDispatch = document.getElementById('btn-auto-dispatch');
+
+  // 批量派工功能
+  function refreshBtn() {
+    btnBulkDispatch.disabled = rowChks().filter(chk => chk.checked && !chk.disabled).length === 0;
+  }
+  
+  chkAll && (chkAll.onchange = () => {
+    rowChks().forEach(chk => { if (!chk.disabled) chk.checked = chkAll.checked; });
+    refreshBtn();
+  });
+  
+  rowChks().forEach(chk => chk.onchange = refreshBtn);
+
+  btnBulkDispatch && (btnBulkDispatch.onclick = async () => {
+    const selected = rowChks().filter(chk => chk.checked && !chk.disabled).map(chk => chk.value);
+    if (selected.length === 0) return;
+    
+    if (!confirm(`確定要為選取的 ${selected.length} 筆工單建立派工單嗎？`)) return;
+    
+    btnBulkDispatch.disabled = true;
+    try {
+      const resp = await fetch('{% url "workorder:mes_orders_bulk_dispatch" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({ order_numbers: selected })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        alert(`建立派工單 ${data.created} 筆，略過 ${data.skipped} 筆`);
+        window.location.reload();
+      } else {
+        alert(data.error || '批量派工失敗');
+      }
+    } catch (e) {
+      alert('批量派工失敗');
+    } finally {
+      btnBulkDispatch.disabled = false;
+    }
+  });
+
+  // 自動批次派工功能
+  btnAutoDispatch && (btnAutoDispatch.onclick = async () => {
+    if (!confirm('確定要為所有未派工的工單自動建立派工單嗎？')) return;
+    
+    btnAutoDispatch.disabled = true;
+    try {
+      const resp = await fetch('{% url "workorder:mes_orders_auto_dispatch" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
+      });
+      const data = await resp.json();
+      if (data.success) {
+        alert(data.message);
+        window.location.reload();
+      } else {
+        alert(data.error || '自動批次派工失敗');
+      }
+    } catch (e) {
+      alert('自動批次派工失敗');
+    } finally {
+      btnAutoDispatch.disabled = false;
+    }
+  });
+
+  // 單筆派工功能
+  document.querySelectorAll('.dispatch-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const orderNumber = btn.dataset.order;
+      if (!confirm(`確定要為工單 ${orderNumber} 建立派工單嗎？`)) return;
+      
+      btn.disabled = true;
+      try {
+        const resp = await fetch('{% url "workorder:mes_order_dispatch" %}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+          body: `order_number=${orderNumber}`
+        });
+        const data = await resp.json();
+        if (data.success) {
+          alert(data.message);
+          window.location.reload();
+        } else {
+          alert(data.error || '派工失敗');
+        }
+      } catch (e) {
+        alert('派工失敗');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
+
+  // 刪除工單功能
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const orderNumber = btn.dataset.order;
+      if (!confirm(`確定要刪除工單 ${orderNumber} 嗎？此操作無法復原！`)) return;
+      
+      btn.disabled = true;
+      try {
+        const resp = await fetch('{% url "workorder:mes_order_delete" %}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+          body: `order_number=${orderNumber}`
+        });
+        const data = await resp.json();
+        if (data.success) {
+          alert(data.message);
+          window.location.reload();
+        } else {
+          alert(data.error || '刪除失敗');
+        }
+      } catch (e) {
+        alert('刪除失敗');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
+
+  // 設定功能
+  document.getElementById('btn-save-settings').onclick = async () => {
+    const interval = document.getElementById('auto-dispatch-interval').value;
+    if (!interval || interval < 1 || interval > 1440) {
+      alert('請輸入有效的間隔時間（1-1440分鐘）');
+      return;
+    }
+
+    const btn = document.getElementById('btn-save-settings');
+    btn.disabled = true;
+    btn.textContent = '儲存中...';
+
+    try {
+      const resp = await fetch('{% url "workorder:mes_orders_set_auto_dispatch_interval" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: `interval=${interval}`
+      });
+      const data = await resp.json();
+      if (data.success) {
+        alert(data.message);
+        // 關閉模態框
+        const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
+        modal.hide();
+      } else {
+        alert(data.error || '設定失敗');
+      }
+    } catch (e) {
+      alert('設定失敗');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '儲存設定';
+    }
+  };
+</script>
+{% endblock %} 

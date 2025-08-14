@@ -8,11 +8,9 @@ from datetime import datetime
 from django.db import transaction
 from django.utils import timezone
 from workorder.models import WorkOrder, WorkOrderProduction, WorkOrderProductionDetail
-from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
 from erp_integration.models import CompanyConfig
 
 logger = logging.getLogger(__name__)
-
 
 class ProductionReportSyncService:
     """
@@ -35,7 +33,7 @@ class ProductionReportSyncService:
             
             # 2. 同步SMT報工記錄
             logger.info("開始同步SMT報工記錄...")
-            ProductionReportSyncService._sync_smt_reports()
+            # ProductionReportSyncService._sync_smt_reports()  # 暫時停用
             
             # 移除主管報工同步，避免混淆
             # 主管職責：監督、審核、管理，不代為報工
@@ -53,9 +51,11 @@ class ProductionReportSyncService:
     def _sync_operator_reports():
         """同步作業員補登報工記錄"""
         try:
-            operator_reports = OperatorSupplementReport.objects.filter(
+            from workorder.models import CompletedProductionReport
+            operator_reports = CompletedProductionReport.objects.filter(
+                report_type='operator',
                 approval_status='approved'
-            ).select_related('workorder', 'operator', 'equipment', 'process')
+            ).select_related('completed_workorder')
             
             logger.info(f"找到 {operator_reports.count()} 筆已核准的作業員報工記錄")
             
@@ -332,10 +332,12 @@ class ProductionReportSyncService:
             
             with transaction.atomic():
                 # 同步該工單的作業員報工記錄
-                operator_reports = OperatorSupplementReport.objects.filter(
-                    workorder=workorder,
+                from workorder.models import CompletedProductionReport
+                operator_reports = CompletedProductionReport.objects.filter(
+                    completed_workorder__order_number=workorder.order_number,
+                    report_type='operator',
                     approval_status='approved'
-                ).select_related('operator', 'equipment', 'process')
+                )
                 
                 for report in operator_reports:
                     ProductionReportSyncService._create_or_update_production_detail(
@@ -386,15 +388,17 @@ class ProductionReportSyncService:
                     )
                 
                 # 同步該工單的SMT報工記錄
-                smt_reports = SMTSupplementReport.objects.filter(
-                    workorder=workorder,
+                from workorder.models import CompletedProductionReport
+                smt_reports = CompletedProductionReport.objects.filter(
+                    completed_workorder__order_number=workorder.order_number,
+                    report_type='smt',
                     approval_status='approved'
-                ).select_related('equipment')
+                )
                 
                 for report in smt_reports:
                     ProductionReportSyncService._create_or_update_production_detail(
                         workorder=workorder,
-                        process_name=report.operation,
+                        process_name=report.process_name,
                         report_date=report.work_date,
                         report_time=timezone.now(),
                         work_quantity=report.work_quantity or 0,

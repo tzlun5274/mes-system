@@ -1,0 +1,521 @@
+{% extends 'workorder/base.html' %}
+{% load static %}
+
+{% block title %}工單Excel匯入{% endblock %}
+
+{% block extra_css %}
+<style>
+    .import-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .upload-area {
+        border: 3px dashed #007bff;
+        border-radius: 10px;
+        padding: 40px;
+        text-align: center;
+        background: #f8f9fa;
+        transition: all 0.3s ease;
+        margin-bottom: 30px;
+    }
+    
+    .upload-area:hover {
+        border-color: #0056b3;
+        background: #e9ecef;
+    }
+    
+    .upload-area.dragover {
+        border-color: #28a745;
+        background: #d4edda;
+    }
+    
+    .file-input {
+        display: none;
+    }
+    
+    .btn-upload {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        border: none;
+        color: white;
+        padding: 12px 30px;
+        border-radius: 25px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        margin: 10px;
+    }
+    
+    .btn-upload:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        color: white;
+    }
+    
+    .btn-template {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        margin: 10px;
+    }
+    
+    .btn-template:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        color: white;
+    }
+    
+    .format-table {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+    
+    .format-table th {
+        background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+        color: white;
+        border: none;
+    }
+    
+    .progress-container {
+        display: none;
+        margin: 20px 0;
+    }
+    
+    .progress-bar {
+        height: 25px;
+        border-radius: 15px;
+        background: linear-gradient(90deg, #007bff, #0056b3);
+    }
+    
+    .result-container {
+        display: none;
+        margin: 20px 0;
+        padding: 20px;
+        border-radius: 10px;
+        background: white;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .result-success {
+        border-left: 5px solid #28a745;
+        background: #d4edda;
+    }
+    
+    .result-error {
+        border-left: 5px solid #dc3545;
+        background: #f8d7da;
+    }
+    
+    .error-list {
+        max-height: 200px;
+        overflow-y: auto;
+        background: #f8f9fa;
+        border-radius: 5px;
+        padding: 10px;
+    }
+    
+    .alert-info {
+        background: linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="import-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <i class="fas fa-file-excel text-success"></i>
+            工單Excel匯入
+        </h2>
+        <a href="{% url 'workorder:list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> 返回工單列表
+        </a>
+    </div>
+    
+    <!-- 說明資訊 -->
+    <div class="alert alert-info" role="alert">
+        <h5 class="alert-heading">
+            <i class="fas fa-info-circle"></i> 匯入說明
+        </h5>
+        <p class="mb-2">
+            此功能支援從正航系統匯出的製令簡要表匯入工單資料。請確保Excel檔案包含必要的欄位。
+        </p>
+        <p class="mb-0">
+            <strong>支援格式：</strong>Excel (.xlsx) 或 CSV 檔案
+        </p>
+    </div>
+    
+    <!-- 欄位格式說明 -->
+    <div class="format-table">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-table"></i>
+                欄位格式說明
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead>
+                        <tr>
+                            <th>欄位名稱</th>
+                            <th>必填</th>
+                            <th>格式</th>
+                            <th>說明</th>
+                            <th>範例</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-danger">
+                            <td><strong>公司名稱</strong></td>
+                            <td><span class="badge badge-danger">必填</span></td>
+                            <td>文字</td>
+                            <td>公司名稱（與公司代號擇一填寫）</td>
+                            <td>中儀科技</td>
+                        </tr>
+                        <tr class="table-danger">
+                            <td><strong>公司代號</strong></td>
+                            <td><span class="badge badge-danger">必填</span></td>
+                            <td>文字</td>
+                            <td>公司代號（與公司名稱擇一填寫）</td>
+                            <td>02</td>
+                        </tr>
+                        <tr class="table-danger">
+                            <td><strong>製令單號</strong></td>
+                            <td><span class="badge badge-danger">必填</span></td>
+                            <td>文字</td>
+                            <td>正航系統的製令單號</td>
+                            <td>331-25808001</td>
+                        </tr>
+                        <tr class="table-danger">
+                            <td><strong>產品編號</strong></td>
+                            <td><span class="badge badge-danger">必填</span></td>
+                            <td>文字</td>
+                            <td>產品的編號</td>
+                            <td>PFP-SSP-SKP1SP026V2PO-500</td>
+                        </tr>
+                        <tr class="table-danger">
+                            <td><strong>生產數量</strong></td>
+                            <td><span class="badge badge-danger">必填</span></td>
+                            <td>數字</td>
+                            <td>生產數量，必須大於0</td>
+                            <td>100</td>
+                        </tr>
+                        <tr class="table-warning">
+                            <td>產品名稱</td>
+                            <td><span class="badge badge-warning">選填</span></td>
+                            <td>文字</td>
+                            <td>產品名稱</td>
+                            <td>SSP產品</td>
+                        </tr>
+                        <tr class="table-warning">
+                            <td>預計開工日</td>
+                            <td><span class="badge badge-warning">選填</span></td>
+                            <td>日期</td>
+                            <td>預計開工日期</td>
+                            <td>2025-08-15</td>
+                        </tr>
+                        <tr class="table-warning">
+                            <td>預計完工日</td>
+                            <td><span class="badge badge-warning">選填</span></td>
+                            <td>日期</td>
+                            <td>預計完工日期</td>
+                            <td>2025-08-20</td>
+                        </tr>
+                        <tr class="table-warning">
+                            <td>製令狀態</td>
+                            <td><span class="badge badge-warning">選填</span></td>
+                            <td>文字</td>
+                            <td>製令狀態</td>
+                            <td>待生產</td>
+                        </tr>
+                        <tr class="table-warning">
+                            <td>備註</td>
+                            <td><span class="badge badge-warning">選填</span></td>
+                            <td>文字</td>
+                            <td>備註資訊</td>
+                            <td>正常製令</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 下載範本 -->
+    <div class="text-center mb-4">
+        <a href="{% url 'workorder:download_workorder_template' %}" class="btn btn-template">
+            <i class="fas fa-download"></i>
+            下載匯入範本
+        </a>
+    </div>
+    
+    <!-- 檔案上傳區域 -->
+    <div class="upload-area" id="uploadArea">
+        <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+        <h4>拖拽檔案到此處或點擊選擇檔案</h4>
+        <p class="text-muted">支援 Excel (.xlsx) 或 CSV 格式</p>
+        
+        <input type="file" id="fileInput" class="file-input" accept=".xlsx,.csv">
+        
+        <div class="mt-3">
+            <button type="button" class="btn btn-upload" onclick="document.getElementById('fileInput').click()">
+                <i class="fas fa-folder-open"></i>
+                選擇檔案
+            </button>
+        </div>
+        
+        <div id="fileInfo" class="mt-3" style="display: none;">
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i>
+                <span id="fileName"></span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 進度條 -->
+    <div class="progress-container" id="progressContainer">
+        <div class="progress">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                 role="progressbar" style="width: 0%"></div>
+        </div>
+        <div class="text-center mt-2">
+            <span id="progressText">準備中...</span>
+        </div>
+    </div>
+    
+    <!-- 結果顯示 -->
+    <div class="result-container" id="resultContainer">
+        <h5 id="resultTitle"></h5>
+        <div id="resultMessage"></div>
+        <div id="resultData"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.querySelector('.progress-bar');
+    const progressText = document.getElementById('progressText');
+    const resultContainer = document.getElementById('resultContainer');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultMessage = document.getElementById('resultMessage');
+    const resultData = document.getElementById('resultData');
+    
+    // 拖拽功能
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+    
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    });
+    
+    // 檔案選擇
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            handleFile(e.target.files[0]);
+        }
+    });
+    
+    function handleFile(file) {
+        // 檢查檔案格式
+        const allowedTypes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/csv',
+            'application/csv'
+        ];
+        
+        const fileExtension = file.name.toLowerCase().split('.').pop();
+        if (!allowedTypes.includes(file.type) && !['xlsx', 'csv'].includes(fileExtension)) {
+            alert('請選擇 Excel (.xlsx) 或 CSV 格式的檔案');
+            return;
+        }
+        
+        // 顯示檔案資訊
+        fileName.textContent = `已選擇: ${file.name} (${formatFileSize(file.size)})`;
+        fileInfo.style.display = 'block';
+        
+        // 上傳檔案
+        uploadFile(file);
+    }
+    
+    function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // 顯示進度條
+        progressContainer.style.display = 'block';
+        resultContainer.style.display = 'none';
+        
+        // 模擬進度
+        let progress = 0;
+        const progressInterval = setInterval(function() {
+            progress += Math.random() * 10;
+            if (progress > 90) progress = 90;
+            progressBar.style.width = progress + '%';
+            progressText.textContent = `上傳中... ${Math.round(progress)}%`;
+        }, 200);
+        
+        $.ajax({
+            url: '{% url "workorder:workorder_import_file" %}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                progressText.textContent = '完成！';
+                
+                setTimeout(function() {
+                    showResult(response);
+                }, 500);
+            },
+            error: function(xhr, status, error) {
+                clearInterval(progressInterval);
+                progressContainer.style.display = 'none';
+                
+                let errorMessage = '上傳失敗';
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    errorMessage = response.message || errorMessage;
+                } catch (e) {
+                    errorMessage = error || errorMessage;
+                }
+                
+                showResult({
+                    success: false,
+                    message: errorMessage
+                });
+            }
+        });
+    }
+    
+    function showResult(response) {
+        progressContainer.style.display = 'none';
+        resultContainer.style.display = 'block';
+        
+        if (response.success) {
+            resultContainer.className = 'result-container result-success';
+            resultTitle.innerHTML = '<i class="fas fa-check-circle text-success"></i> 匯入成功';
+            resultMessage.innerHTML = `<div class="alert alert-success">${response.message}</div>`;
+            
+            if (response.data) {
+                const data = response.data;
+                let dataHtml = `
+                    <div class="row mt-3">
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title text-primary">${data.total_records}</h5>
+                                    <p class="card-text">總記錄數</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title text-success">${data.created_count}</h5>
+                                    <p class="card-text">創建工單</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title text-info">${data.updated_count}</h5>
+                                    <p class="card-text">更新工單</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title text-warning">${data.error_count}</h5>
+                                    <p class="card-text">錯誤記錄</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                if (data.errors && data.errors.length > 0) {
+                    dataHtml += `
+                        <div class="mt-3">
+                            <h6>錯誤詳情：</h6>
+                            <div class="error-list">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>行號</th>
+                                            <th>錯誤訊息</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                    `;
+                    
+                    data.errors.forEach(function(error) {
+                        dataHtml += `
+                            <tr>
+                                <td>${error.row}</td>
+                                <td>${error.error}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    dataHtml += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                resultData.innerHTML = dataHtml;
+            }
+        } else {
+            resultContainer.className = 'result-container result-error';
+            resultTitle.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> 匯入失敗';
+            resultMessage.innerHTML = `<div class="alert alert-danger">${response.message}</div>`;
+            resultData.innerHTML = '';
+        }
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+});
+</script>
+{% endblock %} 

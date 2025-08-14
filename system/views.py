@@ -1574,9 +1574,10 @@ def permission_assign(request):
 def workorder_settings(request):
     """
     工單管理設定頁面
-    管理工單系統相關設定，包含審核流程等
+    管理工單系統相關設定，包含審核流程和定時任務等
     """
     from workorder.models import SystemConfig
+    from django_celery_beat.models import PeriodicTask, IntervalSchedule
     
     if request.method == "POST":
         # 處理表單提交
@@ -1585,6 +1586,12 @@ def workorder_settings(request):
         audit_log_enabled = request.POST.get('audit_log_enabled') == 'on'
         max_file_size = request.POST.get('max_file_size', 10)
         session_timeout = request.POST.get('session_timeout', 30)
+        
+        # 定時任務設定
+        completion_check_enabled = request.POST.get('completion_check_enabled') == 'on'
+        completion_check_interval = int(request.POST.get('completion_check_interval', 15))
+        auto_allocation_enabled = request.POST.get('auto_allocation_enabled') == 'on'
+        auto_allocation_interval = int(request.POST.get('auto_allocation_interval', 30))
         
         # 更新系統設定
         SystemConfig.objects.update_or_create(
@@ -1607,6 +1614,36 @@ def workorder_settings(request):
             key="session_timeout",
             defaults={"value": str(session_timeout)}
         )
+        
+        # 更新定時任務設定
+        try:
+            # 完工檢查定時任務
+            completion_task = PeriodicTask.objects.get(name='自動檢查工單完工狀態')
+            completion_task.enabled = completion_check_enabled
+            if completion_check_interval != completion_task.interval.every:
+                # 更新間隔
+                interval_schedule, _ = IntervalSchedule.objects.get_or_create(
+                    every=completion_check_interval,
+                    period=IntervalSchedule.MINUTES,
+                )
+                completion_task.interval = interval_schedule
+            completion_task.save()
+            
+            # 自動分配定時任務
+            auto_allocation_task = PeriodicTask.objects.get(name='自動分配任務')
+            auto_allocation_task.enabled = auto_allocation_enabled
+            if auto_allocation_interval != auto_allocation_task.interval.every:
+                interval_schedule, _ = IntervalSchedule.objects.get_or_create(
+                    every=auto_allocation_interval,
+                    period=IntervalSchedule.MINUTES,
+                )
+                auto_allocation_task.interval = interval_schedule
+            auto_allocation_task.save()
+            
+
+            
+        except PeriodicTask.DoesNotExist as e:
+            messages.warning(request, f"部分定時任務未找到：{str(e)}")
         
         messages.success(request, "工單管理設定已成功更新！")
         return redirect('system:workorder_settings')
@@ -1646,8 +1683,32 @@ def workorder_settings(request):
         'session_timeout': session_timeout,  # 會話超時 (分鐘)
     }
     
+    # 獲取定時任務資訊
+    def get_task_info(task_name):
+        try:
+            task = PeriodicTask.objects.get(name=task_name)
+            return {
+                'enabled': task.enabled,
+                'interval_minutes': task.interval.every if task.interval else 0,
+                'last_run': task.last_run_at,
+                'task': task.task
+            }
+        except PeriodicTask.DoesNotExist:
+            return {
+                'enabled': False,
+                'interval_minutes': 0,
+                'last_run': None,
+                'task': None
+            }
+    
+    # 定時任務資訊
+    completion_task = get_task_info('自動檢查工單完工狀態')
+    auto_allocation_task = get_task_info('自動分配任務')
+    
     context = {
         'system_options': system_options,
+        'completion_task': completion_task,
+        'auto_allocation_task': auto_allocation_task,
     }
     return render(request, 'system/workorder_settings.html', context)
 

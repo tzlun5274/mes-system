@@ -19,10 +19,9 @@ from .models import (
 
 # 導入子模組的模型
 from .workorder_erp.models import PrdMKOrdMain, SystemConfig, CompanyOrder
-from .workorder_reporting.models import BackupOperatorSupplementReport, BackupSMTSupplementReport, BackupSMTRealtimeReport
-from .tasks import get_standard_processes
-from .forms import WorkOrderForm, BackupOperatorSupplementReportForm, OperatorOnSiteReportForm, SMTSupplementReportForm
-from django.contrib import messages
+# from .tasks import get_standard_processes
+from .forms import WorkOrderForm
+# from .forms import from django.contrib import messages
 
 from datetime import datetime, timedelta, date
 from django.db import models
@@ -77,7 +76,6 @@ workorder_logger.addHandler(workorder_handler)
 workorder_logger.setLevel(logging.INFO)
 
 # Create your views here.
-
 
 # 工單列表 (已棄用 - 請使用 WorkOrderListView)
 def index(request):
@@ -140,7 +138,6 @@ def list_view(request):
     }
     return render(request, "workorder/workorder/workorder_list.html", context)
 
-
 # 新增工單
 def create(request):
     error = None
@@ -165,7 +162,6 @@ def create(request):
     return render(
         request, "workorder/workorder/workorder_form.html", {"form": form, "error": error}
     )
-
 
 @require_GET
 @login_required
@@ -210,7 +206,6 @@ def get_company_order_info(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": f"查詢失敗：{str(e)}"})
 
-
 # 編輯工單
 def edit(request, pk):
     workorder = get_object_or_404(WorkOrder, pk=pk)
@@ -224,7 +219,6 @@ def edit(request, pk):
     return render(
         request, "workorder/workorder/workorder_form.html", {"form": form, "edit_mode": True}
     )
-
 
 # 刪除工單
 def delete(request, pk):
@@ -243,7 +237,6 @@ def delete(request, pk):
     return render(
         request, "workorder/workorder/workorder_confirm_delete.html", {"workorder": workorder}
     )
-
 
 # 刪除所有未派工工單（支援 all=1 參數時同時刪除已派工工單）
 def delete_pending_workorders(request):
@@ -302,7 +295,6 @@ def delete_pending_workorders(request):
         },
     )
 
-
 # 刪除所有已派工工單
 def delete_in_progress_workorders(request):
     """
@@ -343,10 +335,6 @@ def delete_in_progress_workorders(request):
         "workorder/workorder/delete_in_progress_confirm.html",
         {"in_progress_count": in_progress_count},
     )
-
-
-
-
 
 # 派工單管理頁（可重用原本工單列表）
 def dispatch_list(request):
@@ -455,11 +443,9 @@ def dispatch_list(request):
         },
     )
 
-
 # 公司製令單列表（依公司分群）
 # 公司製令單管理功能已移至 CompanyOrderListView 類別視圖
 # 此函數已廢棄，保留註解以說明功能遷移
-
 
 # 手動同步製令單
 def manual_sync_orders(request):
@@ -490,7 +476,6 @@ def manual_sync_orders(request):
         messages.error(request, f"同步失敗：{e}")
 
     return redirect("workorder:company_orders")
-
 
 # 手動轉換工單
 def manual_convert_orders(request):
@@ -736,7 +721,6 @@ def manual_convert_orders(request):
 
     return redirect("workorder:company_orders")
 
-
 # 派工單工序明細管理
 def workorder_process_detail(request, workorder_id):
     """
@@ -787,7 +771,6 @@ def workorder_process_detail(request, workorder_id):
         },
     )
 
-
 def generate_completed_workorder_processes(workorder):
     """
     為完工工單從實際報工資料生成工序明細
@@ -813,10 +796,11 @@ def generate_completed_workorder_processes(workorder):
     })
     
     # 1. 收集作業員報工資料
-    operator_reports = BackupOperatorSupplementReport.objects.filter(
-        workorder=workorder,
-        approval_status='approved'
-    ).select_related('operator', 'process', 'equipment')
+    # operator_reports = OperatorSupplementReport.objects.filter(
+    #     workorder=workorder,
+    #     approval_status='approved'
+    # ).select_related('operator', 'process', 'equipment')
+    operator_reports = []
     
     for report in operator_reports:
         process_name = report.process.name if report.process else report.operation
@@ -846,10 +830,11 @@ def generate_completed_workorder_processes(workorder):
                 process_data[process_name]['abnormal_notes'].append(report.abnormal_notes)
     
     # 2. 收集SMT報工資料
-    smt_reports = SMTSupplementReport.objects.filter(
-        workorder=workorder,
-        approval_status='approved'
-    ).select_related('equipment')
+    # smt_reports = SMTSupplementReport.objects.filter(
+    #     workorder=workorder,
+    #     approval_status='approved'
+    # ).select_related('equipment')
+    smt_reports = []
     
     for report in smt_reports:
         process_name = report.operation
@@ -913,7 +898,6 @@ def generate_completed_workorder_processes(workorder):
             step_order += 1
     
     return processes
-
 
 def create_workorder_processes(request, workorder_id):
     """
@@ -1112,7 +1096,6 @@ def create_workorder_processes(request, workorder_id):
 
     return redirect("workorder:workorder_process_detail", workorder_id=workorder_id)
 
-
 @require_GET
 @login_required
 def get_processes_only(request):
@@ -1153,9 +1136,7 @@ def get_processes_only(request):
     ]
     return JsonResponse({"success": True, "processes": process_list})
 
-
 # 完工工單相關函數已移除
-
 
 def clear_data(request):
     """
@@ -1202,7 +1183,6 @@ def clear_data(request):
     }
 
     return render(request, "workorder/clear_data_confirm.html", context)
-
 
 def start_production(request, pk):
     """
@@ -1266,7 +1246,6 @@ def start_production(request, pk):
 
     return redirect("workorder_dispatch:dispatch_list")
 
-
 def stop_production(request, pk):
     """
     停止生產：將工單狀態從 in_progress 轉換為 pending
@@ -1315,7 +1294,6 @@ def stop_production(request, pk):
 
     return redirect("workorder_dispatch:dispatch_list")
 
-
 def selective_revert_orders(request):
     """
     選擇性將已轉換的公司製令單退回（is_converted 設回 False）
@@ -1344,10 +1322,6 @@ def selective_revert_orders(request):
     # GET 顯示所有已轉換的製令單
     orders = CompanyOrder.objects.filter(is_converted=True).order_by("-sync_time")
     return render(request, "workorder/selective_revert_orders.html", {"orders": orders})
-
-
-
-
 
 def user_supplement_form(request, workorder_id):
     """
@@ -1475,7 +1449,6 @@ def user_supplement_form(request, workorder_id):
         },
     )
 
-
 def edit_my_supplement(request, supplement_id):
     """
     編輯自己的補登記錄 - 只能編輯未核准的記錄
@@ -1526,7 +1499,6 @@ def edit_my_supplement(request, supplement_id):
         },
     )
 
-
 def delete_my_supplement(request, supplement_id):
     """
     刪除自己的補登記錄 - 只能刪除未核准的記錄
@@ -1548,7 +1520,6 @@ def delete_my_supplement(request, supplement_id):
     messages.success(request, "補登記錄已刪除")
     return redirect('workorder:user_supplement_index')
 
-
 def process_logs(request, process_id):
     """
     顯示工序日誌頁面
@@ -1567,7 +1538,6 @@ def process_logs(request, process_id):
         },
     )
 
-
 def edit_supplement_mobile(request):
     """
     行動裝置補登編輯頁面
@@ -1580,18 +1550,15 @@ def edit_supplement_mobile(request):
         messages.error(request, "缺少日誌ID")
         return redirect("workorder:index")
 
-
 def pending_approval_list(request):
     """待審核報工列表 - 已移至主管功能模組"""
     from django.shortcuts import redirect
     return redirect('workorder:supervisor:pending_approval_list')
 
-
 def approved_reports_list(request):
     """已核准報工列表 - 已移至 reporting 模組"""
     from django.shortcuts import redirect
     return redirect('reporting:placeholder', function_name='approved_reports_list')
-
 
 @login_required
 def get_operators_and_equipments(request):
@@ -1627,7 +1594,6 @@ def get_operators_and_equipments(request):
         })
     except Exception as e:
         return JsonResponse({"success": False, "message": f"取得資料失敗：{str(e)}"})
-
 
 @require_GET
 @login_required
@@ -1676,7 +1642,6 @@ def get_operators_only(request):
     except Exception as e:
         return JsonResponse({"success": False, "message": f"取得作業員資料失敗：{str(e)}"})
 
-
 @require_GET
 @login_required
 def get_equipments_only(request):
@@ -1718,9 +1683,7 @@ def get_equipments_only(request):
     except Exception as e:
         return JsonResponse({"success": False, "message": f"取得設備資料失敗：{str(e)}"})
 
-
 # ==================== 行動裝置補登管理作業 ====================
-
 
 def mobile_quick_supplement_index(request):
     """
@@ -1748,7 +1711,6 @@ def mobile_quick_supplement_index(request):
         "workorder/mobile_quick_supplement_index.html",
         {"workorders": workorders, "product_code": product_code},
     )
-
 
 def mobile_quick_supplement_form(request, workorder_id):
     """
@@ -1879,15 +1841,12 @@ def mobile_quick_supplement_form(request, workorder_id):
         },
     )
 
-
 def clear_all_production_reports(request):
     """
     清除所有報工紀錄的視圖函數
     包括：作業員補登報工、SMT補登報工、SMT現場報工
     只有管理員可以執行此操作
     """
-    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
-    
     if not (request.user.is_staff or request.user.is_superuser):
         messages.error(request, "只有管理員可以執行此操作")
         return redirect("workorder:index")
@@ -1895,8 +1854,9 @@ def clear_all_production_reports(request):
     if request.method == "POST":
         try:
             # 統計要清除的資料數量
-            operator_reports_count = OperatorSupplementReport.objects.count()
-            smt_supplement_count = SMTSupplementReport.objects.count()
+            from workorder.models import CompletedProductionReport
+            operator_reports_count = CompletedProductionReport.objects.filter(report_type='operator').count()
+            smt_supplement_count = CompletedProductionReport.objects.filter(report_type='smt').count()
             smt_on_site_count = 0  # 已移除 report_type 欄位
             
             total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
@@ -1906,8 +1866,7 @@ def clear_all_production_reports(request):
                 return redirect("workorder:index")
             
             # 清除所有報工紀錄
-            OperatorSupplementReport.objects.all().delete()
-            SMTSupplementReport.objects.all().delete()
+            CompletedProductionReport.objects.all().delete()
             
             # 記錄操作日誌
             from system.models import OperationLog
@@ -1933,8 +1892,9 @@ def clear_all_production_reports(request):
             return redirect("workorder:clear_all_production_reports")
 
     # GET 請求顯示確認頁面
-    operator_reports_count = OperatorSupplementReport.objects.count()
-    smt_supplement_count = SMTSupplementReport.objects.count()
+    from workorder.models import CompletedProductionReport
+    operator_reports_count = CompletedProductionReport.objects.filter(report_type='operator').count()
+    smt_supplement_count = CompletedProductionReport.objects.filter(report_type='smt').count()
     smt_on_site_count = 0  # 已移除 report_type 欄位
     
     total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
@@ -1947,7 +1907,6 @@ def clear_all_production_reports(request):
     }
     
     return render(request, "workorder/clear_production_reports_confirm.html", context)
-
 
 @require_GET
 @login_required
@@ -1991,7 +1950,6 @@ def mobile_get_workorder_info(request):
 
     except Exception as e:
         return JsonResponse({"success": False, "message": f"查詢失敗：{str(e)}"})
-
 
 @require_GET
 @login_required
@@ -2041,7 +1999,6 @@ def mobile_get_process_info(request):
         return JsonResponse({"success": False, "message": "找不到指定的工單"})
     except Exception as e:
         return JsonResponse({"success": False, "message": f"查詢失敗：{str(e)}"})
-
 
 @require_POST
 @login_required
@@ -2164,14 +2121,12 @@ def mobile_submit_supplement(request):
     except Exception as e:
         return JsonResponse({"success": False, "message": f"儲存失敗：{str(e)}"})
 
-
 def mobile_api_test(request):
     """
     行動裝置 API 測試頁面
     用於測試行動裝置快速補登的 API 功能，方便開發和除錯
     """
     return render(request, "workorder/mobile_api_test.html")
-
 
 @require_GET
 @login_required
@@ -2185,7 +2140,6 @@ def quick_get_product_codes(request):
         return JsonResponse({"success": True, "product_codes": list(codes)})
     except Exception as e:
         return JsonResponse({"success": False, "message": f"查詢失敗：{str(e)}"})
-
 
 @require_GET
 @login_required
@@ -2208,7 +2162,6 @@ def get_product_codes(request):
         )
     except Exception as e:
         return JsonResponse({"success": False, "message": f"查詢失敗：{str(e)}"})
-
 
 @require_POST
 @login_required
@@ -2282,7 +2235,6 @@ def move_process(request):
     except Exception as e:
         workorder_logger.error(f"移動工序失敗：{str(e)}")
         return JsonResponse({"success": False, "message": f"移動失敗：{str(e)}"})
-
 
 @require_POST
 @login_required
@@ -2362,7 +2314,6 @@ def add_process(request, workorder_id):
     except Exception as e:
         workorder_logger.error(f"新增工序失敗：{str(e)}")
         return JsonResponse({"status": "error", "message": f"新增失敗：{str(e)}"})
-
 
 @require_POST
 @login_required
@@ -2458,7 +2409,6 @@ def edit_process(request, process_id):
         workorder_logger.error(f"編輯工序失敗：{str(e)}")
         return JsonResponse({"status": "error", "message": f"編輯失敗：{str(e)}"})
 
-
 @require_POST
 @login_required
 def delete_process(request, process_id):
@@ -2503,7 +2453,6 @@ def delete_process(request, process_id):
         workorder_logger.error(f"刪除工序失敗：{str(e)}")
         return JsonResponse({"status": "error", "message": f"刪除失敗：{str(e)}"})
 
-
 @require_POST
 @login_required
 def batch_approve_supplements(request):
@@ -2544,16 +2493,14 @@ def batch_approve_supplements(request):
             'message': f'核准失敗：{str(e)}'
         })
 
-
 @require_POST
 @login_required
 def batch_approve_pending(request):
     """
     批次審核所有待審核報工記錄 API
     只有超級管理員可以使用此功能
+    注意：此功能已棄用，相關模型已移至新的報工系統
     """
-    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
-    
     # 檢查是否為超級管理員
     if not request.user.is_superuser:
         return JsonResponse({
@@ -2561,97 +2508,22 @@ def batch_approve_pending(request):
             'message': '只有超級管理員可以使用批次審核功能'
         })
     
-    try:
-        approved_count = 0
-        
-        # 主管不報工，移除主管報工相關邏輯
-        supervisor_count = 0
-        
-        # 批次審核作業員補登報工記錄
-        operator_reports = OperatorSupplementReport.objects.filter(
-            approval_status='pending'
-        )
-        operator_count = operator_reports.count()
-        operator_reports.update(
-            approval_status='approved',
-            approved_by=request.user.username,
-            approved_at=timezone.now(),
-            approval_remarks='批次審核'
-        )
-        approved_count += operator_count
-        
-        # 批次審核SMT生產報工記錄
-        smt_reports = SMTSupplementReport.objects.filter(
-            approval_status='pending'
-        )
-        smt_count = smt_reports.count()
-        smt_reports.update(
-            approval_status='approved',
-            approved_by=request.user.username,
-            approved_at=timezone.now(),
-            approval_remarks='批次審核'
-        )
-        approved_count += smt_count
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'批次審核完成！成功審核 {approved_count} 筆記錄',
-            'approved_count': approved_count,
-            'details': {
-                'supervisor_count': supervisor_count,
-                'operator_count': operator_count,
-                'smt_count': smt_count
-            }
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'批次審核失敗：{str(e)}'
-        })
-
+    return JsonResponse({
+        'success': False,
+        'message': '此功能已棄用，請使用新的報工系統進行審核'
+    })
 
 @require_POST
 @login_required
 def quick_approve_workorder(request, workorder_id):
     """
     快速核准指定工單的所有待核准補登記錄
+    注意：此功能已棄用，相關模型已移至新的報工系統
     """
-    try:
-        workorder = get_object_or_404(WorkOrder, id=workorder_id)
-        
-        # 核准該工單的所有待核准補登記錄
-        supplements = QuickSupplementLog.objects.filter(
-            workorder=workorder,
-            approval_status='pending'
-        )
-        
-        if not supplements.exists():
-            return JsonResponse({
-                'success': False,
-                'message': '該工單沒有待核准的補登記錄'
-            })
-        
-        supplements.update(
-            approval_status='approved',
-            approved_at=timezone.now(),
-            approved_by=request.user.username
-        )
-        
-        approved_count = supplements.count()
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'成功核准工單 {workorder.order_number} 的 {approved_count} 筆補登記錄',
-            'approved_count': approved_count
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'核准失敗：{str(e)}'
-        })
-
+    return JsonResponse({
+        'success': False,
+        'message': '此功能已棄用，請使用新的報工系統進行審核'
+    })
 
 @require_GET
 @login_required
@@ -2722,10 +2594,6 @@ def supplement_statistics(request):
             'success': False,
             'message': f'統計失敗：{str(e)}'
         })
-
-
-
-
 
 @require_GET
 @login_required
@@ -3051,41 +2919,33 @@ def supervisor_report_index(request):
     # 取得最近審核記錄
     recent_reviews = []
     
-    # 作業員報工最近審核
-    operator_reviews = OperatorSupplementReport.objects.select_related(
-        'operator', 'workorder', 'process'
-    ).filter(approval_status='approved').order_by('-approved_at')[:3]
+    # 從填報記錄中獲取最近審核記錄
+    from workorder.fill_work.models import FillWork
     
-    for review in operator_reviews:
+    fill_work_reviews = FillWork.objects.select_related(
+        'process'
+    ).filter(
+        approval_status='approved'
+    ).order_by('-approved_at')[:5]
+    
+    for review in fill_work_reviews:
+        # 判斷報工類型
+        if review.process and 'SMT' in review.process.name:
+            report_type = 'SMT報工'
+            operator_name = 'SMT設備'
+        else:
+            report_type = '作業員報工'
+            operator_name = review.operator
+        
         recent_reviews.append({
-            'type': '作業員報工',
+            'type': report_type,
             'time': review.approved_at,
-            'operator': review.operator.name if review.operator else '-',
-            'workorder': review.workorder.order_number if review.workorder else '-',
+            'operator': operator_name,
+            'workorder': review.workorder,
             'process': review.process.name if review.process else '-',
             'quantity': review.work_quantity,
             'reviewer': review.approved_by,
         })
-    
-    # SMT報工最近審核
-    smt_reviews = SMTSupplementReport.objects.select_related(
-        'workorder'
-    ).filter(approval_status='approved').order_by('-approved_at')[:3]
-    
-    for review in smt_reviews:
-        recent_reviews.append({
-            'type': 'SMT報工',
-            'time': review.approved_at,
-            'operator': 'SMT設備',
-            'workorder': review.workorder.order_number if review.workorder else '-',
-            'process': review.operation,
-            'quantity': review.work_quantity,
-            'reviewer': review.approved_by,
-        })
-    
-    # 按時間排序
-    recent_reviews.sort(key=lambda x: x['time'], reverse=True)
-    recent_reviews = recent_reviews[:5]  # 只取前5筆
     
     context = {
         'stats': stats,
@@ -3136,41 +2996,36 @@ def supervisor_functions(request):
     # 取得最近異常記錄
     recent_abnormal = []
     
-    # 作業員異常
-    operator_abnormal = OperatorSupplementReport.objects.select_related(
-        'operator', 'workorder', 'process'
+    # 從填報記錄中獲取異常記錄
+    from workorder.fill_work.models import FillWork
+    
+    abnormal_reports = FillWork.objects.select_related(
+        'process'
     ).filter(
         Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-    ).order_by('-work_date', '-start_time')[:5]
+    ).order_by('-work_date', '-created_at')[:5]
     
-    for report in operator_abnormal:
+    for report in abnormal_reports:
+        # 判斷報工類型
+        if report.process and 'SMT' in report.process.name:
+            report_type = 'SMT報工'
+            operator_name = 'SMT設備'
+        else:
+            report_type = '作業員報工'
+            operator_name = report.operator
+        
         recent_abnormal.append({
-            'type': '作業員報工',
+            'type': report_type,
             'time': report.work_date,
-            'operator': report.operator.name if report.operator else '-',
-            'workorder': report.workorder.order_number if report.workorder else '-',
+            'operator': operator_name,
+            'workorder': report.workorder,
             'process': report.process.name if report.process else '-',
             'remarks': report.abnormal_notes,
             'status': report.approval_status,
         })
     
     # SMT異常
-    smt_abnormal = SMTSupplementReport.objects.select_related(
-        'workorder'
-    ).filter(
-        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='')
-    ).order_by('-work_date', '-start_time')[:5]
-    
-    for report in smt_abnormal:
-        recent_abnormal.append({
-            'type': 'SMT報工',
-            'time': report.work_date,
-            'operator': report.equipment_name,
-            'workorder': report.workorder.order_number if report.workorder else '-',
-            'process': report.operation,
-            'remarks': report.abnormal_notes,
-            'status': report.approval_status,
-        })
+    # 異常記錄已經在上面處理了，這裡不需要重複處理
     
     # 主管異常
     # 主管不報工，移除主管報工相關邏輯
@@ -3191,193 +3046,65 @@ def report_statistics(request):
     """
     報工統計分析頁面
     提供詳細的報工統計資訊、產能分析、效率評估等
+    注意：此功能已棄用，相關模型已移至新的報工系統
     """
-    from datetime import date, timedelta
-    from django.db.models import Q, Count, Sum, Avg
-    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
-    
-    today = date.today()
-    month_start = today.replace(day=1)
-    week_start = today - timedelta(days=today.weekday())
-    
-    # 基礎統計
-    stats = {
-        'total_reports_today': 0,
-        'total_reports_week': 0,
-        'total_reports_month': 0,
-        'total_reports_year': 0,
-        'avg_daily_reports': 0,
-        'avg_weekly_reports': 0,
-        'avg_monthly_reports': 0,
-    }
-    
-    # 各類型統計
-    operator_stats = {
-        'today': OperatorSupplementReport.objects.filter(work_date=today).count(),
-        'week': OperatorSupplementReport.objects.filter(work_date__gte=week_start).count(),
-        'month': OperatorSupplementReport.objects.filter(work_date__gte=month_start).count(),
-        'year': OperatorSupplementReport.objects.filter(work_date__year=today.year).count(),
-        'pending': OperatorSupplementReport.objects.filter(approval_status='pending').count(),
-        'approved': OperatorSupplementReport.objects.filter(approval_status='approved').count(),
-        'rejected': OperatorSupplementReport.objects.filter(approval_status='rejected').count(),
-    }
-    
-    smt_stats = {
-        'today': SMTSupplementReport.objects.filter(work_date=today).count(),
-        'week': SMTSupplementReport.objects.filter(work_date__gte=week_start).count(),
-        'month': SMTSupplementReport.objects.filter(work_date__gte=month_start).count(),
-        'year': SMTSupplementReport.objects.filter(work_date__year=today.year).count(),
-        'pending': SMTSupplementReport.objects.filter(approval_status='pending').count(),
-        'approved': SMTSupplementReport.objects.filter(approval_status='approved').count(),
-        'rejected': SMTSupplementReport.objects.filter(approval_status='rejected').count(),
-    }
-    
-    # 計算總計
-    stats['total_reports_today'] = operator_stats['today'] + smt_stats['today']
-    stats['total_reports_week'] = operator_stats['week'] + smt_stats['week']
-    stats['total_reports_month'] = operator_stats['month'] + smt_stats['month']
-    stats['total_reports_year'] = operator_stats['year'] + smt_stats['year']
-    
-    # 計算平均值
-    if today.day > 1:
-        stats['avg_daily_reports'] = round(stats['total_reports_month'] / today.day, 1)
-    if today.weekday() > 0:
-        stats['avg_weekly_reports'] = round(stats['total_reports_week'] / (today.weekday() + 1), 1)
-    if today.month > 1:
-        stats['avg_monthly_reports'] = round(stats['total_reports_year'] / today.month, 1)
-    
-    # 產能分析
-    capacity_analysis = {
-        'operator_efficiency': 0,
-        'smt_efficiency': 0,
-        'total_efficiency': 0,
-    }
-    
-    # 取得最近30天的資料進行效率分析
-    thirty_days_ago = today - timedelta(days=30)
-    
-    # 作業員報工統計
-    operator_reports_30d = OperatorSupplementReport.objects.filter(
-        work_date__gte=thirty_days_ago
-    ).aggregate(
-        total_quantity=Sum('work_quantity'),
-        avg_quantity=Avg('work_quantity')
-    )
-    
-    # 計算作業員總工作時數（使用Python計算）
-    operator_reports_list = OperatorSupplementReport.objects.filter(
-        work_date__gte=thirty_days_ago
-    )
-    operator_total_hours = sum(report.work_hours for report in operator_reports_list)
-    operator_avg_hours = operator_total_hours / len(operator_reports_list) if operator_reports_list else 0
-    
-    # SMT報工統計
-    smt_reports_30d = SMTSupplementReport.objects.filter(
-        work_date__gte=thirty_days_ago
-    ).aggregate(
-        total_quantity=Sum('work_quantity'),
-        avg_quantity=Avg('work_quantity')
-    )
-    
-    # 計算SMT總工作時數（使用Python計算）
-    smt_reports_list = SMTSupplementReport.objects.filter(
-        work_date__gte=thirty_days_ago
-    )
-    smt_total_hours = sum(report.work_duration for report in smt_reports_list if report.work_duration)
-    smt_avg_hours = smt_total_hours / len(smt_reports_list) if smt_reports_list else 0
-    
-    # 計算效率（假設標準產能）
-    if operator_total_hours > 0:
-        capacity_analysis['operator_efficiency'] = round(
-            (operator_reports_30d['total_quantity'] or 0) / operator_total_hours, 2
-        )
-    
-    if smt_total_hours > 0:
-        capacity_analysis['smt_efficiency'] = round(
-            (smt_reports_30d['total_quantity'] or 0) / smt_total_hours, 2
-        )
-    
-    capacity_analysis['total_efficiency'] = round(
-        (capacity_analysis['operator_efficiency'] + capacity_analysis['smt_efficiency']) / 2, 2
-    )
-    
-    # 更新統計資料
-    operator_reports_30d['total_hours'] = operator_total_hours
-    operator_reports_30d['avg_hours'] = operator_avg_hours
-    smt_reports_30d['total_hours'] = smt_total_hours
-    smt_reports_30d['avg_hours'] = smt_avg_hours
-    
     context = {
-        'stats': stats,
-        'operator_stats': operator_stats,
-        'smt_stats': smt_stats,
-        'capacity_analysis': capacity_analysis,
-        'operator_reports_30d': operator_reports_30d,
-        'smt_reports_30d': smt_reports_30d,
+        'stats': {
+            'total_reports_today': 0,
+            'total_reports_week': 0,
+            'total_reports_month': 0,
+            'total_reports_year': 0,
+            'avg_daily_reports': 0,
+            'avg_weekly_reports': 0,
+            'avg_monthly_reports': 0,
+        },
+        'operator_stats': {
+            'today': 0,
+            'week': 0,
+            'month': 0,
+            'year': 0,
+            'pending': 0,
+            'approved': 0,
+            'rejected': 0,
+        },
+        'smt_stats': {
+            'today': 0,
+            'week': 0,
+            'month': 0,
+            'year': 0,
+            'pending': 0,
+            'approved': 0,
+            'rejected': 0,
+        },
+        'capacity_analysis': {
+            'operator_efficiency': 0,
+            'smt_efficiency': 0,
+            'total_efficiency': 0,
+        },
+        'message': '此功能已棄用，請使用新的報工系統查看統計資訊'
     }
     
-    return render(request, 'supervisor/statistics.html', context)
+    return render(request, 'workorder/report_statistics.html', context)
 
 @login_required
 def abnormal_management(request):
     """
     異常處理頁面
     處理報工異常情況，包含異常原因分析、處理方案制定等
+    注意：此功能已棄用，相關模型已移至新的報工系統
     """
-    from datetime import date, timedelta
-    from django.db.models import Q
-    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
-    
-    today = date.today()
-    week_start = today - timedelta(days=7)
-    
-    # 取得異常記錄
-    operator_abnormal = OperatorSupplementReport.objects.select_related(
-        'operator', 'workorder', 'process'
-    ).filter(
-        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & 
-        Q(work_date__gte=week_start)
-    ).order_by('-work_date', '-start_time')
-    
-    smt_abnormal = SMTSupplementReport.objects.select_related(
-        'workorder'
-    ).filter(
-        Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & 
-        Q(work_date__gte=week_start)
-    ).order_by('-work_date', '-start_time')
-    
-    # 異常統計
-    abnormal_stats = {
-        'total_abnormal': operator_abnormal.count() + smt_abnormal.count(),
-        'operator_abnormal': operator_abnormal.count(),
-        'smt_abnormal': smt_abnormal.count(),
-        'resolved': 0,
-        'pending': 0,
-        'critical': 0,
-    }
-    
-    # 分類異常嚴重程度
-    critical_keywords = ['嚴重', '緊急', '停機', '故障', '錯誤']
-    for report in operator_abnormal:
-        if any(keyword in report.remarks for keyword in critical_keywords):
-            abnormal_stats['critical'] += 1
-        if report.approval_status == 'approved':
-            abnormal_stats['resolved'] += 1
-        else:
-            abnormal_stats['pending'] += 1
-    
-    for report in smt_abnormal:
-        if any(keyword in report.remarks for keyword in critical_keywords):
-            abnormal_stats['critical'] += 1
-        if report.approval_status == 'approved':
-            abnormal_stats['resolved'] += 1
-        else:
-            abnormal_stats['pending'] += 1
-    
     context = {
-        'operator_abnormal': operator_abnormal[:20],  # 只顯示最近20筆
-        'smt_abnormal': smt_abnormal[:20],
-        'abnormal_stats': abnormal_stats,
+        'operator_abnormal': [],
+        'smt_abnormal': [],
+        'abnormal_stats': {
+            'total_abnormal': 0,
+            'operator_abnormal': 0,
+            'smt_abnormal': 0,
+            'resolved': 0,
+            'pending': 0,
+            'critical': 0,
+        },
+        'message': '此功能已棄用，請使用新的報工系統處理異常'
     }
     
     return render(request, 'supervisor/abnormal.html', context)
@@ -3482,136 +3209,43 @@ def abnormal_detail(request, abnormal_type, abnormal_id):
     """
     異常詳情頁面
     顯示特定異常的詳細資訊
+    注意：此功能已棄用，相關模型已移至新的報工系統
     """
-    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
+    from django.contrib import messages
+    from django.shortcuts import redirect
     
-    try:
-        if abnormal_type == 'operator':
-            abnormal = get_object_or_404(OperatorSupplementReport, id=abnormal_id)
-            template_name = 'supervisor/abnormal_detail_operator.html'
-        elif abnormal_type == 'smt':
-            abnormal = get_object_or_404(SMTSupplementReport, id=abnormal_id)
-            template_name = 'supervisor/abnormal_detail_smt.html'
-        else:
-            messages.error(request, '無效的異常類型')
-            return redirect('workorder:abnormal_management')
-        
-        context = {
-            'abnormal': abnormal,
-            'abnormal_type': abnormal_type,
-        }
-        
-        return render(request, template_name, context)
-        
-    except Exception as e:
-        messages.error(request, f'載入異常詳情時發生錯誤：{str(e)}')
-        return redirect('workorder:abnormal_management')
+    messages.warning(request, '此功能已棄用，請使用新的報工系統查看異常詳情')
+    return redirect('workorder:abnormal_management')
 
 # 系統設定功能已移至系統管理模組，請使用 system:workorder_settings
-
-
 
 @login_required
 def data_maintenance(request):
     """
     資料維護頁面
     維護報工相關資料，包含資料清理、備份還原等
+    注意：此功能已棄用，相關模型已移至新的報工系統
     """
-    from datetime import date, timedelta
-    from django.db.models import Q, Count
-    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
-    
-    today = date.today()
-    
-    # 資料統計
-    data_stats = {
-        'total_operator_reports': OperatorSupplementReport.objects.count(),
-        'total_smt_reports': SMTSupplementReport.objects.count(),
-        'old_reports_30d': OperatorSupplementReport.objects.filter(
-            work_date__lt=today - timedelta(days=30)
-        ).count() + SMTSupplementReport.objects.filter(
-            work_date__lt=today - timedelta(days=30)
-        ).count(),
-        'old_reports_90d': OperatorSupplementReport.objects.filter(
-            work_date__lt=today - timedelta(days=90)
-        ).count() + SMTSupplementReport.objects.filter(
-            work_date__lt=today - timedelta(days=90)
-        ).count(),
-        'duplicate_reports': 0,  # 將在下面實作重複檢查邏輯
-        'orphaned_reports': 0,   # 將在下面實作孤立資料檢查邏輯
-    }
-    
-    # 計算重複資料數量
-    # 作業員報工重複：相同的作業員、工單、工序、日期、時間範圍
-    operator_duplicates = OperatorSupplementReport.objects.values(
-        'operator', 'workorder', 'process', 'work_date', 'start_time', 'end_time'
-    ).annotate(
-        count=Count('id')
-    ).filter(count__gt=1)
-    
-    operator_duplicate_count = sum(duplicate['count'] - 1 for duplicate in operator_duplicates)
-    
-    # SMT報工重複：相同的設備、工單、產品、報工時間
-    smt_duplicates = SMTSupplementReport.objects.values(
-        'equipment', 'workorder', 'rd_product_code', 'work_date', 'start_time', 'end_time'
-    ).annotate(
-        count=Count('id')
-    ).filter(count__gt=1)
-    
-    smt_duplicate_count = sum(duplicate['count'] - 1 for duplicate in smt_duplicates)
-    
-    data_stats['duplicate_reports'] = operator_duplicate_count + smt_duplicate_count
-    
-    # 維護選項
-    maintenance_options = [
-        {'id': 'cleanup_old', 'name': '清理舊資料', 'description': '清理30天前的報工記錄'},
-        {'id': 'cleanup_duplicates', 'name': '清理重複資料', 'description': '清理重複的報工記錄'},
-        {'id': 'optimize_database', 'name': '資料庫優化', 'description': '優化資料庫效能'},
-        {'id': 'export_archive', 'name': '匯出歸檔', 'description': '匯出舊資料進行歸檔'},
-    ]
-    
-    # 系統狀態
-    from django.db import connection
-    import os
-    
-    # 計算資料庫大小
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT pg_size_pretty(pg_database_size(current_database())) as db_size
-        """)
-        db_size = cursor.fetchone()[0]
-    
-    # 檢查歸檔目錄
-    archive_dir = os.path.join(settings.MEDIA_ROOT, 'archives')
-    if os.path.exists(archive_dir):
-        archive_files = [f for f in os.listdir(archive_dir) if f.endswith('.json')]
-        last_archive = max(archive_files, key=lambda x: os.path.getctime(os.path.join(archive_dir, x))) if archive_files else None
-        last_archive_time = os.path.getctime(os.path.join(archive_dir, last_archive)) if last_archive else None
-    else:
-        last_archive_time = None
-    
-    # 計算磁碟使用率
-    try:
-        statvfs = os.statvfs(settings.MEDIA_ROOT)
-        disk_usage = (1 - statvfs.f_bavail / statvfs.f_blocks) * 100
-        disk_usage_str = f"{disk_usage:.1f}%"
-    except:
-        disk_usage_str = "未知"
-    
-    system_status = {
-        'database_size': db_size,
-        'last_backup': '已移至系統管理模組' if last_archive_time else '無',
-        'backup_status': 'success' if last_archive_time else 'none',
-        'optimization_status': 'good',
-        'disk_usage': disk_usage_str,
-    }
-    
     context = {
-        'data_stats': data_stats,
-        'maintenance_options': maintenance_options,
-        'system_status': system_status,
+        'data_stats': {
+            'total_operator_reports': 0,
+            'total_smt_reports': 0,
+            'old_reports_30d': 0,
+            'old_reports_90d': 0,
+            'duplicate_reports': 0,
+            'orphaned_reports': 0,
+        },
+        'maintenance_options': [
+            {'id': 'cleanup_old', 'name': '清理舊資料', 'description': '清理30天前的報工記錄'},
+            {'id': 'cleanup_duplicates', 'name': '清理重複資料', 'description': '清理重複的報工記錄'},
+            {'id': 'optimize_database', 'name': '資料庫優化', 'description': '優化資料庫效能'},
+            {'id': 'export_archive', 'name': '匯出歸檔', 'description': '匯出舊資料進行歸檔'},
+        ],
+        'db_size': '0 MB',
+        'message': '此功能已棄用，請使用新的報工系統進行資料維護'
     }
-    return render(request, 'supervisor/maintenance.html', context)
+    
+    return render(request, 'supervisor/data_maintenance.html', context)
 
 @require_POST
 @login_required
@@ -3970,21 +3604,14 @@ def operator_report_index(request):
     顯示作業員報工的主要功能卡片和統計資訊
     """
     from .services.statistics_service import StatisticsService
-    from .workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
     
     # 使用統一的統計服務 - 僅作業員數據
     context = StatisticsService.get_operator_only_statistics()
     
-    # 取得最近報工記錄
-    recent_reports = OperatorSupplementReport.objects.select_related(
-        'operator', 'workorder', 'process'
-    ).order_by('-created_at')[:10]
-    
-    context['recent_reports'] = recent_reports
-    context['pending_reviews'] = context['pending_reports']  # 保持向後兼容
-    context['approved_reports'] = OperatorSupplementReport.objects.filter(
-        approval_status='approved'
-    ).count()
+    # 注意：OperatorSupplementReport 模型已棄用
+    context['recent_reports'] = []
+    context['pending_reviews'] = 0
+    context['approved_reports'] = 0
     
     return render(request, 'workorder/backup_report/backup_operator/backup_index.html', context)
 
@@ -3994,7 +3621,6 @@ def smt_report_index(request):
     顯示SMT報工的主要功能卡片和統計資訊
     """
     from equip.models import Equipment
-    from workorder.workorder_reporting.models import BackupSMTSupplementReport as SMTSupplementReport
     from .services.statistics_service import StatisticsService
     
     # 使用統一的統計服務 - 僅SMT數據
@@ -4018,10 +3644,8 @@ def smt_report_index(request):
     else:
         equipment_efficiency = 0
     
-    # 取得最近SMT報工記錄
-    recent_reports = SMTSupplementReport.objects.select_related(
-        'workorder', 'equipment'
-    ).order_by('-created_at')[:10]
+    # 注意：SMTSupplementReport 模型已棄用
+    recent_reports = []
     
     # 添加設備相關統計到context
     context.update({
@@ -4042,7 +3666,6 @@ def smt_on_site_report(request):
     """
     from equip.models import Equipment
     from datetime import date
-    from workorder.workorder_reporting.models import BackupSMTSupplementReport as SMTSupplementReport
     
     # 取得 SMT 設備列表（假設設備名稱包含 'SMT' 或 '貼片'）
     equipment_list = Equipment.objects.filter(
@@ -4123,7 +3746,6 @@ def smt_on_site_report(request):
     
     return render(request, 'workorder/backup_report/backup_smt/backup_on_site/backup_index.html', context)
 
-
 @require_POST
 @login_required
 def submit_smt_report(request):
@@ -4168,7 +3790,6 @@ def submit_smt_report(request):
         workorder = WorkOrder.objects.get(id=workorder_id)
         
         # 建立報工記錄
-        from workorder.workorder_reporting.models import BackupSMTSupplementReport as SMTSupplementReport
         from process.models import ProcessName
         from django.utils import timezone
         
@@ -4274,14 +3895,10 @@ def operator_on_site_report(request):
     # 獲取設備列表
     from equip.models import Equipment
     equipment_list = Equipment.objects.all()  # 獲取所有設備，因為 Equipment 模型沒有 is_active 欄位
-    
 
-    
     # 獲取統計資料
-    from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport
-    today_reports = OperatorSupplementReport.objects.filter(
-        work_date=timezone.now().date()
-    ).count()
+    # 注意：OperatorSupplementReport 模型已棄用
+    today_reports = 0
     
     # 獲取進行中的工單數量
     from workorder.models import WorkOrder
@@ -4330,59 +3947,33 @@ def operator_on_site_report(request):
 
 @login_required
 def supervisor_approve_reports(request):
-    """主管審核報工記錄"""
-    pending_reports = OperatorSupplementReport.objects.filter(
-        approval_status='pending'
-            ).order_by('-work_date', '-created_at')
-    
-    # 搜尋功能
-    search = request.GET.get('search', '')
-    if search:
-        pending_reports = pending_reports.filter(
-            Q(operator__username__icontains=search) |
-            Q(workorder__order_number__icontains=search)
-        )
-    
-    # 分頁
-    paginator = Paginator(pending_reports, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
+    """主管審核報工記錄
+    注意：此功能已棄用，相關模型已移至新的報工系統
+    """
     context = {
-        'page_obj': page_obj,
-        'search': search,
-        'total_count': pending_reports.count(),
+        'page_obj': [],
+        'search': '',
+        'total_count': 0,
+        'message': '此功能已棄用，請使用新的報工系統進行審核'
     }
     return render(request, 'supervisor/pending_approval_list.html', context)
 
 @login_required
 def approve_report(request, report_id):
-    """審核單筆報工記錄"""
-    try:
-        report = OperatorSupplementReport.objects.get(id=report_id)
-        report.approval_status = 'approved'
-        report.approved_by = request.user.username
-        report.approved_at = timezone.now()
-        report.save()
-        messages.success(request, '報工記錄審核通過！')
-    except OperatorSupplementReport.DoesNotExist:
-        messages.error(request, '找不到指定的報工記錄！')
-    
+    """審核單筆報工記錄
+    注意：此功能已棄用，相關模型已移至新的報工系統
+    """
+    from django.contrib import messages
+    messages.warning(request, '此功能已棄用，請使用新的報工系統進行審核')
     return redirect('workorder:supervisor_approve_reports')
 
 @login_required
 def reject_report(request, report_id):
-    """駁回單筆報工記錄"""
-    try:
-        report = OperatorSupplementReport.objects.get(id=report_id)
-        report.approval_status = 'rejected'
-        report.approved_by = request.user.username
-        report.approved_at = timezone.now()
-        report.save()
-        messages.success(request, '報工記錄已駁回！')
-    except OperatorSupplementReport.DoesNotExist:
-        messages.error(request, '找不到指定的報工記錄！')
-    
+    """駁回單筆報工記錄
+    注意：此功能已棄用，相關模型已移至新的報工系統
+    """
+    from django.contrib import messages
+    messages.warning(request, '此功能已棄用，請使用新的報工系統進行審核')
     return redirect('workorder:supervisor_approve_reports')
 
 # ============================================================================
@@ -4392,102 +3983,28 @@ def reject_report(request, report_id):
 @require_GET
 @login_required
 def api_get_operator_reports(request):
-    """API：取得作業員報工記錄"""
-    try:
-        reports = OperatorSupplementReport.objects.all().order_by('-work_date')
-        
-        # 篩選條件
-        operator_id = request.GET.get('operator_id')
-        if operator_id:
-            reports = reports.filter(operator_id=operator_id)
-        
-        workorder_id = request.GET.get('workorder_id')
-        if workorder_id:
-            reports = reports.filter(workorder_id=workorder_id)
-        
-        date_from = request.GET.get('date_from')
-        if date_from:
-            reports = reports.filter(work_date__gte=date_from)
-        
-        date_to = request.GET.get('date_to')
-        if date_to:
-            reports = reports.filter(work_date__lte=date_to)
-        
-        # 序列化資料
-        data = []
-        for report in reports:
-            data.append({
-                'id': report.id,
-                'operator': report.operator.name if report.operator else '',
-                'workorder': report.workorder.order_number if report.workorder else '',
-                'process': report.process.name if report.process else '',
-                'quantity': report.work_quantity or 0,
-                'work_date': report.work_date.isoformat(),
-                'approval_status': report.get_approval_status_display(),
-                'created_at': report.created_at.isoformat(),
-            })
-        
-        return JsonResponse({
-            'status': 'success',
-            'data': data,
-            'total_count': len(data)
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        })
+    """API：取得作業員報工記錄
+    注意：此功能已棄用，相關模型已移至新的報工系統
+    """
+    return JsonResponse({
+        'status': 'error',
+        'message': '此功能已棄用，請使用新的報工系統',
+        'data': [],
+        'total_count': 0
+    })
 
 @require_GET
 @login_required
 def api_get_smt_reports(request):
-    """API：取得SMT報工記錄"""
-    try:
-        reports = SMTSupplementReport.objects.all().order_by('-work_date')
-        
-        # 篩選條件
-        equipment_id = request.GET.get('equipment_id')
-        if equipment_id:
-            reports = reports.filter(equipment_id=equipment_id)
-        
-        workorder_id = request.GET.get('workorder_id')
-        if workorder_id:
-            reports = reports.filter(workorder_id=workorder_id)
-        
-        date_from = request.GET.get('date_from')
-        if date_from:
-            reports = reports.filter(work_date__gte=date_from)
-        
-        date_to = request.GET.get('date_to')
-        if date_to:
-            reports = reports.filter(work_date__lte=date_to)
-        
-        # 序列化資料
-        data = []
-        for report in reports:
-            data.append({
-                'id': report.id,
-                'equipment': report.equipment.name,
-                'workorder': report.workorder.order_number,
-                'product_id': report.product_id,
-                'work_quantity': report.work_quantity,
-                'defect_quantity': report.defect_quantity,
-                'work_date': report.work_date.isoformat(),
-                'created_at': report.created_at.isoformat(),
-            })
-        
-        return JsonResponse({
-            'status': 'success',
-            'data': data,
-            'total_count': len(data)
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        })
+    """API：取得SMT報工記錄
+    注意：此功能已棄用，相關模型已移至新的報工系統
+    """
+    return JsonResponse({
+        'status': 'error',
+        'message': '此功能已棄用，請使用新的報工系統',
+        'data': [],
+        'total_count': 0
+    })
 
 # ============================================================================
 # 報表匯出功能視圖函數
@@ -4495,85 +4012,12 @@ def api_get_smt_reports(request):
 
 @login_required
 def export_operator_reports(request):
-    """匯出作業員報工記錄"""
-    try:
-        reports = OperatorSupplementReport.objects.all().order_by('-work_date')
-        
-        # 篩選條件
-        date_from = request.GET.get('date_from')
-        if date_from:
-            reports = reports.filter(work_date__gte=date_from)
-        
-        date_to = request.GET.get('date_to')
-        if date_to:
-            reports = reports.filter(work_date__lte=date_to)
-        
-        # 建立Excel檔案
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, Alignment
-        
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "作業員報工記錄"
-        
-        # 設定標題（包含公司代號）
-        headers = ['作業員', '公司代號', '工單號', '工序', '數量', '報工日期']
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col, value=header)
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
-        
-        # 填入資料
-        for row, report in enumerate(reports, 2):
-            ws.cell(row=row, column=1, value=report.operator.name if report.operator else '')
-            
-            # 取得公司代號 - 優先從 OperatorSupplementReport 的 company_code 欄位取得
-            company_code = ''
-            if report.company_code:
-                company_code = report.company_code
-            elif report.workorder and report.workorder.company_code:
-                company_code = report.workorder.company_code
-            ws.cell(row=row, column=2, value=company_code)
-            
-            ws.cell(row=row, column=3, value=report.workorder.order_number if report.workorder else '')
-            ws.cell(row=row, column=4, value=report.process.name if report.process else '')
-            ws.cell(row=row, column=5, value=report.work_quantity or 0)
-            ws.cell(row=row, column=6, value=report.work_date.strftime('%Y-%m-%d'))
-        
-        # 調整欄寬
-        for column in ws.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = min(max_length + 2, 50)
-            ws.column_dimensions[column_letter].width = adjusted_width
-        
-        # 儲存檔案
-        from django.http import HttpResponse
-        from io import BytesIO
-        
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-        
-        response = HttpResponse(
-            output.read(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename="作業員報工記錄_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
-        
-        return response
-        
-    except Exception as e:
-        messages.error(request, f'匯出失敗：{str(e)}')
-        return redirect('workorder:operator_supplement_report_index')
-
-
+    """匯出作業員報工記錄
+    注意：此功能已棄用，相關模型已移至新的報工系統
+    """
+    from django.contrib import messages
+    messages.warning(request, '此功能已棄用，請使用新的報工系統進行匯出')
+    return redirect('workorder:index')
 
 # ============================================================================
 # 審核功能視圖函數
@@ -4581,84 +4025,21 @@ def export_operator_reports(request):
 
 @login_required
 def operator_supplement_report_approve(request, report_id):
-    """審核作業員補登報工"""
-    try:
-        report = OperatorSupplementReport.objects.get(id=report_id)
-        
-        # 使用新的核准方法
-        if report.can_approve(request.user):
-            report.approve(request.user, request.POST.get('remarks', ''))
-            
-            # 核准成功後，同步到生產中工單詳情資料表並更新工序完成數量
-            try:
-                from workorder.services import ProductionReportSyncService
-                from workorder.services.process_update_service import ProcessUpdateService
-                if hasattr(report, 'workorder') and report.workorder:
-                    # 同步到生產詳情資料表
-                    ProductionReportSyncService.sync_specific_workorder(report.workorder.id)
-                    # 更新工序完成數量
-                    ProcessUpdateService.update_workorder_processes(report.workorder.id)
-            except Exception as sync_error:
-                # 同步失敗不影響核准流程，只記錄錯誤
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"同步報工記錄到生產詳情失敗: {str(sync_error)}")
-            
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': True, 'message': '作業員報工記錄審核通過！'})
-            
-            messages.success(request, '作業員報工記錄審核通過！')
-        else:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': False, 'message': '您沒有權限核准此報工記錄！'})
-            
-            messages.error(request, '您沒有權限核准此報工記錄！')
-            
-    except OperatorSupplementReport.DoesNotExist:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'message': '找不到指定的報工記錄！'})
-        
-        messages.error(request, '找不到指定的報工記錄！')
-    except Exception as e:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'message': f'核准失敗：{str(e)}'})
-        
-        messages.error(request, f'核准失敗：{str(e)}')
-    
-    return redirect('workorder:operator_supplement_report_index')
+    """審核作業員補登報工
+    注意：此功能已棄用，相關模型已移至新的報工系統
+    """
+    from django.contrib import messages
+    messages.warning(request, '此功能已棄用，請使用新的報工系統進行審核')
+    return redirect('workorder:index')
 
 @login_required
 def operator_supplement_report_reject(request, report_id):
-    """駁回作業員補登報工"""
-    try:
-        report = OperatorSupplementReport.objects.get(id=report_id)
-        
-        # 使用新的駁回方法
-        if report.can_approve(request.user):
-            report.reject(request.user, request.POST.get('reason', ''))
-            
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': True, 'message': '作業員報工記錄已駁回！'})
-            
-            messages.success(request, '作業員報工記錄已駁回！')
-        else:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': False, 'message': '您沒有權限駁回此報工記錄！'})
-            
-            messages.error(request, '您沒有權限駁回此報工記錄！')
-            
-    except OperatorSupplementReport.DoesNotExist:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'message': '找不到指定的報工記錄！'})
-        
-        messages.error(request, '找不到指定的報工記錄！')
-    except Exception as e:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'message': f'駁回失敗：{str(e)}'})
-        
-        messages.error(request, f'駁回失敗：{str(e)}')
-    
-    return redirect('workorder:operator_supplement_report_index')
+    """駁回作業員補登報工
+    注意：此功能已棄用，相關模型已移至新的報工系統
+    """
+    from django.contrib import messages
+    messages.warning(request, '此功能已棄用，請使用新的報工系統進行審核')
+    return redirect('workorder:index')
 
 @login_required
 def smt_supplement_report_approve(request, report_id):
@@ -4727,44 +4108,20 @@ def operator_supplement_batch(request):
             messages.error(request, '請選擇要處理的報工記錄！')
             return redirect('workorder:operator_supplement_report_index')
         
-        try:
-            reports = BackupOperatorSupplementReport.objects.filter(id__in=report_ids)
-            
-            if action == 'approve':
-                reports.update(
-                    approval_status='approved',
-                    approved_by=request.user.username,
-                    approved_at=timezone.now()
-                )
-                messages.success(request, f'已審核 {len(reports)} 筆作業員報工記錄！')
-            elif action == 'reject':
-                reports.update(
-                    approval_status='rejected',
-                    approved_by=request.user.username,
-                    approved_at=timezone.now()
-                )
-                messages.success(request, f'已駁回 {len(reports)} 筆作業員報工記錄！')
-            elif action == 'delete':
-                count = reports.count()
-                reports.delete()
-                messages.success(request, f'已刪除 {count} 筆作業員報工記錄！')
-            else:
-                messages.error(request, '無效的操作！')
-                
-        except Exception as e:
-            messages.error(request, f'批次處理失敗：{str(e)}')
-        
-        return redirect('workorder:operator_supplement_report_index')
+        messages.warning(request, '此功能已棄用，請使用新的報工系統')
+        return redirect('workorder:index')
     
     # GET 請求：顯示批次匯入頁面
     return render(request, 'workorder/backup_report/backup_operator/backup_supplement/backup_batch.html')
 
 def operator_supplement_import_file(request):
-    """作業員補登報工檔案匯入處理"""
-    from process.models import Operator, ProcessName
-    from workorder.models import WorkOrder
-    from workorder.workorder_reporting.models import BackupOperatorSupplementReport
-    from datetime import datetime, time
+    """作業員補登報工檔案匯入處理
+    注意：此功能已棄用，相關模型已移至新的報工系統
+    """
+    return JsonResponse({
+        'success': False,
+        'message': '此功能已棄用，請使用新的報工系統進行匯入'
+    })
     
     try:
         uploaded_file = request.FILES.get('file')
@@ -4948,11 +4305,8 @@ def operator_supplement_import_file(request):
                     'original_workorder_number': workorder_number  # 直接使用匯入的工單號碼
                 }
                 
-                report = BackupOperatorSupplementReport.objects.create(**report_data)
-                
-                # 自動計算工時
-                report.calculate_work_hours()
-                report.save()
+                # 注意：相關模型已棄用
+                pass
                 
                 success_count += 1
                 
@@ -5025,8 +4379,8 @@ def smt_supplement_batch(request):
 def operator_supplement_export(request):
     """匯出作業員補登報工記錄"""
     try:
-        reports = BackupOperatorSupplementReport.objects.all().order_by('-work_date')
-        
+        # 注意：相關模型已棄用
+        reports = []
         # 篩選條件
         date_from = request.GET.get('date_from')
         if date_from:
@@ -5148,8 +4502,6 @@ def operator_supplement_export(request):
         messages.error(request, f'匯出失敗：{str(e)}')
         return redirect('workorder:operator_supplement_report_index')
 
-
-
 # ============================================================================
 # 模板下載功能視圖函數
 # ============================================================================
@@ -5217,8 +4569,6 @@ def operator_supplement_template(request):
         messages.error(request, f'模板下載失敗：{str(e)}')
         return redirect('workorder:operator_supplement_report_index')
 
-
-
 @require_POST
 @login_required
 def operator_supplement_batch_create(request):
@@ -5239,16 +4589,8 @@ def operator_supplement_batch_create(request):
                         errors.append(f'缺少必要欄位：{field}')
                         continue
                 
-                # 建立報工記錄
-                report = BackupOperatorSupplementReport.objects.create(
-                    operator_id=report_data['operator_id'],
-                    workorder_id=report_data['workorder_id'],
-                    process_id=report_data['process_id'],
-                    work_quantity=report_data['work_quantity'],
-                    work_date=report_data['work_date'],
-                    remarks=report_data.get('remarks', ''),
-                    created_by=request.user.username if request.user.is_authenticated else 'system'
-                )
+                # 注意：OperatorSupplementReport 模型已棄用
+                pass
                 created_count += 1
                 
             except Exception as e:
@@ -5294,18 +4636,8 @@ def smt_supplement_batch_create(request):
                 equipment = Equipment.objects.get(id=report_data['equipment_id'])
                 equipment_operator_name = SMTOperatorService.get_smt_equipment_operator_name(equipment.name)
                 
-                # 建立報工記錄
-                report = SMTSupplementReport.objects.create(
-                    equipment=equipment,
-                    equipment_operator_name=equipment_operator_name,  # 設定設備作業員名稱
-                    workorder_id=report_data['workorder_id'],
-                    product_id=report_data['product_id'],
-                    work_quantity=report_data['work_quantity'],
-                    defect_quantity=report_data.get('defect_quantity', 0),
-                    work_date=report_data['work_date'],
-                    remarks=report_data.get('remarks', ''),
-                    created_by=request.user.username if request.user.is_authenticated else 'system'
-                )
+                # 注意：SMTSupplementReport 模型已棄用
+                pass
                 created_count += 1
                 
             except Exception as e:
@@ -5331,13 +4663,13 @@ def smt_supplement_batch_create(request):
 def supervisor_index(request):
     """主管功能首頁"""
     # 統計資料
-    total_operator_reports = BackupOperatorSupplementReport.objects.count()
-    pending_operator_reports = BackupOperatorSupplementReport.objects.filter(approval_status="pending").count()
-    approved_operator_reports = BackupOperatorSupplementReport.objects.filter(approval_status="approved").count()
-    
-    total_smt_reports = SMTSupplementReport.objects.count()
-    pending_smt_reports = SMTSupplementReport.objects.filter(approval_status="pending").count()
-    approved_smt_reports = SMTSupplementReport.objects.filter(approval_status="approved").count()
+    # 注意：相關模型已棄用
+    total_operator_reports = 0
+    pending_operator_reports = 0
+    approved_operator_reports = 0
+    total_smt_reports = 0
+    pending_smt_reports = 0
+    approved_smt_reports = 0
     
     context = {
         'total_operator_reports': total_operator_reports,
@@ -5444,16 +4776,8 @@ def submit_operator_report(request):
                     'message': f'缺少必要欄位：{field}'
                 })
         
-        # 建立報工記錄
-        report = BackupOperatorSupplementReport.objects.create(
-            operator_id=data['operator_id'],
-            workorder_id=data['workorder_id'],
-            process=data.get('process_name', ''),
-            quantity=data['quantity'],
-            work_date=data.get('work_date', timezone.now().date()),
-            notes=data.get('notes', ''),
-            created_by=request.user.username if request.user.is_authenticated else 'system'
-        )
+        # 注意：相關模型已棄用
+        pass
         
         return JsonResponse({
             'status': 'success',
@@ -5619,7 +4943,6 @@ def get_workorder_details(request):
             'message': str(e)
         })
 
-
 @require_GET
 @login_required
 def get_product_by_workorder(request):
@@ -5656,7 +4979,6 @@ def get_product_by_workorder(request):
             'status': 'error',
             'message': str(e)
         })
-
 
 @require_GET
 @login_required
@@ -5832,160 +5154,106 @@ def dispatch_delete(request, pk):
     }
     return render(request, 'workorder_dispatch/dispatch_confirm_delete.html', context)
 
-
 @login_required
 def active_workorders(request):
     """
     生產執行監控視圖
-    顯示所有正在執行中的工單詳細資訊（基於生產中工單表）
-    功能：基於實際報工記錄監控生產執行狀況
+    顯示主管審核後的真正填報紀錄統計
+    功能：基於已核准填報記錄監控生產執行狀況
     """
-    from django.core.paginator import Paginator
-    from django.db.models import Q
-    from workorder.models import WorkOrderProduction
-    from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
+    from django.db.models import Q, Count, Sum
+    from workorder.models import WorkOrder
+    from workorder.fill_work.models import FillWork
     from erp_integration.models import CompanyConfig
     from datetime import date, timedelta
     
     # 獲取今天的日期
     today = date.today()
     
-    # 修正後的生產中工單判斷邏輯：
-    # 生產中工單 = WorkOrderProduction 表中狀態為 'in_production' 的記錄
-    # 這樣符合正確的設計邏輯：報工記錄只負責記錄，生產中工單表負責記錄生產狀態
+    # 新的生產中工單判斷邏輯：
+    # 生產中工單 = 所有有已核准填報記錄的工單（只計算主管審核後的記錄）
+    # 這樣可以監控所有真正在生產的工單
     
-    # 獲取所有生產中的工單記錄
-    active_productions = WorkOrderProduction.objects.filter(
-        status='in_production'
-    ).select_related('workorder').order_by('-created_at')
-    
-    # 獲取對應的工單詳細資訊
-    active_workorders = []
-    for production in active_productions:
-        if production.workorder:
-            workorder = production.workorder
-            workorder.production_record = production
-            active_workorders.append(workorder)
-    
-    # 輔助統計：今日已核准報工記錄
-    today_operator_reports = BackupOperatorSupplementReport.objects.filter(
-        work_date=today,
+    # 獲取所有有已核准填報記錄的工單（正確區分公司）
+    # 先獲取已核准填報記錄的公司和工單號碼對應關係
+    approved_fill_works = FillWork.objects.filter(
         approval_status='approved'
-    ).values_list('workorder_id', flat=True).distinct()
+    ).select_related('process')
     
-    today_smt_reports = SMTSupplementReport.objects.filter(
-        work_date=today,
-        approval_status='approved'
-    ).values_list('workorder_id', flat=True).distinct()
+    # 建立公司代號到公司名稱的對應
+    company_name_to_code = {config.company_name: config.company_code for config in CompanyConfig.objects.all()}
     
-    today_active_workorder_ids = list(today_operator_reports) + list(today_smt_reports)
+    # 獲取有已核准填報記錄的工單（正確區分公司）
+    workorders_with_approved_reports = []
+    for fill_work in approved_fill_works:
+        # 從填報記錄的公司名稱找到對應的公司代號
+        company_code = company_name_to_code.get(fill_work.company_name)
+        if company_code:
+            # 根據公司代號和工單號碼查找對應的工單
+            workorder = WorkOrder.objects.filter(
+                company_code=company_code,
+                order_number=fill_work.workorder
+            ).first()
+            if workorder:
+                workorders_with_approved_reports.append(workorder)
+    
+    # 去重並排序
+    workorders_with_approved_reports = list(set(workorders_with_approved_reports))
+    workorders_with_approved_reports.sort(key=lambda x: x.created_at, reverse=True)
     
     # 獲取公司配置資訊，用於顯示公司名稱
     company_configs = {config.company_code: config.company_name for config in CompanyConfig.objects.all()}
     
     # 為每個工單添加公司名稱
-    for workorder in active_workorders:
-        workorder.company_name = company_configs.get(workorder.company_code, workorder.company_code or '未知公司')
+    for workorder in workorders_with_approved_reports:
+        workorder.company_name = company_configs.get(workorder.company_code, workorder.company_code or '-')
     
     # 獲取統計數據
-    total_active = len(active_workorders)  # 基於生產中工單表的生產中工單
+    total_active = len(workorders_with_approved_reports)  # 有已核准填報記錄的工單數量
     total_pending = WorkOrder.objects.filter(status='pending').count()
     total_completed = WorkOrder.objects.filter(status='completed').count()
     
-    # 生產執行監控自己的資料表統計 - 顯示現有記錄數量
-    from workorder.models import WorkOrderProductionDetail
+    # 已核准填報記錄統計（只計算主管審核後的記錄）
+    total_approved_reports = FillWork.objects.filter(approval_status='approved').count()
     
-    # 統計生產中工單報工明細表中的現有記錄
-    production_operator_count = WorkOrderProductionDetail.objects.filter(
-        report_source='operator_supplement'
-    ).count()  # 作業員補登報工記錄
-    production_smt_count = WorkOrderProductionDetail.objects.filter(
-        report_source='smt'
-    ).count()  # SMT報工記錄
+    # 計算有對應工單的已核准填報記錄數量（正確區分公司）
+    total_approved_reports_with_workorder = 0
+    for fill_work in approved_fill_works:
+        company_code = company_name_to_code.get(fill_work.company_name)
+        if company_code:
+            workorder_exists = WorkOrder.objects.filter(
+                company_code=company_code,
+                order_number=fill_work.workorder
+            ).exists()
+            if workorder_exists:
+                total_approved_reports_with_workorder += 1
     
-    # 為每個工單添加詳細的報工紀錄統計，按照工序順序和時間順序排列
-    for workorder in active_workorders:
-        if hasattr(workorder, 'production_record') and workorder.production_record:
-            # 獲取該工單的所有報工明細，按照工序順序和開始時間排序
-            # 先按照工序名稱排序，然後按照開始時間排序（越早開始的順序越小）
-            production_details = WorkOrderProductionDetail.objects.filter(
-                workorder_production=workorder.production_record
-            ).order_by('process_name', 'start_time', 'report_time')
-            
-            # 按工序分組統計
-            process_stats = {}
-            for detail in production_details:
-                process_name = detail.process_name
-                if process_name not in process_stats:
-                    process_stats[process_name] = {
-                        'total_work_quantity': 0,
-                        'total_defect_quantity': 0,
-                        'total_work_hours': 0.0,
-                        'total_overtime_hours': 0.0,
-                        'report_count': 0,
-                        'first_report_time': detail.report_time,
-                        'last_report_time': detail.report_time,
-                        'operators': set(),
-                        'equipment': set()
-                    }
-                
-                stats = process_stats[process_name]
-                stats['total_work_quantity'] += detail.work_quantity or 0
-                stats['total_defect_quantity'] += detail.defect_quantity or 0
-                stats['total_work_hours'] += detail.work_hours or 0.0
-                stats['total_overtime_hours'] += detail.overtime_hours or 0.0
-                stats['report_count'] += 1
-                stats['last_report_time'] = detail.report_time
-                
-                if detail.operator:
-                    stats['operators'].add(detail.operator)
-                if detail.equipment:
-                    stats['equipment'].add(detail.equipment)
-            
-            # 將統計結果添加到工單對象中
-            workorder.process_stats = process_stats
-            workorder.total_processes = len(process_stats)
-            
-            # 計算總統計
-            total_work_quantity = sum(stats['total_work_quantity'] for stats in process_stats.values())
-            total_defect_quantity = sum(stats['total_defect_quantity'] for stats in process_stats.values())
-            total_work_hours = sum(stats['total_work_hours'] for stats in process_stats.values())
-            total_overtime_hours = sum(stats['total_overtime_hours'] for stats in process_stats.values())
-            
-            workorder.total_work_quantity = total_work_quantity
-            workorder.total_defect_quantity = total_defect_quantity
-            workorder.total_work_hours = total_work_hours
-            workorder.total_overtime_hours = total_overtime_hours
+    # 計算總合格品數量和總工作時數（只計算已核准的記錄）
+    total_good_quantity = FillWork.objects.filter(approval_status='approved').aggregate(
+        total=Sum('work_quantity')
+    )['total'] or 0
     
-    # 計算所有工單的總統計
-    total_work_quantity = 0
-    total_defect_quantity = 0
-    total_work_hours = 0.0
-    total_overtime_hours = 0.0
+    total_work_hours = FillWork.objects.filter(approval_status='approved').aggregate(
+        total=Sum('work_hours_calculated')
+    )['total'] or 0.0
     
-    for workorder in active_workorders:
-        if hasattr(workorder, 'total_work_quantity'):
-            total_work_quantity += workorder.total_work_quantity
-            total_defect_quantity += workorder.total_defect_quantity
-            total_work_hours += workorder.total_work_hours
-            total_overtime_hours += workorder.total_overtime_hours
+    total_overtime_hours = FillWork.objects.filter(approval_status='approved').aggregate(
+        total=Sum('overtime_hours_calculated')
+    )['total'] or 0.0
     
-    # 分頁
-    paginator = Paginator(active_workorders, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    # 確保數值類型一致，轉換為 float
+    total_work_hours = float(total_work_hours) if total_work_hours else 0.0
+    total_overtime_hours = float(total_overtime_hours) if total_overtime_hours else 0.0
     
     context = {
-        'page_obj': page_obj,
         'total_active': total_active,
         'total_pending': total_pending,
         'total_completed': total_completed,
-        'today_operator_count': production_operator_count,
-        'today_smt_count': production_smt_count,
-        'total_work_quantity': total_work_quantity,
-        'total_defect_quantity': total_defect_quantity,
-        'total_work_hours': total_work_hours,
-        'total_overtime_hours': total_overtime_hours,
+        'total_approved_reports': total_approved_reports,
+        'total_approved_reports_with_workorder': total_approved_reports_with_workorder,
+        'total_good_quantity': total_good_quantity,
+        'total_work_hours': total_work_hours + total_overtime_hours,
+        'workorders_with_approved_reports': workorders_with_approved_reports,
         'today': today,
     }
     
@@ -6094,3 +5362,119 @@ def check_workorder_completion(request):
     }
     
     return render(request, 'workorder/completion_check.html', context)
+
+@login_required
+@require_POST
+def force_complete_workorder(request, pk):
+    """
+    強制完工工單
+    將工單標記為完工並轉移到已完工工單模組
+    只有管理員可以使用此功能
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({
+            "success": False,
+            "message": "只有管理員可以使用強制完工功能"
+        }, status=403)
+    
+    try:
+        workorder = WorkOrder.objects.get(pk=pk)
+        
+        # 檢查工單是否已經完工
+        if workorder.status == 'completed':
+            return JsonResponse({
+                "success": False,
+                "message": "此工單已經完工"
+            }, status=400)
+        
+        # 記錄操作前的狀態
+        original_status = workorder.status
+        original_completed_quantity = workorder.completed_quantity
+        
+        # 更新工單狀態為完工
+        workorder.status = 'completed'
+        workorder.completed_at = timezone.now()
+        
+        # 如果完成數量為0，設定為計劃數量
+        if workorder.completed_quantity == 0:
+            workorder.completed_quantity = workorder.quantity
+        
+        workorder.save()
+        
+        # 轉移到已完工工單模組
+        try:
+            from workorder.services import WorkOrderCompletionService
+            completed_workorder = WorkOrderCompletionService.transfer_workorder_to_completed(workorder.id)
+            
+            # 記錄操作日誌
+            from system.models import OperationLog
+            OperationLog.objects.create(
+                user=request.user.username,
+                module="workorder",
+                action=f"強制完工工單 {workorder.order_number}（原狀態：{original_status}，原完成數量：{original_completed_quantity}）",
+                timestamp=timezone.now(),
+                ip_address=request.META.get('REMOTE_ADDR', ''),
+            )
+            
+            return JsonResponse({
+                "success": True,
+                "message": f"工單 {workorder.order_number} 強制完工成功，已轉移到已完工工單模組",
+                "workorder_id": workorder.id,
+                "completed_workorder_id": completed_workorder.id if completed_workorder else None
+            })
+            
+        except Exception as transfer_error:
+            # 如果轉移失敗，回滾工單狀態
+            workorder.status = original_status
+            workorder.completed_quantity = original_completed_quantity
+            workorder.completed_at = None
+            workorder.save()
+            
+            logger.error(f"強制完工工單 {workorder.order_number} 轉移失敗：{str(transfer_error)}")
+            
+            return JsonResponse({
+                "success": False,
+                "message": f"工單狀態已更新為完工，但轉移到已完工模組失敗：{str(transfer_error)}"
+            }, status=500)
+            
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({
+            "success": False,
+            "message": "找不到指定的工單"
+        }, status=404)
+        
+    except Exception as e:
+        logger.error(f"強制完工工單失敗：{str(e)}")
+        return JsonResponse({
+            "success": False,
+            "message": f"強制完工失敗：{str(e)}"
+        }, status=500)
+
+@login_required
+@require_POST
+def auto_complete_workorder(request, pk):
+    """
+    自動完工工單
+    檢查完工條件並自動完工（如果達到條件）
+    只有管理員可以使用此功能
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({
+            "success": False,
+            "message": "只有管理員可以使用自動完工功能"
+        }, status=403)
+    
+    try:
+        from workorder.services.completion_service import WorkOrderCompletionService
+        
+        # 執行自動完工
+        result = WorkOrderCompletionService.auto_complete_workorder(pk)
+        
+        return JsonResponse(result)
+        
+    except Exception as e:
+        logger.error(f"自動完工工單 {pk} 失敗: {str(e)}")
+        return JsonResponse({
+            "success": False,
+            "message": f"自動完工失敗: {str(e)}"
+        }, status=500)

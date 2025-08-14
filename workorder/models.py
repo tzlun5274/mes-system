@@ -15,8 +15,7 @@ from .workorder_erp.models import PrdMKOrdMain, PrdMkOrdMats, CompanyOrder, Syst
 # from .workorder_completed.models import CompletedWorkOrder, CompletedWorkOrderProcess  # 已移除
 
 # 導入報工管理子模組的模型
-from .workorder_reporting.models import BackupSMTSupplementReport, BackupOperatorSupplementReport
-
+# 
 
 class WorkOrder(models.Model):
     """
@@ -147,6 +146,14 @@ class WorkOrder(models.Model):
         return 0.0
 
     @property
+    def completion_rate(self):
+        """計算工單完成率（基於數量）"""
+        if self.quantity > 0:
+            # 使用完成數量除以總數量
+            return round((self.completed_quantity / self.quantity) * 100, 1)
+        return 0.0
+
+    @property
     def current_operator(self):
         """取得當前負責的作業員"""
         current_process = self.processes.filter(status="in_progress").first()
@@ -190,13 +197,6 @@ class WorkOrder(models.Model):
     def is_erp_order(self):
         """判斷是否為ERP工單"""
         return self.order_source == "erp"
-
-
-
-
-
-
-
 
 class WorkOrderProcess(models.Model):
     """
@@ -332,7 +332,6 @@ class WorkOrderProcess(models.Model):
                 )
         return 0
 
-
 class WorkOrderProcessLog(models.Model):
     """
     工單工序執行日誌：記錄每個工序的詳細執行記錄
@@ -381,7 +380,6 @@ class WorkOrderProcessLog(models.Model):
     def __str__(self):
         return f"{self.workorder_process} - {self.action} - {self.created_at}"
 
-
 # 工單分配記錄模型
 class WorkOrderAssignment(models.Model):
     """工單分配記錄：記錄工單與設備、作業員的分配關係"""
@@ -403,7 +401,6 @@ class WorkOrderAssignment(models.Model):
         return (
             f"{self.workorder.order_number} - {self.equipment_id} - {self.operator_id}"
         )
-
 
 # 工序產能設定表
 class WorkOrderProcessCapacity(models.Model):
@@ -428,15 +425,12 @@ class WorkOrderProcessCapacity(models.Model):
     def __str__(self):
         return f"{self.workorder_process.process_name} - 產能設定"
 
-
 # 新增：只在最後一天計算產量的工序關鍵字設定
 # key: final_day_only_process_keywords，value: 以逗號分隔的關鍵字字串
 # 例如 value: "包裝,出貨包裝,PACK,PACKING"
 
-
 # 注意：ERP同步相關功能已移至 erp_integration 模組
 # 請使用 erp_integration.models.ERPSyncConfig 和 erp_integration.models.ERPSyncLog
-
 
 class DispatchLog(models.Model):
     """
@@ -475,16 +469,6 @@ class DispatchLog(models.Model):
 
     def __str__(self):
         return f"{self.workorder} - {self.process} - {self.operator} - {self.quantity}"
-
-
-
-
-
-
-
-
-
-
 
 # ============================================================================
 # 重新設計的工單資料表架構
@@ -533,7 +517,6 @@ class WorkOrderProduction(models.Model):
 
     def __str__(self):
         return f"生產中：{self.workorder.order_number}"
-
 
 class WorkOrderProductionDetail(models.Model):
     """
@@ -642,7 +625,6 @@ class WorkOrderProductionDetail(models.Model):
     def __str__(self):
         return f"{self.workorder_production.workorder.order_number} - {self.process_name} - {self.report_date}"
 
-
 class CompletedWorkOrder(models.Model):
     """
     已完工工單模型
@@ -713,7 +695,6 @@ class CompletedWorkOrder(models.Model):
         """取得完工率顯示文字"""
         return f"{self.get_completion_rate():.1f}%"
 
-
 class CompletedWorkOrderProcess(models.Model):
     """
     已完工工單工序模型
@@ -761,7 +742,6 @@ class CompletedWorkOrderProcess(models.Model):
         if self.planned_quantity > 0:
             return (self.completed_quantity / self.planned_quantity) * 100
         return 0.0
-
 
 class CompletedProductionReport(models.Model):
     """
@@ -818,7 +798,6 @@ class CompletedProductionReport(models.Model):
 
     def __str__(self):
         return f"{self.completed_workorder.order_number} - {self.process_name} - {self.report_date}"
-
 
 class AutoAllocationSettings(models.Model):
     """
@@ -968,7 +947,6 @@ class AutoAllocationSettings(models.Model):
         
         return True
 
-
 class AutoAllocationLog(models.Model):
     """
     自動分配執行記錄模型
@@ -1060,7 +1038,6 @@ class AutoAllocationLog(models.Model):
             else:
                 return f"{total_seconds/3600:.1f}小時"
         return "--"
-
 
 class AutoManagementConfig(models.Model):
     """
@@ -1239,6 +1216,4 @@ class AutoManagementConfig(models.Model):
             is_enabled=True,
             next_execution__lte=timezone.now()
         )
-
-
 

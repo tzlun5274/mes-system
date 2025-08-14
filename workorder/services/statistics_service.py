@@ -5,9 +5,7 @@
 
 from datetime import date, timedelta
 from django.db.models import Q, Count
-from workorder.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
-
-
+from workorder.models import CompletedProductionReport
 class StatisticsService:
     """
     統一統計服務類別
@@ -47,44 +45,60 @@ class StatisticsService:
     def _get_operator_statistics(today, month_start):
         """
         獲取作業員報工統計
-        使用 created_at（登記時間）進行統計，而不是 work_date（工作日期）
+        使用 report_date（報工日期）進行統計
         """
-        from django.utils import timezone
-        from datetime import datetime
-        today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
-        today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
-        month_start_datetime = timezone.make_aware(datetime.combine(month_start, datetime.min.time()))
-        
         return {
-            'today': OperatorSupplementReport.objects.filter(created_at__range=(today_start, today_end)).count(),
-            'month': OperatorSupplementReport.objects.filter(created_at__gte=month_start_datetime).count(),
-            'pending': OperatorSupplementReport.objects.filter(approval_status='pending').count(),
-            'abnormal': OperatorSupplementReport.objects.filter(
+            'today': CompletedProductionReport.objects.filter(
+                report_type='operator',
+                report_date=today
+            ).count(),
+            'month': CompletedProductionReport.objects.filter(
+                report_type='operator',
+                report_date__gte=month_start
+            ).count(),
+            'pending': CompletedProductionReport.objects.filter(
+                report_type='operator',
+                approval_status='pending'
+            ).count(),
+            'abnormal': CompletedProductionReport.objects.filter(
+                report_type='operator'
+            ).filter(
                 Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
             ).count(),
-            'approved': OperatorSupplementReport.objects.filter(approval_status='approved').count(),
+            'approved': CompletedProductionReport.objects.filter(
+                report_type='operator',
+                approval_status='approved'
+            ).count(),
         }
     
     @staticmethod
     def _get_smt_statistics(today, month_start):
         """
         獲取SMT報工統計
-        使用 created_at（登記時間）進行統計，而不是 work_date（工作日期）
+        使用 report_date（報工日期）進行統計
         """
-        from django.utils import timezone
-        from datetime import datetime
-        today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
-        today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
-        month_start_datetime = timezone.make_aware(datetime.combine(month_start, datetime.min.time()))
-        
         return {
-            'today': SMTSupplementReport.objects.filter(created_at__range=(today_start, today_end)).count(),
-            'month': SMTSupplementReport.objects.filter(created_at__gte=month_start_datetime).count(),
-            'pending': SMTSupplementReport.objects.filter(approval_status='pending').count(),
-            'abnormal': SMTSupplementReport.objects.filter(
+            'today': CompletedProductionReport.objects.filter(
+                report_type='smt',
+                report_date=today
+            ).count(),
+            'month': CompletedProductionReport.objects.filter(
+                report_type='smt',
+                report_date__gte=month_start
+            ).count(),
+            'pending': CompletedProductionReport.objects.filter(
+                report_type='smt',
+                approval_status='pending'
+            ).count(),
+            'abnormal': CompletedProductionReport.objects.filter(
+                report_type='smt'
+            ).filter(
                 Q(abnormal_notes__isnull=False) & ~Q(abnormal_notes='') & ~Q(abnormal_notes='nan')
             ).count(),
-            'approved': SMTSupplementReport.objects.filter(approval_status='approved').count(),
+            'approved': CompletedProductionReport.objects.filter(
+                report_type='smt',
+                approval_status='approved'
+            ).count(),
         }
     
     @staticmethod

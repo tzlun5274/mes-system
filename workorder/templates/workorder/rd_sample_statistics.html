@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}RD樣品統計{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-flask text-info"></i>
+                RD樣品統計
+            </h1>
+            <p class="text-muted mb-0">RD樣品的詳細統計資訊</p>
+        </div>
+        <div>
+            <a href="{% url 'workorder:fillwork_consistency_check' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left"></i>
+                返回檢查頁面
+            </a>
+        </div>
+    </div>
+
+    <!-- 基本統計 -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                總RD樣品數
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ rd_stats.total_rd_samples }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-flask fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 按作業員統計 -->
+    {% if rd_stats.by_operator %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-users"></i>
+                        按作業員統計
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped" id="operatorStatsTable">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>作業員</th>
+                                    <th>RD樣品數量</th>
+                                    <th>百分比</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in rd_stats.by_operator %}
+                                <tr>
+                                    <td>{{ item.operator }}</td>
+                                    <td>
+                                        <span class="badge badge-info">{{ item.count }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar bg-info" role="progressbar" 
+                                                 style="width: {% widthratio item.count rd_stats.total_rd_samples 100 %}%">
+                                                {% widthratio item.count rd_stats.total_rd_samples 100 %}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 按工序統計 -->
+    {% if rd_stats.by_process %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-cogs"></i>
+                        按工序統計
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped" id="processStatsTable">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>工序</th>
+                                    <th>RD樣品數量</th>
+                                    <th>百分比</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in rd_stats.by_process %}
+                                <tr>
+                                    <td>{{ item.process__name|default:"未指定" }}</td>
+                                    <td>
+                                        <span class="badge badge-success">{{ item.count }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar bg-success" role="progressbar" 
+                                                 style="width: {% widthratio item.count rd_stats.total_rd_samples 100 %}%">
+                                                {% widthratio item.count rd_stats.total_rd_samples 100 %}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 按日期統計 -->
+    {% if rd_stats.by_date %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-calendar"></i>
+                        按日期統計
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped" id="dateStatsTable">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>日期</th>
+                                    <th>RD樣品數量</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in rd_stats.by_date %}
+                                <tr>
+                                    <td>{{ item.work_date|date:"Y-m-d" }}</td>
+                                    <td>
+                                        <span class="badge badge-warning">{{ item.count }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 說明 -->
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-info-circle"></i>
+                說明
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-primary">RD樣品識別規則</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> 工單號碼為 "RD樣品"</li>
+                        <li><i class="fas fa-check text-success"></i> 工單號碼包含 "RD"</li>
+                        <li><i class="fas fa-check text-success"></i> 產品編號為 "PFP-CCT"</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-primary">統計說明</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-info text-info"></i> 這些記錄在相符性檢查中會被自動排除</li>
+                        <li><i class="fas fa-info text-info"></i> RD樣品不影響正式工單的相符性統計</li>
+                        <li><i class="fas fa-info text-info"></i> 可透過此頁面了解RD樣品的分布情況</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 初始化DataTable
+    $('#operatorStatsTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Chinese-traditional.json"
+        },
+        "pageLength": 25,
+        "order": [[1, "desc"]], // 按數量排序
+        "responsive": true
+    });
+    
+    $('#processStatsTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Chinese-traditional.json"
+        },
+        "pageLength": 25,
+        "order": [[1, "desc"]], // 按數量排序
+        "responsive": true
+    });
+    
+    $('#dateStatsTable').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Chinese-traditional.json"
+        },
+        "pageLength": 25,
+        "order": [[0, "desc"]], // 按日期排序
+        "responsive": true
+    });
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,442 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}填報紀錄相符性檢查{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        transition: transform 0.2s;
+    }
+    .stats-card:hover {
+        transform: translateY(-2px);
+    }
+    .issue-type-card {
+        border-left: 4px solid #007bff;
+    }
+    .issue-type-card.missing {
+        border-left-color: #dc3545;
+    }
+    .issue-type-card.product {
+        border-left-color: #28a745;
+    }
+    .issue-type-card.workorder {
+        border-left-color: #ffc107;
+    }
+    .issue-type-card.company {
+        border-left-color: #6f42c1;
+    }
+    .issue-type-card.matched {
+        border-left-color: #17a2b8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-search text-primary"></i>
+                填報紀錄相符性檢查
+            </h1>
+            <p class="text-muted mb-0">三種獨立檢查類型，全面分析資料一致性</p>
+        </div>
+        <div>
+            <button class="btn btn-primary" onclick="refreshCheck()">
+                <i class="fas fa-sync-alt"></i>
+                重新檢查
+            </button>
+        </div>
+    </div>
+
+    <!-- 檢查時間 -->
+    <div class="alert alert-info">
+        <i class="fas fa-clock"></i>
+        最後檢查時間：<span id="checkTime">{{ check_time|date:"Y-m-d H:i:s" }}</span>
+    </div>
+
+    <!-- 總體統計 -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card stats-card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                總填報紀錄
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalFillwork">
+                                {{ results.total_fillwork }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card stats-card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                相符工單
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="matchedWorkorders">
+                                {{ results.matched_workorders }}
+                            </div>
+                            <div class="text-xs text-gray-600" id="matchRate">
+                                相符率: {{ match_rate|floatformat:1 }}%
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card stats-card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                總問題數
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalIssues">
+                                {{ results.missing_workorders|add:results.product_mismatch|add:results.workorder_mismatch|add:results.company_mismatch }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card stats-card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                RD樣品
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="rdSamples">
+                                {{ results.rd_samples_excluded }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-flask fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 三種檢查類型 -->
+    <div class="row mb-4">
+        <!-- 缺失工單 -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card issue-type-card missing shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-danger">
+                        <i class="fas fa-times-circle"></i>
+                        缺失工單
+                    </h6>
+                    <small class="text-muted">工單號碼完全不存在</small>
+                </div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center mb-3">
+                        <div class="col mr-2">
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ results.missing_workorders }}
+                            </div>
+                            <div class="text-xs text-gray-600">筆記錄</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-times-circle fa-2x text-danger"></i>
+                        </div>
+                    </div>
+                    <div class="btn-group-vertical w-100">
+                        <a href="{% url 'workorder:missing_workorders' %}" class="btn btn-sm btn-outline-danger">
+                            <i class="fas fa-eye"></i> 查看詳細
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 產品編號不匹配 -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card issue-type-card product shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">
+                        <i class="fas fa-tag"></i>
+                        產品編號不匹配
+                    </h6>
+                    <small class="text-muted">公司代號+工單號碼匹配，但產品編號不匹配</small>
+                </div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center mb-3">
+                        <div class="col mr-2">
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ results.product_mismatch }}
+                            </div>
+                            <div class="text-xs text-gray-600">筆記錄</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-tag fa-2x text-success"></i>
+                        </div>
+                    </div>
+                    <div class="btn-group-vertical w-100">
+                        <a href="{% url 'workorder:product_mismatch' %}" class="btn btn-sm btn-outline-success mb-1">
+                            <i class="fas fa-eye"></i> 查看詳細
+                        </a>
+                        <a href="{% url 'workorder:fillwork_correction' %}" class="btn btn-sm btn-success">
+                            <i class="fas fa-tools"></i> 修正產品編號
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 工單號碼不匹配 -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card issue-type-card workorder shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="fas fa-clipboard-list"></i>
+                        工單號碼不匹配
+                    </h6>
+                    <small class="text-muted">公司代號+產品編號匹配，但工單號碼不匹配</small>
+                </div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center mb-3">
+                        <div class="col mr-2">
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ results.workorder_mismatch }}
+                            </div>
+                            <div class="text-xs text-gray-600">筆記錄</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-list fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                    <div class="btn-group-vertical w-100">
+                        <a href="{% url 'workorder:workorder_mismatch' %}" class="btn btn-sm btn-outline-warning mb-1">
+                            <i class="fas fa-eye"></i> 查看詳細
+                        </a>
+                        <a href="{% url 'workorder:fillwork_correction' %}" class="btn btn-sm btn-warning">
+                            <i class="fas fa-tools"></i> 修正工單號碼
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 公司代號不匹配 -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card issue-type-card company shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-purple">
+                        <i class="fas fa-building"></i>
+                        公司代號不匹配
+                    </h6>
+                    <small class="text-muted">工單號碼+產品編號匹配，但公司代號不匹配</small>
+                </div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center mb-3">
+                        <div class="col mr-2">
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ results.company_mismatch }}
+                            </div>
+                            <div class="text-xs text-gray-600">筆記錄</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-building fa-2x text-purple"></i>
+                        </div>
+                    </div>
+                    <div class="btn-group-vertical w-100">
+                        <a href="{% url 'workorder:company_mismatch' %}" class="btn btn-sm btn-outline-purple mb-1">
+                            <i class="fas fa-eye"></i> 查看詳細
+                        </a>
+                        <a href="{% url 'workorder:fillwork_correction' %}" class="btn btn-sm btn-purple">
+                            <i class="fas fa-tools"></i> 修正公司代號
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 相符工單 -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card issue-type-card matched shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">
+                        <i class="fas fa-check-circle"></i>
+                        相符工單
+                    </h6>
+                    <small class="text-muted">所有資料都匹配的記錄</small>
+                </div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center mb-3">
+                        <div class="col mr-2">
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ results.matched_workorders }}
+                            </div>
+                            <div class="text-xs text-gray-600">筆記錄</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-info"></i>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <span class="badge badge-success">資料正確</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RD樣品統計 -->
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card issue-type-card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-secondary">
+                        <i class="fas fa-flask"></i>
+                        RD樣品統計
+                    </h6>
+                    <small class="text-muted">研發樣品的統計資訊</small>
+                </div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center mb-3">
+                        <div class="col mr-2">
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ results.rd_samples_excluded }}
+                            </div>
+                            <div class="text-xs text-gray-600">筆記錄</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-flask fa-2x text-secondary"></i>
+                        </div>
+                    </div>
+                    <div class="btn-group-vertical w-100">
+                        <a href="{% url 'workorder:rd_sample_statistics' %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-chart-bar"></i> 查看統計
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速操作 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-cogs"></i>
+                        快速操作
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6 class="text-primary">檢查填報資料</h6>
+                            <p class="text-muted">查看所有填報紀錄的詳細資料</p>
+                            <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-info">
+                                <i class="fas fa-search"></i>
+                                檢查填報資料
+                            </a>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-primary">檢查工單資料</h6>
+                            <p class="text-muted">查看所有工單的詳細資料</p>
+                            <a href="{% url 'workorder:list' %}" class="btn btn-warning">
+                                <i class="fas fa-clipboard-list"></i>
+                                檢查工單資料
+                            </a>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-primary">修正不一致資料</h6>
+                            <p class="text-muted">使用自動修正功能修正不一致的資料</p>
+                            <a href="{% url 'workorder:fillwork_correction' %}" class="btn btn-success">
+                                <i class="fas fa-tools"></i>
+                                修正不一致資料
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function refreshCheck() {
+    // 顯示載入中
+    $('#checkTime').html('<i class="fas fa-spinner fa-spin"></i> 檢查中...');
+    
+    // 發送AJAX請求
+    $.ajax({
+        url: '{% url "workorder:fillwork_consistency_check_ajax" %}',
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                // 更新統計數據
+                $('#totalFillwork').text(response.results.total_fillwork);
+                $('#matchedWorkorders').text(response.results.matched_workorders);
+                $('#matchRate').text('相符率: ' + response.match_rate + '%');
+                $('#totalIssues').text(
+                    response.results.missing_workorders + 
+                    response.results.product_mismatch + 
+                    response.results.workorder_mismatch + 
+                    response.results.company_mismatch
+                );
+                $('#rdSamples').text(response.results.rd_samples_excluded);
+                $('#checkTime').text(new Date(response.check_time).toLocaleString('zh-TW'));
+                
+                // 顯示成功訊息
+                showAlert('檢查完成！', 'success');
+            } else {
+                showAlert('檢查失敗：' + response.error, 'danger');
+            }
+        },
+        error: function() {
+            showAlert('檢查請求失敗', 'danger');
+        }
+    });
+}
+
+function showAlert(message, type) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="close" data-dismiss="alert">
+                <span>&times;</span>
+            </button>
+        </div>
+    `;
+    
+    // 插入到頁面頂部
+    $('.container-fluid').prepend(alertHtml);
+    
+    // 3秒後自動消失
+    setTimeout(function() {
+        $('.alert').fadeOut();
+    }, 3000);
+}
+</script>
+{% endblock %} 

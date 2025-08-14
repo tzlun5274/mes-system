@@ -1,133 +1,284 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}{{ title|default:"派工單" }}{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'workorder_dispatch/css/dispatch.css' %}">
-{% endblock %}
+{% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid mt-4">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'workorder:workorder_dispatch:dispatch_list' %}">派工單管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
+        </ol>
+    </nav>
+
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-edit"></i> {{ title }}</h2>
+        <a href="{% url 'workorder:workorder_dispatch:dispatch_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 返回列表
+        </a>
+    </div>
+
     <div class="row">
-        <div class="col-12">
+        <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="bi bi-clipboard-plus"></i> {{ title|default:"派工單" }}
-                    </h3>
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> 派工單資訊</h5>
                 </div>
                 <div class="card-body">
                     <form method="post" id="dispatchForm">
                         {% csrf_token %}
                         
-                        <div class="row">
+                        <!-- 工單查詢 -->
+                        <div class="row mb-3">
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="{{ form.work_order.id_for_label }}" class="form-label">
-                                        <i class="bi bi-file-earmark-text"></i> 工單 <span class="text-danger">*</span>
-                                    </label>
-                                    {{ form.work_order }}
-                                    {% if form.work_order.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.work_order.errors.0 }}
-                                        </div>
-                                    {% endif %}
+                                <label for="work_order_search" class="form-label">工單查詢</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="work_order_search" 
+                                           placeholder="輸入工單號碼查詢">
+                                    <button class="btn btn-outline-secondary" type="button" id="searchBtn">
+                                        <i class="fas fa-search"></i> 查詢
+                                    </button>
                                 </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="{{ form.operator.id_for_label }}" class="form-label">
-                                        <i class="bi bi-person"></i> 作業員
-                                    </label>
-                                    {{ form.operator }}
-                                    {% if form.operator.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.operator.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                </div>
+                                <div class="form-text">輸入工單號碼後點擊查詢，系統會自動填入相關資訊</div>
                             </div>
                         </div>
 
-                        <div class="row">
+                        <!-- 基本資訊 -->
+                        <div class="row mb-3">
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="{{ form.process.id_for_label }}" class="form-label">
-                                        <i class="bi bi-gear"></i> 工序 <span class="text-danger">*</span>
-                                    </label>
-                                    {{ form.process }}
-                                    {% if form.process.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.process.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                </div>
+                                <label for="{{ form.company_code.id_for_label }}" class="form-label">
+                                    {{ form.company_code.label }}
+                                </label>
+                                {{ form.company_code }}
+                                {% if form.company_code.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.company_code.errors.0 }}
+                                    </div>
+                                {% endif %}
                             </div>
-                            
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="{{ form.planned_quantity.id_for_label }}" class="form-label">
-                                        <i class="bi bi-boxes"></i> 計劃數量 <span class="text-danger">*</span>
-                                    </label>
-                                    {{ form.planned_quantity }}
-                                    {% if form.planned_quantity.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.planned_quantity.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                </div>
+                                <label for="{{ form.order_number.id_for_label }}" class="form-label">
+                                    {{ form.order_number.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.order_number }}
+                                {% if form.order_number.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.order_number.errors.0 }}
+                                    </div>
+                                {% endif %}
                             </div>
                         </div>
 
-                        {% if form.status %}
-                        <div class="row">
+                        <div class="row mb-3">
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="{{ form.status.id_for_label }}" class="form-label">
-                                        <i class="bi bi-flag"></i> 狀態
-                                    </label>
-                                    {{ form.status }}
-                                    {% if form.status.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.status.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                </div>
+                                <label for="{{ form.product_code.id_for_label }}" class="form-label">
+                                    {{ form.product_code.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.product_code }}
+                                {% if form.product_code.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.product_code.errors.0 }}
+                                    </div>
+                                {% endif %}
                             </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.product_name.id_for_label }}" class="form-label">
+                                    {{ form.product_name.label }}
+                                </label>
+                                {{ form.product_name }}
+                                {% if form.product_name.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.product_name.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.planned_quantity.id_for_label }}" class="form-label">
+                                    {{ form.planned_quantity.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.planned_quantity }}
+                                {% if form.planned_quantity.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.planned_quantity.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.status.id_for_label }}" class="form-label">
+                                    {{ form.status.label }}
+                                </label>
+                                {{ form.status }}
+                                {% if form.status.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.status.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 派工資訊 -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.dispatch_date.id_for_label }}" class="form-label">
+                                    {{ form.dispatch_date.label }}
+                                </label>
+                                {{ form.dispatch_date }}
+                                {% if form.dispatch_date.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.dispatch_date.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.process_name.id_for_label }}" class="form-label">
+                                    {{ form.process_name.label }}
+                                </label>
+                                {{ form.process_name }}
+                                {% if form.process_name.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.process_name.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.assigned_operator.id_for_label }}" class="form-label">
+                                    {{ form.assigned_operator.label }}
+                                </label>
+                                {{ form.assigned_operator }}
+                                {% if form.assigned_operator.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.assigned_operator.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.assigned_equipment.id_for_label }}" class="form-label">
+                                    {{ form.assigned_equipment.label }}
+                                </label>
+                                {{ form.assigned_equipment }}
+                                {% if form.assigned_equipment.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.assigned_equipment.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 計劃日期 -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.planned_start_date.id_for_label }}" class="form-label">
+                                    {{ form.planned_start_date.label }}
+                                </label>
+                                {{ form.planned_start_date }}
+                                {% if form.planned_start_date.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.planned_start_date.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.planned_end_date.id_for_label }}" class="form-label">
+                                    {{ form.planned_end_date.label }}
+                                </label>
+                                {{ form.planned_end_date }}
+                                {% if form.planned_end_date.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.planned_end_date.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 備註 -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                    {{ form.notes.label }}
+                                </label>
+                                {{ form.notes }}
+                                {% if form.notes.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.notes.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 表單錯誤 -->
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
                         </div>
                         {% endif %}
 
+                        <!-- 提交按鈕 -->
                         <div class="row">
                             <div class="col-12">
-                                <div class="mb-3">
-                                    <label for="{{ form.notes.id_for_label }}" class="form-label">
-                                        <i class="bi bi-chat-text"></i> 備註
-                                    </label>
-                                    {{ form.notes }}
-                                    {% if form.notes.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.notes.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-12">
-                                <div class="d-flex justify-content-between">
-                                    <a href="{% url 'workorder:workorder_dispatch:dispatch_list' %}" class="btn btn-secondary">
-                                        <i class="bi bi-arrow-left"></i> 返回列表
-                                    </a>
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="bi bi-check-circle"></i> {{ submit_text|default:"儲存" }}
-                                    </button>
-                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> {{ submit_text }}
+                                </button>
+                                <a href="{% url 'workorder:workorder_dispatch:dispatch_list' %}" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> 取消
+                                </a>
                             </div>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 側邊欄 -->
+        <div class="col-md-4">
+            <!-- 工單資訊預覽 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-eye"></i> 工單資訊預覽</h5>
+                </div>
+                <div class="card-body">
+                    <div id="workOrderPreview">
+                        <p class="text-muted">請輸入工單號碼並點擊查詢</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作說明 -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-question-circle"></i> 操作說明</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <i class="fas fa-info-circle text-info"></i>
+                            標記 <span class="text-danger">*</span> 的欄位為必填項目
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-search text-primary"></i>
+                            可使用工單查詢功能自動填入相關資訊
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-calendar text-success"></i>
+                            計劃開始日期不能晚於計劃完成日期
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                            工單號碼必須存在於系統中
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -136,20 +287,91 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'workorder_dispatch/js/dispatch.js' %}"></script>
 <script>
 $(document).ready(function() {
-    // 為表單欄位添加 Bootstrap 樣式
-    $('#dispatchForm select, #dispatchForm input, #dispatchForm textarea').addClass('form-control');
-    
-    // 工單選擇變更時自動載入相關資訊
-    $('#id_work_order').change(function() {
-        var workOrderId = $(this).val();
-        if (workOrderId) {
-            // 這裡可以添加 AJAX 請求來載入工單相關資訊
-            console.log('選擇的工單ID:', workOrderId);
+    // 工單查詢功能
+    $('#searchBtn').click(function() {
+        const orderNumber = $('#work_order_search').val().trim();
+        if (!orderNumber) {
+            alert('請輸入工單號碼');
+            return;
+        }
+
+        $.ajax({
+            url: '{% url "workorder:workorder_dispatch:get_work_order_info" %}',
+            method: 'GET',
+            data: { order_number: orderNumber },
+            success: function(response) {
+                if (response.success) {
+                    const data = response.data;
+                    
+                    // 填入表單欄位
+                    $('#id_order_number').val(data.order_number);
+                    $('#id_product_code').val(data.product_code);
+                    $('#id_product_name').val(data.product_name);
+                    $('#id_planned_quantity').val(data.quantity);
+                    $('#id_company_code').val(data.company_code);
+                    
+                    // 更新預覽
+                    $('#workOrderPreview').html(`
+                        <table class="table table-sm table-borderless">
+                            <tr><th>工單號碼：</th><td>${data.order_number}</td></tr>
+                            <tr><th>產品編號：</th><td>${data.product_code}</td></tr>
+                            <tr><th>產品名稱：</th><td>${data.product_name || '-'}</td></tr>
+                            <tr><th>數量：</th><td>${data.quantity}</td></tr>
+                            <tr><th>狀態：</th><td>${data.status}</td></tr>
+                            <tr><th>公司代號：</th><td>${data.company_code || '-'}</td></tr>
+                        </table>
+                    `);
+                } else {
+                    alert('查詢失敗：' + response.error);
+                }
+            },
+            error: function() {
+                alert('查詢失敗，請稍後再試');
+            }
+        });
+    });
+
+    // 表單驗證
+    $('#dispatchForm').submit(function(e) {
+        const orderNumber = $('#id_order_number').val().trim();
+        const productCode = $('#id_product_code').val().trim();
+        const plannedQuantity = $('#id_planned_quantity').val();
+
+        if (!orderNumber) {
+            alert('請輸入工單號碼');
+            e.preventDefault();
+            return false;
+        }
+
+        if (!productCode) {
+            alert('請輸入產品編號');
+            e.preventDefault();
+            return false;
+        }
+
+        if (!plannedQuantity || plannedQuantity <= 0) {
+            alert('請輸入有效的計劃數量');
+            e.preventDefault();
+            return false;
+        }
+
+        // 驗證日期邏輯
+        const startDate = $('#id_planned_start_date').val();
+        const endDate = $('#id_planned_end_date').val();
+        
+        if (startDate && endDate && startDate > endDate) {
+            alert('計劃開始日期不能晚於計劃完成日期');
+            e.preventDefault();
+            return false;
         }
     });
+
+    // 自動設定今天日期
+    if (!$('#id_dispatch_date').val()) {
+        $('#id_dispatch_date').val(new Date().toISOString().split('T')[0]);
+    }
 });
 </script>
 {% endblock %} 

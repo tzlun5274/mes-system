@@ -1,161 +1,359 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}派工單詳情{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'workorder_dispatch/css/dispatch.css' %}">
-{% endblock %}
+{% block title %}派工單詳情 - {{ dispatch.order_number }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid mt-4">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'workorder:workorder_dispatch:dispatch_list' %}">派工單管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">派工單詳情</li>
+        </ol>
+    </nav>
+
+    <!-- 頁面標題和操作按鈕 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-tasks"></i> 派工單詳情</h2>
+        <div class="btn-group">
+            <a href="{% url 'workorder:workorder_dispatch:dispatch_edit' dispatch.id %}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> 編輯派工單
+            </a>
+            <a href="{% url 'workorder:workorder_dispatch:dispatch_delete' dispatch.id %}" 
+               class="btn btn-danger"
+               onclick="return confirm('確定要刪除這個派工單嗎？此操作無法復原。')">
+                <i class="fas fa-trash"></i> 刪除派工單
+            </a>
+            {% if work_order %}
+            <a href="{% url 'workorder:detail' work_order.id %}" class="btn btn-info">
+                <i class="fas fa-eye"></i> 查看工單詳情
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
     <div class="row">
-        <div class="col-12">
-            <div class="card">
+        <!-- 基本資訊 -->
+        <div class="col-md-8">
+            <div class="card mb-4">
                 <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h3 class="card-title">
-                            <i class="bi bi-clipboard-data"></i> 派工單詳情
-                        </h3>
-                        <div>
-                            <a href="{% url 'workorder:workorder_dispatch:dispatch_edit' dispatch.id %}" class="btn btn-primary me-2">
-                                <i class="bi bi-pencil"></i> 編輯
-                            </a>
-                            <a href="{% url 'workorder:workorder_dispatch:dispatch_list' %}" class="btn btn-secondary">
-                                <i class="bi bi-arrow-left"></i> 返回列表
-                            </a>
-                        </div>
-                    </div>
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> 基本資訊</h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <h5 class="border-bottom pb-2 mb-3">
-                                <i class="bi bi-info-circle"></i> 基本資訊
-                            </h5>
                             <table class="table table-borderless">
                                 <tr>
-                                    <th width="30%">派工單號：</th>
+                                    <th width="120">派工單ID：</th>
                                     <td><strong>{{ dispatch.id }}</strong></td>
                                 </tr>
                                 <tr>
-                                    <th>工單號：</th>
+                                    <th>工單號碼：</th>
                                     <td>
-                                        <a href="{% url 'workorder:detail' dispatch.work_order.id %}" 
+                                        {% if work_order %}
+                                        <a href="{% url 'workorder:detail' work_order.id %}" 
                                            class="text-decoration-none">
-                                            {{ dispatch.work_order.order_number }}
+                                            {{ dispatch.order_number }}
                                         </a>
+                                        {% else %}
+                                        <span class="text-muted">{{ dispatch.order_number }}</span>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 <tr>
                                     <th>產品編號：</th>
-                                    <td>{{ dispatch.work_order.product_code }}</td>
-                                </tr>
-                                <tr>
-                                    <th>作業員：</th>
-                                    <td>{{ dispatch.operator|default:"未指定" }}</td>
-                                </tr>
-                                <tr>
-                                    <th>工序：</th>
-                                    <td>{{ dispatch.process }}</td>
+                                    <td>{{ dispatch.product_code }}</td>
                                 </tr>
                                 <tr>
                                     <th>計劃數量：</th>
-                                    <td>{{ dispatch.planned_quantity }}</td>
+                                    <td>{{ dispatch.planned_quantity|default:"-" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>公司代號：</th>
+                                    <td>{{ dispatch.company_code|default:"-" }}</td>
                                 </tr>
                             </table>
                         </div>
-                        
                         <div class="col-md-6">
-                            <h5 class="border-bottom pb-2 mb-3">
-                                <i class="bi bi-calendar-event"></i> 時間資訊
-                            </h5>
                             <table class="table table-borderless">
                                 <tr>
-                                    <th width="30%">狀態：</th>
+                                    <th width="120">派工狀態：</th>
                                     <td>
                                         {% if dispatch.status == 'pending' %}
-                                            <span class="badge bg-warning">待處理</span>
+                                            <span class="badge bg-warning">待派工</span>
                                         {% elif dispatch.status == 'dispatched' %}
                                             <span class="badge bg-info">已派工</span>
                                         {% elif dispatch.status == 'in_production' %}
-                                            <span class="badge bg-primary">生產中</span>
+                                            <span class="badge bg-secondary">生產中</span>
                                         {% elif dispatch.status == 'completed' %}
-                                            <span class="badge bg-success">已完成</span>
+                                            <span class="badge bg-success">已完工</span>
                                         {% elif dispatch.status == 'cancelled' %}
                                             <span class="badge bg-danger">已取消</span>
                                         {% endif %}
                                     </td>
                                 </tr>
+
                                 <tr>
                                     <th>派工日期：</th>
-                                    <td>{{ dispatch.dispatch_date|default:"未設定" }}</td>
-                                </tr>
-                                <tr>
-                                    <th>計劃開始日期：</th>
-                                    <td>{{ dispatch.planned_start_date|default:"未設定" }}</td>
-                                </tr>
-                                <tr>
-                                    <th>計劃完成日期：</th>
-                                    <td>{{ dispatch.planned_end_date|default:"未設定" }}</td>
+                                    <td>{{ dispatch.dispatch_date|date:"Y-m-d"|default:"-" }}</td>
                                 </tr>
                                 <tr>
                                     <th>建立時間：</th>
                                     <td>{{ dispatch.created_at|date:"Y-m-d H:i:s" }}</td>
                                 </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ERP 製令單日期 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-calendar"></i> ERP 製令單日期</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
                                 <tr>
-                                    <th>更新時間：</th>
-                                    <td>{{ dispatch.updated_at|date:"Y-m-d H:i:s" }}</td>
+                                    <th width="120">預定開工日：</th>
+                                    <td>
+                                        {% if erp_start_date %}
+                                            <span class="text-primary">{{ erp_start_date }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
                                 <tr>
-                                    <th>建立人員：</th>
-                                    <td>{{ dispatch.created_by }}</td>
+                                    <th width="120">預定出貨日：</th>
+                                    <td>
+                                        {% if erp_end_date %}
+                                            <span class="text-primary">{{ erp_end_date }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                             </table>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    {% if dispatch.notes %}
-                    <div class="row mt-4">
-                        <div class="col-12">
-                            <h5 class="border-bottom pb-2 mb-3">
-                                <i class="bi bi-chat-text"></i> 備註
-                            </h5>
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    {{ dispatch.notes|linebreaks }}
-                                </div>
-                            </div>
-                        </div>
+            <!-- 備註 -->
+            {% if dispatch.notes %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-sticky-note"></i> 備註</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ dispatch.notes|linebreaks }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 側邊欄 -->
+        <div class="col-md-4">
+            <!-- 相關工單資訊 -->
+            {% if work_order %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-link"></i> 相關工單</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <th>工單狀態：</th>
+                            <td>
+                                {% if work_order.status == 'pending' %}
+                                    <span class="badge bg-warning">待生產</span>
+                                {% elif work_order.status == 'in_progress' %}
+                                    <span class="badge bg-info">生產中</span>
+                                {% elif work_order.status == 'paused' %}
+                                    <span class="badge bg-secondary">暫停</span>
+                                {% elif work_order.status == 'completed' %}
+                                    <span class="badge bg-success">已完成</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>工單數量：</th>
+                            <td>{{ work_order.quantity }}</td>
+                        </tr>
+                        <tr>
+                            <th>工單來源：</th>
+                            <td>{{ work_order.get_order_source_display }}</td>
+                        </tr>
+                    </table>
+                    <a href="{% url 'workorder:detail' work_order.id %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-external-link-alt"></i> 查看工單詳情
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- 工序明細 -->
+            {% if processes %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-list-ol"></i> 工序明細</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>工序順序</th>
+                                    <th>工序名稱</th>
+                                    <th>計劃數量</th>
+                                    <th>分配作業員</th>
+                                    <th>分配設備</th>
+                                    <th>派工狀態</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for process in processes %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-primary">{{ process.step_order }}</span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ process.process_name }}</strong>
+                                    </td>
+                                    <td>{{ process.planned_quantity }}</td>
+                                    <td>{{ process.assigned_operator|default:"-" }}</td>
+                                    <td>{{ process.assigned_equipment|default:"-" }}</td>
+                                    <td>
+                                        {% if process.dispatch_status == 'pending' %}
+                                            <span class="badge bg-warning">待派工</span>
+                                        {% elif process.dispatch_status == 'dispatched' %}
+                                            <span class="badge bg-info">已派工</span>
+                                        {% elif process.dispatch_status == 'in_progress' %}
+                                            <span class="badge bg-secondary">進行中</span>
+                                        {% elif process.dispatch_status == 'completed' %}
+                                            <span class="badge bg-success">已完成</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
 
-                    <div class="row mt-4">
-                        <div class="col-12">
-                            <h5 class="border-bottom pb-2 mb-3">
-                                <i class="bi bi-tools"></i> 操作
-                            </h5>
-                            <div class="btn-group" role="group">
-                                <a href="{% url 'workorder:workorder_dispatch:dispatch_edit' dispatch.id %}" 
-                                   class="btn btn-primary">
-                                    <i class="bi bi-pencil"></i> 編輯派工單
-                                </a>
-                                <a href="{% url 'workorder:workorder_dispatch:dispatch_delete' dispatch.id %}" 
-                                   class="btn btn-danger"
-                                   onclick="return confirm('確定要刪除這個派工單嗎？此操作無法復原。')">
-                                    <i class="bi bi-trash"></i> 刪除派工單
-                                </a>
-                                <a href="{% url 'workorder:detail' dispatch.work_order.id %}" 
-                                   class="btn btn-info">
-                                    <i class="bi bi-eye"></i> 查看工單詳情
-                                </a>
-                            </div>
-                        </div>
+            <!-- 系統資訊 -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cog"></i> 系統資訊</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <th>建立人員：</th>
+                            <td>{{ dispatch.created_by }}</td>
+                        </tr>
+                        <tr>
+                            <th>建立時間：</th>
+                            <td>{{ dispatch.created_at|date:"Y-m-d H:i:s" }}</td>
+                        </tr>
+                        <tr>
+                            <th>更新時間：</th>
+                            <td>{{ dispatch.updated_at|date:"Y-m-d H:i:s" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 歷史記錄 -->
+    {% if history %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-history"></i> 操作歷史</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>操作時間</th>
+                                    <th>操作類型</th>
+                                    <th>原狀態</th>
+                                    <th>新狀態</th>
+                                    <th>操作人員</th>
+                                    <th>備註</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in history %}
+                                <tr>
+                                    <td>{{ record.created_at|date:"Y-m-d H:i:s" }}</td>
+                                    <td>{{ record.action }}</td>
+                                    <td>
+                                        {% if record.old_status %}
+                                            {% if record.old_status == 'pending' %}
+                                                <span class="badge bg-warning">待派工</span>
+                                            {% elif record.old_status == 'dispatched' %}
+                                                <span class="badge bg-info">已派工</span>
+                                            {% elif record.old_status == 'in_production' %}
+                                                <span class="badge bg-secondary">生產中</span>
+                                            {% elif record.old_status == 'completed' %}
+                                                <span class="badge bg-success">已完工</span>
+                                            {% elif record.old_status == 'cancelled' %}
+                                                <span class="badge bg-danger">已取消</span>
+                                            {% else %}
+                                                {{ record.old_status }}
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if record.new_status %}
+                                            {% if record.new_status == 'pending' %}
+                                                <span class="badge bg-warning">待派工</span>
+                                            {% elif record.new_status == 'dispatched' %}
+                                                <span class="badge bg-info">已派工</span>
+                                            {% elif record.new_status == 'in_production' %}
+                                                <span class="badge bg-secondary">生產中</span>
+                                            {% elif record.new_status == 'completed' %}
+                                                <span class="badge bg-success">已完工</span>
+                                            {% elif record.new_status == 'cancelled' %}
+                                                <span class="badge bg-danger">已取消</span>
+                                            {% else %}
+                                                {{ record.new_status }}
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ record.operator }}</td>
+                                    <td>{{ record.notes|default:"-" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
 {% endblock %}
 

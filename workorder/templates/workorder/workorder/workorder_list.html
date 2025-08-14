@@ -36,6 +36,25 @@
             </div>
             <div class="col-md-3">
                 <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-purple text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-cogs"></i> MES 工單管理
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            集中查看已轉成 MES 的工單，提供批量派工功能。
+                            <br>
+                            可查詢、批量派工、狀態管理。
+                        </p>
+                        <a href="{% url 'workorder:mes_orders' %}" class="btn btn-purple">
+                            <i class="fas fa-cogs"></i> 進入 MES 工單管理
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
                     <div class="card-header bg-warning text-dark">
                         <h4 class="mb-0">
                             <i class="fas fa-clipboard-check"></i> 填報作業管理
@@ -53,25 +72,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-secondary text-white">
-                        <h4 class="mb-0">
-                            <i class="fas fa-edit"></i> 備用報工管理
-                        </h4>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text">
-                            備用報工管理，支援完整的報工資料記錄與核准流程。
-                            <br>
-                            可新增、核准、匯入匯出。
-                        </p>
-                        <a href="{% url 'workorder:backup_report_index' %}" class="btn btn-secondary">
-                            <i class="fas fa-edit"></i> 進入備用報工管理
-                        </a>
-                    </div>
-                </div>
-            </div>
+
             <div class="col-md-3">
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-info text-white">
@@ -97,6 +98,96 @@
                         <h4 class="mb-0">
                             <i class="fas fa-check-circle"></i> 已完工工單
                         </h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            查看已完成生產的工單記錄。
+                            <br>
+                            可查詢、統計、分析。
+                        </p>
+                        <a href="{% url 'workorder:completed_workorder_list' %}" class="btn btn-success">
+                            <i class="fas fa-check-circle"></i> 查看已完工工單
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-danger text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-exclamation-triangle"></i> 相符性檢查
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            檢查填報紀錄與工單的相符性，排除RD樣品。
+                            <br>
+                            可檢查、統計、修正。
+                        </p>
+                        <a href="{% url 'workorder:fillwork_consistency_check' %}" class="btn btn-danger">
+                            <i class="fas fa-search"></i> 開始檢查
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-dark text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-trash-alt"></i> 清除所有工單
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            安全地清除所有工單資料，重新開始。
+                            <br>
+                            可備份、清除、重新匯入。
+                        </p>
+                        <a href="{% url 'workorder:clear_workorders' %}" class="btn btn-dark">
+                            <i class="fas fa-trash-alt"></i>
+                            清除工單
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-danger text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-plus-circle"></i> 創建缺失工單
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            從填報資料自動創建缺失的工單記錄。
+                            <br>
+                            以公司名稱/代號+製令號碼+產品編號為唯一性識別。
+                        </p>
+                        <a href="{% url 'workorder:create_missing_workorders' %}" class="btn btn-danger">
+                            <i class="fas fa-magic"></i> 創建缺失工單
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-file-excel"></i> Excel匯入工單
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            從正航系統匯出的製令簡要表匯入工單。
+                            <br>
+                            支援Excel和CSV格式，自動識別公司代號。
+                        </p>
+                        <a href="{% url 'workorder:workorder_import' %}" class="btn btn-success">
+                            <i class="fas fa-upload"></i> Excel匯入工單
+                        </a>
+                    </div>
+                </div>
+            </div>
                     </div>
                     <div class="card-body">
                         <p class="card-text">

@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}批量派工{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'workorder:workorder_dispatch:dispatch_list' %}">派工單管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">批量派工</li>
+        </ol>
+    </nav>
+
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-layer-group"></i> 批量派工</h2>
+        <a href="{% url 'workorder:workorder_dispatch:dispatch_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 返回列表
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-edit"></i> 批量派工設定</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="bulkDispatchForm">
+                        {% csrf_token %}
+                        
+                        <!-- 工單號碼列表 -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label for="{{ form.work_order_numbers.id_for_label }}" class="form-label">
+                                    {{ form.work_order_numbers.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.work_order_numbers }}
+                                {% if form.work_order_numbers.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.work_order_numbers.errors.0 }}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">
+                                    每行輸入一個工單號碼，系統會自動驗證工單是否存在
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 派工資訊 -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.assigned_operator.id_for_label }}" class="form-label">
+                                    {{ form.assigned_operator.label }}
+                                </label>
+                                {{ form.assigned_operator }}
+                                {% if form.assigned_operator.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.assigned_operator.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.assigned_equipment.id_for_label }}" class="form-label">
+                                    {{ form.assigned_equipment.label }}
+                                </label>
+                                {{ form.assigned_equipment }}
+                                {% if form.assigned_equipment.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.assigned_equipment.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.process_name.id_for_label }}" class="form-label">
+                                    {{ form.process_name.label }}
+                                </label>
+                                {{ form.process_name }}
+                                {% if form.process_name.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.process_name.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.dispatch_date.id_for_label }}" class="form-label">
+                                    {{ form.dispatch_date.label }}
+                                </label>
+                                {{ form.dispatch_date }}
+                                {% if form.dispatch_date.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.dispatch_date.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 備註 -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                    {{ form.notes.label }}
+                                </label>
+                                {{ form.notes }}
+                                {% if form.notes.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.notes.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 表單錯誤 -->
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- 提交按鈕 -->
+                        <div class="row">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save"></i> {{ submit_text }}
+                                </button>
+                                <a href="{% url 'workorder:workorder_dispatch:dispatch_list' %}" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> 取消
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 側邊欄 -->
+        <div class="col-md-4">
+            <!-- 操作說明 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-question-circle"></i> 操作說明</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <i class="fas fa-info-circle text-info"></i>
+                            標記 <span class="text-danger">*</span> 的欄位為必填項目
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-list text-primary"></i>
+                            每行輸入一個工單號碼，系統會自動驗證
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                            已存在派工單的工單會被自動跳過
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success"></i>
+                            成功建立的派工單會顯示在列表中
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 範例格式 -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-file-alt"></i> 範例格式</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="mb-0" style="font-size: 0.875rem;">
+WO2024001
+WO2024002
+WO2024003
+WO2024004
+WO2024005</pre>
+                    <div class="form-text mt-2">
+                        請按照上述格式輸入工單號碼，每行一個
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 表單驗證
+    $('#bulkDispatchForm').submit(function(e) {
+        const workOrderNumbers = $('#id_work_order_numbers').val().trim();
+        
+        if (!workOrderNumbers) {
+            alert('請輸入工單號碼列表');
+            e.preventDefault();
+            return false;
+        }
+        
+        // 檢查是否有有效的工單號碼
+        const numbers = workOrderNumbers.split('\n').filter(no => no.trim());
+        if (numbers.length === 0) {
+            alert('請輸入有效的工單號碼');
+            e.preventDefault();
+            return false;
+        }
+    });
+
+    // 自動設定今天日期
+    if (!$('#id_dispatch_date').val()) {
+        $('#id_dispatch_date').val(new Date().toISOString().split('T')[0]);
+    }
+});
+</script>
+{% endblock %} 

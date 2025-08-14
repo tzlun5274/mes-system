@@ -2210,3 +2210,173 @@ class SupervisorReviewedListView(LoginRequiredMixin, UserPassesTestMixin, ListVi
         context['approved_count'] = base_qs.filter(approval_status='approved').count()
         context['rejected_count'] = base_qs.filter(approval_status='rejected').count()
         return context
+
+
+@login_required
+@require_POST
+def batch_approve_fill_work(request):
+    """
+    批次核准填報記錄
+    處理多筆填報記錄的批量核准操作
+    """
+    if request.method != 'POST':
+        return redirect('workorder:fill_work:supervisor_pending_list')
+    
+    # 檢查權限
+    if not (request.user.is_superuser or request.user.groups.filter(name='主管').exists()):
+        messages.error(request, '您沒有權限執行批次核准操作')
+        return redirect('workorder:fill_work:supervisor_pending_list')
+    
+    try:
+        # 取得要核准的記錄ID列表
+        record_ids = request.POST.getlist('record_ids')
+        
+        if not record_ids:
+            messages.warning(request, '請選擇要核准的記錄')
+            return redirect('workorder:fill_work:supervisor_pending_list')
+        
+        # 查詢待核准的記錄
+        pending_records = FillWork.objects.filter(
+            id__in=record_ids,
+            approval_status='pending'
+        )
+        
+        if not pending_records.exists():
+            messages.info(request, '沒有找到需要核准的記錄')
+            return redirect('workorder:fill_work:supervisor_pending_list')
+        
+        approved_count = 0
+        synced_workorders = set()  # 記錄需要同步的工單
+        
+        # 批量更新記錄狀態
+        for record in pending_records:
+            record.approval_status = 'approved'
+            record.approved_by = request.user.username
+            record.approved_at = timezone.now()
+            record.save(update_fields=['approval_status', 'approved_by', 'approved_at', 'updated_at'])
+            approved_count += 1
+            
+            # 記錄需要同步的工單
+            if record.workorder:
+                synced_workorders.add(record.workorder)
+        
+        # 批量同步到生產執行監控
+        if synced_workorders:
+            try:
+                for workorder_number in synced_workorders:
+                    workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
+                    if workorder:
+                        # 取得該工單的所有已核准填報記錄
+                        approved_fill_works = FillWork.objects.filter(
+                            workorder=workorder_number,
+                            approval_status='approved'
+                        )
+                        
+                        for fill_work in approved_fill_works:
+                            # 判斷類型：SMT 或 作業員
+                            is_smt = False
+                            try:
+                                if (fill_work.operator and 'SMT' in fill_work.operator.upper()) or (fill_work.process and 'SMT' in fill_work.process.name.upper()):
+                                    is_smt = True
+                            except Exception:
+                                is_smt = False
+                            report_type = 'smt' if is_smt else 'operator'
+
+                            ProductionReportSyncService._create_or_update_production_detail(
+                                workorder=workorder,
+                                process_name=(fill_work.process.name if fill_work.process else fill_work.operation or ''),
+                                report_date=fill_work.work_date,
+                                report_time=timezone.now(),
+                                work_quantity=fill_work.work_quantity or 0,
+                                defect_quantity=fill_work.defect_quantity or 0,
+                                operator=(fill_work.operator or None),
+                                equipment=(fill_work.equipment or None),
+                                report_source='fill_work',
+                                start_time=fill_work.start_time,
+                                end_time=fill_work.end_time,
+                                remarks=fill_work.remarks,
+                                abnormal_notes=fill_work.abnormal_notes,
+                                original_report_id=fill_work.id,
+                                original_report_type='fill_work',
+                                work_hours=float(fill_work.work_hours_calculated or 0),
+                                overtime_hours=float(fill_work.overtime_hours_calculated or 0),
+                                has_break=bool(fill_work.has_break),
+                                break_start_time=fill_work.break_start_time,
+                                break_end_time=fill_work.break_end_time,
+                                break_hours=float(fill_work.break_hours or 0),
+                                report_type=report_type,
+                                allocated_quantity=0,
+                                quantity_source='original',
+                                allocation_notes='',
+                                is_completed=bool(fill_work.is_completed),
+                                completion_method='manual',
+                                auto_completed=False,
+                                completion_time=None,
+                                cumulative_quantity=0,
+                                cumulative_hours=float(fill_work.work_hours_calculated or 0),
+                                approval_status=fill_work.approval_status,
+                                approved_by=fill_work.approved_by,
+                                approved_at=fill_work.approved_at,
+                                approval_remarks=fill_work.approval_remarks or ''
+                            )
+            except Exception as sync_error:
+                # 同步失敗不影響核准流程，只記錄錯誤
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"批次同步填報記錄到生產詳情失敗: {str(sync_error)}")
+        
+        messages.success(request, f'成功核准 {approved_count} 筆填報記錄')
+        
+    except Exception as e:
+        messages.error(request, f'批次核准失敗: {str(e)}')
+    
+    return redirect('workorder:fill_work:supervisor_pending_list')
+
+
+@login_required
+@require_POST
+def batch_delete_fill_work(request):
+    """
+    批次刪除填報記錄
+    處理多筆填報記錄的批量刪除操作（僅限待核准狀態）
+    """
+    if request.method != 'POST':
+        return redirect('workorder:fill_work:supervisor_pending_list')
+    
+    # 檢查權限
+    if not request.user.is_superuser:
+        messages.error(request, '您沒有權限執行批次刪除操作')
+        return redirect('workorder:fill_work:supervisor_pending_list')
+    
+    try:
+        # 取得要刪除的記錄ID列表
+        record_ids = request.POST.getlist('record_ids')
+        
+        if not record_ids:
+            messages.warning(request, '請選擇要刪除的記錄')
+            return redirect('workorder:fill_work:supervisor_pending_list')
+        
+        # 查詢待核准的記錄（只能刪除待核准狀態的記錄）
+        pending_records = FillWork.objects.filter(
+            id__in=record_ids,
+            approval_status='pending'
+        )
+        
+        if not pending_records.exists():
+            messages.info(request, '沒有找到可以刪除的記錄（只能刪除待核准狀態的記錄）')
+            return redirect('workorder:fill_work:supervisor_pending_list')
+        
+        deleted_count = 0
+        
+        # 批量刪除記錄
+        for record in pending_records:
+            record_id = record.id
+            record.delete()
+            deleted_count += 1
+        
+        messages.success(request, f'成功刪除 {deleted_count} 筆填報記錄')
+        
+    except Exception as e:
+        messages.error(request, f'批次刪除失敗: {str(e)}')
+    
+    return redirect('workorder:fill_work:supervisor_pending_list')

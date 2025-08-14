@@ -5,10 +5,9 @@
 """
 
 from django.core.management.base import BaseCommand
-from workorder.workorder_reporting.models import BackupOperatorSupplementReport as OperatorSupplementReport, BackupSMTSupplementReport as SMTSupplementReport
+from workorder.models import CompletedProductionReport as OperatorSupplementReport
 from workorder.models import WorkOrder
 from django.db import transaction, models
-
 
 class Command(BaseCommand):
     help = '從相同公司代號和工單號的其他記錄中補充產品編號'

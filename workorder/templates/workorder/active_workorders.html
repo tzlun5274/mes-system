@@ -1,93 +1,37 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}生產中工單詳情{% endblock %}
+{% block title %}生產執行監控{% endblock %}
 
 {% block extra_head %}
 <style>
-    .workorder-card {
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        transition: all 0.3s ease;
-    }
-    
-    .workorder-card:hover {
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        transform: translateY(-2px);
-    }
-    
-    .workorder-header {
-        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-        color: white;
-        padding: 15px;
-        border-radius: 8px 8px 0 0;
-    }
-    
-    .workorder-body {
-        padding: 20px;
-        background: white;
-    }
-    
-    .process-item {
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        padding: 12px;
-        margin-bottom: 10px;
-        background: #f8f9fa;
-    }
-    
-    .process-item.completed {
-        background: #d4edda;
-        border-color: #c3e6cb;
-    }
-    
-    .process-item.in_progress {
-        background: #fff3cd;
-        border-color: #ffeaa7;
-    }
-    
-    .process-item.pending {
-        background: #f8f9fa;
-        border-color: #dee2e6;
-    }
-    
-    .status-badge {
-        padding: 4px 8px;
-        border-radius: 12px;
-        font-size: 0.8em;
-        font-weight: bold;
-    }
-    
-    .status-in_progress {
-        background-color: #fff3cd;
-        color: #856404;
-    }
-    
-    .status-completed {
-        background-color: #d4edda;
-        color: #155724;
-    }
-    
-    .status-pending {
-        background-color: #e2e3e5;
-        color: #383d41;
-    }
-    
+    /* 統計卡片樣式 */
     .stats-card {
         text-align: center;
-        padding: 20px;
-        border-radius: 8px;
+        padding: 25px 20px;
+        border-radius: 12px;
         color: white;
         margin-bottom: 20px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stats-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+        pointer-events: none;
     }
     
     .stats-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
     }
     
     .stats-card.active {
@@ -99,94 +43,205 @@
     }
     
     .stats-card.completed {
-        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+    }
+    
+    .stats-card.reports {
+        background: linear-gradient(135deg, #17a2b8 0%, #117a8b 100%);
+    }
+    
+    .stats-card.quantity {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a2d91 100%);
+    }
+    
+    .stats-card.hours {
+        background: linear-gradient(135deg, #fd7e14 0%, #e55a00 100%);
     }
     
     .stats-number {
-        font-size: 2.5em;
+        font-size: 2.8em;
         font-weight: bold;
-        margin-bottom: 5px;
+        margin-bottom: 8px;
         display: block;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     
     .stats-label {
-        font-size: 0.9em;
-        opacity: 0.9;
+        font-size: 1em;
+        opacity: 0.95;
         margin-bottom: 5px;
         display: block;
+        font-weight: 500;
     }
     
-    /* 工單列表卡片樣式 */
-    .workorder-list-card {
-        transition: all 0.3s ease;
-        border: 1px solid #e9ecef;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    .stats-subtitle {
+        font-size: 0.8em;
+        opacity: 0.8;
+        font-weight: 300;
     }
     
-    .workorder-list-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        transform: translateY(-2px);
+    /* 簡化工單列表樣式 */
+    .workorder-list {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        overflow: hidden;
     }
     
-    .workorder-list-card .card-header {
+    .workorder-list .card-header {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border-bottom: 1px solid #dee2e6;
+        border-bottom: 2px solid #dee2e6;
+        padding: 20px;
     }
     
-    .workorder-list-card .card-footer {
-        background: #f8f9fa;
-        border-top: 1px solid #dee2e6;
+    .workorder-item {
+        border-bottom: 1px solid #f1f3f4;
+        padding: 12px 20px;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
     }
     
-    .workorder-list-card .btn-primary {
-        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    .workorder-item:last-child {
+        border-bottom: none;
+    }
+    
+    .workorder-item:hover {
+        background-color: #f8f9fa;
+        transform: translateX(5px);
+    }
+    
+
+    
+    .workorder-detail-item {
+        color: #6c757d;
+        font-size: 0.9em;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex: 1;
+        min-width: 0;
+        padding: 0 10px;
+    }
+    
+    .workorder-detail-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .workorder-detail-item i {
+        color: #007bff;
+        width: 16px;
+    }
+    
+    .workorder-status {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.8em;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .status-active {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-pending {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-completed {
+        background-color: #cce5ff;
+        color: #004085;
+    }
+    
+    /* 進度條樣式 */
+    .progress-container {
+        margin-top: 10px;
+    }
+    
+    .progress {
+        height: 8px;
+        border-radius: 4px;
+        background-color: #e9ecef;
+        overflow: hidden;
+    }
+    
+    .progress-bar {
+        background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+        transition: width 0.6s ease;
+    }
+    
+    .progress-text {
+        font-size: 0.8em;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+    
+    /* 響應式設計 */
+    @media (max-width: 768px) {
+        .stats-card {
+            padding: 20px 15px;
+        }
+        
+        .stats-number {
+            font-size: 2.2em;
+        }
+        
+        .workorder-item {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+        
+        .workorder-detail-item {
+            font-size: 0.8em;
+            flex: none;
+            padding: 5px 0;
+        }
+    }
+    
+    /* 動畫效果 */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .fade-in-up {
+        animation: fadeInUp 0.6s ease-out;
+    }
+    
+    /* 快速操作按鈕 */
+    .quick-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    .btn-quick {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.85em;
+        font-weight: 500;
         border: none;
         transition: all 0.3s ease;
     }
     
-    .workorder-list-card .btn-primary:hover {
-        background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
-        transform: translateY(-1px);
-    }
-    
-    /* 工序統計表格樣式 */
-    .process-stats-table {
-        font-size: 0.9em;
-    }
-    
-    .process-stats-table th {
-        background-color: #f8f9fa;
-        border-color: #dee2e6;
-        font-weight: 600;
-        text-align: center;
-    }
-    
-    .process-stats-table td {
-        vertical-align: middle;
-        text-align: center;
-    }
-    
-    .process-stats-table .badge {
-        font-size: 0.8em;
-    }
-    
-    /* 總統計卡片樣式 */
-    .total-stats-card {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 15px;
-    }
-    
-    .total-stats-card h5 {
-        margin-bottom: 5px;
-        font-weight: bold;
-    }
-    
-    .total-stats-card small {
-        color: #6c757d;
-        font-size: 0.8em;
+    .btn-quick:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
 </style>
 {% endblock %}
@@ -196,7 +251,7 @@
     <!-- 頁面標題 -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0">
-            <i class="fas fa-clipboard-list text-primary"></i>
+            <i class="fas fa-tachometer-alt text-primary"></i>
             生產執行監控
         </h1>
         <nav aria-label="breadcrumb">
@@ -207,268 +262,182 @@
         </nav>
     </div>
 
-    <!-- 統計卡片 -->
+    <!-- 主要統計卡片 -->
     <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="stats-card active">
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="stats-card active fade-in-up">
                 <div class="stats-number">{{ total_active|default:0 }}</div>
                 <div class="stats-label">執行中工單</div>
-                <small>基於已核准報工</small>
+                <div class="stats-subtitle">正在生產</div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="stats-card pending">
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="stats-card pending fade-in-up">
                 <div class="stats-number">{{ total_pending|default:0 }}</div>
                 <div class="stats-label">待生產工單</div>
+                <div class="stats-subtitle">等待開始</div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="stats-card completed fade-in-up">
+                <div class="stats-number">{{ total_completed|default:0 }}</div>
+                <div class="stats-label">已完成工單</div>
+                <div class="stats-subtitle">生產完成</div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="stats-card reports fade-in-up">
+                <div class="stats-number">{{ total_approved_reports_with_workorder|default:0 }}</div>
+                <div class="stats-label">已核准填報</div>
+                <div class="stats-subtitle">主管審核</div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="stats-card quantity fade-in-up">
+                <div class="stats-number">{{ total_good_quantity|default:0 }}</div>
+                <div class="stats-label">合格品數量</div>
+                <div class="stats-subtitle">總計</div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="stats-card hours fade-in-up">
+                <div class="stats-number">{{ total_work_hours|default:0|floatformat:1 }}</div>
+                <div class="stats-label">工作時數</div>
+                <div class="stats-subtitle">小時</div>
             </div>
         </div>
     </div>
 
-    <!-- 報工統計詳情 -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h6 class="mb-0">
-                        <i class="fas fa-user-clock"></i> 作業員報工記錄
-                    </h6>
-                </div>
-                <div class="card-body text-center">
-                    <h3 class="text-primary">{{ today_operator_count|default:0 }}</h3>
-                    <small class="text-muted">現有記錄數</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <h6 class="mb-0">
-                        <i class="fas fa-cogs"></i> SMT報工記錄
-                    </h6>
-                </div>
-                <div class="card-body text-center">
-                    <h3 class="text-success">{{ today_smt_count|default:0 }}</h3>
-                    <small class="text-muted">現有記錄數</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header bg-info text-white">
-                    <h6 class="mb-0">
-                        <i class="fas fa-chart-line"></i> 總合格品數量
-                    </h6>
-                </div>
-                <div class="card-body text-center">
-                    <h3 class="text-info">{{ total_work_quantity|default:0 }}</h3>
-                    <small class="text-muted">所有工單總計</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header bg-warning text-white">
-                    <h6 class="mb-0">
-                        <i class="fas fa-clock"></i> 總工作時數
-                    </h6>
-                </div>
-                <div class="card-body text-center">
-                    <h3 class="text-warning">{{ total_work_hours|default:0|floatformat:1 }}</h3>
-                    <small class="text-muted">小時</small>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 工單列表 -->
-    {% if page_obj %}
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <i class="fas fa-clipboard-list"></i> 執行中工單列表
-                </h5>
-            </div>
-            <div class="card-body p-0">
-                {% for workorder in page_obj %}
-                <div class="workorder-card mb-3">
-                    <div class="workorder-header">
-                        <div class="row align-items-center">
-                            <div class="col-md-3">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-clipboard"></i>
-                                    <span class="badge bg-info me-1">{{ workorder.company_code|default:"-" }}</span>
-                                    <strong>{{ workorder.order_number }}</strong>
-                                </h6>
-                                <small>{{ workorder.company_name|default:"未知公司" }}</small>
-                            </div>
-                            <div class="col-md-3">
-                                <small>產品編號</small><br>
-                                <strong>{{ workorder.product_code|truncatechars:30 }}</strong>
-                            </div>
-                            <div class="col-md-2">
-                                <small>計劃數量</small><br>
-                                <span class="badge bg-info">{{ workorder.quantity }}</span>
-                            </div>
-                            <div class="col-md-2">
-                                <small>建立時間</small><br>
-                                <strong>{{ workorder.created_at|date:"m/d H:i" }}</strong>
-                            </div>
-                            <div class="col-md-2 text-end">
-                                <span class="badge bg-warning">生產中</span><br>
-                                <a href="{% url 'workorder:detail' workorder.id %}" class="btn btn-light btn-sm mt-1">
-                                    <i class="fas fa-eye"></i> 查看詳情
-                                </a>
-                            </div>
+    <!-- 簡化工單列表 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="workorder-list">
+                <div class="card-header" style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-white">
+                            <i class="fas fa-list-ul text-info me-2"></i>
+                            執行中工單列表
+                        </h5>
+                        <div class="quick-actions">
+                            <button class="btn btn-quick btn-outline-primary" onclick="refreshData()">
+                                <i class="fas fa-sync-alt"></i> 重新整理
+                            </button>
                         </div>
                     </div>
-                    
-                    {% if workorder.process_stats %}
-                    <div class="workorder-body">
-                        <h6 class="mb-3">
-                            <i class="fas fa-chart-bar"></i> 工序報工統計 (按時間順序排列)
-                        </h6>
+                </div>
+                
+                <div class="card-body p-0">
+                    {% if workorders_with_approved_reports %}
+                        {% for workorder in workorders_with_approved_reports|slice:":10" %}
+                        <div class="workorder-item">
+                            <div class="workorder-detail-item">
+                                <i class="fas fa-building"></i>
+                                <span>{{ workorder.company_name|default:"-" }}</span>
+                            </div>
+                            <div class="workorder-detail-item" style="font-weight: bold; color: #2c3e50;">
+                                <i class="fas fa-clipboard-list text-primary"></i>
+                                <span>{{ workorder.order_number }}</span>
+                            </div>
+                            <div class="workorder-detail-item">
+                                <i class="fas fa-box"></i>
+                                <span>{{ workorder.product_code }}</span>
+                            </div>
+                            <div class="workorder-detail-item">
+                                <i class="fas fa-hashtag"></i>
+                                <span>{{ workorder.quantity }}</span>
+                            </div>
+                            <div class="workorder-detail-item">
+                                <i class="fas fa-calendar-check"></i>
+                                <span>{{ workorder.created_at|date:"m-d" }}</span>
+                            </div>
+                            <a href="{% url 'workorder:detail' workorder.id %}" class="btn btn-sm btn-primary" title="查看詳情" style="flex-shrink: 0;">
+                                <i class="fas fa-eye me-1"></i>
+                                詳情
+                            </a>
+                        </div>
+                        {% endfor %}
                         
-                        <!-- 總統計 -->
-                        <div class="row mb-3">
-                            <div class="col-md-3">
-                                <div class="total-stats-card text-center">
-                                    <h5 class="text-primary">{{ workorder.total_work_quantity|default:0 }}</h5>
-                                    <small class="text-muted">總合格品</small>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="total-stats-card text-center">
-                                    <h5 class="text-danger">{{ workorder.total_defect_quantity|default:0 }}</h5>
-                                    <small class="text-muted">總不良品</small>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="total-stats-card text-center">
-                                    <h5 class="text-success">{{ workorder.total_work_hours|default:0|floatformat:1 }}</h5>
-                                    <small class="text-muted">總工作時數</small>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="total-stats-card text-center">
-                                    <h5 class="text-warning">{{ workorder.total_overtime_hours|default:0|floatformat:1 }}</h5>
-                                    <small class="text-muted">總加班時數</small>
-                                </div>
-                            </div>
+                        {% if workorders_with_approved_reports.count > 10 %}
+                        <div class="text-center p-3 border-top">
+                            <span class="text-muted">顯示前 10 筆記錄，共 {{ workorders_with_approved_reports.count }} 筆</span>
+                            <br>
+                            <a href="{% url 'workorder:list' %}" class="btn btn-outline-primary btn-sm mt-2">
+                                <i class="fas fa-list"></i> 查看全部工單
+                            </a>
                         </div>
-                        
-                        <!-- 工序詳細統計 -->
-                        <div class="table-responsive">
-                            <table class="table table-sm table-bordered process-stats-table">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th style="width: 15%;">工序名稱</th>
-                                        <th style="width: 10%;">合格品</th>
-                                        <th style="width: 10%;">不良品</th>
-                                        <th style="width: 10%;">工作時數</th>
-                                        <th style="width: 10%;">加班時數</th>
-                                        <th style="width: 10%;">報工次數</th>
-                                        <th style="width: 15%;">首次報工</th>
-                                        <th style="width: 15%;">最後報工</th>
-                                        <th style="width: 5%;">作業員</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for process_name, stats in workorder.process_stats.items %}
-                                    <tr>
-                                        <td>
-                                            <strong>{{ process_name }}</strong>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-success">{{ stats.total_work_quantity }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-danger">{{ stats.total_defect_quantity }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-info">{{ stats.total_work_hours|floatformat:1 }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-warning">{{ stats.total_overtime_hours|floatformat:1 }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-secondary">{{ stats.report_count }}</span>
-                                        </td>
-                                        <td>
-                                            <small>{{ stats.first_report_time|date:"m/d H:i" }}</small>
-                                        </td>
-                                        <td>
-                                            <small>{{ stats.last_report_time|date:"m/d H:i" }}</small>
-                                        </td>
-                                        <td>
-                                            <small>
-                                                {% for operator in stats.operators %}
-                                                    {{ operator }}{% if not forloop.last %}, {% endif %}
-                                                {% endfor %}
-                                            </small>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="workorder-body">
-                        <div class="alert alert-info mb-0">
-                            <i class="fas fa-info-circle"></i>
-                            此工單尚未有報工記錄
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- 分頁 -->
-        {% if page_obj.has_other_pages %}
-        <div class="d-flex justify-content-center mt-4">
-            <nav aria-label="工單分頁">
-                <ul class="pagination">
-                    {% if page_obj.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page=1">&laquo; 第一頁</a>
-                        </li>
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一頁</a>
-                        </li>
-                    {% endif %}
-
-                    {% for num in page_obj.paginator.page_range %}
-                        {% if page_obj.number == num %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ num }}</span>
-                            </li>
-                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-                            </li>
                         {% endif %}
-                    {% endfor %}
-
-                    {% if page_obj.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">下一頁</a>
-                        </li>
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">最後一頁 &raquo;</a>
-                        </li>
+                    {% else %}
+                        <div class="text-center p-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">目前沒有執行中的工單</h5>
+                            <p class="text-muted">所有工單都已完成或尚未開始生產</p>
+                            <a href="{% url 'workorder:list' %}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> 查看工單列表
+                            </a>
+                        </div>
                     {% endif %}
-                </ul>
-            </nav>
+                </div>
+            </div>
         </div>
-        {% endif %}
+    </div>
 
-    {% else %}
-        <div class="alert alert-info text-center">
-            <i class="fas fa-info-circle"></i>
-            目前沒有生產中的工單
+    <!-- 說明資訊 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="alert alert-info border-0 shadow-sm">
+                <div class="d-flex align-items-start">
+                    <i class="fas fa-info-circle fa-lg text-info mt-1 me-3"></i>
+                    <div>
+                        <h6 class="alert-heading mb-2">生產執行監控說明</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul class="mb-0 small">
+                                    <li><strong>執行中工單：</strong>有已核准填報記錄的工單數量</li>
+                                    <li><strong>待生產工單：</strong>狀態為待生產的工單數量</li>
+                                    <li><strong>已完成工單：</strong>狀態為已完成的工單數量</li>
+                                    <li><strong>工單列表：</strong>顯示公司、工單號、產品、數量、日期，詳細資料請點擊「詳情」</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul class="mb-0 small">
+                                    <li><strong>已核准填報：</strong>主管審核通過的填報記錄數量</li>
+                                    <li><strong>合格品數量：</strong>所有已核准填報的合格品總數</li>
+                                    <li><strong>工作時數：</strong>所有已核准填報的工作時數總計</li>
+                                    <li><strong>操作說明：</strong>點擊「詳情」按鈕查看工單詳細資訊</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+    </div>
+    
+    <!-- 資料同步提醒 -->
+    {% if total_approved_reports != total_approved_reports_with_workorder %}
+    <div class="alert alert-warning border-0 shadow-sm">
+        <div class="d-flex align-items-start">
+            <i class="fas fa-exclamation-triangle fa-lg text-warning mt-1 me-3"></i>
+            <div>
+                <h6 class="alert-heading mb-2">資料同步提醒</h6>
+                <p class="mb-0">
+                    目前有 {{ total_approved_reports|default:0 }} 筆已核准填報記錄，其中 {{ total_approved_reports_with_workorder|default:0 }} 筆有對應的工單。
+                    建議從 ERP 系統同步缺失的工單資料以獲得完整的統計資訊。
+                </p>
+            </div>
+        </div>
+    </div>
     {% endif %}
 </div>
+
+<script>
+function refreshData() {
+    location.reload();
+}
+
+// 自動重新整理（每5分鐘）
+setTimeout(function() {
+    refreshData();
+}, 300000);
+</script>
 {% endblock %} 

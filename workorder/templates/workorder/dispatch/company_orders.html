@@ -2,6 +2,15 @@
 {% block title %}未結案公司製令單{% endblock %}
 {% block content %}
 
+<!-- 麵包屑導航 -->
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
+        <li class="breadcrumb-item active" aria-current="page">公司製令單</li>
+    </ol>
+</nav>
+
 <!-- 頁面說明 -->
 <div class="alert alert-info" role="alert">
     <i class="fas fa-info-circle"></i>
@@ -132,12 +141,12 @@
                     <a class="nav-link active" href="{% url 'workorder:company_orders' %}">公司製令</a>
                 </li>
                 <li class="nav-item">
-                                            <a class="nav-link" href="#" onclick="alert('完工工單功能開發中')">已完工工單</a>
+                    <a class="nav-link" href="{% url 'workorder:mes_orders' %}">MES工單管理</a>
                 </li>
             </ul>
         </div>
     </div>
-    <p class="text-muted">此頁顯示 ERP 同步來的原始工單（來自各公司 MES 資料庫 prdMKOrdMain 表），<strong>只顯示未結案的公司製令單（CompleteStatus=2 或空白，且 BillStatus 不是 1）</strong>，方便現場追蹤與管理。</p>
+    <p class="text-muted">此頁顯示 ERP 同步來的原始工單（來自各公司 MES 資料庫 prdMKOrdMain 表），<strong>只顯示未結案的公司製令單（CompleteStatus=2，且 BillStatus 不是 1）</strong>，方便現場追蹤與管理。</p>
     <form method="get" class="mb-3">
         <div class="row g-2 align-items-center">
             <div class="col-auto">
@@ -206,7 +215,7 @@
         </tbody>
     </table>
     <div class="alert alert-info mt-3">
-        <b>說明：</b>本頁資料來自各公司 MES 資料庫的 <code>prdMKOrdMain</code> 表，<strong>只顯示未結案的公司製令單（CompleteStatus=2 或空白，且 BillStatus 不是 1）</strong>，方便現場追蹤與管理。
+        <b>說明：</b>本頁資料來自各公司 MES 資料庫的 <code>prdMKOrdMain</code> 表，<strong>只顯示未結案的公司製令單（CompleteStatus=2，且 BillStatus 不是 1）</strong>，方便現場追蹤與管理。
         <br><br>
         <b>轉換狀態說明：</b>
         <ul class="mb-0">

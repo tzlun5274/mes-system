@@ -22,20 +22,17 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.contrib.auth.decorators import login_required
 
-from ..workorder_reporting.models import BackupOperatorSupplementReport, BackupSMTSupplementReport
 from ..forms import (
     SMTSupplementReportForm,
-    BackupOperatorSupplementReportForm,
     BackupRDSampleSupplementReportForm,
     # 移除主管報工相關的 form，避免混淆
     # 主管職責：監督、審核、管理，不代為報工
 )
-from ..forms_smt_rd_sample import SMTRDSampleSupplementReportForm
-from ..forms_operator_rd_sample import OperatorRDSampleSupplementReportForm
+# from ..forms_smt_rd_sample import SMTRDSampleSupplementReportForm  # 暫時停用
+# from ..forms_operator_rd_sample import OperatorRDSampleSupplementReportForm  # 暫時停用
 from process.models import Operator, ProcessName
 from workorder.models import WorkOrder
 from production.models import ProductionLine
-
 
 class ReportIndexView(LoginRequiredMixin, ListView):
     """
@@ -48,8 +45,7 @@ class ReportIndexView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         """取得最近的報工記錄"""
-        return BackupOperatorSupplementReport.objects.all()[:10]
-
+        return 
     def get_context_data(self, **kwargs):
         """提供模板所需的上下文數據"""
         context = super().get_context_data(**kwargs)
@@ -63,15 +59,13 @@ class ReportIndexView(LoginRequiredMixin, ListView):
 
         return context
 
-
 class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
     """
     作業員補登報工列表視圖
     顯示所有待核准的作業員補登報工記錄
     """
 
-    model = BackupOperatorSupplementReport
-    template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_index.html"
+    model =     template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_index.html"
     context_object_name = "supplement_reports"
     paginate_by = 20  # 每頁顯示20筆記錄
 
@@ -136,15 +130,19 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
         }
 
         # 計算統計數據
-        context["pending_count"] = BackupOperatorSupplementReport.objects.filter(
+        from workorder.models import CompletedProductionReport
+        context["pending_count"] = CompletedProductionReport.objects.filter(
+            report_type='operator',
             approval_status="pending"
         ).count()
 
-        context["approved_count"] = BackupOperatorSupplementReport.objects.filter(
+        context["approved_count"] = CompletedProductionReport.objects.filter(
+            report_type='operator',
             approval_status="approved"
         ).count()
 
-        context["rejected_count"] = BackupOperatorSupplementReport.objects.filter(
+        context["rejected_count"] = CompletedProductionReport.objects.filter(
+            report_type='operator',
             approval_status="rejected"
         ).count()
 
@@ -178,16 +176,13 @@ class OperatorSupplementReportListView(LoginRequiredMixin, ListView):
 
         return context
 
-
 class OperatorSupplementReportCreateView(LoginRequiredMixin, CreateView):
     """
     備用的作業員補登報工新增視圖
     用於建立新的作業員補登報工記錄
     """
 
-    model = BackupOperatorSupplementReport
-    form_class = BackupOperatorSupplementReportForm
-    template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_form.html"
+    model =     form_class =     template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_form.html"
     success_url = reverse_lazy("workorder:operator_supplement_report_index")
 
     def form_valid(self, form):
@@ -201,16 +196,13 @@ class OperatorSupplementReportCreateView(LoginRequiredMixin, CreateView):
         messages.error(self.request, "作業員補登報工記錄建立失敗，請檢查輸入資料！")
         return super().form_invalid(form)
 
-
 class OperatorSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
     """
     備用的作業員補登報工編輯視圖
     用於編輯現有作業員補登報工記錄
     """
 
-    model = BackupOperatorSupplementReport
-    form_class = BackupOperatorSupplementReportForm
-    template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_form.html"
+    model =     form_class =     template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_form.html"
     success_url = reverse_lazy("workorder:operator_supplement_report_index")
 
     def form_valid(self, form):
@@ -223,15 +215,13 @@ class OperatorSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
         messages.error(self.request, "作業員補登報工記錄更新失敗，請檢查輸入資料！")
         return super().form_invalid(form)
 
-
 class OperatorSupplementReportDetailView(LoginRequiredMixin, DetailView):
     """
     備用的作業員補登報工詳情視圖
     顯示單一作業員補登報工記錄的詳細資訊
     """
 
-    model = BackupOperatorSupplementReport
-    template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_detail.html"
+    model =     template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_detail.html"
     context_object_name = "report"
 
     def get_context_data(self, **kwargs):
@@ -256,15 +246,13 @@ class OperatorSupplementReportDetailView(LoginRequiredMixin, DetailView):
 
         return context
 
-
 class SMTSupplementReportListView(LoginRequiredMixin, ListView):
     """
     備用的SMT補登報工列表視圖
     顯示所有SMT補登報工記錄
     """
 
-    model = BackupSMTSupplementReport
-    template_name = "workorder/backup_report/backup_smt/backup_supplement/backup_index.html"
+    model =     template_name = "workorder/backup_report/backup_smt/backup_supplement/backup_index.html"
     context_object_name = "reports"
     paginate_by = 20
     ordering = ["-work_date", "-start_time"]
@@ -310,20 +298,23 @@ class SMTSupplementReportListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
 
         # 計算統計數據
-        context["pending_count"] = BackupSMTSupplementReport.objects.filter(
+        from workorder.models import CompletedProductionReport
+        context["pending_count"] = CompletedProductionReport.objects.filter(
+            report_type='smt',
             approval_status="pending"
         ).count()
 
-        context["approved_count"] = BackupSMTSupplementReport.objects.filter(
+        context["approved_count"] = CompletedProductionReport.objects.filter(
+            report_type='smt',
             approval_status="approved"
         ).count()
 
-        context["rejected_count"] = BackupSMTSupplementReport.objects.filter(
+        context["rejected_count"] = CompletedProductionReport.objects.filter(
+            report_type='smt',
             approval_status="rejected"
         ).count()
 
-        context["total_count"] = BackupSMTSupplementReport.objects.count()
-
+        context["total_count"] = context["pending_count"] + context["approved_count"] + context["rejected_count"]
         # 添加篩選參數到上下文，用於保持表單狀態
         context["filters"] = {
             "company_name": self.request.GET.get("company_name", ""),
@@ -357,14 +348,13 @@ class SMTSupplementReportListView(LoginRequiredMixin, ListView):
 
         return context
 
-
 class SMTSupplementReportCreateView(LoginRequiredMixin, CreateView):
     """
     備用的SMT補登報工新增視圖
     用於建立新的SMT補登報工記錄
     """
 
-    model = BackupSMTSupplementReport
+    model = None  # 暫時設為 None，避免模型引用錯誤
     form_class = SMTSupplementReportForm
     template_name = "workorder/backup_report/backup_smt/backup_supplement/backup_form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -380,14 +370,13 @@ class SMTSupplementReportCreateView(LoginRequiredMixin, CreateView):
         messages.error(self.request, "SMT生產報工記錄建立失敗，請檢查輸入資料！")
         return super().form_invalid(form)
 
-
 class SMTSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
     """
     備用的SMT補登報工編輯視圖
     用於編輯現有SMT補登報工記錄
     """
 
-    model = BackupSMTSupplementReport
+    model = None  # 暫時設為 None，避免模型引用錯誤
     form_class = SMTSupplementReportForm
     template_name = "workorder/backup_report/backup_smt/backup_supplement/backup_form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -408,14 +397,13 @@ class SMTSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
         messages.error(self.request, "SMT生產報工記錄更新失敗，請檢查輸入資料！")
         return super().form_invalid(form)
 
-
 class SMTSupplementReportDetailView(LoginRequiredMixin, DetailView):
     """
     備用的SMT補登報工詳情視圖
     顯示單一SMT補登報工記錄的詳細資訊
     """
 
-    model = BackupSMTSupplementReport
+    model = None  # 暫時設為 None，避免模型引用錯誤
     template_name = "workorder/backup_report/backup_smt/backup_supplement/backup_detail.html"
     context_object_name = "supplement_report"
 
@@ -445,7 +433,6 @@ class SMTSupplementReportDetailView(LoginRequiredMixin, DetailView):
 
         return context
 
-
 class SMTSupplementReportDeleteView(
     LoginRequiredMixin, UserPassesTestMixin, DeleteView
 ):
@@ -454,7 +441,7 @@ class SMTSupplementReportDeleteView(
     用於刪除SMT補登報工記錄，僅限管理員使用
     """
 
-    model = BackupSMTSupplementReport
+    model = None  # 暫時設為 None，避免模型引用錯誤
     template_name = "workorder/backup_report/backup_smt/backup_supplement/backup_delete_confirm.html"
     context_object_name = "supplement_report"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
@@ -519,7 +506,6 @@ class SMTSupplementReportDeleteView(
 
         return redirect("workorder:smt_supplement_report_index")
 
-
 class OperatorSupplementReportDeleteView(
     LoginRequiredMixin, UserPassesTestMixin, DeleteView
 ):
@@ -528,8 +514,7 @@ class OperatorSupplementReportDeleteView(
     僅允許建立者本人或超級用戶刪除
     """
 
-    model = BackupOperatorSupplementReport
-    template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_delete_confirm.html"
+    model =     template_name = "workorder/backup_report/backup_operator/backup_supplement/backup_delete_confirm.html"
     context_object_name = "supplement_report"
     success_url = reverse_lazy("workorder:operator_supplement_report_index")
 
@@ -548,15 +533,14 @@ class OperatorSupplementReportDeleteView(
         messages.success(request, "作業員補登報工記錄刪除成功！")
         return super().delete(request, *args, **kwargs)
 
-
 class SMTRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView):
     """
     備用的SMT RD樣品補登報工新增視圖
     用於建立新的SMT RD樣品補登報工記錄
     """
 
-    model = BackupSMTSupplementReport
-    form_class = SMTRDSampleSupplementReportForm
+    model = None  # 暫時設為 None，避免模型引用錯誤
+    form_class = None  # 暫時設為 None，避免表單引用錯誤
     template_name = "workorder/backup_report/backup_smt/backup_rd_sample/backup_form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
 
@@ -571,15 +555,14 @@ class SMTRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView):
         messages.error(self.request, "SMT RD樣品生產報工記錄建立失敗，請檢查輸入資料！")
         return super().form_invalid(form)
 
-
 class SMTRDSampleSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
     """
     備用的SMT RD樣品補登報工編輯視圖
     用於編輯現有SMT RD樣品補登報工記錄
     """
 
-    model = BackupSMTSupplementReport
-    form_class = SMTRDSampleSupplementReportForm
+    model = None  # 暫時設為 None，避免模型引用錯誤
+    form_class = None  # 暫時設為 None，避免表單引用錯誤
     template_name = "workorder/backup_report/backup_smt/backup_rd_sample/backup_form.html"
     success_url = reverse_lazy("workorder:smt_supplement_report_index")
 
@@ -593,9 +576,7 @@ class SMTRDSampleSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
         messages.error(self.request, "SMT RD樣品生產報工記錄更新失敗，請檢查輸入資料！")
         return super().form_invalid(form)
 
-
 # 已移除作業員RD樣品補登報工列表視圖 - 只保留新增功能
-
 
 class OperatorRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView):
     """
@@ -603,7 +584,7 @@ class OperatorRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView)
     使用專用的RD樣品表單
     """
 
-    model = BackupOperatorSupplementReport
+    model = None  # 暫時設為 None，避免模型引用錯誤
     form_class = BackupRDSampleSupplementReportForm
     template_name = "workorder/backup_report/backup_operator/backup_rd_sample_supplement/backup_form.html"
 
@@ -623,14 +604,13 @@ class OperatorRDSampleSupplementReportCreateView(LoginRequiredMixin, CreateView)
         messages.success(self.request, "作業員RD樣品補登報工記錄已成功建立！")
         return super().form_valid(form)
 
-
 class OperatorRDSampleSupplementReportUpdateView(LoginRequiredMixin, UpdateView):
     """
     備用的作業員RD樣品補登報工編輯視圖
     使用專用的RD樣品表單
     """
 
-    model = BackupOperatorSupplementReport
+    model = None  # 暫時設為 None，避免模型引用錯誤
     form_class = BackupRDSampleSupplementReportForm
     template_name = "workorder/backup_report/backup_operator/backup_rd_sample_supplement/backup_form.html"
 
@@ -642,12 +622,9 @@ class OperatorRDSampleSupplementReportUpdateView(LoginRequiredMixin, UpdateView)
         messages.success(self.request, "作業員RD樣品補登報工記錄已成功更新！")
         return super().form_valid(form)
 
-
 # 已移除作業員RD樣品補登報工詳情視圖 - 只保留新增功能
 
-
 # 已移除作業員RD樣品補登報工刪除視圖 - 只保留新增功能
-
 
 @require_POST
 @login_required
@@ -659,9 +636,11 @@ def approve_report(request, report_id):
     try:
         report_type = request.POST.get("report_type")
         if report_type == "operator":
-            report = get_object_or_404(BackupOperatorSupplementReport, id=report_id)
+            from workorder.models import CompletedProductionReport
+            report = get_object_or_404(CompletedProductionReport, id=report_id, report_type='operator')
         elif report_type == "smt":
-            report = get_object_or_404(BackupSMTSupplementReport, id=report_id)
+            from workorder.models import CompletedProductionReport
+            report = get_object_or_404(CompletedProductionReport, id=report_id, report_type='smt')
         else:
             messages.error(request, "無效的報工記錄類型！")
             return redirect("workorder:backup_report_index")
@@ -693,7 +672,6 @@ def approve_report(request, report_id):
 
     return redirect("workorder:backup_report_index")
 
-
 @require_POST
 @login_required
 def reject_report(request, report_id):
@@ -704,9 +682,11 @@ def reject_report(request, report_id):
     try:
         report_type = request.POST.get("report_type")
         if report_type == "operator":
-            report = get_object_or_404(BackupOperatorSupplementReport, id=report_id)
+            from workorder.models import CompletedProductionReport
+            report = get_object_or_404(CompletedProductionReport, id=report_id, report_type='operator')
         elif report_type == "smt":
-            report = get_object_or_404(BackupSMTSupplementReport, id=report_id)
+            from workorder.models import CompletedProductionReport
+            report = get_object_or_404(CompletedProductionReport, id=report_id, report_type='smt')
         else:
             messages.error(request, "無效的報工記錄類型！")
             return redirect("workorder:backup_report_index")
@@ -721,7 +701,6 @@ def reject_report(request, report_id):
         messages.error(request, f"駁回失敗：{str(e)}")
 
     return redirect("workorder:backup_report_index")
-
 
 class BackupReportIndexView(ReportIndexView):
     """

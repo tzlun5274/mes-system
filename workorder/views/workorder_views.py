@@ -10,23 +10,30 @@ from django.views.generic import (
     UpdateView,
     DeleteView,
     DetailView,
+    View,
 )
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.db.models import Q
 from django.core.paginator import Paginator
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+import logging
 
 from ..models import WorkOrder
-from ..workorder_erp.models import CompanyOrder
+from ..workorder_erp.models import CompanyOrder, SystemConfig
 from ..forms import WorkOrderForm
 from erp_integration.models import CompanyConfig
+from ..workorder_dispatch.models import WorkOrderDispatch
 
+# 設定 logger
+workorder_logger = logging.getLogger('workorder')
 
 class WorkOrderListView(LoginRequiredMixin, ListView):
     """
@@ -59,7 +66,6 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
             self.request.settings.DEBUG if hasattr(self.request, "settings") else False
         )
         return context
-
 
 class WorkOrderDetailView(LoginRequiredMixin, DetailView):
     """
@@ -125,68 +131,36 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         context["in_progress_processes_count"] = in_progress_processes_count
 
         # 獲取所有已核准的報工記錄
-        from workorder.workorder_reporting.models import (
-            BackupOperatorSupplementReport as OperatorSupplementReport,
-            BackupSMTSupplementReport as SMTSupplementReport,
-        )
+        from workorder.fill_work.models import FillWork
 
-        # 作業員補登報工記錄（已核准）
-        operator_reports = OperatorSupplementReport.objects.filter(
-            workorder=workorder, approval_status="approved"
+        # 獲取所有已核准的填報記錄
+        fill_work_reports = FillWork.objects.filter(
+            workorder=workorder.order_number,
+            approval_status="approved"
         ).order_by("work_date", "start_time")
 
-        # SMT生產報工記錄（已核准）
-        smt_reports = SMTSupplementReport.objects.filter(
-            workorder=workorder, approval_status="approved"
-        ).order_by("work_date", "start_time")
-
-        # 合併所有報工記錄並按時間排序
+        # 處理填報記錄
         all_reports = []
 
-        # 添加作業員報工記錄
-        for report in operator_reports:
+        for report in fill_work_reports:
             all_reports.append(
                 {
-                    "type": "operator",
+                    "type": "fill_work",
                     "report_date": report.work_date,
-                    "process_name": report.process_name,
-                    "operator": report.operator.name if report.operator else "-",
-                    "equipment": report.equipment.name if report.equipment else "-",
+                    "process_name": report.operation or "未指定",
+                    "operator": report.operator or "-",
+                    "equipment": report.equipment or "-",
                     "work_quantity": report.work_quantity or 0,
                     "defect_quantity": report.defect_quantity or 0,
                     "work_hours": report.work_hours_calculated or 0,
                     "overtime_hours": report.overtime_hours_calculated or 0,
-                    "report_source": "作業員補登報工",
+                    "report_source": "填報作業",
                     "report_time": report.start_time,
                     "start_time": report.start_time,
                     "end_time": report.end_time,
-                    "remarks": report.remarks,
-                    "abnormal_notes": report.abnormal_notes,
-                    "approved_by": report.approved_by,
-                    "approved_at": report.approved_at,
-                }
-            )
-
-        # 添加SMT報工記錄
-        for report in smt_reports:
-            all_reports.append(
-                {
-                    "type": "smt",
-                    "report_date": report.work_date,
-                    "process_name": report.operation,
-                    "operator": "-",
-                    "equipment": report.equipment.name if report.equipment else "-",
-                    "work_quantity": report.work_quantity or 0,
-                    "defect_quantity": report.defect_quantity or 0,
-                    "work_hours": report.work_hours_calculated or 0,
-                    "overtime_hours": report.overtime_hours_calculated or 0,
-                    "report_source": "SMT報工",
-                    "report_time": report.start_time,
-                    "start_time": report.start_time,
-                    "end_time": report.end_time,
-                    "remarks": report.remarks,
-                    "abnormal_notes": report.abnormal_notes,
-                    "approved_by": report.approved_by,
+                    "remarks": report.remarks or "",
+                    "abnormal_notes": report.abnormal_notes or "",
+                    "approved_by": report.approved_by or "",
                     "approved_at": report.approved_at,
                 }
             )
@@ -297,8 +271,16 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         context["production_stats_by_process"] = sorted_stats_by_process
         context["production_total_stats"] = total_stats
 
-        return context
+        # 添加完工判斷資訊
+        try:
+            from ..services.completion_service import WorkOrderCompletionService
+            completion_summary = WorkOrderCompletionService.get_completion_summary(workorder.id)
+            context["completion_summary"] = completion_summary
+        except Exception as e:
+            workorder_logger.error(f"獲取工單 {workorder.order_number} 完工摘要失敗: {str(e)}")
+            context["completion_summary"] = {'error': '獲取完工摘要失敗'}
 
+        return context
 
 class WorkOrderCreateView(LoginRequiredMixin, CreateView):
     """
@@ -321,7 +303,6 @@ class WorkOrderCreateView(LoginRequiredMixin, CreateView):
         messages.error(self.request, "工單建立失敗，請檢查輸入資料！")
         return super().form_invalid(form)
 
-
 class WorkOrderUpdateView(LoginRequiredMixin, UpdateView):
     """
     工單編輯視圖
@@ -343,7 +324,6 @@ class WorkOrderUpdateView(LoginRequiredMixin, UpdateView):
         messages.error(self.request, "工單更新失敗，請檢查輸入資料！")
         return super().form_invalid(form)
 
-
 class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     """
     工單刪除視圖
@@ -363,7 +343,6 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         messages.success(request, "工單刪除成功！")
         return super().delete(request, *args, **kwargs)
 
-
 @method_decorator(ensure_csrf_cookie, name="dispatch")
 class CompanyOrderListView(LoginRequiredMixin, ListView):
     """
@@ -381,13 +360,13 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         """取得查詢集，支援搜尋和排序功能"""
         # 只顯示未結案的公司製令單
-        # CompleteStatus=2 或空白，且 BillStatus 不是 1
+        # CompleteStatus=2，且 BillStatus 不是 1（排除已結案的）
         queryset = (
             super()
             .get_queryset()
             .filter(
-                # CompleteStatus 為 2 或空白（null）
-                (Q(complete_status=2) | Q(complete_status__isnull=True))
+                # CompleteStatus 為 2
+                Q(complete_status=2)
                 &
                 # BillStatus 不是 1（排除已結案的）
                 ~Q(bill_status=1)
@@ -554,7 +533,6 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
 
         return self.get(request, *args, **kwargs)
 
-
 @require_GET
 def get_company_order_info(request):
     """
@@ -587,3 +565,446 @@ def get_company_order_info(request):
 
     except Exception as e:
         return JsonResponse({"error": f"查詢失敗：{str(e)}"}, status=500)
+
+class MesOrderListView(LoginRequiredMixin, ListView):
+    """
+    MES 工單管理清單：集中查看已轉成 MES 的工單，並提供批量派工入口
+    """
+
+    model = WorkOrder
+    template_name = "workorder/mes_orders.html"
+    context_object_name = "orders"
+    paginate_by = 20
+    ordering = ["-created_at"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # 依關鍵字過濾（工單號/產品/公司代號）
+        search = self.request.GET.get("search", "").strip()
+        if search:
+            qs = qs.filter(
+                Q(order_number__icontains=search)
+                | Q(product_code__icontains=search)
+                | Q(company_code__icontains=search)
+            )
+        # 派工狀態過濾：undispatched/dispatched/all
+        status = self.request.GET.get("dispatch_status", "all")
+        if status == "undispatched":
+            qs = qs.exclude(order_number__in=WorkOrderDispatch.objects.values_list("order_number", flat=True))
+        elif status == "dispatched":
+            qs = qs.filter(order_number__in=WorkOrderDispatch.objects.values_list("order_number", flat=True))
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        dispatched_numbers = set(
+            WorkOrderDispatch.objects.values_list("order_number", flat=True)
+        )
+        ctx["dispatched_map"] = dispatched_numbers
+        ctx["search"] = self.request.GET.get("search", "")
+        ctx["dispatch_status"] = self.request.GET.get("dispatch_status", "all")
+        
+        # 統計資料
+        total_orders = WorkOrder.objects.count()
+        dispatched_orders = WorkOrderDispatch.objects.count()
+        undispatched_orders = total_orders - dispatched_orders
+        
+        ctx["total_orders"] = total_orders
+        ctx["dispatched_orders"] = dispatched_orders
+        ctx["undispatched_orders"] = undispatched_orders
+        
+        # 讀取自動批次派工間隔設定
+        auto_dispatch_interval = 60
+        try:
+            config = SystemConfig.objects.get(key="auto_batch_dispatch_interval")
+            auto_dispatch_interval = int(config.value)
+        except SystemConfig.DoesNotExist:
+            pass
+        ctx["auto_dispatch_interval"] = auto_dispatch_interval
+        
+        return ctx
+
+@login_required
+@require_POST
+def mes_orders_bulk_dispatch(request):
+    """
+    批量派工：從 MES 工單管理頁選取多筆工單，建立派工單
+    """
+    import json
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "資料格式錯誤"}, status=400)
+
+    order_numbers = payload.get("order_numbers") or []
+    if not order_numbers:
+        return JsonResponse({"error": "沒有選取工單"}, status=400)
+
+    created = 0
+    skipped = 0
+    for no in order_numbers:
+        try:
+            wo = WorkOrder.objects.get(order_number=no)
+        except WorkOrder.DoesNotExist:
+            skipped += 1
+            continue
+        # 若已有派工單，略過
+        if WorkOrderDispatch.objects.filter(order_number=no).exists():
+            skipped += 1
+            continue
+        WorkOrderDispatch.objects.create(
+            company_code=getattr(wo, "company_code", None),
+            order_number=wo.order_number,
+            product_code=wo.product_code,
+            planned_quantity=wo.quantity,
+            status="pending",
+            created_by=str(request.user) if request.user.is_authenticated else "system",
+        )
+        created += 1
+
+    return JsonResponse({"success": True, "created": created, "skipped": skipped})
+
+@login_required
+@require_POST
+def mes_order_dispatch(request):
+    """
+    單筆派工：為指定工單建立派工單
+    """
+    order_number = request.POST.get("order_number")
+    if not order_number:
+        return JsonResponse({"error": "工單號碼不能為空"}, status=400)
+    
+    try:
+        wo = WorkOrder.objects.get(order_number=order_number)
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({"error": "工單不存在"}, status=400)
+    
+    # 檢查是否已有派工單
+    if WorkOrderDispatch.objects.filter(order_number=order_number).exists():
+        return JsonResponse({"error": "此工單已有派工單"}, status=400)
+    
+    # 建立派工單
+    WorkOrderDispatch.objects.create(
+        company_code=getattr(wo, "company_code", None),
+        order_number=wo.order_number,
+        product_code=wo.product_code,
+        planned_quantity=wo.quantity,
+        status="pending",
+        created_by=str(request.user) if request.user.is_authenticated else "system",
+    )
+    
+    return JsonResponse({"success": True, "message": "派工單建立成功"})
+
+@login_required
+@require_POST
+def mes_order_delete(request):
+    """
+    刪除工單：刪除指定的 MES 工單
+    """
+    order_number = request.POST.get("order_number")
+    if not order_number:
+        return JsonResponse({"error": "工單號碼不能為空"}, status=400)
+    
+    try:
+        wo = WorkOrder.objects.get(order_number=order_number)
+    except WorkOrder.DoesNotExist:
+        return JsonResponse({"error": "工單不存在"}, status=400)
+    
+    # 檢查是否有派工單
+    if WorkOrderDispatch.objects.filter(order_number=order_number).exists():
+        return JsonResponse({"error": "此工單已有派工單，無法刪除"}, status=400)
+    
+    # 刪除工單
+    wo.delete()
+    
+    return JsonResponse({"success": True, "message": "工單刪除成功"})
+
+@login_required
+@require_POST
+def mes_orders_auto_dispatch(request):
+    """
+    自動批次派工：自動為所有未派工的工單建立派工單
+    """
+    try:
+        # 取得所有未派工的工單
+        undispatched_orders = WorkOrder.objects.exclude(
+            order_number__in=WorkOrderDispatch.objects.values_list("order_number", flat=True)
+        )
+        
+        created = 0
+        for wo in undispatched_orders:
+            WorkOrderDispatch.objects.create(
+                company_code=getattr(wo, "company_code", None),
+                order_number=wo.order_number,
+                product_code=wo.product_code,
+                planned_quantity=wo.quantity,
+                status="pending",
+                created_by=str(request.user) if request.user.is_authenticated else "system",
+            )
+            created += 1
+        
+        return JsonResponse({
+            "success": True, 
+            "message": f"自動批次派工完成，共建立 {created} 筆派工單"
+        })
+        
+    except Exception as e:
+        return JsonResponse({"error": f"自動批次派工失敗：{str(e)}"}, status=500)
+
+@login_required
+@require_POST
+def mes_orders_set_auto_dispatch_interval(request):
+    """
+    設定自動批次派工間隔
+    """
+    try:
+        interval = request.POST.get("interval")
+        if not interval or not interval.isdigit():
+            return JsonResponse({"error": "間隔時間必須是正整數"}, status=400)
+        
+        interval_minutes = int(interval)
+        if interval_minutes < 1 or interval_minutes > 1440:  # 1分鐘到24小時
+            return JsonResponse({"error": "間隔時間必須在1-1440分鐘之間"}, status=400)
+        
+        # 更新系統設定
+        SystemConfig.objects.update_or_create(
+            key="auto_batch_dispatch_interval",
+            defaults={"value": str(interval_minutes)}
+        )
+        
+        # 更新 Celery 定時任務
+        from django_celery_beat.models import PeriodicTask, IntervalSchedule
+        
+        # 建立或更新間隔排程
+        interval_schedule, created = IntervalSchedule.objects.get_or_create(
+            every=interval_minutes,
+            period=IntervalSchedule.MINUTES,
+        )
+        
+        # 更新定時任務
+        periodic_task, created = PeriodicTask.objects.get_or_create(
+            name="自動批次派工",
+            defaults={
+                "task": "workorder.tasks.auto_batch_dispatch_orders",
+                "interval": interval_schedule,
+                "enabled": True,
+            },
+        )
+        
+        if not created:
+            periodic_task.interval = interval_schedule
+            periodic_task.enabled = True
+            periodic_task.save()
+        
+        workorder_logger.info(
+            f"管理員 {request.user} 設定自動批次派工間隔為 {interval_minutes} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        
+        return JsonResponse({
+            "success": True, 
+            "message": f"自動批次派工間隔已設定為 {interval_minutes} 分鐘"
+        })
+        
+    except Exception as e:
+        workorder_logger.error(f"設定自動批次派工間隔失敗：{str(e)}")
+        return JsonResponse({"error": f"設定失敗：{str(e)}"}, status=500)
+
+@method_decorator(login_required, name='dispatch')
+class CreateMissingWorkOrdersView(LoginRequiredMixin, View):
+    """
+    從填報資料創建缺失工單的視圖
+    提供網頁介面讓使用者執行工單創建功能
+    """
+    
+    def get(self, request):
+        """顯示工單創建頁面"""
+        from ..fill_work.models import FillWork
+        from ..models import WorkOrder
+        
+        # 統計資訊
+        total_fill_works = FillWork.objects.count()
+        total_workorders = WorkOrder.objects.count()
+        
+        # 分析可能缺失的工單
+        missing_workorders = []
+        try:
+            # 取得所有填報資料中的唯一組合
+            fill_work_combinations = FillWork.objects.values(
+                'company_name', 'workorder', 'product_id'
+            ).distinct()
+            
+            for combo in fill_work_combinations:
+                # 檢查是否已存在對應的工單
+                existing_workorder = WorkOrder.objects.filter(
+                    order_number=combo['workorder'],
+                    product_code=combo['product_id']
+                ).first()
+                
+                if not existing_workorder:
+                    missing_workorders.append({
+                        'company_name': combo['company_name'],
+                        'workorder': combo['workorder'],
+                        'product_id': combo['product_id']
+                    })
+        except Exception as e:
+            workorder_logger.error(f"分析缺失工單時發生錯誤: {e}")
+        
+        context = {
+            'total_fill_works': total_fill_works,
+            'total_workorders': total_workorders,
+            'missing_workorders': missing_workorders,
+            'missing_count': len(missing_workorders)
+        }
+        
+        return render(request, 'workorder/workorder/create_missing_workorders.html', context)
+    
+    def post(self, request):
+        """執行工單創建功能"""
+        # 直接定義函數，避免循環導入問題
+        def create_missing_workorders_from_fillwork():
+            from ..fill_work.models import FillWork
+            from ..models import WorkOrder
+            from erp_integration.models import CompanyConfig
+            from ..workorder_erp.models import PrdMKOrdMain, CompanyOrder
+            from django.db import transaction
+            import logging
+            
+            logger = logging.getLogger(__name__)
+            
+            # 統計資訊
+            created_count = 0
+            skipped_count = 0
+            error_count = 0
+            errors = []
+            
+            try:
+                # 取得所有填報資料
+                fill_works = FillWork.objects.all()
+                
+                for fill_work in fill_works:
+                    try:
+                        # 檢查必要欄位
+                        if not fill_work.company_name or not fill_work.workorder or not fill_work.product_id:
+                            workorder_logger.warning(f"填報資料缺少必要欄位: ID={fill_work.id}")
+                            error_count += 1
+                            continue
+                        
+                        # 從公司名稱查找公司代號
+                        company_code = None
+                        try:
+                            company_config = CompanyConfig.objects.filter(
+                                company_name__icontains=fill_work.company_name
+                            ).first()
+                            
+                            if company_config:
+                                company_code = company_config.company_code
+                            else:
+                                # 如果找不到公司配置，嘗試從製令資料中查找
+                                mkord_main = PrdMKOrdMain.objects.filter(
+                                    MKOrdNO=fill_work.workorder,
+                                    ProductID=fill_work.product_id
+                                ).first()
+                                
+                                if mkord_main:
+                                    # 從製令資料中查找公司代號
+                                    company_order = CompanyOrder.objects.filter(
+                                        mkordno=fill_work.workorder,
+                                        product_id=fill_work.product_id
+                                    ).first()
+                                    
+                                    if company_order:
+                                        company_code = company_order.company_code
+                        
+                        except Exception as e:
+                            workorder_logger.error(f"查找公司代號時發生錯誤: {e}")
+                            error_count += 1
+                            continue
+                        
+                        if not company_code:
+                            workorder_logger.warning(f"無法找到公司代號: 公司名稱={fill_work.company_name}, 工單號={fill_work.workorder}")
+                            error_count += 1
+                            continue
+                        
+                        # 檢查工單是否已存在
+                        existing_workorder = WorkOrder.objects.filter(
+                            company_code=company_code,
+                            order_number=fill_work.workorder,
+                            product_code=fill_work.product_id
+                        ).first()
+                        
+                        if existing_workorder:
+                            workorder_logger.info(f"工單已存在，跳過: {company_code}-{fill_work.workorder}-{fill_work.product_id}")
+                            skipped_count += 1
+                            continue
+                        
+                        # 創建新工單
+                        with transaction.atomic():
+                            new_workorder = WorkOrder.objects.create(
+                                company_code=company_code,
+                                order_number=fill_work.workorder,
+                                product_code=fill_work.product_id,
+                                quantity=fill_work.planned_quantity or 0,
+                                status='pending',
+                                order_source='mes'  # 從填報資料創建的工單標記為MES來源
+                            )
+                            
+                            created_count += 1
+                            workorder_logger.info(f"成功創建工單: {new_workorder}")
+                        
+                    except Exception as e:
+                        workorder_logger.error(f"處理填報資料時發生錯誤 (ID={fill_work.id}): {e}")
+                        error_count += 1
+                        errors.append({
+                            'fill_work_id': fill_work.id,
+                            'error': str(e)
+                        })
+                
+                # 記錄統計結果
+                workorder_logger.info(f"工單創建完成 - 成功: {created_count}, 跳過: {skipped_count}, 錯誤: {error_count}")
+                
+                return {
+                    'success': True,
+                    'created_count': created_count,
+                    'skipped_count': skipped_count,
+                    'error_count': error_count,
+                    'errors': errors
+                }
+                
+            except Exception as e:
+                workorder_logger.error(f"創建缺失工單時發生嚴重錯誤: {e}")
+                return {
+                    'success': False,
+                    'error': str(e),
+                    'created_count': created_count,
+                    'skipped_count': skipped_count,
+                    'error_count': error_count,
+                    'errors': errors
+                }
+        
+        try:
+            # 執行工單創建功能
+            result = create_missing_workorders_from_fillwork()
+            
+            if result['success']:
+                messages.success(
+                    request,
+                    f'工單創建完成！成功創建 {result["created_count"]} 個工單，'
+                    f'跳過 {result["skipped_count"]} 個已存在的工單，'
+                    f'處理 {result["error_count"]} 個錯誤記錄。'
+                )
+            else:
+                messages.error(
+                    request,
+                    f'工單創建失敗: {result["error"]}'
+                )
+            
+            # 重定向到工單列表頁面
+            return redirect('workorder:list')
+            
+        except Exception as e:
+            workorder_logger.error(f"執行工單創建時發生錯誤: {e}")
+            messages.error(request, f'執行過程中發生錯誤: {e}')
+            return redirect('workorder:list')
+
+
