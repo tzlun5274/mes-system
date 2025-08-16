@@ -241,13 +241,13 @@
                     this.loadWorkorders('', companyName);
                 });
 
-                // 產品編號變更事件
-                this.productSelect.addEventListener('change', () => {
-                    const productId = this.productSelect.value;
-                    const companyName = this.companySelect.value;
-                    console.log('產品編號變更為:', productId, '公司名稱:', companyName);
-                    this.loadWorkorders(productId, companyName);
-                });
+                            // 產品編號變更事件
+            this.productSelect.addEventListener('change', () => {
+                const productId = this.productSelect.value;
+                const companyName = this.companySelect.value;
+                console.log('產品編號變更為:', productId, '公司名稱:', companyName);
+                this.loadWorkorders(productId, companyName);
+            });
 
                 // 工單號碼變更事件
                 this.workorderSelect.addEventListener('change', () => {
@@ -352,10 +352,19 @@
                             option.textContent = workorder.workorder;
                             option.dataset.company = workorder.company_name;
                             option.dataset.quantity = workorder.planned_quantity;
+                            option.dataset.product = workorder.product_id; // 新增產品編號資料
                             this.workorderSelect.appendChild(option);
                         });
                         
                         console.log(`載入工單號碼完成，共 ${filteredWorkorders.length} 個選項`);
+                        
+                        // 如果選擇了產品編號，自動選擇第一個工單（參考作業員補登填報紀錄的邏輯）
+                        if (productId && filteredWorkorders.length > 0) {
+                            const firstWorkorder = filteredWorkorders[0].workorder;
+                            this.workorderSelect.value = firstWorkorder;
+                            // 觸發工單變更事件
+                            this.handleWorkorderChange();
+                        }
                     }
                 } catch (error) {
                     console.error('載入工單號碼失敗:', error);
@@ -441,8 +450,24 @@
                     this.plannedQuantityInput.value = quantity;
                     console.log('自動填入預設生產數量:', quantity);
                     
-                    // 根據選中的工單，自動填入產品編號
-                    this.loadProductForWorkorder(selectedOption.value);
+                    // 自動填入產品編號（參考作業員補登填報紀錄的寫法）
+                    if (selectedOption.dataset.product) {
+                        const productId = selectedOption.dataset.product;
+                        console.log('自動填入產品編號:', productId);
+                        
+                        // 檢查產品編號是否已存在於選項中
+                        const existingOption = this.productSelect.querySelector(`option[value="${productId}"]`);
+                        if (!existingOption) {
+                            // 如果不存在，新增選項
+                            const newOption = document.createElement('option');
+                            newOption.value = productId;
+                            newOption.textContent = productId;
+                            this.productSelect.appendChild(newOption);
+                        }
+                        
+                        // 設定選中的產品編號
+                        this.productSelect.value = productId;
+                    }
                     
                 } else {
                     // 清空預設生產數量

@@ -55,6 +55,7 @@ urlpatterns = [
     path("api/workorder-list/", views.workorder_list_api, name="workorder_list_api"),
     path("api/operator-list/", views.operator_list_api, name="operator_list_api"),
     path("api/equipment-list/", views.equipment_list_api, name="equipment_list_api"),
+    path("api/process-list/", views.process_list_api, name="process_list_api"),
     path("api/workorder-by-product/", views.workorder_by_product_api, name="workorder_by_product_api"),
     path("api/products-by-company/", views.products_by_company_api, name="products_by_company_api"),
     path("api/workorder-detail/", views.workorder_detail_api, name="workorder_detail_api"),

@@ -1590,6 +1590,25 @@ class OnsiteReportAutoProcessService:
                 'message': f'取得工序列表失敗：{str(e)}'
             } 
 
+def process_list_api(request):
+    """工序列表 API"""
+    try:
+        from process.models import ProcessName
+        
+        # 取得所有工序
+        processes = ProcessName.objects.values('name').distinct().order_by('name')
+        
+        return JsonResponse({
+            'success': True,
+            'processes': list(processes)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
+
 @login_required
 def workorder_debug_api(request):
     """工單調試 API - 檢查工單資料狀態（使用 WorkOrderDispatch 模型）"""
