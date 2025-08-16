@@ -236,9 +236,14 @@
                                     <a href="{% url 'workorder:fill_work:operator_index' %}" class="btn btn-secondary">
                                         <i class="fas fa-arrow-left"></i> 返回列表
                                     </a>
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save"></i> 儲存填報紀錄
-                                    </button>
+                                    <div>
+                                        <button type="button" class="btn btn-warning me-2" onclick="resetFillWorkForm()">
+                                            <i class="fas fa-redo"></i> 重新選擇
+                                        </button>
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save"></i> 儲存填報紀錄
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -258,202 +263,124 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- 載入統一的填報表單 JavaScript 模組 -->
+<script src="{% static 'js/fill_work_common.js' %}"></script>
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('作業員補登填報表單 JavaScript 載入完成');
+    
     // 設定預設日期為今天
     const today = new Date().toISOString().split('T')[0];
-    $('#id_work_date').val(today);
-
-    // 初始化 product/workorder
-    $('#product_id').html('<option value="">請選擇產品編號</option>');
-    $('#workorder').html('<option value="">請選擇工單號碼</option>');
-
-    // 載入全部產品清單
-    $.ajax({
-        url: '{% url "workorder:fill_work:get_product_list" %}',
-        success: function(data){
-            updateProductOptions(data);
-        }
-    });
-    // 載入全部工單號碼
-    $.ajax({
-        url: '{% url "workorder:fill_work:get_all_workorder_numbers" %}',
-        success: function(data){
-            const arr = (data && data.workorders) ? data.workorders : [];
-            let options = '<option value="">請選擇工單號碼</option>';
-            arr.forEach(function(no){ options += `<option value="${no}">${no}</option>`; });
-            $('#workorder').html(options);
-        }
-    });
+    const workDateElement = document.getElementById('id_work_date');
+    if (workDateElement) {
+        workDateElement.value = today;
+    }
 
     // 設定預設時間
-    $('#start_hour').val('08');
-    $('#start_minute').val('30');
-    $('#end_hour').val('17');
-    $('#end_minute').val('30');
+    const startHourElement = document.getElementById('start_hour');
+    const startMinuteElement = document.getElementById('start_minute');
+    const endHourElement = document.getElementById('end_hour');
+    const endMinuteElement = document.getElementById('end_minute');
+    
+    if (startHourElement) startHourElement.value = '08';
+    if (startMinuteElement) startMinuteElement.value = '30';
+    if (endHourElement) endHourElement.value = '17';
+    if (endMinuteElement) endMinuteElement.value = '30';
 
     // 更新隱藏的時間欄位
     updateTimeFields();
 
     // 時間選擇變更事件
-    $('#start_hour, #start_minute, #end_hour, #end_minute').change(function() {
-        updateTimeFields();
-    });
-
-    // 當產品選好後，依產品載入工單清單
-    $('#product_id').on('change', function() {
-        const productId = $(this).val();
-        if (!productId) {
-            $('#workorder').html('<option value="">請選擇工單號碼</option>');
-            $('#planned_quantity').val('');
-            return;
+    const timeSelects = ['start_hour', 'start_minute', 'end_hour', 'end_minute'];
+    timeSelects.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', updateTimeFields);
         }
-        showLoading();
-        $.ajax({
-            url: '{% url "workorder:fill_work:get_workorder_by_product" %}',
-            data: { product_id: productId },
-            success: function(data) {
-                const items = data && data.workorders ? data.workorders : [];
-                updateWorkorderOptions(items);
-                // 自動選擇第一筆工單並觸發帶入公司與數量
-                if (items.length > 0) {
-                    const firstNo = items[0].workorder;
-                    $('#workorder').val(firstNo).trigger('change');
-                }
-                hideLoading();
-            },
-            error: function() {
-                hideLoading();
-                alert('獲取工單資料失敗');
+    });
+    
+    // 表單提交前驗證
+    const formElement = document.getElementById('fillWorkForm');
+    if (formElement) {
+        formElement.addEventListener('submit', function(e) {
+            if (!validateForm()) {
+                e.preventDefault();
+                return false;
             }
         });
-    });
-
-    // 工單號碼變更事件：帶出公司與預設數量，並回填產品
-    $('#workorder').change(function() {
-        const workorderId = $(this).val();
-        if (workorderId) {
-            showLoading();
-            $.ajax({
-                url: '{% url "workorder:fill_work:get_workorder_info" %}',
-                data: { workorder_id: workorderId },
-                success: function(data) {
-                    // 回填公司與數量
-                    if (data.company_name) { $('#company_name').val(data.company_name); }
-                    if (data.planned_quantity !== undefined) { $('#planned_quantity').val(data.planned_quantity); }
-                    // 回填產品（若清單中不存在，附加後選中）
-                    if (data.product_id) {
-                        if ($(`#product_id option[value='${data.product_id}']`).length === 0) {
-                            $('#product_id').append(`<option value="${data.product_id}">${data.product_id}</option>`);
-                        }
-                        $('#product_id').val(data.product_id);
-                    }
-                    hideLoading();
-                },
-                error: function() {
-                    hideLoading();
-                    alert('獲取工單資訊失敗');
-                }
-            });
-        } else {
-            $('#planned_quantity').val('');
-        }
-    });
-
-    // 取消公司→產品的聯動（依規範雙向為 產品←→工單）
+    }
+    
+    // 初始化統一的填報表單控制器
+    new FillWorkController();
+    
+    console.log('作業員補登填報表單初始化完成');
 });
-
-// 更新工單選項
-function updateWorkorderOptions(workorders) {
-    let options = '<option value="">請選擇工單號碼</option>';
-    workorders.forEach(function(workorder) {
-        // 僅顯示工單號碼
-        options += `<option value="${workorder.workorder}" data-planned-quantity="${workorder.planned_quantity}" data-company-name="${workorder.company_name}">${workorder.workorder}</option>`;
-    });
-    $('#workorder').html(options);
-}
-
-// 更新產品選項
-function updateProductOptions(data) {
-    const products = (data && data.products) ? data.products : [];
-    let options = '<option value="">請選擇產品編號</option>';
-    products.forEach(function(pid) {
-        options += `<option value="${pid}">${pid}</option>`;
-    });
-    $('#product_id').html(options);
-}
 
 // 更新隱藏的時間欄位
 function updateTimeFields() {
-    const startHour = $('#start_hour').val();
-    const startMinute = $('#start_minute').val();
-    const endHour = $('#end_hour').val();
-    const endMinute = $('#end_minute').val();
+    const startHour = document.getElementById('start_hour');
+    const startMinute = document.getElementById('start_minute');
+    const endHour = document.getElementById('end_hour');
+    const endMinute = document.getElementById('end_minute');
+    const startTime = document.getElementById('start_time');
+    const endTime = document.getElementById('end_time');
     
-    if (startHour && startMinute) {
-        const startTime = `${startHour}:${startMinute}`;
-        $('#start_time').val(startTime);
+    if (startHour && startMinute && startTime && startHour.value && startMinute.value) {
+        const startTimeValue = `${startHour.value}:${startMinute.value}`;
+        startTime.value = startTimeValue;
     }
     
-    if (endHour && endMinute) {
-        const endTime = `${endHour}:${endMinute}`;
-        $('#end_time').val(endTime);
+    if (endHour && endMinute && endTime && endHour.value && endMinute.value) {
+        const endTimeValue = `${endHour.value}:${endMinute.value}`;
+        endTime.value = endTimeValue;
     }
-}
-
-// 同步下拉選單到手動輸入欄位
-function syncToManualInput() {
-    const startHour = $('#start_hour').val();
-    const startMinute = $('#start_minute').val();
-    const endHour = $('#end_hour').val();
-    const endMinute = $('#end_minute').val();
-    
-    if (startHour && startMinute) {
-        $('#start_time_manual').val(`${startHour}:${startMinute}`);
-    }
-    
-    if (endHour && endMinute) {
-        $('#end_time_manual').val(`${endHour}:${endMinute}`);
-    }
-}
-
-
-
-// 顯示載入指示器
-function showLoading() {
-    $('#loadingIndicator').show();
-}
-
-// 隱藏載入指示器
-function hideLoading() {
-    $('#loadingIndicator').hide();
 }
 
 // 表單驗證
 function validateForm() {
-    const requiredFields = ['product_id', 'workorder', 'company_name', 'operator', 'process', 'work_quantity'];
+    const requiredFields = ['product_id', 'workorder', 'company_name', 'operator', 'work_quantity'];
     
     for (let field of requiredFields) {
-        const value = $(`#${field}`).val();
-        if (!value) {
-            alert(`請填寫必填欄位：${$(`#${field}`).prev('label').text().replace(' *', '')}`);
-            $(`#${field}`).focus();
+        const element = document.getElementById(field);
+        if (!element) {
+            console.error(`找不到元素: ${field}`);
+            continue;
+        }
+        const value = element.value;
+        if (!value || value.trim() === '') {
+            const label = element.previousElementSibling;
+            const labelText = label ? label.textContent.replace(' *', '') : field;
+            alert(`請填寫必填欄位：${labelText}`);
+            element.focus();
             return false;
         }
     }
     
-    const startHour = $('#start_hour').val();
-    const startMinute = $('#start_minute').val();
-    const endHour = $('#end_hour').val();
-    const endMinute = $('#end_minute').val();
+    // 檢查工序欄位（可能是Django form渲染的）
+    const processElement = document.getElementById('id_process');
+    if (processElement && (!processElement.value || processElement.value.trim() === '')) {
+        alert('請填寫必填欄位：工序');
+        processElement.focus();
+        return false;
+    }
+    
+    const startHour = document.getElementById('start_hour');
+    const startMinute = document.getElementById('start_minute');
+    const endHour = document.getElementById('end_hour');
+    const endMinute = document.getElementById('end_minute');
     
     if (!startHour || !startMinute || !endHour || !endMinute) {
         alert('請選擇完整的開始時間和結束時間');
         return false;
     }
     
-    const startMinutes = parseInt(startHour) * 60 + parseInt(startMinute);
-    const endMinutes = parseInt(endHour) * 60 + parseInt(endMinute);
+    if (!startHour.value || !startMinute.value || !endHour.value || !endMinute.value) {
+        alert('請選擇完整的開始時間和結束時間');
+        return false;
+    }
+    
+    const startMinutes = parseInt(startHour.value) * 60 + parseInt(startMinute.value);
+    const endMinutes = parseInt(endHour.value) * 60 + parseInt(endMinute.value);
     
     if (endMinutes <= startMinutes) {
         alert('結束時間必須晚於開始時間');

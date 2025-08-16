@@ -1590,6 +1590,7 @@ class OnsiteReportAutoProcessService:
                 'message': f'取得工序列表失敗：{str(e)}'
             } 
 
+@login_required
 def process_list_api(request):
     """工序列表 API"""
     try:

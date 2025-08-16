@@ -1460,7 +1460,7 @@ def get_workorder_info(request):
 def get_products_by_company(request):
     """根據公司名稱獲取產品清單的API"""
     try:
-        company_name = request.GET.get('company_name')
+        company_name = request.POST.get('company_name') or request.GET.get('company_name')
         if not company_name:
             return JsonResponse({'error': '缺少公司名稱參數'}, status=400)
         
@@ -1468,7 +1468,7 @@ def get_products_by_company(request):
         company_cfg = CompanyConfig.objects.filter(company_name=company_name).first()
         code = company_cfg.company_code if company_cfg else company_name
         products = WorkOrderDispatch.objects.filter(company_code=code).values_list('product_code', flat=True).distinct()
-        product_list = list(products)
+        product_list = [{'product_id': product} for product in products]
         
         return JsonResponse({'products': product_list})
         
