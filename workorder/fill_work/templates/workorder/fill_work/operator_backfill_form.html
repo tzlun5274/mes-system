@@ -264,7 +264,7 @@
 
 {% block extra_js %}
 <!-- 載入統一的填報表單 JavaScript 模組 -->
-<script src="{% static 'js/fill_work_common.js' %}"></script>
+<script src="{% static 'js/work_common.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     console.log('作業員補登填報表單 JavaScript 載入完成');
@@ -323,15 +323,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 1000);
     
-    // 初始化統一的作業員、工序、設備控制器（作業員表單）
-    window.operatorProcessEquipmentController = new OperatorProcessEquipmentController({
-        formType: 'operator',
-        enableEquipmentAutoFill: false,
-        apiPrefix: '/workorder/static/api',
-        operatorId: 'operator',
-        processId: 'id_process',
-        equipmentId: 'equipment'
-    });
+
     
     console.log('作業員補登填報表單初始化完成');
 });

@@ -34,5 +34,5 @@ MES工單管理 (獨立模組)
 
 ### 統一JS模組配置
 ```javascript
-apiPrefix: '/var/www/mes/workorder/static/js/fill_work_common.js'
+apiPrefix: '/var/www/mes/workorder/static/js/work_common.js'
 ```

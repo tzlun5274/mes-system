@@ -1,6 +1,6 @@
 /**
- * 填報表單通用 JavaScript 模組
- * 統一處理所有填報表單的功能：產品編號、工單號碼、公司名稱、作業員、工序、設備
+ * 工單表單通用 JavaScript 模組
+ * 統一處理所有工單表單的功能：產品編號、工單號碼、公司名稱、作業員、工序、設備
  */
 
 class FillWorkController {
@@ -93,44 +93,108 @@ class FillWorkController {
         }
     }
 
-    // 載入公司名稱
-    async loadCompanies() {
+    // 通用 API 呼叫方法
+    async fetchAPI(url, options = {}) {
         try {
-            const response = await fetch('/workorder/static/api/workorder-list/', {
+            const response = await fetch(url, {
                 method: 'GET',
                 credentials: 'same-origin',
                 headers: {
                     'X-CSRFToken': this.getCSRFToken(),
                     'Content-Type': 'application/json',
-                }
+                    ...options.headers
+                },
+                ...options
             });
-            const data = await response.json();
-            if (data.success && data.workorders) {
-                // 保存當前選中的值
-                const currentValue = this.companySelect.value;
+            
+            if (!response.ok) {
+                throw new Error(`API請求失敗: ${response.status} ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error(`API呼叫失敗 (${url}):`, error);
+            throw error;
+        }
+    }
+
+    // 通用選項填充方法
+    populateSelect(selectElement, data, options = {}) {
+        if (!selectElement) return;
+        
+        const {
+            placeholder = '請選擇',
+            valueKey = 'name',
+            textKey = 'name',
+            filter = null,
+            sort = true,
+            preserveValue = true
+        } = options;
+        
+        // 保存當前選中的值
+        const currentValue = preserveValue ? selectElement.value : '';
+        
+        // 清空選項
+        selectElement.innerHTML = `<option value="">${placeholder}</option>`;
+        
+        // 處理資料
+        let processedData = Array.isArray(data) ? data : [];
+        
+        // 應用過濾器
+        if (filter) {
+            processedData = processedData.filter(filter);
+        }
+        
+        // 排序
+        if (sort) {
+            processedData.sort((a, b) => {
+                const aText = typeof a === 'string' ? a : a[textKey];
+                const bText = typeof b === 'string' ? b : b[textKey];
+                return aText.localeCompare(bText);
+            });
+        }
+        
+        // 填充選項
+        processedData.forEach(item => {
+            const option = document.createElement('option');
+            
+            if (typeof item === 'string') {
+                option.value = item;
+                option.textContent = item;
+            } else {
+                option.value = item[valueKey];
+                option.textContent = item[textKey];
                 
+                // 複製額外的資料屬性
+                if (item.company_name) option.dataset.company = item.company_name;
+                if (item.planned_quantity) option.dataset.quantity = item.planned_quantity;
+                if (item.product_id) option.dataset.product = item.product_id;
+            }
+            
+            selectElement.appendChild(option);
+        });
+        
+        // 恢復之前選中的值
+        if (currentValue && preserveValue) {
+            selectElement.value = currentValue;
+        }
+        
+        console.log(`填充選項完成，共 ${processedData.length} 個選項`);
+        return processedData.length;
+    }
+
+    // 載入公司名稱
+    async loadCompanies() {
+        try {
+            const data = await this.fetchAPI('/workorder/static/api/workorder-list/');
+            if (data.success && data.workorders) {
                 // 從工單資料中提取公司名稱，過濾掉純數字的公司代號
                 const companies = [...new Set(data.workorders.map(w => w.company_name))]
-                    .filter(company => {
-                        // 過濾掉純數字的公司代號（如 "01", "02" 等）
-                        return !/^\d+$/.test(company) && company.trim() !== '';
-                    })
-                    .sort();
+                    .filter(company => !/^\d+$/.test(company) && company.trim() !== '');
                 
-                this.companySelect.innerHTML = '<option value="">請選擇公司名稱</option>';
-                companies.forEach(company => {
-                    const option = document.createElement('option');
-                    option.value = company;
-                    option.textContent = company;
-                    this.companySelect.appendChild(option);
+                this.populateSelect(this.companySelect, companies, {
+                    placeholder: '請選擇公司名稱'
                 });
-                
-                // 恢復之前選中的值
-                if (currentValue) {
-                    this.companySelect.value = currentValue;
-                }
-                
-                console.log(`載入公司名稱完成，共 ${companies.length} 個選項`);
             }
         } catch (error) {
             console.error('載入公司名稱失敗:', error);
@@ -145,38 +209,13 @@ class FillWorkController {
                 url = `/workorder/static/api/products-by-company/?company_name=${encodeURIComponent(companyName)}`;
             }
             
-            const response = await fetch(url, {
-                method: 'GET',
-                credentials: 'same-origin',
-                headers: {
-                    'X-CSRFToken': this.getCSRFToken(),
-                    'Content-Type': 'application/json',
-                }
-            });
-            const data = await response.json();
+            const data = await this.fetchAPI(url);
             if (data.success && data.products) {
-                // 保存當前選中的值
-                const currentValue = this.productSelect.value;
-                
-                this.productSelect.innerHTML = '<option value="">請選擇產品編號</option>';
-                data.products.forEach(product => {
-                    const option = document.createElement('option');
-                    // 處理不同的資料格式
-                    if (typeof product === 'string') {
-                        option.value = product;
-                        option.textContent = product;
-                    } else if (product && product.product_id) {
-                        option.value = product.product_id;
-                        option.textContent = product.product_id;
-                    }
-                    this.productSelect.appendChild(option);
+                this.populateSelect(this.productSelect, data.products, {
+                    placeholder: '請選擇產品編號',
+                    valueKey: 'product_id',
+                    textKey: 'product_id'
                 });
-                
-                // 恢復之前選中的值
-                if (currentValue) {
-                    this.productSelect.value = currentValue;
-                    console.log('恢復產品編號選中的值:', currentValue);
-                }
             }
         } catch (error) {
             console.error('載入產品編號失敗:', error);
@@ -194,27 +233,8 @@ class FillWorkController {
                 console.log('載入所有工單');
             }
             
-            const response = await fetch(url, {
-                method: 'GET',
-                credentials: 'same-origin',
-                headers: {
-                    'X-CSRFToken': this.getCSRFToken(),
-                    'Content-Type': 'application/json',
-                }
-            });
-            
-            console.log('API回應狀態:', response.status, response.statusText);
-            
-            if (!response.ok) {
-                throw new Error(`API請求失敗: ${response.status} ${response.statusText}`);
-            }
-            
-            const data = await response.json();
-            console.log('API回應資料:', data);
-            
+            const data = await this.fetchAPI(url);
             if (data.success && data.workorders) {
-                this.workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                
                 // 如果使用特定產品編號的API，直接使用返回的資料
                 // 如果使用通用API，則需要篩選
                 let filteredWorkorders = data.workorders;
@@ -223,17 +243,12 @@ class FillWorkController {
                     filteredWorkorders = filteredWorkorders.filter(w => w.company_name === companyName);
                 }
                 
-                filteredWorkorders.forEach(workorder => {
-                    const option = document.createElement('option');
-                    option.value = workorder.workorder;
-                    option.textContent = workorder.workorder;
-                    option.dataset.company = workorder.company_name;
-                    option.dataset.quantity = workorder.planned_quantity;
-                    option.dataset.product = workorder.product_id;
-                    this.workorderSelect.appendChild(option);
+                this.populateSelect(this.workorderSelect, filteredWorkorders, {
+                    placeholder: '請選擇工單號碼',
+                    valueKey: 'workorder',
+                    textKey: 'workorder',
+                    preserveValue: false
                 });
-                
-                console.log(`載入工單號碼完成，共 ${filteredWorkorders.length} 個選項`);
             }
         } catch (error) {
             console.error('載入工單號碼失敗:', error);
@@ -265,24 +280,18 @@ class FillWorkController {
     // 載入作業員
     async loadOperators() {
         try {
-            const response = await fetch('/workorder/static/api/operator-list/', {
-                method: 'GET',
-                credentials: 'same-origin',
-                headers: {
-                    'X-CSRFToken': this.getCSRFToken(),
-                    'Content-Type': 'application/json',
-                }
-            });
-            const data = await response.json();
+            // 如果是SMT表單且有作業員顯示欄位，不需要載入作業員選項
+            if (this.getFormType() === 'smt' && this.operatorDisplay) {
+                console.log('SMT表單：作業員欄位為唯讀顯示，不載入選項');
+                return;
+            }
+            
+            // 作業員表單才載入作業員選項
+            const data = await this.fetchAPI('/workorder/static/api/operator-list/');
             if (data.success && data.operators) {
-                this.operatorSelect.innerHTML = '<option value="">請選擇作業員</option>';
-                data.operators.forEach(operator => {
-                    const option = document.createElement('option');
-                    option.value = operator.name;
-                    option.textContent = operator.name;
-                    this.operatorSelect.appendChild(option);
+                this.populateSelect(this.operatorSelect, data.operators, {
+                    placeholder: '請選擇作業員'
                 });
-                console.log(`載入作業員完成，共 ${data.operators.length} 個選項`);
             }
         } catch (error) {
             console.error('載入作業員失敗:', error);
@@ -292,24 +301,14 @@ class FillWorkController {
     // 載入工序
     async loadProcesses() {
         try {
-            const response = await fetch('/workorder/static/api/process-list/', {
-                method: 'GET',
-                credentials: 'same-origin',
-                headers: {
-                    'X-CSRFToken': this.getCSRFToken(),
-                    'Content-Type': 'application/json',
-                }
-            });
-            const data = await response.json();
+            // 根據表單類型決定API參數
+            const formType = this.getFormType();
+            const url = `/workorder/static/api/process-list/?form_type=${formType}`;
+            const data = await this.fetchAPI(url);
             if (data.success && data.processes) {
-                this.processSelect.innerHTML = '<option value="">請選擇此次報工的工序</option>';
-                data.processes.forEach(process => {
-                    const option = document.createElement('option');
-                    option.value = process.name;
-                    option.textContent = process.name;
-                    this.processSelect.appendChild(option);
+                this.populateSelect(this.processSelect, data.processes, {
+                    placeholder: '請選擇此次報工的工序'
                 });
-                console.log(`載入工序完成，共 ${data.processes.length} 個選項`);
             }
         } catch (error) {
             console.error('載入工序失敗:', error);
@@ -319,27 +318,28 @@ class FillWorkController {
     // 載入設備
     async loadEquipment() {
         try {
-            const response = await fetch('/workorder/static/api/equipment-list/', {
-                method: 'GET',
-                credentials: 'same-origin',
-                headers: {
-                    'X-CSRFToken': this.getCSRFToken(),
-                    'Content-Type': 'application/json',
-                }
-            });
-            const data = await response.json();
+            // 根據表單類型決定API參數
+            const formType = this.getFormType();
+            const url = `/workorder/static/api/equipment-list/?form_type=${formType}`;
+            const data = await this.fetchAPI(url);
             if (data.success && data.equipments) {
-                this.equipmentSelect.innerHTML = '<option value="">請選擇設備</option>';
-                data.equipments.forEach(equipment => {
-                    const option = document.createElement('option');
-                    option.value = equipment.name;
-                    option.textContent = equipment.name;
-                    this.equipmentSelect.appendChild(option);
+                this.populateSelect(this.equipmentSelect, data.equipments, {
+                    placeholder: '請選擇設備'
                 });
-                console.log(`載入設備完成，共 ${data.equipments.length} 個選項`);
             }
         } catch (error) {
             console.error('載入設備失敗:', error);
+        }
+    }
+
+    // 獲取表單類型
+    getFormType() {
+        // 檢查URL路徑來判斷表單類型
+        const pathname = window.location.pathname;
+        if (pathname.includes('/smt/')) {
+            return 'smt';
+        } else {
+            return 'operator';
         }
     }
 

@@ -217,11 +217,12 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/fill_work_common.js' %}"></script>
+<script src="{% static 'js/work_common.js' %}"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // 初始化統一的填報控制器（處理產品編號、工單號碼、公司名稱的雙向關聯選擇）
-        new FillWorkController();
+        const fillWorkController = new FillWorkController();
         
         // 現場報工表單控制器（處理其他功能）
         class OnsiteReportController {
@@ -320,16 +321,6 @@
                 }
             }
         }
-
-        // 初始化統一的作業員、工序、設備控制器（作業員現場報工）
-        window.operatorProcessEquipmentController = new OperatorProcessEquipmentController({
-            formType: 'operator',
-            enableEquipmentAutoFill: false,
-            apiPrefix: '/workorder/api',
-            operatorId: 'operator',
-            processId: 'process',
-            equipmentId: 'equipment'
-        });
 
         // 初始化現場報工控制器
         new OnsiteReportController();

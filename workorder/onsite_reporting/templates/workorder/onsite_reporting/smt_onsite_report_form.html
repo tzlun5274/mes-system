@@ -79,10 +79,10 @@
 
                             <!-- 作業員 -->
                             <div class="col-md-4 mb-3">
-                                <label for="operator" class="form-label">作業員 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="operator" name="operator" required>
-                                    <option value="">請選擇作業員</option>
-                                </select>
+                                <label for="operator_display" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="operator_display" value="" readonly>
+                                <input type="hidden" id="operator" name="operator" value="">
+                                <div class="form-text">選擇設備時會自動填入作業員欄位</div>
                             </div>
 
                             <!-- 工序 -->
@@ -207,7 +207,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/fill_work_common.js' %}"></script>
+<script src="{% static 'js/work_common.js' %}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // 初始化統一的填報控制器（處理產品編號、工單號碼、公司名稱的雙向關聯選擇）
@@ -275,16 +275,6 @@
                 }
             }
         }
-
-        // 初始化統一的作業員、工序、設備控制器（SMT現場報工）
-        window.operatorProcessEquipmentController = new OperatorProcessEquipmentController({
-            formType: 'smt',
-            enableEquipmentAutoFill: true,
-            apiPrefix: '/workorder/api',
-            operatorId: 'operator',
-            processId: 'process',
-            equipmentId: 'equipment'
-        });
 
         // 初始化 SMT 現場報工控制器
         new SMTOnsiteReportController();
