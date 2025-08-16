@@ -235,13 +235,18 @@
             initializeEventListeners() {
                 // 公司名稱變更事件
                 this.companySelect.addEventListener('change', () => {
-                    this.loadProducts(this.companySelect.value);
-                    this.loadWorkorders('', this.companySelect.value);
+                    const companyName = this.companySelect.value;
+                    console.log('公司名稱變更為:', companyName);
+                    this.loadProducts(companyName);
+                    this.loadWorkorders('', companyName);
                 });
 
                 // 產品編號變更事件
                 this.productSelect.addEventListener('change', () => {
-                    this.loadWorkorders(this.productSelect.value, this.companySelect.value);
+                    const productId = this.productSelect.value;
+                    const companyName = this.companySelect.value;
+                    console.log('產品編號變更為:', productId, '公司名稱:', companyName);
+                    this.loadWorkorders(productId, companyName);
                 });
 
                 // 工單號碼變更事件
@@ -334,7 +339,14 @@
                     const data = await response.json();
                     if (data.workorders) {
                         this.workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                        data.workorders.forEach(workorder => {
+                        
+                        // 篩選工單（根據產品編號和公司名稱）
+                        let filteredWorkorders = data.workorders;
+                        if (companyName) {
+                            filteredWorkorders = filteredWorkorders.filter(w => w.company_name === companyName);
+                        }
+                        
+                        filteredWorkorders.forEach(workorder => {
                             const option = document.createElement('option');
                             option.value = workorder.workorder;
                             option.textContent = workorder.workorder;
@@ -342,6 +354,8 @@
                             option.dataset.quantity = workorder.planned_quantity;
                             this.workorderSelect.appendChild(option);
                         });
+                        
+                        console.log(`載入工單號碼完成，共 ${filteredWorkorders.length} 個選項`);
                     }
                 } catch (error) {
                     console.error('載入工單號碼失敗:', error);
@@ -414,22 +428,26 @@
             handleWorkorderChange() {
                 const selectedOption = this.workorderSelect.options[this.workorderSelect.selectedIndex];
                 if (selectedOption && selectedOption.value) {
+                    console.log('工單號碼變更為:', selectedOption.value);
+                    
                     // 自動填入公司名稱
                     if (selectedOption.dataset.company) {
                         this.companySelect.value = selectedOption.dataset.company;
+                        console.log('自動填入公司名稱:', selectedOption.dataset.company);
                     }
                     
                     // 自動填入預設生產數量
                     const quantity = selectedOption.dataset.quantity || 0;
                     this.plannedQuantityInput.value = quantity;
+                    console.log('自動填入預設生產數量:', quantity);
                     
-                    // 如果公司名稱有變更，重新載入產品選項
-                    if (selectedOption.dataset.company && selectedOption.dataset.company !== this.companySelect.value) {
-                        this.loadProducts(selectedOption.dataset.company);
-                    }
+                    // 根據選中的工單，自動填入產品編號
+                    this.loadProductForWorkorder(selectedOption.value);
+                    
                 } else {
                     // 清空預設生產數量
                     this.plannedQuantityInput.value = '';
+                    console.log('清空預設生產數量');
                 }
             }
 
