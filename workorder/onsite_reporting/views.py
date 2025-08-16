@@ -788,6 +788,7 @@ def smt_work_selection(request):
 
 
 @login_required
+@login_required
 def operator_rd_onsite_report_create(request):
     """
     作業員RD樣品現場報工建立視圖
@@ -797,9 +798,10 @@ def operator_rd_onsite_report_create(request):
     from .models import OnsiteReport
     from workorder.models import WorkOrder
     from django.contrib import messages
-    from django.http import JsonResponse
+    from django.shortcuts import render, redirect
     from django.db.models import Q
     from django.db import transaction
+    from django.utils import timezone
     
     if request.method == 'POST':
         try:
@@ -810,9 +812,17 @@ def operator_rd_onsite_report_create(request):
                 process = request.POST.get('process', '')
                 work_quantity = request.POST.get('work_quantity', 0)
                 defect_quantity = request.POST.get('defect_quantity', 0)
-                status = request.POST.get('status', 'start')
-                notes = request.POST.get('notes', '')
-                abnormal_record = request.POST.get('abnormal_record', '')
+                status = request.POST.get('status', 'started')
+                remarks = request.POST.get('remarks', '')
+                abnormal_notes = request.POST.get('abnormal_notes', '')
+                company_code = request.POST.get('company_code', '')
+                product_code = request.POST.get('product_code', 'PFP-CCT')  # 從表單取得產品編號
+                order_number = request.POST.get('order_number', 'RD樣品')   # 從表單取得工單號碼
+                
+                # 驗證必填欄位
+                if not all([operator, process, status]):
+                    messages.error(request, '請填寫所有必填欄位')
+                    return redirect('workorder:onsite_reporting:operator_rd_onsite_report_create')
                 
                 # 檢查是否已有RD樣品工單，如果沒有則自動建立
                 rd_workorder = WorkOrder.objects.filter(
@@ -827,7 +837,7 @@ def operator_rd_onsite_report_create(request):
                         product_id='PFP-CCT',
                         workorder='RD樣品',
                         company_name='RD樣品',
-                        planned_quantity=100,  # 預設數量
+                        planned_quantity=0,  # RD樣品無預設數量
                         order_source='mes',
                         status='pending',
                         created_by=request.user
@@ -840,34 +850,34 @@ def operator_rd_onsite_report_create(request):
                     operator=operator,
                     equipment=equipment,
                     process=process,
-                    product_id='PFP-CCT',  # 固定產品編號
-                    workorder='RD樣品',    # 固定工單號碼
-                    company_name='RD樣品', # 固定公司名稱
+                    product_code='PFP-CCT',  # 固定產品編號
+                    order_number='RD樣品',   # 固定工單號碼
+                    company_code=company_code,
                     work_quantity=int(work_quantity) if work_quantity else 0,
                     defect_quantity=int(defect_quantity) if defect_quantity else 0,
                     status=status,
-                    remarks=notes,
-                    abnormal_notes=abnormal_record,
+                    remarks=remarks,
+                    abnormal_notes=abnormal_notes,
                     created_by=request.user.username,
                     work_date=timezone.now().date(),
                     start_datetime=timezone.now()
                 )
                 
-                messages.success(request, f'作業員RD樣品現場報工記錄建立成功！')
-                return redirect('workorder:onsite_reporting:operator_work_selection')
+                messages.success(request, '作業員RD樣品現場報工記錄建立成功！')
+                return redirect('workorder:onsite_reporting:onsite_report_index')
                 
         except Exception as e:
             messages.error(request, f'作業員RD樣品現場報工記錄建立失敗：{str(e)}')
     
     # 取得作業員列表（過濾非SMT）
-    from system.models import Operator
+    from process.models import Operator
     operators = Operator.objects.filter(
         ~Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
     # 取得工序列表（過濾非SMT）
-    from process.models import Process
-    processes = Process.objects.filter(
+    from process.models import ProcessName
+    processes = ProcessName.objects.filter(
         ~Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
@@ -877,10 +887,15 @@ def operator_rd_onsite_report_create(request):
         ~Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
+    # 取得公司名稱列表
+    from erp_integration.models import CompanyConfig
+    companies = CompanyConfig.objects.values_list('company_name', 'company_name').distinct()
+    
     context = {
         'operators': operators,
         'processes': processes,
         'equipments': equipments,
+        'companies': companies,
         'title': '建立作業員RD樣品現場報工記錄',
         'subtitle': '現場報工 - 作業員RD樣品報工管理'
     }
@@ -961,14 +976,14 @@ def smt_rd_onsite_report_create(request):
             messages.error(request, f'SMT_RD樣品現場報工記錄建立失敗：{str(e)}')
     
     # 取得作業員列表（過濾非SMT）
-    from system.models import Operator
+    from process.models import Operator
     operators = Operator.objects.filter(
         ~Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
     # 取得工序列表（過濾非SMT）
-    from process.models import Process
-    processes = Process.objects.filter(
+    from process.models import ProcessName
+    processes = ProcessName.objects.filter(
         ~Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
@@ -978,10 +993,15 @@ def smt_rd_onsite_report_create(request):
         ~Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
+    # 取得公司名稱列表
+    from erp_integration.models import CompanyConfig
+    companies = CompanyConfig.objects.values_list('company_name', 'company_name').distinct()
+    
     context = {
         'operators': operators,
         'processes': processes,
         'equipments': equipments,
+        'companies': companies,
         'title': '建立SMT_RD樣品現場報工記錄',
         'subtitle': '現場報工 - SMT_RD樣品報工管理'
     }

@@ -291,7 +291,7 @@ function getAllRowIds(){
 // 全部記錄刪除（超級管理員）
 document.getElementById('btnDeleteAll')?.addEventListener('click', function(){
 	if(!confirm('警告：這將刪除「全部」填報記錄，且無法復原！\n\n是否確定要刪除？')) return;
-	window.location.href = '{% url "workorder:fill_work:fill_work_delete_all" %}';
+	                window.location.href = '{% url "workorder:fill_work:batch_delete_fill_work" %}';
 });
 
 // 批次刪除（超級管理員）

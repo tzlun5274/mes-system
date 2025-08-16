@@ -37,9 +37,30 @@ urlpatterns = [
     path("<int:pk>/detail/", views.FillWorkDetailView.as_view(), name="fill_work_detail"),
     path("<int:pk>/delete/", views.FillWorkDeleteView.as_view(), name="fill_work_delete"),
 
+    # 功能設定
+    path("settings/", views.FillWorkSettingsView.as_view(), name="fill_work_settings"),
+    path("settings/data/", views.FillWorkDataSettingsView.as_view(), name="fill_work_settings_data"),
+    path("settings/data/operator/", views.FillWorkDataOperatorView.as_view(), name="fill_work_settings_data_operator"),
+    path("settings/data/smt/", views.FillWorkDataSMTView.as_view(), name="fill_work_settings_data_smt"),
+
+    # 模板下載
+    path("settings/data/operator/template/", views.download_fill_work_template_operator, name="fill_work_template_operator"),
+    path("settings/data/smt/template/", views.download_fill_work_template_smt, name="fill_work_template_smt"),
+    path("settings/data/operator/template-xlsx/", views.download_fill_work_template_operator_xlsx, name="fill_work_template_operator_xlsx"),
+    path("settings/data/smt/template-xlsx/", views.download_fill_work_template_smt_xlsx, name="fill_work_template_smt_xlsx"),
+
+    # 資料匯入
+    path("settings/data/operator/import/", views.import_fill_work_records_operator, name="fill_work_import_operator"),
+    path("settings/data/smt/import/", views.import_fill_work_records_smt, name="fill_work_import_smt"),
+
     # 資料匯出功能
     path("settings/data/operator/export/", views.export_fill_work_records_operator, name="fill_work_export_operator"),
     path("settings/data/smt/export/", views.export_fill_work_records_smt, name="fill_work_export_smt"),
     path("settings/data/operator/export-xlsx/", views.export_fill_work_records_operator_xlsx, name="fill_work_export_operator_xlsx"),
     path("settings/data/smt/export-xlsx/", views.export_fill_work_records_smt_xlsx, name="fill_work_export_smt_xlsx"),
+
+    # 批次操作
+    path("batch/delete/", views.batch_delete_fill_work, name="batch_delete_fill_work"),
+    path("batch/approve/", views.batch_approve_fill_work, name="batch_approve_fill_work"),
+    path("batch/unapprove/", views.batch_unapprove_fill_work, name="batch_unapprove_fill_work"),
 ] 
