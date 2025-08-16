@@ -48,6 +48,11 @@
                                 <label for="product_id" class="form-label">產品編號 <span class="text-danger">*</span></label>
                                 <select class="form-select" id="product_id" name="product_id" required>
                                     <option value="">請選擇產品編號</option>
+                                    {% for value, label in form.fields.product_id.choices %}
+                                        {% if value %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                        {% endif %}
+                                    {% endfor %}
                                 </select>
                                 <div class="form-text">選擇產品編號會自動更新相關的工單號碼選項</div>
                             </div>
@@ -91,7 +96,9 @@
                             <!-- 工序 -->
                             <div class="col-md-4 mb-3">
                                 <label for="process" class="form-label">工序 <span class="text-danger">*</span></label>
-                                {{ form.process }}
+                                <select class="form-select" id="process" name="process" required>
+                                    <option value="">請選擇此次填報的工序</option>
+                                </select>
                                 <div class="form-text">請選擇此次填報的工序</div>
                             </div>
 
@@ -100,13 +107,8 @@
                                 <label for="equipment" class="form-label">使用的設備</label>
                                 <select class="form-select" id="equipment" name="equipment">
                                     <option value="">請選擇使用的設備</option>
-                                    {% for value, label in form.fields.equipment.choices %}
-                                        {% if value %}
-                                            <option value="{{ value }}">{{ label }}</option>
-                                        {% endif %}
-                                    {% endfor %}
                                 </select>
-                                <div class="form-text">請選擇此次填報使用的設備</div>
+                                <div class="form-text">請選擇此次填報使用的設備，選擇後會自動填入作業員欄位</div>
                             </div>
                         </div>
 
@@ -311,13 +313,23 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 初始化統一的填報表單控制器
-    new FillWorkController();
+    const fillWorkController = new FillWorkController();
+    
+    // 等待初始化完成
+    setTimeout(() => {
+        // 檢查是否有預先填入的產品編號，如果有則觸發載入工單
+        const productSelect = document.getElementById('product_id');
+        if (productSelect && productSelect.value) {
+            console.log('模板中檢測到預先填入的產品編號:', productSelect.value);
+            fillWorkController.handleProductChange();
+        }
+    }, 1000);
     
     // 初始化統一的作業員、工序、設備控制器（作業員表單）
     window.operatorProcessEquipmentController = new OperatorProcessEquipmentController({
         formType: 'operator',
         enableEquipmentAutoFill: false,
-        apiPrefix: '/workorder/api',
+        apiPrefix: '/workorder/static/api',
         operatorId: 'operator',
         processId: 'id_process',
         equipmentId: 'equipment'

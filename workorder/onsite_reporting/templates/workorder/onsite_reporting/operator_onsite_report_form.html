@@ -55,6 +55,11 @@
                                 <label for="product_id" class="form-label">產品編號 <span class="text-danger">*</span></label>
                                 <select class="form-select" id="product_id" name="product_id" required>
                                     <option value="">請選擇產品編號</option>
+                                    {% for value, label in form.fields.product_id.choices %}
+                                        {% if value %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                        {% endif %}
+                                    {% endfor %}
                                 </select>
                                 <div class="form-text">選擇產品編號會自動更新相關的工單號碼選項</div>
                             </div>
@@ -73,6 +78,11 @@
                                 <label for="company_name" class="form-label">公司名稱 <span class="text-danger">*</span></label>
                                 <select class="form-select" id="company_name" name="company_name" required>
                                     <option value="">請選擇公司名稱</option>
+                                    {% for value, label in form.fields.company_name.choices %}
+                                        {% if value %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                        {% endif %}
+                                    {% endfor %}
                                 </select>
                                 <div class="form-text">選擇公司名稱會更新相關的產品編號選項</div>
                             </div>

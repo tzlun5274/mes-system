@@ -49,7 +49,16 @@ class OperatorBackfillForm(ModelForm):
         label="產品編號",
         widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇產品編號'}),
         required=True,
-        help_text="請選擇產品編號",
+        help_text="選擇產品編號會自動更新相關的工單號碼選項",
+    )
+    
+    # 工單號碼 - 下拉式選單（選項由前端載入）
+    workorder = forms.ChoiceField(
+        choices=[],
+        label="工單號碼",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇工單號碼'}),
+        required=True,
+        help_text="選擇工單號碼會自動填入公司名稱和預設生產數量",
     )
     
     # 下拉式日期（最近 30 天）
@@ -67,7 +76,7 @@ class OperatorBackfillForm(ModelForm):
         label="公司名稱",
         widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇公司名稱'}),
         required=True,
-        help_text="請選擇公司名稱",
+        help_text="選擇公司名稱會更新相關的產品編號選項",
     )
     
     # 作業員欄位 - 下拉式選單
@@ -85,7 +94,7 @@ class OperatorBackfillForm(ModelForm):
         label="使用的設備",
         widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇使用的設備'}),
         required=False,
-        help_text="請選擇使用的設備",
+        help_text="請選擇此次填報使用的設備,選擇後會自動填入作業員欄位",
     )
     
     class Meta:
@@ -96,8 +105,7 @@ class OperatorBackfillForm(ModelForm):
             'work_date', 'start_time', 'end_time', 'remarks', 'abnormal_notes'
         ]
         widgets = {
-            # product_id 由上方 ChoiceField 控制
-            'workorder': forms.TextInput(attrs={'class': 'form-control'}),
+            # product_id 和 workorder 由上方 ChoiceField 控制
             'planned_quantity': forms.NumberInput(attrs={'class': 'form-control', 'readonly': 'readonly'}),
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'defect_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
@@ -133,6 +141,7 @@ class OperatorBackfillForm(ModelForm):
         self.fields['company_name'].choices = self.get_company_choices()
         self.fields['operator'].choices = self.get_operator_choices()
         self.fields['equipment'].choices = self.get_equipment_choices()
+        self.fields['workorder'].choices = self.get_workorder_choices()
         
         # 設定預設值與日期選項
         if not self.instance.pk:
@@ -175,6 +184,18 @@ class OperatorBackfillForm(ModelForm):
             equipments = Equipment.objects.exclude(name__icontains='SMT').order_by('name')
             for equipment in equipments:
                 choices.append((equipment.name, equipment.name))
+        except ImportError:
+            pass
+        return choices
+    
+    def get_workorder_choices(self):
+        """獲取工單號碼選項"""
+        choices = [("", "請選擇工單號碼")]
+        try:
+            from workorder.workorder_dispatch.models import WorkOrderDispatch
+            workorders = WorkOrderDispatch.objects.all().order_by('order_number')
+            for workorder in workorders:
+                choices.append((workorder.order_number, workorder.order_number))
         except ImportError:
             pass
         return choices
@@ -264,7 +285,7 @@ class OperatorRDBackfillForm(ModelForm):
             'work_date', 'start_time', 'end_time', 'remarks', 'abnormal_notes'
         ]
         widgets = {
-            'product_id': forms.TextInput(attrs={'class': 'form-control'}),
+            'product_id': forms.TextInput(attrs={'class': 'form-control', 'readonly': 'readonly'}),
             'workorder': forms.TextInput(attrs={'class': 'form-control', 'readonly': 'readonly'}),
             'planned_quantity': forms.NumberInput(attrs={'class': 'form-control', 'readonly': 'readonly'}),
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
@@ -395,6 +416,23 @@ class OperatorRDBackfillForm(ModelForm):
 class SMTBackfillForm(ModelForm):
     """SMT補登填報表單"""
 
+    # 產品編號 - 下拉式選單（選項由前端載入）
+    product_id = forms.CharField(
+        label="產品編號",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇產品編號'}),
+        required=True,
+        help_text="選擇產品編號會自動更新相關的工單號碼選項",
+    )
+    
+    # 工單號碼 - 下拉式選單（選項由前端載入）
+    workorder = forms.ChoiceField(
+        choices=[],
+        label="工單號碼",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇工單號碼'}),
+        required=True,
+        help_text="選擇工單號碼會自動填入公司名稱和預設生產數量",
+    )
+    
     # 下拉式日期（最近 30 天）
     work_date = forms.ChoiceField(
         choices=[],
@@ -407,12 +445,18 @@ class SMTBackfillForm(ModelForm):
     # 公司名稱、作業員、設備（僅顯示SMT相關設備）
     company_name = forms.ChoiceField(
         choices=[], label="公司名稱",
-        widget=forms.Select(attrs={'class': 'form-select'}), required=True
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇公司名稱'}), required=True,
+        help_text="選擇公司名稱會更新相關的產品編號選項"
     )
-    operator = forms.CharField(label="作業員", required=False)
+    operator = forms.ChoiceField(
+        choices=[], label="作業員",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇作業員'}), required=True,
+        help_text="請選擇作業員"
+    )
     equipment = forms.ChoiceField(
         choices=[], label="使用的設備",
-        widget=forms.Select(attrs={'class': 'form-select'}), required=True
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇使用的設備'}), required=True,
+        help_text="請選擇此次填報使用的設備,選擇後會自動填入作業員欄位"
     )
     
     class Meta:

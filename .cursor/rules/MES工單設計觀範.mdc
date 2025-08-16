@@ -26,3 +26,13 @@ MES工單管理 (獨立模組)
 4-1. 派工單的工序與現場報工做關聯，工單詳情的工序紀錄與現場報工關聯。
 4-2. 工單詳情的填報紀錄與填報管理做關聯。 
 4-3. 工單詳情的完工判斷 以工序紀錄跟填報紀錄做合併計算
+
+## 統一API端點規範
+
+### API路徑
+所有工單相關API統一使用 `/var/www/mes/workorder/static/api/` 路徑
+
+### 統一JS模組配置
+```javascript
+apiPrefix: '/var/www/mes/workorder/static/js/fill_work_common.js'
+```

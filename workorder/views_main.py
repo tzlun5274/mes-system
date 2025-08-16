@@ -4676,7 +4676,6 @@ def get_product_by_workorder(request):
 # ==================== 統一API視圖函數 ====================
 
 @require_GET
-@login_required
 def get_workorder_list_unified(request):
     """統一工單列表API - 統一使用 WorkOrderDispatch 資料來源"""
     try:
@@ -4933,7 +4932,6 @@ def get_company_list_unified(request):
         }, status=400)
 
 @require_GET
-@login_required
 def get_operator_list_unified(request):
     """統一作業員清單API"""
     try:
@@ -4953,7 +4951,6 @@ def get_operator_list_unified(request):
         }, status=400)
 
 @require_GET
-@login_required
 def get_process_list_unified(request):
     """統一工序清單API"""
     try:
@@ -4992,7 +4989,6 @@ def get_process_list_unified(request):
         }, status=400)
 
 @require_GET
-@login_required
 def get_equipment_list_unified(request):
     """統一設備清單API"""
     try:

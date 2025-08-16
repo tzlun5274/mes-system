@@ -49,28 +49,44 @@ class FillWorkController {
     }
 
     // 載入初始資料
-    loadInitialData() {
-        this.loadCompanies();
-        this.loadProducts();
-        this.loadWorkorders();
-        
-        // 檢查是否有預先填入的產品編號，如果有則觸發載入工單
-        if (this.productSelect.value) {
-            console.log('檢測到預先填入的產品編號:', this.productSelect.value);
-            // 延遲執行，確保DOM完全載入
-            setTimeout(() => {
-                console.log('延遲載入工單，產品編號:', this.productSelect.value);
-                this.handleProductChange();
-            }, 500);
-        } else {
-            console.log('沒有預先填入的產品編號');
+    async loadInitialData() {
+        try {
+            // 先載入公司名稱
+            await this.loadCompanies();
+            
+            // 再載入產品編號
+            await this.loadProducts();
+            
+            // 最後載入工單號碼
+            await this.loadWorkorders();
+            
+            // 檢查是否有預先填入的產品編號，如果有則觸發載入工單
+            if (this.productSelect.value) {
+                console.log('檢測到預先填入的產品編號:', this.productSelect.value);
+                // 延遲執行，確保DOM完全載入
+                setTimeout(() => {
+                    console.log('延遲載入工單，產品編號:', this.productSelect.value);
+                    this.handleProductChange();
+                }, 500);
+            } else {
+                console.log('沒有預先填入的產品編號');
+            }
+        } catch (error) {
+            console.error('載入初始資料失敗:', error);
         }
     }
 
     // 載入公司名稱
     async loadCompanies() {
         try {
-            const response = await fetch('/workorder/api/workorder-list/');
+            const response = await fetch('/workorder/static/api/workorder-list/', {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': this.getCSRFToken(),
+                    'Content-Type': 'application/json',
+                }
+            });
             const data = await response.json();
             if (data.success && data.workorders) {
                 // 保存當前選中的值
@@ -107,12 +123,19 @@ class FillWorkController {
     // 載入產品編號
     async loadProducts(companyName = '') {
         try {
-            let url = '/workorder/api/product-list/';
+            let url = '/workorder/static/api/product-list/';
             if (companyName) {
-                url = `/workorder/api/products-by-company/?company_name=${encodeURIComponent(companyName)}`;
+                url = `/workorder/static/api/products-by-company/?company_name=${encodeURIComponent(companyName)}`;
             }
             
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': this.getCSRFToken(),
+                    'Content-Type': 'application/json',
+                }
+            });
             const data = await response.json();
             if (data.success && data.products) {
                 // 保存當前選中的值
@@ -135,6 +158,7 @@ class FillWorkController {
                 // 恢復之前選中的值
                 if (currentValue) {
                     this.productSelect.value = currentValue;
+                    console.log('恢復產品編號選中的值:', currentValue);
                 }
             }
         } catch (error) {
@@ -145,27 +169,40 @@ class FillWorkController {
     // 載入工單號碼
     async loadWorkorders(productId = '', companyName = '') {
         try {
-            let url = '/workorder/api/workorder-list/';
+            let url = '/workorder/static/api/workorder-list/';
             if (productId) {
-                url = `/workorder/api/workorder-by-product/?product_id=${encodeURIComponent(productId)}`;
+                url = `/workorder/static/api/workorder-by-product/?product_id=${encodeURIComponent(productId)}`;
                 console.log('載入特定產品編號的工單:', productId);
             } else {
                 console.log('載入所有工單');
             }
             
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': this.getCSRFToken(),
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            console.log('API回應狀態:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                throw new Error(`API請求失敗: ${response.status} ${response.statusText}`);
+            }
+            
             const data = await response.json();
-            console.log('API回應:', data);
+            console.log('API回應資料:', data);
             
             if (data.success && data.workorders) {
                 this.workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
                 
-                // 篩選工單（根據產品編號和公司名稱）
+                // 如果使用特定產品編號的API，直接使用返回的資料
+                // 如果使用通用API，則需要篩選
                 let filteredWorkorders = data.workorders;
-                if (productId) {
-                    filteredWorkorders = filteredWorkorders.filter(w => w.product_id === productId);
-                }
-                if (companyName) {
+                if (!productId && companyName) {
+                    // 只有在使用通用API且有公司名稱時才篩選
                     filteredWorkorders = filteredWorkorders.filter(w => w.company_name === companyName);
                 }
                 
@@ -180,14 +217,6 @@ class FillWorkController {
                 });
                 
                 console.log(`載入工單號碼完成，共 ${filteredWorkorders.length} 個選項`);
-                
-                // 如果選擇了產品編號且只有一個工單，自動選擇
-                if (productId && filteredWorkorders.length === 1) {
-                    const firstWorkorder = filteredWorkorders[0].workorder;
-                    this.workorderSelect.value = firstWorkorder;
-                    // 觸發工單變更事件
-                    this.handleWorkorderChange();
-                }
             }
         } catch (error) {
             console.error('載入工單號碼失敗:', error);
@@ -203,13 +232,22 @@ class FillWorkController {
             // 載入對應的工單號碼
             await this.loadWorkorders(productId, this.companySelect.value);
             
-            // 如果只有一個工單，自動選擇並觸發工單變更事件
-            if (this.workorderSelect.options.length === 2) { // 1個選項 + 1個預設選項
+            // 檢查是否有工單選項載入
+            const actualOptions = this.workorderSelect.options.length - 1; // 減去預設選項
+            console.log('載入的工單選項數量:', actualOptions);
+            
+            if (actualOptions === 1) {
+                // 如果只有一個工單，自動選擇並觸發工單變更事件
                 const workorderOption = this.workorderSelect.options[1]; // 第一個實際選項
                 if (workorderOption) {
                     this.workorderSelect.value = workorderOption.value;
+                    console.log('自動選擇唯一工單:', workorderOption.value);
                     this.handleWorkorderChange();
                 }
+            } else if (actualOptions > 1) {
+                console.log('有多個工單選項，請手動選擇');
+            } else {
+                console.log('沒有找到對應的工單');
             }
         } else {
             // 清空工單號碼選項
@@ -268,6 +306,12 @@ class FillWorkController {
         }
     }
 
+    // 獲取CSRF Token
+    getCSRFToken() {
+        const token = document.querySelector('[name=csrfmiddlewaretoken]');
+        return token ? token.value : '';
+    }
+
     // 重置所有選項（當選錯時使用）
     resetAllOptions() {
         this.productSelect.innerHTML = '<option value="">請選擇產品編號</option>';
@@ -291,7 +335,7 @@ class OperatorProcessEquipmentController {
             // 是否啟用設備自動填入作業員功能（SMT專用）
             enableEquipmentAutoFill: options.enableEquipmentAutoFill || false,
             // API端點前綴
-            apiPrefix: options.apiPrefix || '/workorder/api',
+            apiPrefix: options.apiPrefix || '/workorder/static/api',
             // 元素ID
             operatorId: options.operatorId || 'operator',
             operatorDisplayId: options.operatorDisplayId || 'operator_display',
@@ -343,7 +387,14 @@ class OperatorProcessEquipmentController {
     // 載入作業員
     async loadOperators() {
         try {
-            const response = await fetch(`${this.options.apiPrefix}/operator-list/`);
+            const response = await fetch(`${this.options.apiPrefix}/operator-list/`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': this.getCSRFToken(),
+                    'Content-Type': 'application/json',
+                }
+            });
             const data = await response.json();
             if (data.success) {
                 // 如果是SMT表單且有作業員顯示欄位，不需要載入作業員選項
@@ -372,7 +423,14 @@ class OperatorProcessEquipmentController {
     // 載入工序（根據表單類型過濾）
     async loadProcesses() {
         try {
-            const response = await fetch(`${this.options.apiPrefix}/process-list/?form_type=${this.options.formType}`);
+            const response = await fetch(`${this.options.apiPrefix}/process-list/?form_type=${this.options.formType}`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': this.getCSRFToken(),
+                    'Content-Type': 'application/json',
+                }
+            });
             const data = await response.json();
             if (data.success) {
                 this.processSelect.innerHTML = '<option value="">請選擇此次報工的工序</option>';
@@ -394,7 +452,14 @@ class OperatorProcessEquipmentController {
     // 載入設備（根據表單類型過濾）
     async loadEquipment() {
         try {
-            const response = await fetch(`${this.options.apiPrefix}/equipment-list/?form_type=${this.options.formType}`);
+            const response = await fetch(`${this.options.apiPrefix}/equipment-list/?form_type=${this.options.formType}`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': this.getCSRFToken(),
+                    'Content-Type': 'application/json',
+                }
+            });
             const data = await response.json();
             if (data.success) {
                 this.equipmentSelect.innerHTML = '<option value="">請選擇設備</option>';
@@ -443,6 +508,12 @@ class OperatorProcessEquipmentController {
                 this.operatorSelect.value = '';
             }
         }
+    }
+
+    // 獲取CSRF Token
+    getCSRFToken() {
+        const token = document.querySelector('[name=csrfmiddlewaretoken]');
+        return token ? token.value : '';
     }
 
     // 重置所有選項
