@@ -88,7 +88,9 @@
                             <!-- 工序 -->
                             <div class="col-md-4 mb-3">
                                 <label for="process" class="form-label">工序 <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="process" name="process" required>
+                                <select class="form-select" id="process" name="process" required>
+                                    <option value="">請選擇此次報工的工序</option>
+                                </select>
                                 <div class="form-text">請選擇此次報工的工序</div>
                             </div>
 
@@ -109,33 +111,35 @@
                                 </h5>
                             </div>
                             
-                            <!-- 報工日期 -->
-                            <div class="col-md-3 mb-3">
-                                <label for="work_date" class="form-label">報工日期 <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" id="work_date" name="work_date" required>
-                            </div>
-
-                            <!-- 開始時間 -->
-                            <div class="col-md-3 mb-3">
-                                <label for="start_datetime" class="form-label">開始時間 <span class="text-danger">*</span></label>
-                                <input type="datetime-local" class="form-control" id="start_datetime" name="start_datetime" required>
-                            </div>
-
                             <!-- 報工狀態 -->
-                            <div class="col-md-3 mb-3">
-                                <label for="status" class="form-label">報工狀態 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="status" name="status" required>
-                                    <option value="">請選擇狀態</option>
-                                    <option value="started">開工</option>
-                                    <option value="paused">暫停</option>
-                                    <option value="resumed">重啟開工</option>
-                                    <option value="completed">完工</option>
-                                    <option value="stopped">停工</option>
-                                </select>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">報工狀態 <span class="text-danger">*</span></label>
+                                <div class="d-flex flex-row gap-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="status" id="status_started" value="started" required>
+                                        <label class="form-check-label" for="status_started">開工</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="status" id="status_paused" value="paused">
+                                        <label class="form-check-label" for="status_paused">暫停</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="status" id="status_resumed" value="resumed">
+                                        <label class="form-check-label" for="status_resumed">重啟開工</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="status" id="status_completed" value="completed">
+                                        <label class="form-check-label" for="status_completed">完工</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="status" id="status_stopped" value="stopped">
+                                        <label class="form-check-label" for="status_stopped">停工</label>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- 預設生產數量 -->
-                            <div class="col-md-3 mb-3">
+                            <div class="col-md-6 mb-3">
                                 <label for="planned_quantity" class="form-label">預設生產數量</label>
                                 <input type="number" class="form-control" id="planned_quantity" name="planned_quantity" readonly>
                             </div>
@@ -205,209 +209,302 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // 取得 DOM 元素
-        const productSelect = document.getElementById('product_id');
-        const workorderSelect = document.getElementById('workorder');
-        const companySelect = document.getElementById('company_name');
-        const plannedQuantityInput = document.getElementById('planned_quantity');
-        const operatorSelect = document.getElementById('operator');
-        const equipmentSelect = document.getElementById('equipment');
-        const workDateInput = document.getElementById('work_date');
-        const startDatetimeInput = document.getElementById('start_datetime');
+        // 現場報工表單控制器
+        class OnsiteReportController {
+            constructor() {
+                this.initializeElements();
+                this.initializeEventListeners();
+                this.loadInitialData();
+                this.updateQuantityFields(); // 初始化數量欄位狀態
+            }
 
-        // 設定今天日期
-        const today = new Date().toISOString().split('T')[0];
-        workDateInput.value = today;
+            // 初始化 DOM 元素
+            initializeElements() {
+                this.productSelect = document.getElementById('product_id');
+                this.workorderSelect = document.getElementById('workorder');
+                this.companySelect = document.getElementById('company_name');
+                this.plannedQuantityInput = document.getElementById('planned_quantity');
+                this.operatorSelect = document.getElementById('operator');
+                this.equipmentSelect = document.getElementById('equipment');
+                this.workQuantityInput = document.getElementById('work_quantity');
+                this.defectQuantityInput = document.getElementById('defect_quantity');
+                this.statusRadios = document.querySelectorAll('input[name="status"]');
+            }
 
-        // 設定現在時間
-        const now = new Date();
-        const nowString = now.toISOString().slice(0, 16);
-        startDatetimeInput.value = nowString;
-
-        // 載入公司名稱選項
-        function loadCompanies() {
-            console.log('開始載入公司名稱...');
-            fetch('/workorder/onsite_reporting/api/company-list/')
-                .then(response => {
-                    console.log('公司名稱 API 回應狀態:', response.status);
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('公司名稱 API 資料:', data);
-                    if (data.success) {
-                        companySelect.innerHTML = '<option value="">請選擇公司名稱</option>';
-                        data.companies.forEach(company => {
-                            const option = document.createElement('option');
-                            option.value = company.company_code;
-                            option.textContent = company.company_code;
-                            companySelect.appendChild(option);
-                        });
-                        console.log(`成功載入 ${data.companies.length} 個公司選項`);
-                    } else {
-                        console.error('載入公司名稱失敗:', data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('載入公司名稱失敗:', error);
-                    console.error('錯誤詳情:', error.message);
+            // 初始化事件監聽器
+            initializeEventListeners() {
+                // 公司名稱變更事件
+                this.companySelect.addEventListener('change', () => {
+                    this.loadProducts(this.companySelect.value);
+                    this.loadWorkorders('', this.companySelect.value);
                 });
-        }
 
-        // 載入產品編號選項
-        function loadProducts(companyName = '') {
-            const url = companyName 
-                ? `/workorder/onsite_reporting/api/product-list/?company_name=${encodeURIComponent(companyName)}`
-                : '/workorder/onsite_reporting/api/product-list/';
-            
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        productSelect.innerHTML = '<option value="">請選擇產品編號</option>';
-                        if (data.products && data.products.length > 0) {
-                            data.products.forEach(product => {
-                                const option = document.createElement('option');
-                                option.value = product.product_code;
-                                option.textContent = product.product_code;
-                                productSelect.appendChild(option);
-                            });
-                        }
+                // 產品編號變更事件
+                this.productSelect.addEventListener('change', () => {
+                    this.loadWorkorders(this.productSelect.value, this.companySelect.value);
+                });
+
+                // 工單號碼變更事件
+                this.workorderSelect.addEventListener('change', () => {
+                    this.handleWorkorderChange();
+                });
+
+                // 設備選擇事件
+                this.equipmentSelect.addEventListener('change', () => {
+                    this.handleEquipmentChange();
+                });
+
+                // 報工狀態變更事件
+                this.statusRadios.forEach(radio => {
+                    radio.addEventListener('change', () => {
+                        this.updateQuantityFields();
+                    });
+                });
+
+                // 表單提交驗證
+                document.getElementById('onsiteReportForm').addEventListener('submit', (e) => {
+                    this.validateForm(e);
+                });
+            }
+
+            // 載入初始資料
+            loadInitialData() {
+                this.loadCompanies();
+                this.loadProducts();
+                this.loadWorkorders();
+                this.loadOperators();
+                this.loadProcesses();
+                this.loadEquipment();
+            }
+
+            // 載入公司名稱
+            async loadCompanies() {
+                try {
+                    const response = await fetch('/workorder/fill_work/api/workorder-list/');
+                    const data = await response.json();
+                    if (data.workorders) {
+                        // 從工單資料中提取公司名稱
+                        const companies = [...new Set(data.workorders.map(w => w.company_name))].sort();
+                        this.companySelect.innerHTML = '<option value="">請選擇公司名稱</option>';
+                        companies.forEach(company => {
+                            const option = document.createElement('option');
+                            option.value = company;
+                            option.textContent = company;
+                            this.companySelect.appendChild(option);
+                        });
                     }
-                })
-                .catch(error => console.error('載入產品編號失敗:', error));
-        }
+                } catch (error) {
+                    console.error('載入公司名稱失敗:', error);
+                }
+            }
 
-        // 載入工單號碼選項
-        function loadWorkorders(productId = '', companyName = '') {
-            const params = new URLSearchParams();
-            if (productId) params.append('product_id', productId);
-            if (companyName) params.append('company_name', companyName);
-            
-            const url = `/workorder/onsite_reporting/api/workorder-list/?${params.toString()}`;
-            
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
-                        if (data.workorders && data.workorders.length > 0) {
-                            data.workorders.forEach(workorder => {
-                                const option = document.createElement('option');
-                                option.value = workorder.order_number;
-                                option.textContent = workorder.order_number;
-                                option.dataset.company = workorder.company_code;
-                                option.dataset.quantity = workorder.planned_quantity;
-                                workorderSelect.appendChild(option);
-                            });
-                        }
+            // 載入產品編號
+            async loadProducts(companyName = '') {
+                try {
+                    let url = '/workorder/fill_work/api/product-list/';
+                    if (companyName) {
+                        url = `/workorder/fill_work/api/products-by-company/?company_name=${encodeURIComponent(companyName)}`;
                     }
-                })
-                .catch(error => console.error('載入工單號碼失敗:', error));
-        }
+                    
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    if (data.products) {
+                        this.productSelect.innerHTML = '<option value="">請選擇產品編號</option>';
+                        data.products.forEach(product => {
+                            const option = document.createElement('option');
+                            option.value = product;
+                            option.textContent = product;
+                            this.productSelect.appendChild(option);
+                        });
+                    }
+                } catch (error) {
+                    console.error('載入產品編號失敗:', error);
+                }
+            }
 
-        // 載入作業員選項
-        function loadOperators() {
-            fetch('/workorder/onsite_reporting/api/operator-list/')
-                .then(response => response.json())
-                .then(data => {
+            // 載入工單號碼
+            async loadWorkorders(productId = '', companyName = '') {
+                try {
+                    let url = '/workorder/fill_work/api/workorder-list/';
+                    if (productId) {
+                        url = `/workorder/fill_work/api/workorder-by-product/?product_id=${encodeURIComponent(productId)}`;
+                    }
+                    
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    if (data.workorders) {
+                        this.workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                        data.workorders.forEach(workorder => {
+                            const option = document.createElement('option');
+                            option.value = workorder.workorder;
+                            option.textContent = workorder.workorder;
+                            option.dataset.company = workorder.company_name;
+                            option.dataset.quantity = workorder.planned_quantity;
+                            this.workorderSelect.appendChild(option);
+                        });
+                    }
+                } catch (error) {
+                    console.error('載入工單號碼失敗:', error);
+                }
+            }
+
+            // 載入作業員
+            async loadOperators() {
+                try {
+                    const response = await fetch('/workorder/onsite_reporting/api/operator-list/');
+                    const data = await response.json();
                     if (data.success) {
-                        operatorSelect.innerHTML = '<option value="">請選擇作業員</option>';
+                        this.operatorSelect.innerHTML = '<option value="">請選擇作業員</option>';
                         data.operators.forEach(operator => {
                             const option = document.createElement('option');
                             option.value = operator.name;
                             option.textContent = operator.name;
-                            operatorSelect.appendChild(option);
+                            this.operatorSelect.appendChild(option);
                         });
                     }
-                })
-                .catch(error => console.error('載入作業員失敗:', error));
-        }
+                } catch (error) {
+                    console.error('載入作業員失敗:', error);
+                }
+            }
 
-        // 載入設備選項
-        function loadEquipment() {
-            fetch('/workorder/onsite_reporting/api/equipment-list/')
-                .then(response => response.json())
-                .then(data => {
+            // 載入工序（過濾非SMT）
+            async loadProcesses() {
+                try {
+                    const response = await fetch('/workorder/onsite_reporting/api/process-list/');
+                    const data = await response.json();
                     if (data.success) {
-                        equipmentSelect.innerHTML = '<option value="">請選擇設備</option>';
+                        const processSelect = document.getElementById('process');
+                        processSelect.innerHTML = '<option value="">請選擇此次報工的工序</option>';
+                        data.processes.forEach(process => {
+                            if (!process.name.includes('SMT')) {
+                                const option = document.createElement('option');
+                                option.value = process.name;
+                                option.textContent = process.name;
+                                processSelect.appendChild(option);
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('載入工序失敗:', error);
+                }
+            }
+
+            // 載入設備（過濾非SMT）
+            async loadEquipment() {
+                try {
+                    const response = await fetch('/workorder/onsite_reporting/api/equipment-list/');
+                    const data = await response.json();
+                    if (data.success) {
+                        this.equipmentSelect.innerHTML = '<option value="">請選擇設備</option>';
                         data.equipments.forEach(equipment => {
                             if (!equipment.name.includes('SMT')) {
                                 const option = document.createElement('option');
                                 option.value = equipment.name;
                                 option.textContent = equipment.name;
-                                equipmentSelect.appendChild(option);
+                                this.equipmentSelect.appendChild(option);
                             }
                         });
                     }
-                })
-                .catch(error => console.error('載入設備失敗:', error));
-        }
-
-        // 公司名稱變更時更新產品編號和工單號碼
-        companySelect.addEventListener('change', function() {
-            const companyName = this.value;
-            loadProducts(companyName);
-            loadWorkorders('', companyName);
-        });
-
-        // 產品編號變更時更新工單號碼
-        productSelect.addEventListener('change', function() {
-            const productId = this.value;
-            const companyName = companySelect.value;
-            loadWorkorders(productId, companyName);
-        });
-
-        // 工單號碼變更時自動填入公司名稱和預設生產數量
-        workorderSelect.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            if (selectedOption && selectedOption.dataset.company) {
-                companySelect.value = selectedOption.dataset.company;
-                plannedQuantityInput.value = selectedOption.dataset.quantity || 0;
+                } catch (error) {
+                    console.error('載入設備失敗:', error);
+                }
             }
-        });
 
-        // 設備選擇時自動填入作業員（如果設備名稱與作業員名稱相同）
-        equipmentSelect.addEventListener('change', function() {
-            const equipmentName = this.value;
-            if (equipmentName) {
-                for (let i = 0; i < operatorSelect.options.length; i++) {
-                    if (operatorSelect.options[i].value === equipmentName) {
-                        operatorSelect.value = equipmentName;
-                        break;
+            // 處理工單變更
+            handleWorkorderChange() {
+                const selectedOption = this.workorderSelect.options[this.workorderSelect.selectedIndex];
+                if (selectedOption && selectedOption.value) {
+                    // 自動填入公司名稱
+                    if (selectedOption.dataset.company) {
+                        this.companySelect.value = selectedOption.dataset.company;
+                    }
+                    
+                    // 自動填入預設生產數量
+                    const quantity = selectedOption.dataset.quantity || 0;
+                    this.plannedQuantityInput.value = quantity;
+                    
+                    // 如果公司名稱有變更，重新載入產品選項
+                    if (selectedOption.dataset.company && selectedOption.dataset.company !== this.companySelect.value) {
+                        this.loadProducts(selectedOption.dataset.company);
+                    }
+                } else {
+                    // 清空預設生產數量
+                    this.plannedQuantityInput.value = '';
+                }
+            }
+
+            // 處理設備變更
+            handleEquipmentChange() {
+                const equipmentName = this.equipmentSelect.value;
+                if (equipmentName) {
+                    for (let i = 0; i < this.operatorSelect.options.length; i++) {
+                        if (this.operatorSelect.options[i].value === equipmentName) {
+                            this.operatorSelect.value = equipmentName;
+                            break;
+                        }
                     }
                 }
             }
-        });
 
-                    // 初始載入所有選項
-            console.log('開始載入現場報工選項...');
-            loadCompanies();
-            loadProducts();
-            loadWorkorders();
-            loadOperators();
-            loadEquipment();
-            console.log('現場報工選項載入完成');
-    });
-
-    // 表單驗證
-    document.getElementById('onsiteReportForm').addEventListener('submit', function(e) {
-        const requiredFields = ['product_id', 'workorder', 'company_name', 'operator', 'process', 'status'];
-        let isValid = true;
-
-        requiredFields.forEach(fieldName => {
-            const field = document.getElementById(fieldName);
-            if (!field.value.trim()) {
-                field.classList.add('is-invalid');
-                isValid = false;
-            } else {
-                field.classList.remove('is-invalid');
+            // 更新數量欄位狀態
+            updateQuantityFields() {
+                const selectedStatus = document.querySelector('input[name="status"]:checked');
+                
+                if (selectedStatus) {
+                    const status = selectedStatus.value;
+                    console.log('報工狀態變更為:', status);
+                    
+                    // 開工和重啟開工時，數量欄位唯讀且設為0
+                    if (status === 'started' || status === 'resumed') {
+                        this.workQuantityInput.setAttribute('readonly', 'readonly');
+                        this.defectQuantityInput.setAttribute('readonly', 'readonly');
+                        this.workQuantityInput.value = '0';
+                        this.defectQuantityInput.value = '0';
+                        this.workQuantityInput.classList.add('bg-light');
+                        this.defectQuantityInput.classList.add('bg-light');
+                        console.log('數量欄位設為唯讀，數值重置為0');
+                    } else {
+                        // 暫停、完工、停工時，數量欄位可編輯
+                        this.workQuantityInput.removeAttribute('readonly');
+                        this.defectQuantityInput.removeAttribute('readonly');
+                        this.workQuantityInput.classList.remove('bg-light');
+                        this.defectQuantityInput.classList.remove('bg-light');
+                        console.log('數量欄位設為可編輯');
+                    }
+                } else {
+                    // 沒有選擇狀態時，預設為可編輯
+                    this.workQuantityInput.removeAttribute('readonly');
+                    this.defectQuantityInput.removeAttribute('readonly');
+                    this.workQuantityInput.classList.remove('bg-light');
+                    this.defectQuantityInput.classList.remove('bg-light');
+                    console.log('數量欄位預設為可編輯');
+                }
             }
-        });
 
-        if (!isValid) {
-            e.preventDefault();
-            alert('請填寫所有必填欄位');
+            // 表單驗證
+            validateForm(e) {
+                const requiredFields = ['product_id', 'workorder', 'company_name', 'operator', 'process', 'status'];
+                let isValid = true;
+
+                requiredFields.forEach(fieldName => {
+                    const field = document.getElementById(fieldName);
+                    if (!field.value.trim()) {
+                        field.classList.add('is-invalid');
+                        isValid = false;
+                    } else {
+                        field.classList.remove('is-invalid');
+                    }
+                });
+
+                if (!isValid) {
+                    e.preventDefault();
+                    alert('請填寫所有必填欄位');
+                }
+            }
         }
+
+        // 初始化現場報工控制器
+        new OnsiteReportController();
     });
 </script>
 {% endblock %} 
