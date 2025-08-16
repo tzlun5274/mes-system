@@ -57,4 +57,8 @@ urlpatterns = [
         name="download_log_file",
     ),
     path("environment/clean_logs/", views.clean_logs, name="clean_logs"),
+
+    # 完工檢查配置
+    path('completion-check/config/', views.completion_check_config, name='completion_check_config'),
+    path('completion-check/status/', views.completion_check_status, name='completion_check_status'),
 ]

@@ -2,12 +2,23 @@ from django.apps import AppConfig
 
 
 class WorkorderConfig(AppConfig):
-    default_auto_field = "django.db.models.BigAutoField"
-    name = "workorder"
-    
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'workorder'
+    verbose_name = '工單管理'
+
     def ready(self):
         """
-        應用啟動時註冊信號處理器
+        應用程式啟動時執行
+        註冊信號處理器
         """
-        # 移除信號處理器引用，完工判斷改為輪詢式
-# import workorder.signals
+        try:
+            # 註冊完工觸發信號
+            from .signals.completion_trigger_signals import register_completion_trigger_signals
+            register_completion_trigger_signals()
+            
+            # 註冊工單狀態信號
+            from .signals.workorder_status_signals import register_workorder_status_signals
+            register_workorder_status_signals()
+        except Exception as e:
+            # 避免在遷移時出現錯誤
+            pass

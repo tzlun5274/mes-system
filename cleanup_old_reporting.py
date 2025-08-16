@@ -65,7 +65,7 @@ def main():
         'workorder/management/commands/從相同工單補充產品編號.py',
         'workorder/management/commands/clear_workorder_status_only.py',
         'workorder/management/commands/處理重複工單記錄.py',
-        'workorder/management/commands/報工紀錄複製到生產中.py',
+        'workorder/management/commands/填報紀錄複製到生產中.py',
     ]
     
     for file_path in files_to_clean:

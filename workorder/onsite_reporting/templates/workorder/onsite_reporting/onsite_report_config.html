@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}現場報工配置管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">現場報工配置管理</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 訊息顯示區域 -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- 新增配置按鈕 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <a href="{% url 'workorder:onsite_reporting:onsite_report_config_create' %}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> 新增配置
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- 配置列表 -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">配置列表</h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if object_list %}
+                                        <div class="table-responsive">
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th>配置類型</th>
+                                                        <th>配置鍵</th>
+                                                        <th>配置值</th>
+                                                        <th>配置說明</th>
+                                                        <th>狀態</th>
+                                                        <th>建立人員</th>
+                                                        <th>建立時間</th>
+                                                        <th>操作</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for config in object_list %}
+                                                    <tr>
+                                                        <td>{{ config.get_config_type_display }}</td>
+                                                        <td>{{ config.config_key }}</td>
+                                                        <td>
+                                                            {% if config.config_value|length > 50 %}
+                                                                {{ config.config_value|slice:":50" }}...
+                                                            {% else %}
+                                                                {{ config.config_value }}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ config.config_description|default:"-" }}</td>
+                                                        <td>
+                                                            <span class="badge bg-{% if config.is_active %}success{% else %}secondary{% endif %}">
+                                                                {% if config.is_active %}啟用{% else %}停用{% endif %}
+                                                            </span>
+                                                        </td>
+                                                        <td>{{ config.created_by }}</td>
+                                                        <td>{{ config.created_at|date:"Y-m-d H:i" }}</td>
+                                                        <td>
+                                                            <div class="btn-group" role="group">
+                                                                <a href="{% url 'workorder:onsite_reporting:onsite_report_config_edit' config.pk %}" class="btn btn-sm btn-primary">
+                                                                    <i class="fas fa-edit"></i> 編輯
+                                                                </a>
+                                                                <a href="{% url 'workorder:onsite_reporting:onsite_report_config_delete' config.pk %}" class="btn btn-sm btn-danger" onclick="return confirm('確定要刪除此配置嗎？')">
+                                                                    <i class="fas fa-trash"></i> 刪除
+                                                                </a>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- 分頁 -->
+                                        {% include 'includes/pagination.html' with page_obj=page_obj %}
+                                    {% else %}
+                                        <div class="text-center py-4">
+                                            <i class="fas fa-info-circle fa-3x text-muted mb-3"></i>
+                                            <p class="text-muted">目前沒有配置記錄</p>
+                                            <a href="{% url 'workorder:onsite_reporting:onsite_report_config_create' %}" class="btn btn-primary">
+                                                <i class="fas fa-plus"></i> 新增第一個配置
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 操作按鈕 -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <a href="{% url 'workorder:onsite_reporting:onsite_report_index' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> 返回首頁
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

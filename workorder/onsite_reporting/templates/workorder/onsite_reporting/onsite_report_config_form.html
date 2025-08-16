@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if object %}編輯{% else %}新增{% endif %}現場報工配置{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">{% if object %}編輯{% else %}新增{% endif %}現場報工配置</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 訊息顯示區域 -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" id="configForm">
+                        {% csrf_token %}
+                        
+                        <!-- 配置類型 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">基本資訊</h5>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="config_type" class="form-label">配置類型 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="config_type" name="config_type" required>
+                                    <option value="">請選擇配置類型</option>
+                                    <option value="operator" {% if form.config_type.value == 'operator' %}selected{% endif %}>作業員報工</option>
+                                    <option value="smt" {% if form.config_type.value == 'smt' %}selected{% endif %}>SMT設備報工</option>
+                                    <option value="system" {% if form.config_type.value == 'system' %}selected{% endif %}>系統配置</option>
+                                </select>
+                                <div class="form-text">選擇此配置的類型</div>
+                                {% if form.config_type.errors %}
+                                    <div class="text-danger">{{ form.config_type.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="config_key" class="form-label">配置鍵 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="config_key" name="config_key" value="{{ form.config_key.value|default:'' }}" required>
+                                <div class="form-text">配置的唯一識別鍵</div>
+                                {% if form.config_key.errors %}
+                                    <div class="text-danger">{{ form.config_key.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 配置內容 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">配置內容</h5>
+                            </div>
+                            
+                            <div class="col-12 mb-3">
+                                <label for="config_value" class="form-label">配置值 <span class="text-danger">*</span></label>
+                                <textarea class="form-control" id="config_value" name="config_value" rows="5" required>{{ form.config_value.value|default:'' }}</textarea>
+                                <div class="form-text">配置的具體值，可以是文字、JSON格式或其他格式</div>
+                                {% if form.config_value.errors %}
+                                    <div class="text-danger">{{ form.config_value.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-12 mb-3">
+                                <label for="config_description" class="form-label">配置說明</label>
+                                <textarea class="form-control" id="config_description" name="config_description" rows="3">{{ form.config_description.value|default:'' }}</textarea>
+                                <div class="form-text">此配置的詳細說明</div>
+                                {% if form.config_description.errors %}
+                                    <div class="text-danger">{{ form.config_description.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 狀態設定 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">狀態設定</h5>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="is_active" name="is_active" {% if form.is_active.value %}checked{% endif %}>
+                                    <label class="form-check-label" for="is_active">
+                                        啟用此配置
+                                    </label>
+                                </div>
+                                <div class="form-text">勾選表示此配置為啟用狀態</div>
+                                {% if form.is_active.errors %}
+                                    <div class="text-danger">{{ form.is_active.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 提交按鈕 -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'workorder:onsite_reporting:onsite_report_config' %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> 返回列表
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> {% if object %}更新{% else %}建立{% endif %}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 表單驗證
+    document.getElementById('configForm').addEventListener('submit', function(e) {
+        const configType = document.getElementById('config_type').value;
+        const configKey = document.getElementById('config_key').value.trim();
+        const configValue = document.getElementById('config_value').value.trim();
+        
+        if (!configType) {
+            e.preventDefault();
+            alert('請選擇配置類型');
+            return false;
+        }
+        
+        if (!configKey) {
+            e.preventDefault();
+            alert('請輸入配置鍵');
+            return false;
+        }
+        
+        if (!configValue) {
+            e.preventDefault();
+            alert('請輸入配置值');
+            return false;
+        }
+        
+        // 檢查配置鍵格式
+        if (!/^[a-zA-Z0-9_]+$/.test(configKey)) {
+            e.preventDefault();
+            alert('配置鍵只能包含字母、數字和底線');
+            return false;
+        }
+    });
+
+    // 配置類型變更時的提示
+    document.getElementById('config_type').addEventListener('change', function() {
+        const configType = this.value;
+        const configValueField = document.getElementById('config_value');
+        
+        // 根據配置類型提供預設值或提示
+        switch(configType) {
+            case 'operator':
+                configValueField.placeholder = '例如：{\n  "max_work_hours": 8,\n  "break_time": 30\n}';
+                break;
+            case 'smt':
+                configValueField.placeholder = '例如：{\n  "auto_report_interval": 5,\n  "quality_check_required": true\n}';
+                break;
+            case 'system':
+                configValueField.placeholder = '例如：{\n  "session_timeout": 3600,\n  "max_concurrent_reports": 10\n}';
+                break;
+            default:
+                configValueField.placeholder = '請輸入配置值';
+        }
+    });
+</script>
+{% endblock %} 

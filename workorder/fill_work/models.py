@@ -24,6 +24,7 @@ class FillWork(models.Model):
     
     # 基本資訊欄位
     operator = models.CharField(max_length=100, verbose_name="作業員", help_text="作業員姓名")
+    company_code = models.CharField(max_length=10, verbose_name="公司代號", null=True, blank=True, help_text="公司代號")
     company_name = models.CharField(max_length=100, verbose_name="公司名稱", help_text="公司名稱")
     
     # 工單相關欄位
@@ -84,6 +85,7 @@ class FillWork(models.Model):
         db_table = 'workorder_fill_work'
         ordering = ['-created_at']
         indexes = [
+            models.Index(fields=['company_code']),
             models.Index(fields=['work_date']),
             models.Index(fields=['operator']),
             models.Index(fields=['workorder']),

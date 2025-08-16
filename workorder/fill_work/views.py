@@ -1114,19 +1114,46 @@ class FillWorkDeleteView(LoginRequiredMixin, DeleteView):
 def approve_fill_work(request, pk: int):
     """核准填報記錄"""
     from django.shortcuts import redirect
+    from .services import FillWorkApprovalService
+    
     try:
         record = FillWork.objects.get(pk=pk)
+        
         # 若已核准，避免重複核准與重複同步
         if record.approval_status == 'approved':
             messages.info(request, '此筆填報記錄已核准，已略過重複操作')
             return redirect('workorder:fill_work:fill_work_list')
-        record.approval_status = 'approved'
-        record.save(update_fields=['approval_status', 'updated_at'])
-        messages.success(request, '已核准該筆填報記錄')
-
+        
+        # 使用服務層處理核准流程
+        approval_result = FillWorkApprovalService.approve_fill_work_record(
+            record, request.user.username
+        )
+        
+        if approval_result['success']:
+            # 顯示核准成功訊息
+            success_message = approval_result['message']
+            
+            # 如果有RD樣品工單建立，顯示額外訊息
+            if approval_result.get('workorder_created'):
+                success_message += f"，已自動建立RD樣品工單"
+            if approval_result.get('dispatch_created'):
+                success_message += f"，已自動建立RD樣品派工單"
+            
+            messages.success(request, success_message)
+            
+            # 如果有RD樣品處理訊息，顯示詳細資訊
+            if approval_result.get('rd_message'):
+                messages.info(request, f"RD樣品處理: {approval_result['rd_message']}")
+        else:
+            messages.error(request, approval_result['message'])
+        
         # 嘗試同步到生產執行監控
         try:
-            workorder = WorkOrder.objects.filter(order_number=record.workorder).first()
+            # 使用公司代號和工單號碼組合查詢，確保唯一性
+            workorder = WorkOrder.objects.filter(
+                company_code=record.company_code,
+                order_number=record.workorder
+            ).first()
             if workorder:
                 # 判斷類型：SMT 或 作業員
                 is_smt = False
@@ -1188,7 +1215,7 @@ def cancel_approve_fill_work(request, pk: int):
     """
     from django.shortcuts import redirect
     record = get_object_or_404(FillWork, pk=pk)
-    if not (request.user.is_superuser or request.user.groups.filter(name='主管').exists()):
+    if not (request.user.is_superuser or request.user.groups.filter(name__in=['系統管理員', '主管']).exists()):
         messages.error(request, '無權限取消核准')
         return redirect('workorder:fill_work:fill_work_detail', pk=pk)
 
@@ -1203,7 +1230,11 @@ def cancel_approve_fill_work(request, pk: int):
 
         # 2) 嘗試移除對應生產監控的明細（以來源鍵對應）
         try:
-            workorder = WorkOrder.objects.filter(order_number=record.workorder).first()
+            # 使用公司代號和工單號碼組合查詢，確保唯一性
+            workorder = WorkOrder.objects.filter(
+                company_code=record.company_code,
+                order_number=record.workorder
+            ).first()
             if workorder:
                 from workorder.models import WorkOrderProduction, WorkOrderProductionDetail
                 production_record = WorkOrderProduction.objects.filter(workorder=workorder).first()
@@ -1313,8 +1344,8 @@ def get_workorder_data(request):
 def get_workorder_list(request):
     """獲取工單清單的API"""
     try:
-        # 獲取所有匹配的工單
-        workorders = WorkOrderDispatch.objects.all().order_by('-created_at')[:10]  # 限制10筆
+        # 獲取所有匹配的工單（移除10筆限制）
+        workorders = WorkOrderDispatch.objects.all().order_by('-created_at')
         
         if workorders.exists():
             workorder_list = []
@@ -1467,7 +1498,7 @@ class FillWorkSettingsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
 
     def test_func(self) -> bool:
         user = self.request.user
-        return bool(getattr(user, 'is_superuser', False) or user.groups.filter(name='主管').exists())
+        return bool(getattr(user, 'is_superuser', False) or user.groups.filter(name__in=['系統管理員', '主管']).exists())
 
     def handle_no_permission(self):
         messages.error(self.request, '無權限存取填報功能設定')
@@ -2140,7 +2171,7 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
 
     def test_func(self):
         user = self.request.user
-        return user.is_superuser or user.groups.filter(name='主管').exists()
+        return user.is_superuser or user.groups.filter(name__in=['系統管理員', '主管']).exists()
 
     def get_queryset(self):
         from datetime import datetime
@@ -2251,7 +2282,7 @@ class SupervisorReviewedListView(LoginRequiredMixin, UserPassesTestMixin, ListVi
 
     def test_func(self):
         user = self.request.user
-        return user.is_superuser or user.groups.filter(name='主管').exists()
+        return user.is_superuser or user.groups.filter(name__in=['系統管理員', '主管']).exists()
 
     def get_queryset(self):
         return FillWork.objects.exclude(approval_status='pending').order_by('-work_date', '-start_time', '-created_at')
@@ -2276,7 +2307,7 @@ def batch_approve_fill_work(request):
         return redirect('workorder:fill_work:supervisor_pending_list')
     
     # 檢查權限
-    if not (request.user.is_superuser or request.user.groups.filter(name='主管').exists()):
+    if not (request.user.is_superuser or request.user.groups.filter(name__in=['系統管理員', '主管']).exists()):
         messages.error(request, '您沒有權限執行批次核准操作')
         return redirect('workorder:fill_work:supervisor_pending_list')
     
@@ -2288,36 +2319,53 @@ def batch_approve_fill_work(request):
             messages.warning(request, '請選擇要核准的記錄')
             return redirect('workorder:fill_work:supervisor_pending_list')
         
-        # 查詢待核准的記錄
-        pending_records = FillWork.objects.filter(
-            id__in=record_ids,
-            approval_status='pending'
+        # 使用服務層處理批量核准
+        from .services import FillWorkApprovalService
+        batch_result = FillWorkApprovalService.batch_approve_fill_work_records(
+            record_ids, request.user.username
         )
         
-        if not pending_records.exists():
-            messages.info(request, '沒有找到需要核准的記錄')
-            return redirect('workorder:fill_work:supervisor_pending_list')
-        
-        approved_count = 0
-        synced_workorders = set()  # 記錄需要同步的工單
-        
-        # 批量更新記錄狀態
-        for record in pending_records:
-            record.approval_status = 'approved'
-            record.approved_by = request.user.username
-            record.approved_at = timezone.now()
-            record.save(update_fields=['approval_status', 'approved_by', 'approved_at', 'updated_at'])
-            approved_count += 1
+        if batch_result['success']:
+            # 顯示核准成功訊息
+            success_message = batch_result['message']
             
-            # 記錄需要同步的工單
-            if record.workorder:
-                synced_workorders.add(record.workorder)
+            # 如果有RD樣品工單建立，顯示額外訊息
+            if batch_result.get('rd_workorders_created', 0) > 0:
+                success_message += f"，已自動建立 {batch_result['rd_workorders_created']} 個RD樣品工單"
+            if batch_result.get('rd_dispatches_created', 0) > 0:
+                success_message += f"，已自動建立 {batch_result['rd_dispatches_created']} 個RD樣品派工單"
+            
+            messages.success(request, success_message)
+        else:
+            messages.error(request, batch_result['message'])
         
         # 批量同步到生產執行監控
-        if synced_workorders:
-            try:
+        try:
+            # 取得所有已核准的記錄
+            approved_records = FillWork.objects.filter(
+                id__in=record_ids,
+                approval_status='approved'
+            )
+            
+            synced_workorders = set()  # 記錄需要同步的工單
+            
+            for record in approved_records:
+                if record.workorder:
+                    synced_workorders.add(record.workorder)
+            
+            if synced_workorders:
                 for workorder_number in synced_workorders:
-                    workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
+                    # 使用公司代號和工單號碼組合查詢，確保唯一性
+                    # 注意：這裡需要從填報記錄中獲取公司代號
+                    fill_work_record = FillWork.objects.filter(workorder=workorder_number).first()
+                    if fill_work_record and fill_work_record.company_code:
+                        workorder = WorkOrder.objects.filter(
+                            company_code=fill_work_record.company_code,
+                            order_number=workorder_number
+                        ).first()
+                    else:
+                        # 如果沒有公司代號，使用舊方式查詢（向後相容）
+                        workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
                     if workorder:
                         # 取得該工單的所有已核准填報記錄
                         approved_fill_works = FillWork.objects.filter(
@@ -2372,13 +2420,11 @@ def batch_approve_fill_work(request):
                                 approved_at=fill_work.approved_at,
                                 approval_remarks=fill_work.approval_remarks or ''
                             )
-            except Exception as sync_error:
-                # 同步失敗不影響核准流程，只記錄錯誤
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"批次同步填報記錄到生產詳情失敗: {str(sync_error)}")
-        
-        messages.success(request, f'成功核准 {approved_count} 筆填報記錄')
+        except Exception as sync_error:
+            # 同步失敗不影響核准流程，只記錄錯誤
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"批次同步填報記錄到生產詳情失敗: {str(sync_error)}")
         
     except Exception as e:
         messages.error(request, f'批次核准失敗: {str(e)}')
@@ -2433,3 +2479,58 @@ def batch_delete_fill_work(request):
         messages.error(request, f'批次刪除失敗: {str(e)}')
     
     return redirect('workorder:fill_work:supervisor_pending_list')
+
+
+@login_required
+@require_POST
+def batch_unapprove_fill_work(request):
+    """
+    批次取消審核填報記錄
+    處理多筆已審核填報記錄的批量取消審核操作
+    """
+    if request.method != 'POST':
+        return redirect('workorder:fill_work:supervisor_reviewed_list')
+    
+    # 檢查權限
+    if not (request.user.is_superuser or request.user.groups.filter(name__in=['系統管理員', '主管']).exists()):
+        messages.error(request, '您沒有權限執行批次取消審核操作')
+        return redirect('workorder:fill_work:supervisor_reviewed_list')
+    
+    try:
+        # 取得要取消審核的記錄ID列表
+        record_ids = request.POST.getlist('record_ids')
+        
+        if not record_ids:
+            messages.warning(request, '請選擇要取消審核的記錄')
+            return redirect('workorder:fill_work:supervisor_reviewed_list')
+        
+        # 查詢已審核的記錄（只能取消已核准或已駁回狀態的記錄）
+        reviewed_records = FillWork.objects.filter(
+            id__in=record_ids
+        ).exclude(approval_status='pending')
+        
+        if not reviewed_records.exists():
+            messages.info(request, '沒有找到可以取消審核的記錄')
+            return redirect('workorder:fill_work:supervisor_reviewed_list')
+        
+        unapproved_count = 0
+        
+        # 批量取消審核記錄
+        for record in reviewed_records:
+            # 重置審核狀態
+            record.approval_status = 'pending'
+            record.approved_by = None
+            record.approved_at = None
+            record.approval_remarks = None
+            record.rejected_by = None
+            record.rejected_at = None
+            record.rejection_reason = None
+            record.save()
+            unapproved_count += 1
+        
+        messages.success(request, f'成功取消審核 {unapproved_count} 筆填報記錄')
+        
+    except Exception as e:
+        messages.error(request, f'批次取消審核失敗: {str(e)}')
+    
+    return redirect('workorder:fill_work:supervisor_reviewed_list')

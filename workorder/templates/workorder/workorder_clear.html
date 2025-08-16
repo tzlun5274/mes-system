@@ -45,37 +45,55 @@
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-2">
+                        <div class="col-md-1">
                             <div class="text-center">
                                 <div class="h4 text-primary">{{ workorder_count }}</div>
                                 <div class="text-xs text-gray-600">工單數量</div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-1">
                             <div class="text-center">
                                 <div class="h4 text-info">{{ fillwork_count }}</div>
                                 <div class="text-xs text-gray-600">填報紀錄</div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-1">
                             <div class="text-center">
                                 <div class="h4 text-success">{{ company_order_count }}</div>
                                 <div class="text-xs text-gray-600">公司製令單</div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-1">
                             <div class="text-center">
                                 <div class="h4 text-warning">{{ mkord_main_count }}</div>
                                 <div class="text-xs text-gray-600">製令主檔</div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-1">
                             <div class="text-center">
                                 <div class="h4 text-secondary">{{ mkord_mats_count }}</div>
                                 <div class="text-xs text-gray-600">製令用料</div>
                             </div>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-1">
+                            <div class="text-center">
+                                <div class="h4 text-danger">{{ completed_workorder_count }}</div>
+                                <div class="text-xs text-gray-600">已完工工單</div>
+                            </div>
+                        </div>
+                        <div class="col-md-1">
+                            <div class="text-center">
+                                <div class="h4 text-dark">{{ completed_process_count }}</div>
+                                <div class="text-xs text-gray-600">已完工工序</div>
+                            </div>
+                        </div>
+                        <div class="col-md-1">
+                            <div class="text-center">
+                                <div class="h4 text-muted">{{ completed_report_count }}</div>
+                                <div class="text-xs text-gray-600">已完工報工</div>
+                            </div>
+                        </div>
+                        <div class="col-md-1">
                             <div class="text-center">
                                 <div class="h4 text-danger">{{ total_count }}</div>
                                 <div class="text-xs text-gray-600">總計</div>
@@ -177,6 +195,9 @@
                     <li>{{ company_order_count }} 筆公司製令單</li>
                     <li>{{ mkord_main_count }} 筆製令主檔</li>
                     <li>{{ mkord_mats_count }} 筆製令用料</li>
+                    <li>{{ completed_workorder_count }} 筆已完工工單</li>
+                    <li>{{ completed_process_count }} 筆已完工工序</li>
+                    <li>{{ completed_report_count }} 筆已完工報工記錄</li>
                 </ul>
                 <p class="text-danger"><strong>此操作無法復原！</strong></p>
             </div>
@@ -253,37 +274,55 @@ function showResult(data) {
         
         <h6 class="text-primary">刪除統計：</h6>
         <div class="row">
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <div class="text-center">
                     <div class="h5 text-primary">${data.deleted_counts.workorder}</div>
                     <div class="text-xs text-gray-600">工單</div>
                 </div>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <div class="text-center">
                     <div class="h5 text-info">${data.deleted_counts.fillwork}</div>
                     <div class="text-xs text-gray-600">填報紀錄</div>
                 </div>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <div class="text-center">
                     <div class="h5 text-success">${data.deleted_counts.company_order}</div>
                     <div class="text-xs text-gray-600">公司製令單</div>
                 </div>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <div class="text-center">
                     <div class="h5 text-warning">${data.deleted_counts.mkord_main}</div>
                     <div class="text-xs text-gray-600">製令主檔</div>
                 </div>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
                 <div class="text-center">
                     <div class="h5 text-secondary">${data.deleted_counts.mkord_mats}</div>
                     <div class="text-xs text-gray-600">製令用料</div>
                 </div>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-1">
+                <div class="text-center">
+                    <div class="h5 text-danger">${data.deleted_counts.completed_workorder}</div>
+                    <div class="text-xs text-gray-600">已完工工單</div>
+                </div>
+            </div>
+            <div class="col-md-1">
+                <div class="text-center">
+                    <div class="h5 text-dark">${data.deleted_counts.completed_process}</div>
+                    <div class="text-xs text-gray-600">已完工工序</div>
+                </div>
+            </div>
+            <div class="col-md-1">
+                <div class="text-center">
+                    <div class="h5 text-muted">${data.deleted_counts.completed_report}</div>
+                    <div class="text-xs text-gray-600">已完工報工</div>
+                </div>
+            </div>
+            <div class="col-md-1">
                 <div class="text-center">
                     <div class="h5 text-danger">${data.deleted_counts.total}</div>
                     <div class="text-xs text-gray-600">總計</div>

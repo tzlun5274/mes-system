@@ -4,7 +4,8 @@ from django.contrib.auth.models import User
 from .models import (
     EmailConfig, 
     BackupSchedule, 
-    OperationLogConfig
+    OperationLogConfig,
+    CompletionCheckConfig
 )
 
 
@@ -103,3 +104,95 @@ class CustomUserCreationForm(forms.ModelForm):
         if commit:
             user.save()
         return user
+
+
+class CompletionCheckConfigForm(forms.ModelForm):
+    """
+    完工檢查配置表單
+    """
+    
+    class Meta:
+        model = CompletionCheckConfig
+        fields = [
+            'enabled',
+            'interval_minutes', 
+            'start_time',
+            'end_time',
+            'max_workorders_per_check',
+            'enable_notifications'
+        ]
+        widgets = {
+            'enabled': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'id': 'enabled'
+            }),
+            'interval_minutes': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'max': '60',
+                'step': '1',
+                'placeholder': '5'
+            }),
+            'start_time': forms.TimeInput(attrs={
+                'class': 'form-control',
+                'type': 'time',
+                'placeholder': '08:00'
+            }),
+            'end_time': forms.TimeInput(attrs={
+                'class': 'form-control', 
+                'type': 'time',
+                'placeholder': '18:00'
+            }),
+            'max_workorders_per_check': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '10',
+                'max': '1000',
+                'step': '10',
+                'placeholder': '100'
+            }),
+            'enable_notifications': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'id': 'enable_notifications'
+            })
+        }
+        labels = {
+            'enabled': '啟用完工檢查',
+            'interval_minutes': '檢查間隔（分鐘）',
+            'start_time': '開始時間',
+            'end_time': '結束時間', 
+            'max_workorders_per_check': '每次檢查最大工單數',
+            'enable_notifications': '啟用完工通知'
+        }
+        help_texts = {
+            'enabled': '啟用或停用完工檢查定時任務',
+            'interval_minutes': '每多少分鐘檢查一次完工狀態（建議5-15分鐘）',
+            'start_time': '每日開始檢查的時間',
+            'end_time': '每日結束檢查的時間',
+            'max_workorders_per_check': '每次檢查最多處理多少個工單，避免系統負載過重',
+            'enable_notifications': '工單完工時是否發送通知'
+        }
+    
+    def clean_interval_minutes(self):
+        """驗證檢查間隔"""
+        interval = self.cleaned_data.get('interval_minutes')
+        if interval < 1 or interval > 60:
+            raise forms.ValidationError('檢查間隔必須在1-60分鐘之間')
+        return interval
+    
+    def clean_max_workorders_per_check(self):
+        """驗證最大工單數"""
+        max_workorders = self.cleaned_data.get('max_workorders_per_check')
+        if max_workorders < 10 or max_workorders > 1000:
+            raise forms.ValidationError('每次檢查最大工單數必須在10-1000之間')
+        return max_workorders
+    
+    def clean(self):
+        """整體驗證"""
+        cleaned_data = super().clean()
+        start_time = cleaned_data.get('start_time')
+        end_time = cleaned_data.get('end_time')
+        
+        if start_time and end_time and start_time >= end_time:
+            raise forms.ValidationError('開始時間必須早於結束時間')
+        
+        return cleaned_data

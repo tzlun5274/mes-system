@@ -189,7 +189,7 @@ class AutoAllocationScheduler:
             # 目前先使用簡單的邏輯：分配給第一個可用的作業員
             
             # 檢查是否有作業員資料
-            from system.models import Operator
+            from process.models import Operator
             
             available_operators = Operator.objects.filter(
                 is_active=True

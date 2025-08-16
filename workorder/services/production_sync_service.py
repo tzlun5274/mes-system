@@ -1,6 +1,6 @@
 """
-生產報工記錄同步服務
-將所有已核准的報工記錄同步到生產中工單詳情資料表
+生產填報記錄同步服務
+將所有已核准的填報記錄同步到生產中工單詳情資料表
 """
 
 import logging
@@ -14,42 +14,42 @@ logger = logging.getLogger(__name__)
 
 class ProductionReportSyncService:
     """
-    生產報工記錄同步服務
-    將所有已核准的報工記錄同步到生產中工單詳情資料表
+    生產填報記錄同步服務
+    將所有已核准的填報記錄同步到生產中工單詳情資料表
     """
     
     @staticmethod
     def sync_all_approved_reports():
         """
-        同步所有已核准的報工記錄到生產中工單詳情資料表
+        同步所有已核准的填報記錄到生產中工單詳情資料表
         使用公司代號 + 工單號碼 + 產品編號作為唯一性識別
         """
         try:
-            logger.info("開始同步所有已核准的報工記錄...")
+            logger.info("開始同步所有已核准的填報記錄...")
             
-            # 1. 同步作業員補登報工記錄
-            logger.info("開始同步作業員補登報工記錄...")
+            # 1. 同步作業員補登填報記錄
+            logger.info("開始同步作業員補登填報記錄...")
             ProductionReportSyncService._sync_operator_reports()
             
-            # 2. 同步SMT報工記錄
-            logger.info("開始同步SMT報工記錄...")
+            # 2. 同步SMT填報記錄
+            logger.info("開始同步SMT填報記錄...")
             # ProductionReportSyncService._sync_smt_reports()  # 暫時停用
             
             # 移除主管報工同步，避免混淆
             # 主管職責：監督、審核、管理，不代為報工
             
-            logger.info("所有已核准報工記錄同步完成")
+            logger.info("所有已核准填報記錄同步完成")
             return True
             
         except Exception as e:
-            logger.error(f"同步報工記錄失敗: {str(e)}")
+            logger.error(f"同步填報記錄失敗: {str(e)}")
             import traceback
             logger.error(f"詳細錯誤信息: {traceback.format_exc()}")
             return False
     
     @staticmethod
     def _sync_operator_reports():
-        """同步作業員補登報工記錄"""
+        """同步作業員補登填報記錄"""
         try:
             from workorder.models import CompletedProductionReport
             operator_reports = CompletedProductionReport.objects.filter(
@@ -57,7 +57,7 @@ class ProductionReportSyncService:
                 approval_status='approved'
             ).select_related('completed_workorder')
             
-            logger.info(f"找到 {operator_reports.count()} 筆已核准的作業員報工記錄")
+            logger.info(f"找到 {operator_reports.count()} 筆已核准的作業員填報記錄")
             
             for report in operator_reports:
                 try:
@@ -108,22 +108,22 @@ class ProductionReportSyncService:
                         original_report_type='operator'
                     )
                 except Exception as e:
-                    logger.error(f"同步作業員報工記錄 {report.id} 失敗: {str(e)}")
+                    logger.error(f"同步作業員填報記錄 {report.id} 失敗: {str(e)}")
                     continue
                     
         except Exception as e:
-            logger.error(f"同步作業員報工記錄失敗: {str(e)}")
+            logger.error(f"同步作業員填報記錄失敗: {str(e)}")
             raise
     
     @staticmethod
     def _sync_smt_reports():
-        """同步SMT報工記錄"""
+        """同步SMT填報記錄"""
         try:
             smt_reports = SMTSupplementReport.objects.filter(
                 approval_status='approved'
             ).select_related('workorder', 'equipment')
             
-            logger.info(f"找到 {smt_reports.count()} 筆已核准的SMT報工記錄")
+            logger.info(f"找到 {smt_reports.count()} 筆已核准的SMT填報記錄")
             
             for report in smt_reports:
                 try:
@@ -153,11 +153,11 @@ class ProductionReportSyncService:
                         allocation_notes=''
                     )
                 except Exception as e:
-                    logger.error(f"同步SMT報工記錄 {report.id} 失敗: {str(e)}")
+                    logger.error(f"同步SMT填報記錄 {report.id} 失敗: {str(e)}")
                     continue
                     
         except Exception as e:
-            logger.error(f"同步SMT報工記錄失敗: {str(e)}")
+            logger.error(f"同步SMT填報記錄失敗: {str(e)}")
             raise
     
     @staticmethod
@@ -182,7 +182,7 @@ class ProductionReportSyncService:
         """
         try:
             if not workorder:
-                logger.error("工單為空，無法建立報工記錄")
+                logger.error("工單為空，無法建立填報記錄")
                 return False
                 
             # 確保生產中工單記錄存在
@@ -204,7 +204,7 @@ class ProductionReportSyncService:
             except Exception:
                 company_name_value = None
 
-            # 檢查是否已存在相同的報工記錄（避免重複）
+            # 檢查是否已存在相同的填報記錄（避免重複）
             # 1) 以來源紀錄唯一鍵判斷（最可靠）
             existing_detail = None
             if original_report_id is not None and original_report_type:
@@ -263,10 +263,10 @@ class ProductionReportSyncService:
                     existing_detail.company_name = company_name_value
                 existing_detail.updated_at = timezone.now()
                 existing_detail.save()
-                logger.debug(f"更新已存在的報工記錄: {workorder.order_number} - {process_name}")
+                logger.debug(f"更新已存在的填報記錄: {workorder.order_number} - {process_name}")
                 return True
             else:
-                # 建立新的報工記錄
+                # 建立新的填報記錄
                 detail = WorkOrderProductionDetail.objects.create(
                     workorder_production=production_record,
                     process_name=process_name,
@@ -310,11 +310,11 @@ class ProductionReportSyncService:
                     original_report_type=original_report_type,
                     created_by=f"同步服務({original_report_type})"
                 )
-                logger.debug(f"建立新的報工記錄: {workorder.order_number} - {process_name} (ID: {detail.id})")
+                logger.debug(f"建立新的填報記錄: {workorder.order_number} - {process_name} (ID: {detail.id})")
                 return True
                 
         except Exception as e:
-            error_msg = f"建立報工記錄失敗 - 工單: {workorder.order_number if workorder else 'None'}, 工序: {process_name}, 錯誤: {str(e)}"
+            error_msg = f"建立填報記錄失敗 - 工單: {workorder.order_number if workorder else 'None'}, 工序: {process_name}, 錯誤: {str(e)}"
             logger.error(error_msg)
             # 強制輸出錯誤信息
             print(f"同步錯誤: {error_msg}")
@@ -325,13 +325,13 @@ class ProductionReportSyncService:
     @staticmethod
     def sync_specific_workorder(workorder_id):
         """
-        同步特定工單的所有已核准報工記錄
+        同步特定工單的所有已核准填報記錄
         """
         try:
             workorder = WorkOrder.objects.get(id=workorder_id)
             
             with transaction.atomic():
-                # 同步該工單的作業員報工記錄
+                # 同步該工單的作業員填報記錄
                 from workorder.models import CompletedProductionReport
                 operator_reports = CompletedProductionReport.objects.filter(
                     completed_workorder__order_number=workorder.order_number,
@@ -387,7 +387,7 @@ class ProductionReportSyncService:
                         original_report_type='operator'
                     )
                 
-                # 同步該工單的SMT報工記錄
+                # 同步該工單的SMT填報記錄
                 from workorder.models import CompletedProductionReport
                 smt_reports = CompletedProductionReport.objects.filter(
                     completed_workorder__order_number=workorder.order_number,
@@ -443,12 +443,12 @@ class ProductionReportSyncService:
                         original_report_type='smt'
                     )
                 
-                logger.info(f"工單 {workorder.order_number} 的報工記錄同步完成")
+                logger.info(f"工單 {workorder.order_number} 的填報記錄同步完成")
                 return True
                 
         except WorkOrder.DoesNotExist:
             logger.error(f"工單不存在: {workorder_id}")
             return False
         except Exception as e:
-            logger.error(f"同步工單報工記錄失敗: {str(e)}")
+            logger.error(f"同步工單填報記錄失敗: {str(e)}")
             return False 

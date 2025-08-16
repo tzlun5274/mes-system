@@ -137,7 +137,7 @@
                 <div class="card-header bg-warning text-white">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
-                            <i class="fas fa-list"></i> 待審核報工記錄
+                            <i class="fas fa-list"></i> 待審核填報記錄
                         </h5>
                         {% if user.is_superuser %}
                         <button type="button" class="btn btn-success btn-sm" onclick="batchApprove()">
@@ -220,8 +220,8 @@
                     {% else %}
                         <div class="text-center py-4">
                             <i class="fas fa-check-circle text-success" style="font-size: 3em;"></i>
-                            <h4 class="mt-3 text-muted">目前沒有待審核的報工記錄</h4>
-                            <p class="text-muted">所有報工記錄都已經審核完成</p>
+                                            <h4 class="mt-3 text-muted">目前沒有待審核的填報記錄</h4>
+                <p class="text-muted">所有填報記錄都已經審核完成</p>
                         </div>
                     {% endif %}
                 </div>
@@ -239,7 +239,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>確定要審核通過這筆報工記錄嗎？</p>
+                <p>確定要審核通過這筆填報記錄嗎？</p>
                 <div class="form-group">
                     <label for="approval_remarks">審核備註（可選）：</label>
                     <textarea class="form-control" id="approval_remarks" rows="3"></textarea>
@@ -262,7 +262,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>確定要駁回這筆報工記錄嗎？</p>
+                <p>確定要駁回這筆填報記錄嗎？</p>
                 <div class="form-group">
                     <label for="rejection_reason">駁回原因：</label>
                     <textarea class="form-control" id="rejection_reason" rows="3" required></textarea>
@@ -349,7 +349,7 @@ function viewDetail(reportType, reportId) {
 
 function batchApprove() {
     // 批次審核功能
-    if (!confirm('確定要批次審核所有待審核的報工記錄嗎？\n\n此操作將一次性審核所有待審核記錄，無法撤銷。')) {
+                if (!confirm('確定要批次審核所有待審核的填報記錄嗎？\n\n此操作將一次性審核所有待審核記錄，無法撤銷。')) {
         return;
     }
     

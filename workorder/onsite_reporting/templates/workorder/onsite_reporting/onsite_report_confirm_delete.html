@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}刪除現場報工記錄{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">刪除現場報工記錄</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 訊息顯示區域 -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- 警告訊息 -->
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle"></i> 警告</h5>
+                        <p class="mb-0">您即將刪除以下現場報工記錄，此操作無法復原：</p>
+                    </div>
+
+                    <!-- 報工記錄資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2">報工記錄資訊</h5>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">報工類型</label>
+                            <p class="form-control-plaintext">{{ object.get_report_type_display }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">報工狀態</label>
+                            <p class="form-control-plaintext">
+                                <span class="badge bg-{% if object.status == 'started' %}primary{% elif object.status == 'paused' %}warning{% elif object.status == 'resumed' %}info{% elif object.status == 'completed' %}success{% else %}danger{% endif %}">
+                                    {{ object.get_status_display }}
+                                </span>
+                            </p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">作業員</label>
+                            <p class="form-control-plaintext">{{ object.operator }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">工單號碼</label>
+                            <p class="form-control-plaintext">{{ object.workorder }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">產品編號</label>
+                            <p class="form-control-plaintext">{{ object.product_id }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">工序</label>
+                            <p class="form-control-plaintext">{{ object.process }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">工作數量</label>
+                            <p class="form-control-plaintext">{{ object.work_quantity }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">不良品數量</label>
+                            <p class="form-control-plaintext">{{ object.defect_quantity }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">報工日期</label>
+                            <p class="form-control-plaintext">{{ object.work_date|date:"Y-m-d" }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">開始時間</label>
+                            <p class="form-control-plaintext">{{ object.start_datetime|date:"Y-m-d H:i:s" }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">結束時間</label>
+                            <p class="form-control-plaintext">
+                                {% if object.end_datetime %}
+                                    {{ object.end_datetime|date:"Y-m-d H:i:s" }}
+                                {% else %}
+                                    進行中
+                                {% endif %}
+                            </p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">工作時間</label>
+                            <p class="form-control-plaintext">{{ object.get_duration_minutes }} 分鐘</p>
+                        </div>
+                        
+                        <div class="col-12 mb-3">
+                            <label class="form-label fw-bold">備註</label>
+                            <p class="form-control-plaintext">{{ object.remarks|default:"無" }}</p>
+                        </div>
+                        
+                        <div class="col-12 mb-3">
+                            <label class="form-label fw-bold">異常記錄</label>
+                            <p class="form-control-plaintext">{{ object.abnormal_notes|default:"無" }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">建立人員</label>
+                            <p class="form-control-plaintext">{{ object.created_by }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">建立時間</label>
+                            <p class="form-control-plaintext">{{ object.created_at|date:"Y-m-d H:i:s" }}</p>
+                        </div>
+                    </div>
+
+                    <!-- 刪除確認表單 -->
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'workorder:onsite_reporting:onsite_report_detail' object.pk %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> 取消
+                                    </a>
+                                    <button type="submit" class="btn btn-danger" onclick="return confirm('確定要刪除此報工記錄嗎？此操作無法復原。')">
+                                        <i class="fas fa-trash"></i> 確認刪除
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

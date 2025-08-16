@@ -121,19 +121,19 @@
 <!-- 隱藏的數據容器 -->
 <div id="process-data" style="display: none;">
     {% for process in process_names %}
-        <div data-id="{{ process.id }}" data-name="{{ process.name|escapejs }}"></div>
+        <div data-id="{{ process.id }}" data-name="{{ process.name }}"></div>
     {% endfor %}
 </div>
 
 <div id="equipment-data" style="display: none;">
     {% for equip in equipments %}
-        <div data-id="{{ equip.id }}" data-name="{{ equip.name|escapejs }}"></div>
+        <div data-id="{{ equip.id }}" data-name="{{ equip.name }}"></div>
     {% endfor %}
 </div>
 
 <div id="psp-data" style="display: none;">
     {% for psp in psp_product_ids %}
-        <div data-id="{{ psp.product_id|escapejs }}"></div>
+        <div data-id="{{ psp.product_id }}"></div>
     {% endfor %}
 </div>
 

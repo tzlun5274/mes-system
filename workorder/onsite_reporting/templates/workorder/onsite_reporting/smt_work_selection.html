@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}SMT現場報工作業選擇{% endblock %}
+
+{% block extra_head %}
+<style>
+    .work-selection-card {
+        border-radius: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        transition: all 0.3s ease;
+        margin-bottom: 30px;
+        border: none;
+        overflow: hidden;
+    }
+    
+    .work-selection-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 35px rgba(0,0,0,0.2);
+    }
+    
+    .work-selection-card .card-header {
+        border-radius: 0;
+        font-weight: bold;
+        font-size: 1.2rem;
+        padding: 20px;
+    }
+    
+    .work-selection-card .card-body {
+        padding: 30px;
+    }
+    
+    .feature-description {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 25px;
+        color: #495057;
+    }
+    
+    .feature-actions {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .btn-custom {
+        padding: 12px 25px;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn-custom:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    
+    .page-header h1 {
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: 600;
+    }
+    
+    .page-header p {
+        margin: 10px 0 0 0;
+        opacity: 0.9;
+        font-size: 1.1rem;
+    }
+    
+    .breadcrumb-custom {
+        background: rgba(255,255,255,0.1);
+        border-radius: 10px;
+        padding: 10px 20px;
+        margin-bottom: 20px;
+    }
+    
+    .breadcrumb-custom a {
+        color: white;
+        text-decoration: none;
+    }
+    
+    .breadcrumb-custom a:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="page-header">
+        <div class="breadcrumb-custom">
+            <a href="{% url 'workorder:onsite_reporting:onsite_report_index' %}">
+                <i class="fas fa-home"></i> 現場報工管理
+            </a>
+            <i class="fas fa-chevron-right mx-2"></i>
+            <span>SMT現場報工作業選擇</span>
+        </div>
+        <h1><i class="fas fa-cogs"></i> SMT現場報工作業選擇</h1>
+        <p>請選擇要進行的SMT報工類型</p>
+    </div>
+
+    <!-- 訊息顯示 -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                <i class="fas fa-info-circle"></i> {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <!-- SMT現場報工 -->
+        <div class="col-md-6">
+            <div class="card work-selection-card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-microchip"></i> SMT現場報工
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="feature-description">
+                        <strong>一般SMT設備現場報工</strong><br>
+                        專為SMT設備設計的自動化報工系統，支援設備狀態監控、自動數量統計、異常檢測等功能。
+                        可與SMT設備直接連接，實現無人化報工，提高生產效率和準確性。
+                    </div>
+                    <div class="feature-actions">
+                        <a href="{% url 'workorder:onsite_reporting:smt_onsite_report_create' %}" class="btn btn-success btn-custom">
+                            <i class="fas fa-plus"></i> 新增SMT報工
+                        </a>
+                        <a href="{% url 'workorder:onsite_reporting:onsite_report_list' %}?report_type=smt" class="btn btn-outline-success btn-custom">
+                            <i class="fas fa-list"></i> 查看報工記錄
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SMT_RD樣品現場報工 -->
+        <div class="col-md-6">
+            <div class="card work-selection-card">
+                <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 class="mb-0">
+                        <i class="fas fa-flask"></i> SMT_RD樣品現場報工
+                        <span class="badge bg-light text-dark ms-2">RD樣品專用</span>
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="feature-description">
+                        <strong>SMT_RD樣品現場報工</strong><br>
+                        專為SMT設備研發階段產品設計的報工系統，產品編號固定為PFP-CCT，工單號碼固定為RD樣品。
+                        第一筆報工記錄時自動建立工單，選擇設備時作業員欄位自動填入相同設備名稱。
+                    </div>
+                    <div class="feature-actions">
+                        <a href="{% url 'workorder:onsite_reporting:smt_rd_onsite_report_create' %}" class="btn btn-custom" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+                            <i class="fas fa-plus"></i> 新增SMT_RD樣品報工
+                        </a>
+                        <a href="{% url 'workorder:onsite_reporting:onsite_report_list' %}?report_type=smt_rd" class="btn btn-outline-success btn-custom">
+                            <i class="fas fa-list"></i> 查看報工記錄
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 返回按鈕 -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="{% url 'workorder:onsite_reporting:onsite_report_index' %}" class="btn btn-secondary btn-lg">
+                <i class="fas fa-arrow-left"></i> 返回現場報工管理
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %} 

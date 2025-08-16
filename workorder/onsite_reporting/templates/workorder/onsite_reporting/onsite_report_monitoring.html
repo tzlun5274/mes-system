@@ -1,0 +1,404 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}現場報工監控{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">現場報工監控</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 訊息顯示區域 -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- 統計卡片 -->
+                    <div class="row mb-4">
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">{{ total_reports }}</h4>
+                                            <p class="card-text">總報工記錄</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-clipboard-list fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">{{ active_reports|length }}</h4>
+                                            <p class="card-text">活躍報工</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-play-circle fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">{{ paused_reports|length }}</h4>
+                                            <p class="card-text">暫停報工</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-pause-circle fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">{{ stopped_reports|length }}</h4>
+                                            <p class="card-text">停工報工</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-stop-circle fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 活躍報工監控 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-play-circle text-success"></i> 活躍報工監控
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if active_reports %}
+                                        <div class="table-responsive">
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th>作業員</th>
+                                                        <th>工單號碼</th>
+                                                        <th>產品編號</th>
+                                                        <th>工序</th>
+                                                        <th>開始時間</th>
+                                                        <th>工作時間</th>
+                                                        <th>狀態</th>
+                                                        <th>操作</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for report in active_reports %}
+                                                    <tr>
+                                                        <td>{{ report.operator }}</td>
+                                                        <td>{{ report.workorder }}</td>
+                                                        <td>{{ report.product_id }}</td>
+                                                        <td>{{ report.process }}</td>
+                                                        <td>{{ report.start_datetime|date:"H:i:s" }}</td>
+                                                        <td>{{ report.get_duration_minutes }} 分鐘</td>
+                                                        <td>
+                                                            <span class="badge bg-{% if report.status == 'started' %}primary{% else %}info{% endif %}">
+                                                                {{ report.get_status_display }}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <div class="btn-group" role="group">
+                                                                <button type="button" class="btn btn-sm btn-warning" onclick="pauseReport({{ report.id }})">
+                                                                    <i class="fas fa-pause"></i> 暫停
+                                                                </button>
+                                                                <button type="button" class="btn btn-sm btn-success" onclick="completeReport({{ report.id }})">
+                                                                    <i class="fas fa-check"></i> 完工
+                                                                </button>
+                                                                <button type="button" class="btn btn-sm btn-danger" onclick="stopReport({{ report.id }})">
+                                                                    <i class="fas fa-stop"></i> 停工
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center py-4">
+                                            <i class="fas fa-info-circle fa-3x text-muted mb-3"></i>
+                                            <p class="text-muted">目前沒有活躍的報工記錄</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 暫停報工監控 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-pause-circle text-warning"></i> 暫停報工監控
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if paused_reports %}
+                                        <div class="table-responsive">
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th>作業員</th>
+                                                        <th>工單號碼</th>
+                                                        <th>產品編號</th>
+                                                        <th>工序</th>
+                                                        <th>暫停時間</th>
+                                                        <th>工作時間</th>
+                                                        <th>操作</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for report in paused_reports %}
+                                                    <tr>
+                                                        <td>{{ report.operator }}</td>
+                                                        <td>{{ report.workorder }}</td>
+                                                        <td>{{ report.product_id }}</td>
+                                                        <td>{{ report.process }}</td>
+                                                        <td>{{ report.updated_at|date:"H:i:s" }}</td>
+                                                        <td>{{ report.work_minutes }} 分鐘</td>
+                                                        <td>
+                                                            <div class="btn-group" role="group">
+                                                                <button type="button" class="btn btn-sm btn-info" onclick="resumeReport({{ report.id }})">
+                                                                    <i class="fas fa-play"></i> 恢復
+                                                                </button>
+                                                                <button type="button" class="btn btn-sm btn-success" onclick="completeReport({{ report.id }})">
+                                                                    <i class="fas fa-check"></i> 完工
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center py-4">
+                                            <i class="fas fa-info-circle fa-3x text-muted mb-3"></i>
+                                            <p class="text-muted">目前沒有暫停的報工記錄</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 停工報工監控 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-stop-circle text-danger"></i> 停工報工監控
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if stopped_reports %}
+                                        <div class="table-responsive">
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th>作業員</th>
+                                                        <th>工單號碼</th>
+                                                        <th>產品編號</th>
+                                                        <th>工序</th>
+                                                        <th>停工時間</th>
+                                                        <th>工作時間</th>
+                                                        <th>異常記錄</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for report in stopped_reports %}
+                                                    <tr>
+                                                        <td>{{ report.operator }}</td>
+                                                        <td>{{ report.workorder }}</td>
+                                                        <td>{{ report.product_id }}</td>
+                                                        <td>{{ report.process }}</td>
+                                                        <td>{{ report.updated_at|date:"H:i:s" }}</td>
+                                                        <td>{{ report.work_minutes }} 分鐘</td>
+                                                        <td>{{ report.abnormal_notes|default:"無" }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center py-4">
+                                            <i class="fas fa-info-circle fa-3x text-muted mb-3"></i>
+                                            <p class="text-muted">目前沒有停工的報工記錄</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 操作按鈕 -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between">
+                                <a href="{% url 'workorder:onsite_reporting:onsite_report_index' %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> 返回首頁
+                                </a>
+                                <button type="button" class="btn btn-primary" onclick="refreshPage()">
+                                    <i class="fas fa-sync-alt"></i> 重新整理
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 暫停報工
+    function pauseReport(reportId) {
+        if (confirm('確定要暫停此報工嗎？')) {
+            fetch(`/workorder/onsite_reporting/api/pause/${reportId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('報工已暫停');
+                    location.reload();
+                } else {
+                    alert('暫停失敗：' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('操作失敗：' + error);
+            });
+        }
+    }
+
+    // 完工報工
+    function completeReport(reportId) {
+        const workQuantity = prompt('請輸入工作數量：');
+        if (workQuantity !== null) {
+            const defectQuantity = prompt('請輸入不良品數量（可選）：') || 0;
+            
+            fetch(`/workorder/onsite_reporting/api/complete/${reportId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `work_quantity=${workQuantity}&defect_quantity=${defectQuantity}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('報工已完成');
+                    location.reload();
+                } else {
+                    alert('完工失敗：' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('操作失敗：' + error);
+            });
+        }
+    }
+
+    // 停工報工
+    function stopReport(reportId) {
+        const reason = prompt('請輸入停工原因：');
+        if (reason !== null) {
+            fetch(`/workorder/onsite_reporting/api/pause/${reportId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `pause_reason=${encodeURIComponent(reason)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('報工已停工');
+                    location.reload();
+                } else {
+                    alert('停工失敗：' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('操作失敗：' + error);
+            });
+        }
+    }
+
+    // 恢復報工
+    function resumeReport(reportId) {
+        if (confirm('確定要恢復此報工嗎？')) {
+            fetch(`/workorder/onsite_reporting/api/resume/${reportId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('報工已恢復');
+                    location.reload();
+                } else {
+                    alert('恢復失敗：' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('操作失敗：' + error);
+            });
+        }
+    }
+
+    // 重新整理頁面
+    function refreshPage() {
+        location.reload();
+    }
+
+    // 自動重新整理（每30秒）
+    setInterval(refreshPage, 30000);
+</script>
+{% endblock %} 

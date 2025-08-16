@@ -42,6 +42,7 @@ from .views.completion_automation_views import (
     CompletionAutomationManagementView
 )
 
+
 app_name = "workorder"
 
 urlpatterns = [
@@ -64,7 +65,7 @@ urlpatterns = [
     path("manual-convert-orders/", workorder_views.manual_convert_orders, name="manual_convert_orders"),
     path("selective-revert-orders/", workorder_views.selective_revert_orders, name="selective_revert_orders"),
     path("delete-pending-workorders/", workorder_views.delete_pending_workorders, name="delete_pending_workorders"),
-    path("create-missing-workorders/", CreateMissingWorkOrdersView.as_view(), name="create_missing_workorders"),
+
     
     # 填報紀錄相符性檢查
     path("fillwork-consistency-check/", FillWorkConsistencyCheckView.as_view(), name="fillwork_consistency_check"),
@@ -132,19 +133,20 @@ urlpatterns = [
     path("report/", RedirectView.as_view(url="/workorder/fill_work/", permanent=True)),
     
     # 填報作業管理首頁
-    path("fill_work/", include(('workorder.fill_work.urls', 'fill_work'), namespace='fill_work')),
+    path("fill_work/", include('workorder.fill_work.urls')),
+    
+    # 現場報工管理子模組
+    path("onsite_reporting/", include(('workorder.onsite_reporting.urls', 'onsite_reporting'))),
     
     # 主管功能子模組（原路徑保留）
     path("supervisor/", include('workorder.supervisor.urls')),
     
-    # 系統維護：清除數據（管理員專用）
-    path("clear-data/", workorder_views.clear_data, name="clear_data"),
+
     
-    # 系統維護：清除所有報工紀錄（管理員專用）
-    path("clear-all-production-reports/", workorder_views.clear_all_production_reports, name="clear_all_production_reports"),
+
     
     # 派工單子模組
-    path("dispatch/", include(("workorder.workorder_dispatch.urls", "workorder_dispatch"), namespace="workorder_dispatch")),
+    path("dispatch/", include(('workorder.workorder_dispatch.urls', 'workorder_dispatch'))),
     
     # 報工管理子模組（已移除新的報工管理系統）
     # path("work-reporting/", include("work_reporting_management.urls", namespace="work_reporting_management")),
@@ -169,4 +171,6 @@ urlpatterns = [
     path("mes-orders/delete/", mes_order_delete, name="mes_order_delete"),
     path("mes-orders/auto-dispatch/", mes_orders_auto_dispatch, name="mes_orders_auto_dispatch"),
     path("mes-orders/set-auto-dispatch-interval/", mes_orders_set_auto_dispatch_interval, name="mes_orders_set_auto_dispatch_interval"),
+
+
 ]

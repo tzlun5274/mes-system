@@ -102,7 +102,7 @@
     // 將 process_names 數據傳遞給 JavaScript
     const processNames = [
         {% for process in process_names %}
-            { id: "{{ process.id }}", name: "{{ process.name|escapejs }}" }{% if not forloop.last %},{% endif %}
+            { id: "{{ process.id }}", name: "{{ process.name }}" }{% if not forloop.last %},{% endif %}
         {% empty %}
             []
         {% endfor %}

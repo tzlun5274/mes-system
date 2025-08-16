@@ -232,12 +232,9 @@ def process_workorder_import(df, user):
                     ).first()
                     
                     if existing_workorder:
-                        # 更新現有工單
-                        existing_workorder.quantity = quantity
-                        existing_workorder.updated_at = timezone.now()
-                        existing_workorder.save()
-                        updated_count += 1
-                        logger.info(f"更新工單: {existing_workorder}")
+                        # 略過已存在的工單
+                        skipped_count += 1
+                        logger.info(f"略過已存在的工單: {existing_workorder}")
                     else:
                         # 創建新工單
                         new_workorder = WorkOrder.objects.create(
@@ -261,16 +258,16 @@ def process_workorder_import(df, user):
         
         # 記錄匯入結果
         logger.info(f"工單匯入完成 - 總記錄: {total_records}, 創建: {created_count}, "
-                   f"更新: {updated_count}, 跳過: {skipped_count}, 錯誤: {error_count}")
+                   f"略過: {skipped_count}, 錯誤: {error_count}")
         
         return {
             'success': True,
-            'message': f'匯入完成！創建 {created_count} 個工單，更新 {updated_count} 個工單，'
+            'message': f'匯入完成！創建 {created_count} 個工單，略過 {skipped_count} 個重複工單，'
                       f'處理 {error_count} 個錯誤記錄。',
             'data': {
                 'total_records': total_records,
                 'created_count': created_count,
-                'updated_count': updated_count,
+                'updated_count': 0,  # 不再有更新，統一略過
                 'skipped_count': skipped_count,
                 'error_count': error_count,
                 'errors': errors[:10]  # 只返回前10個錯誤

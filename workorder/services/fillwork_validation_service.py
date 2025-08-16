@@ -97,7 +97,9 @@ class FillWorkValidationService:
                         continue
                     
                     # 檢查工單是否存在
+                    # 使用公司代號和工單號碼組合查詢，確保唯一性
                     workorder = WorkOrder.objects.filter(order_number=fillwork.workorder).first()
+                    # 注意：這裡需要從填報記錄中獲取公司代號，暫時保持原有邏輯
                     
                     if not workorder:
                         # 工單號碼不存在

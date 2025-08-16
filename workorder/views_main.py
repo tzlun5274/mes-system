@@ -21,7 +21,7 @@ from .models import (
 from .workorder_erp.models import PrdMKOrdMain, SystemConfig, CompanyOrder
 # from .tasks import get_standard_processes
 from .forms import WorkOrderForm
-# from .forms import from django.contrib import messages
+from django.contrib import messages
 
 from datetime import datetime, timedelta, date
 from django.db import models
@@ -725,14 +725,14 @@ def manual_convert_orders(request):
 def workorder_process_detail(request, workorder_id):
     """
     派工單工序明細頁面：顯示工單的所有工序及執行狀況
-    完工工單：從實際報工資料生成工序明細
+    完工工單：從實際填報資料生成工序明細
     未完工工單：顯示預先建立的工序明細
     """
     workorder = get_object_or_404(WorkOrder, pk=workorder_id)
     
     # 檢查是否為完工工單
     if workorder.status == "completed":
-        # 完工工單：從實際報工資料生成工序明細
+        # 完工工單：從實際填報資料生成工序明細
         processes = generate_completed_workorder_processes(workorder)
         has_process_route = True  # 完工工單一定有實際工序
     else:
@@ -773,13 +773,13 @@ def workorder_process_detail(request, workorder_id):
 
 def generate_completed_workorder_processes(workorder):
     """
-    為完工工單從實際報工資料生成工序明細
-    整合作業員報工和SMT報工資料
+    為完工工單從實際填報資料生成工序明細
+    整合作業員填報和SMT填報資料
     """
     from collections import defaultdict
     from datetime import datetime, time
     
-    # 收集所有報工資料
+            # 收集所有填報資料
     process_data = defaultdict(lambda: {
         'process_name': '',
         'planned_quantity': workorder.quantity,
@@ -795,7 +795,7 @@ def generate_completed_workorder_processes(workorder):
         'step_order': 0
     })
     
-    # 1. 收集作業員報工資料
+            # 1. 收集作業員填報資料
     # operator_reports = OperatorSupplementReport.objects.filter(
     #     workorder=workorder,
     #     approval_status='approved'
@@ -829,7 +829,7 @@ def generate_completed_workorder_processes(workorder):
             if report.abnormal_notes:
                 process_data[process_name]['abnormal_notes'].append(report.abnormal_notes)
     
-    # 2. 收集SMT報工資料
+            # 2. 收集SMT填報資料
     # smt_reports = SMTSupplementReport.objects.filter(
     #     workorder=workorder,
     #     approval_status='approved'
@@ -1117,9 +1117,12 @@ def get_processes_only(request):
             return JsonResponse({"success": False, "message": "查無此工單"})
     else:
         # 如果是字串，改用工單編號查
-        try:
-            workorder = WorkOrder.objects.get(order_number=workorder_id)
-        except WorkOrder.DoesNotExist:
+        # 查詢所有匹配的工單
+        workorders = WorkOrder.objects.filter(order_number=workorder_id)
+        if workorders.exists():
+            # 如果有多個工單，使用第一個（保持原有行為）
+            workorder = workorders.first()
+        else:
             return JsonResponse({"success": False, "message": "查無此工單編號"})
 
     # 查詢該工單的所有工序
@@ -1843,8 +1846,8 @@ def mobile_quick_supplement_form(request, workorder_id):
 
 def clear_all_production_reports(request):
     """
-    清除所有報工紀錄的視圖函數
-    包括：作業員補登報工、SMT補登報工、SMT現場報工
+    清除所有填報紀錄的視圖函數
+    包括：作業員補登填報、SMT補登填報、SMT現場填報
     只有管理員可以執行此操作
     """
     if not (request.user.is_staff or request.user.is_superuser):
@@ -1862,10 +1865,10 @@ def clear_all_production_reports(request):
             total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
             
             if total_count == 0:
-                messages.info(request, "目前沒有任何報工紀錄需要清除")
+                messages.info(request, "目前沒有任何填報紀錄需要清除")
                 return redirect("workorder:index")
             
-            # 清除所有報工紀錄
+            # 清除所有填報紀錄
             CompletedProductionReport.objects.all().delete()
             
             # 記錄操作日誌
@@ -1873,22 +1876,22 @@ def clear_all_production_reports(request):
             OperationLog.objects.create(
                 user=request.user.username,
                 module="workorder",
-                action=f"清除所有報工紀錄（作業員：{operator_reports_count}，SMT補登：{smt_supplement_count}，SMT現場：{smt_on_site_count}）",
+                action=f"清除所有填報紀錄（作業員：{operator_reports_count}，SMT補登：{smt_supplement_count}，SMT現場：{smt_on_site_count}）",
                 timestamp=timezone.now(),
                 ip_address=request.META.get('REMOTE_ADDR', ''),
             )
             
             messages.success(
                 request, 
-                f"成功清除所有報工紀錄！共清除 {total_count} 筆記錄：\n"
-                f"• 作業員補登報工：{operator_reports_count} 筆\n"
-                f"• SMT補登報工：{smt_supplement_count} 筆\n"
-                f"• SMT現場報工：{smt_on_site_count} 筆"
+                f"成功清除所有填報紀錄！共清除 {total_count} 筆記錄：\n"
+                                 f"• 作業員補登填報：{operator_reports_count} 筆\n"
+                 f"• SMT補登填報：{smt_supplement_count} 筆\n"
+                 f"• SMT現場填報：{smt_on_site_count} 筆"
             )
             return redirect("workorder:index")
             
         except Exception as e:
-            messages.error(request, f"清除報工紀錄失敗：{str(e)}")
+            messages.error(request, f"清除填報紀錄失敗：{str(e)}")
             return redirect("workorder:clear_all_production_reports")
 
     # GET 請求顯示確認頁面
@@ -2797,6 +2800,14 @@ def update_process_status(request, process_id):
                 print(f"✅ 設備狀態更新為運轉中：{equipment_name}")
             except Exception as e:
                 print(f"⚠️ 設備狀態更新失敗：{str(e)}")
+        
+        # 自動更新派工單狀態
+        try:
+            from workorder.services.dispatch_status_service import DispatchStatusService
+            DispatchStatusService.update_dispatch_status_by_process_allocation(process.workorder.id)
+            print(f"✅ 派工單狀態自動更新完成")
+        except Exception as e:
+            print(f"⚠️ 派工單狀態更新失敗：{str(e)}")
         
         # 重新讀取確認儲存
         process.refresh_from_db()
@@ -4910,11 +4921,7 @@ def active_workorders(request):
             if workorder_exists:
                 total_approved_reports_with_workorder += 1
     
-    # 計算總合格品數量和總工作時數（只計算已核准的記錄）
-    total_good_quantity = FillWork.objects.filter(approval_status='approved').aggregate(
-        total=Sum('work_quantity')
-    )['total'] or 0
-    
+    # 計算總工作時數（所有工序）
     total_work_hours = FillWork.objects.filter(approval_status='approved').aggregate(
         total=Sum('work_hours_calculated')
     )['total'] or 0.0
@@ -4922,6 +4929,15 @@ def active_workorders(request):
     total_overtime_hours = FillWork.objects.filter(approval_status='approved').aggregate(
         total=Sum('overtime_hours_calculated')
     )['total'] or 0.0
+    
+    # 計算出貨包裝工序的合格品數量（以出貨包裝為主）
+    packaging_reports = FillWork.objects.filter(
+        approval_status='approved',
+        process__name__icontains='出貨包裝'
+    )
+    total_good_quantity = packaging_reports.aggregate(
+        total=Sum('work_quantity')
+    )['total'] or 0
     
     # 確保數值類型一致，轉換為 float
     total_work_hours = float(total_work_hours) if total_work_hours else 0.0
@@ -5085,8 +5101,8 @@ def force_complete_workorder(request, pk):
         
         # 轉移到已完工工單模組
         try:
-            from workorder.services import WorkOrderCompletionService
-            completed_workorder = WorkOrderCompletionService.transfer_workorder_to_completed(workorder.id)
+            from workorder.services import FillWorkCompletionService
+            completed_workorder = FillWorkCompletionService.transfer_workorder_to_completed(workorder.id)
             
             # 記錄操作日誌
             from system.models import OperationLog
@@ -5147,10 +5163,10 @@ def auto_complete_workorder(request, pk):
         }, status=403)
     
     try:
-        from workorder.services.completion_service import WorkOrderCompletionService
+        from workorder.services.completion_service import FillWorkCompletionService
         
         # 執行自動完工
-        result = WorkOrderCompletionService.auto_complete_workorder(pk)
+        result = FillWorkCompletionService.auto_complete_workorder(pk)
         
         return JsonResponse(result)
         

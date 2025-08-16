@@ -36,7 +36,7 @@
             </div>
             <div class="col-md-3">
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-purple text-white">
+                    <div class="card-header bg-primary text-white">
                         <h4 class="mb-0">
                             <i class="fas fa-cogs"></i> MES 工單管理
                         </h4>
@@ -47,7 +47,7 @@
                             <br>
                             可查詢、批量派工、狀態管理。
                         </p>
-                        <a href="{% url 'workorder:mes_orders' %}" class="btn btn-purple">
+                        <a href="{% url 'workorder:mes_orders' %}" class="btn btn-primary">
                             <i class="fas fa-cogs"></i> 進入 MES 工單管理
                         </a>
                     </div>
@@ -73,16 +73,18 @@
                 </div>
             </div>
 
+
+
             <div class="col-md-3">
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-info text-white">
                         <h4 class="mb-0">
-                            <i class="fas fa-clipboard-list"></i> 生產執行監控
+                            <i class="fas fa-eye"></i> 生產執行監控
                         </h4>
                     </div>
                     <div class="card-body">
                         <p class="card-text">
-                            基於實際報工記錄監控生產執行狀況。
+                            基於實際填報記錄監控生產執行狀況。
                             <br>
                             可查看詳情、監控進度。
                         </p>
@@ -113,140 +115,99 @@
             </div>
             <div class="col-md-3">
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-danger text-white">
+                    <div class="card-header bg-secondary text-white">
                         <h4 class="mb-0">
-                            <i class="fas fa-exclamation-triangle"></i> 相符性檢查
+                            <i class="fas fa-clipboard-list"></i> 現場報工
                         </h4>
                     </div>
                     <div class="card-body">
                         <p class="card-text">
-                            檢查填報紀錄與工單的相符性，排除RD樣品。
+                            現場即時填報記錄，包含作業員和SMT設備填報。
                             <br>
-                            可檢查、統計、修正。
+                            可即時報工、狀態追蹤、統計分析。
                         </p>
-                        <a href="{% url 'workorder:fillwork_consistency_check' %}" class="btn btn-danger">
-                            <i class="fas fa-search"></i> 開始檢查
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-dark text-white">
-                        <h4 class="mb-0">
-                            <i class="fas fa-trash-alt"></i> 清除所有工單
-                        </h4>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text">
-                            安全地清除所有工單資料，重新開始。
-                            <br>
-                            可備份、清除、重新匯入。
-                        </p>
-                        <a href="{% url 'workorder:clear_workorders' %}" class="btn btn-dark">
-                            <i class="fas fa-trash-alt"></i>
-                            清除工單
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-danger text-white">
-                        <h4 class="mb-0">
-                            <i class="fas fa-plus-circle"></i> 創建缺失工單
-                        </h4>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text">
-                            從填報資料自動創建缺失的工單記錄。
-                            <br>
-                            以公司名稱/代號+製令號碼+產品編號為唯一性識別。
-                        </p>
-                        <a href="{% url 'workorder:create_missing_workorders' %}" class="btn btn-danger">
-                            <i class="fas fa-magic"></i> 創建缺失工單
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-success text-white">
-                        <h4 class="mb-0">
-                            <i class="fas fa-file-excel"></i> Excel匯入工單
-                        </h4>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text">
-                            從正航系統匯出的製令簡要表匯入工單。
-                            <br>
-                            支援Excel和CSV格式，自動識別公司代號。
-                        </p>
-                        <a href="{% url 'workorder:workorder_import' %}" class="btn btn-success">
-                            <i class="fas fa-upload"></i> Excel匯入工單
-                        </a>
-                    </div>
-                </div>
-            </div>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text">
-                            檢視已完工的工單歷史記錄，包含完整統計資料。
-                            <br>
-                            可查詢、檢視、分析。
-                        </p>
-                        <a href="{% url 'workorder:completed_workorder_list' %}" class="btn btn-success">
-                            <i class="fas fa-history"></i> 查看已完工工單
+                        <a href="{% url 'workorder:onsite_reporting:onsite_report_index' %}" class="btn btn-secondary">
+                            <i class="fas fa-clipboard-list"></i> 進入現場報工
                         </a>
                     </div>
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- 系統維護功能 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3 class="mb-3">
+                <i class="fas fa-cogs"></i> 系統維護功能
+            </h3>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> 相符性檢查
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        檢查填報紀錄與工單的相符性，排除RD樣品。
+                        <br>
+                        可檢查、統計、修正。
+                    </p>
+                    <a href="{% url 'workorder:fillwork_consistency_check' %}" class="btn btn-danger">
+                        <i class="fas fa-search"></i> 開始檢查
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-trash-alt"></i> 清除所有工單
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        安全地清除所有工單資料，重新開始。
+                        <br>
+                        可備份、清除、重新匯入。
+                    </p>
+                    <a href="{% url 'workorder:clear_workorders' %}" class="btn btn-dark">
+                        <i class="fas fa-trash-alt"></i>
+                        清除工單
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-file-excel"></i> Excel匯入工單
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        從正航系統匯出的製令簡要表匯入工單。
+                        <br>
+                        支援Excel和CSV格式，自動識別公司代號。
+                    </p>
+                    <a href="{% url 'workorder:workorder_import' %}" class="btn btn-success">
+                        <i class="fas fa-upload"></i> Excel匯入工單
+                    </a>
+                </div>
+            </div>
+        </div>
 
 
-            <!-- 管理員專用：清除數據功能 -->
-            {% if user.is_staff or user.is_superuser %}
-                <div class="col-md-3">
-                    <div class="card shadow-sm mb-4 border-danger">
-                        <div class="card-header bg-danger text-white">
-                            <h4 class="mb-0">
-                                <i class="fas fa-trash-alt"></i> 清除數據
-                            </h4>
-                        </div>
-                        <div class="card-body">
-                            <p class="card-text">
-                                清除派工單、完工工單、公司製令單。
-                                <br>
-                                <strong class="text-danger">僅供管理員使用！</strong>
-                            </p>
-                            <a href="{% url 'workorder:clear_data' %}" class="btn btn-danger">
-                                <i class="fas fa-exclamation-triangle"></i> 清除數據
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 管理員專用：清除報工紀錄功能 -->
-                <div class="col-md-3">
-                    <div class="card shadow-sm mb-4 border-warning">
-                        <div class="card-header bg-warning text-dark">
-                            <h4 class="mb-0">
-                                <i class="fas fa-clipboard-list"></i> 清除報工紀錄
-                            </h4>
-                        </div>
-                        <div class="card-body">
-                            <p class="card-text">
-                                清除所有報工紀錄，包含作業員和SMT報工。
-                                <br>
-                                <strong class="text-warning">僅供管理員使用！</strong>
-                            </p>
-                            <a href="{% url 'workorder:clear_all_production_reports' %}" class="btn btn-warning">
-                                <i class="fas fa-exclamation-triangle"></i> 清除報工紀錄
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
+
+
+
             <!-- 超級管理員專用：手動派工功能 -->
         </div>
     </div>

@@ -44,6 +44,7 @@ urlpatterns = [
     path("supervisor/pending/", views.SupervisorPendingListView.as_view(), name="supervisor_pending_list"),
     path("supervisor/reviewed/", views.SupervisorReviewedListView.as_view(), name="supervisor_reviewed_list"),
     path("supervisor/batch-approve/", views.batch_approve_fill_work, name="batch_approve_fill_work"),
+    path("supervisor/batch-unapprove/", views.batch_unapprove_fill_work, name="batch_unapprove_fill_work"),
     path("supervisor/batch-delete/", views.batch_delete_fill_work, name="batch_delete_fill_work"),
     
     # 填報功能設定

@@ -238,14 +238,15 @@
                 <i class="fas fa-clock mr-2"></i>定時任務設定
             </div>
             
+            <!-- 工序完工檢查定時任務 -->
             <div class="setting-item">
                 <div class="setting-header">
                     <div>
-                        <div class="setting-title">完工檢查定時任務</div>
-                        <div class="setting-description">自動檢查工單完工狀態，支援數量達到和手動勾選兩種完工判斷方式</div>
+                        <div class="setting-title">工序完工檢查定時任務</div>
+                        <div class="setting-description">自動檢查工單工序進度，當所有工序都完成時觸發完工</div>
                     </div>
                     <label class="toggle-switch">
-                        <input type="checkbox" name="completion_check_enabled" {% if completion_task.enabled %}checked{% endif %}>
+                        <input type="checkbox" name="process_completion_check_enabled" {% if process_completion_task.enabled %}checked{% endif %}>
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -254,8 +255,8 @@
                         <div class="col-md-6">
                             <label class="form-label">檢查間隔</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" name="completion_check_interval" 
-                                       value="{{ completion_task.interval_minutes }}" min="5" max="1440">
+                                <input type="number" class="form-control" name="process_completion_check_interval" 
+                                       value="{{ process_completion_task.interval_minutes }}" min="5" max="1440">
                                 <div class="input-group-append">
                                     <span class="input-group-text">分鐘</span>
                                 </div>
@@ -265,11 +266,51 @@
                         <div class="col-md-6">
                             <label class="form-label">任務狀態</label>
                             <div class="task-status">
-                                <span class="badge {% if completion_task.enabled %}badge-success{% else %}badge-secondary{% endif %}">
-                                    {% if completion_task.enabled %}啟用{% else %}停用{% endif %}
+                                <span class="badge {% if process_completion_task.enabled %}badge-success{% else %}badge-secondary{% endif %}">
+                                    {% if process_completion_task.enabled %}啟用{% else %}停用{% endif %}
                                 </span>
-                                {% if completion_task.last_run %}
-                                <br><small class="text-muted">最後執行：{{ completion_task.last_run|date:"Y-m-d H:i" }}</small>
+                                {% if process_completion_task.last_run %}
+                                <br><small class="text-muted">最後執行：{{ process_completion_task.last_run|date:"Y-m-d H:i" }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 填報完工檢查定時任務 -->
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">填報完工檢查定時任務</div>
+                        <div class="setting-description">自動檢查出貨包裝報工數量，當達到目標數量時觸發完工</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="report_completion_check_enabled" {% if report_completion_task.enabled %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="mt-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">檢查間隔</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="report_completion_check_interval" 
+                                       value="{{ report_completion_task.interval_minutes }}" min="5" max="1440">
+                                <div class="input-group-append">
+                                    <span class="input-group-text">分鐘</span>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted">建議設定：15-30分鐘</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">任務狀態</label>
+                            <div class="task-status">
+                                <span class="badge {% if report_completion_task.enabled %}badge-success{% else %}badge-secondary{% endif %}">
+                                    {% if report_completion_task.enabled %}啟用{% else %}停用{% endif %}
+                                </span>
+                                {% if report_completion_task.last_run %}
+                                <br><small class="text-muted">最後執行：{{ report_completion_task.last_run|date:"Y-m-d H:i" }}</small>
                                 {% endif %}
                             </div>
                         </div>
@@ -294,7 +335,7 @@
                             <label class="form-label">執行間隔</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" name="auto_allocation_interval" 
-                                       value="{{ auto_allocation_task.interval_minutes }}" min="10" max="1440">
+                                       value="{{ auto_allocation_task.interval_minutes }}" min="5" max="1440">
                                 <div class="input-group-append">
                                     <span class="input-group-text">分鐘</span>
                                 </div>
@@ -315,8 +356,6 @@
                     </div>
                 </div>
             </div>
-            
-
         </div>
 
         <!-- 儲存按鈕 -->

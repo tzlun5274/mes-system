@@ -637,20 +637,89 @@ def edit_product_route(request, product_id):
                     if idx < len(route_ids) and route_ids[idx].strip():
                         try:
                             route = ProductProcessRoute.objects.get(id=route_ids[idx])
-                            # 更新現有工序
-                            route.product_id = product_id_new
-                            route.process_name = process_name
-                            route.step_order = step_order
-                            route.usable_equipment_ids = cleaned_equipment_ids
-                            route.dependent_semi_product = (
-                                dependent_semi_product or None
-                            )
-                            route.save()
-                            logger.debug(
-                                f"更新工序: route_id={route.id}, step_order={step_order}"
-                            )
+                            
+                            # 檢查是否需要更新產品編號或步驟順序
+                            if route.product_id != product_id_new or route.step_order != step_order:
+                                # 檢查新產品編號和步驟順序是否已存在（排除當前記錄）
+                                existing_duplicate = ProductProcessRoute.objects.filter(
+                                    product_id=product_id_new,
+                                    step_order=step_order
+                                ).exclude(id=route.id).first()
+                                
+                                if existing_duplicate:
+                                    # 如果存在重複，先刪除舊記錄，再更新重複記錄
+                                    logger.debug(f"刪除舊記錄: route_id={route.id}")
+                                    route.delete()
+                                    # 更新重複記錄
+                                    existing_duplicate.process_name = process_name
+                                    existing_duplicate.usable_equipment_ids = cleaned_equipment_ids
+                                    existing_duplicate.dependent_semi_product = dependent_semi_product or None
+                                    existing_duplicate.save()
+                                    logger.debug(f"更新重複記錄: route_id={existing_duplicate.id}, step_order={step_order}")
+                                else:
+                                    # 更新現有工序
+                                    route.product_id = product_id_new
+                                    route.process_name = process_name
+                                    route.step_order = step_order
+                                    route.usable_equipment_ids = cleaned_equipment_ids
+                                    route.dependent_semi_product = (
+                                        dependent_semi_product or None
+                                    )
+                                    route.save()
+                                    logger.debug(
+                                        f"更新工序: route_id={route.id}, step_order={step_order}"
+                                    )
+                            else:
+                                # 只更新其他欄位，不改變產品編號和步驟順序
+                                route.process_name = process_name
+                                route.usable_equipment_ids = cleaned_equipment_ids
+                                route.dependent_semi_product = (
+                                    dependent_semi_product or None
+                                )
+                                route.save()
+                                logger.debug(
+                                    f"更新工序: route_id={route.id}, step_order={step_order}"
+                                )
                         except ProductProcessRoute.DoesNotExist:
-                            # 如果找不到對應的工序，則新增
+                            # 如果找不到對應的工序，檢查是否已存在相同的產品和步驟順序
+                            existing_route = ProductProcessRoute.objects.filter(
+                                product_id=product_id_new,
+                                step_order=step_order
+                            ).first()
+                            
+                            if existing_route:
+                                # 如果已存在，則更新現有記錄
+                                existing_route.process_name = process_name
+                                existing_route.usable_equipment_ids = cleaned_equipment_ids
+                                existing_route.dependent_semi_product = dependent_semi_product or None
+                                existing_route.save()
+                                logger.debug(f"更新已存在的工序: route_id={existing_route.id}, step_order={step_order}")
+                            else:
+                                # 如果不存在，則創建新記錄
+                                ProductProcessRoute.objects.create(
+                                    product_id=product_id_new,
+                                    process_name=process_name,
+                                    step_order=step_order,
+                                    usable_equipment_ids=cleaned_equipment_ids,
+                                    dependent_semi_product=dependent_semi_product or None,
+                                )
+                                logger.debug(f"新增工序: step_order={step_order}")
+                    else:
+                        # 新增工序 - 檢查是否已存在相同的產品和步驟順序
+                        existing_route = ProductProcessRoute.objects.filter(
+                            product_id=product_id_new,
+                            step_order=step_order
+                        ).first()
+                        
+                        if existing_route:
+                            # 如果已存在，則更新現有記錄
+                            existing_route.process_name = process_name
+                            existing_route.usable_equipment_ids = cleaned_equipment_ids
+                            existing_route.dependent_semi_product = dependent_semi_product or None
+                            existing_route.save()
+                            logger.debug(f"更新已存在的工序: route_id={existing_route.id}, step_order={step_order}")
+                        else:
+                            # 如果不存在，則創建新記錄
                             ProductProcessRoute.objects.create(
                                 product_id=product_id_new,
                                 process_name=process_name,
@@ -659,16 +728,6 @@ def edit_product_route(request, product_id):
                                 dependent_semi_product=dependent_semi_product or None,
                             )
                             logger.debug(f"新增工序: step_order={step_order}")
-                    else:
-                        # 新增工序
-                        ProductProcessRoute.objects.create(
-                            product_id=product_id_new,
-                            process_name=process_name,
-                            step_order=step_order,
-                            usable_equipment_ids=cleaned_equipment_ids,
-                            dependent_semi_product=dependent_semi_product or None,
-                        )
-                        logger.debug(f"新增工序: step_order={step_order}")
             log_user_operation(
                 request.user.username,
                 "process",

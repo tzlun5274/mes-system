@@ -1,0 +1,372 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}現場報工記錄{% endblock %}
+
+{% block extra_head %}
+<style>
+    .search-form {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-weight: bold;
+    }
+    
+    .status-started {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-in_progress {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .status-paused {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-completed {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-abnormal {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .report-type-badge {
+        font-size: 0.7em;
+        padding: 3px 6px;
+        border-radius: 8px;
+        font-weight: bold;
+    }
+    
+    .report-type-operator {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .report-type-smt {
+        background-color: #28a745;
+        color: white;
+    }
+    
+    .progress-bar-custom {
+        height: 6px;
+        border-radius: 3px;
+        background-color: #e9ecef;
+        overflow: hidden;
+        margin-top: 5px;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #28a745, #20c997);
+        transition: width 0.3s ease;
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: rgba(0,123,255,0.1);
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+    
+    .stats-number {
+        font-size: 1.8rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .stats-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-list"></i> 現場報工記錄
+                </h2>
+                <div>
+                    <a href="{% url 'workorder:onsite_reporting:operator_onsite_report_create' %}" class="btn btn-primary me-2">
+                        <i class="fas fa-plus"></i> 新增作業員報工
+                    </a>
+                    <a href="{% url 'workorder:onsite_reporting:smt_onsite_report_create' %}" class="btn btn-success">
+                        <i class="fas fa-plus"></i> 新增SMT報工
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number">{{ total_count }}</div>
+                <div class="stats-label">總記錄數</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="stats-number">{{ active_count }}</div>
+                <div class="stats-label">活躍報工</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="stats-number">{{ completed_count }}</div>
+                <div class="stats-label">已完成</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                <div class="stats-number">{{ abnormal_count }}</div>
+                <div class="stats-label">異常報工</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 搜尋表單 -->
+    <div class="search-form">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="{{ search_form.search.id_for_label }}" class="form-label">搜尋關鍵字</label>
+                {{ search_form.search }}
+            </div>
+            <div class="col-md-2">
+                <label for="{{ search_form.report_type.id_for_label }}" class="form-label">報工類型</label>
+                {{ search_form.report_type }}
+            </div>
+            <div class="col-md-2">
+                <label for="{{ search_form.status.id_for_label }}" class="form-label">報工狀態</label>
+                {{ search_form.status }}
+            </div>
+            <div class="col-md-2">
+                <label for="{{ search_form.company_name.id_for_label }}" class="form-label">公司名稱</label>
+                {{ search_form.company_name }}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">操作</label>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> 搜尋
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label for="{{ search_form.date_from.id_for_label }}" class="form-label">開始日期</label>
+                {{ search_form.date_from }}
+            </div>
+            <div class="col-md-3">
+                <label for="{{ search_form.date_to.id_for_label }}" class="form-label">結束日期</label>
+                {{ search_form.date_to }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">操作</label>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> 搜尋
+                    </button>
+                    <a href="{% url 'workorder:onsite_reporting:onsite_report_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-undo"></i> 重置
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 報工記錄表格 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-table"></i> 報工記錄列表
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if onsite_reports %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>報工類型</th>
+                            <th>作業員</th>
+                            <th>工單號碼</th>
+                            <th>產品編號</th>
+                            <th>公司名稱</th>
+                            <th>工序</th>
+                            <th>狀態</th>
+                            <th>進度</th>
+                            <th>工作日期</th>
+                            <th>開始時間</th>
+                            <th>最後更新</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for report in onsite_reports %}
+                        <tr>
+                            <td>{{ report.id }}</td>
+                            <td>
+                                <span class="report-type-badge report-type-{{ report.report_type }}">
+                                    {{ report.get_report_type_display }}
+                                </span>
+                            </td>
+                            <td>{{ report.operator }}</td>
+                            <td>{{ report.workorder }}</td>
+                            <td>{{ report.product_id }}</td>
+                            <td>{{ report.company_name }}</td>
+                            <td>{{ report.process }}</td>
+                            <td>
+                                <span class="status-badge status-{{ report.status }}">
+                                    {{ report.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="me-2">{{ report.current_quantity }}/{{ report.planned_quantity }}</span>
+                                    <div class="progress-bar-custom" style="width: 60px;">
+                                        <div class="progress-fill" style="width: {{ report.get_progress_percentage }}%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ report.work_date|date:"Y-m-d" }}</td>
+                            <td>{{ report.start_time|time:"H:i" }}</td>
+                            <td>{{ report.last_update_time|date:"m-d H:i" }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'workorder:onsite_reporting:onsite_report_detail' report.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="查看詳情">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'workorder:onsite_reporting:onsite_report_edit' report.pk %}" 
+                                       class="btn btn-sm btn-outline-warning" title="編輯">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% if report.is_active %}
+                                    <button type="button" class="btn btn-sm btn-outline-success" 
+                                            onclick="completeReport({{ report.pk }})" title="完成報工">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分頁 -->
+            {% if is_paginated %}
+            <nav aria-label="報工記錄分頁">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.report_type %}&report_type={{ request.GET.report_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.company_name %}&company_name={{ request.GET.company_name }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.report_type %}&report_type={{ request.GET.report_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.company_name %}&company_name={{ request.GET.company_name }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.report_type %}&report_type={{ request.GET.report_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.company_name %}&company_name={{ request.GET.company_name }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.report_type %}&report_type={{ request.GET.report_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.company_name %}&company_name={{ request.GET.company_name }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.report_type %}&report_type={{ request.GET.report_type }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.company_name %}&company_name={{ request.GET.company_name }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">沒有找到報工記錄</h5>
+                <p class="text-muted">請嘗試調整搜尋條件或新增報工記錄</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function completeReport(reportId) {
+        if (confirm('確定要完成此報工記錄嗎？')) {
+            fetch(`/workorder/onsite_reporting/api/complete/${reportId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('報工已完成');
+                    location.reload();
+                } else {
+                    alert('操作失敗: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('操作失敗，請稍後再試');
+            });
+        }
+    }
+    
+    // 自動刷新頁面（每60秒）
+    setTimeout(function() {
+        location.reload();
+    }, 60000);
+</script>
+{% endblock %} 

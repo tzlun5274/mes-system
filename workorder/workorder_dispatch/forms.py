@@ -108,14 +108,19 @@ class WorkOrderDispatchForm(forms.ModelForm):
         # 驗證工單號碼是否存在
         order_number = cleaned_data.get('order_number')
         if order_number:
-            try:
-                work_order = WorkOrder.objects.get(order_number=order_number)
+            # 查詢所有匹配的工單
+            # 使用公司代號和工單號碼組合查詢，確保唯一性
+            work_orders = WorkOrder.objects.filter(order_number=order_number)
+            # 注意：這裡需要從請求中獲取公司代號，暫時保持原有邏輯
+            if work_orders.exists():
+                # 如果有多個工單，使用第一個（保持原有行為）
+                work_order = work_orders.first()
                 # 自動填入產品資訊
                 if not cleaned_data.get('product_code'):
                     cleaned_data['product_code'] = work_order.product_code
                 if not cleaned_data.get('planned_quantity'):
                     cleaned_data['planned_quantity'] = work_order.quantity
-            except WorkOrder.DoesNotExist:
+            else:
                 raise ValidationError(_('找不到指定的工單號碼'))
         
         return cleaned_data

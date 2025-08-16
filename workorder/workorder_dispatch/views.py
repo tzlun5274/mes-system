@@ -88,12 +88,13 @@ class DispatchListView(LoginRequiredMixin, ListView):
         # 搜尋表單
         context['search_form'] = DispatchSearchForm(self.request.GET)
         
-        # 統計資料
-        context['total_count'] = WorkOrderDispatch.objects.count()
-        context['pending_count'] = WorkOrderDispatch.objects.filter(status='pending').count()
-        context['dispatched_count'] = WorkOrderDispatch.objects.filter(status='dispatched').count()
-        context['in_production_count'] = WorkOrderDispatch.objects.filter(status='in_production').count()
-        context['completed_count'] = WorkOrderDispatch.objects.filter(status='completed').count()
+        # 統計資料（基於搜尋結果）
+        queryset = self.get_queryset()
+        context['total_count'] = queryset.count()
+        context['pending_count'] = queryset.filter(status='pending').count()
+        context['dispatched_count'] = queryset.filter(status='dispatched').count()
+        context['in_production_count'] = queryset.filter(status='in_production').count()
+        context['completed_count'] = queryset.filter(status='completed').count()
         
         # 搜尋參數
         context['search'] = self.request.GET.get('search', '')
@@ -239,8 +240,16 @@ class DispatchDetailView(LoginRequiredMixin, DetailView):
         
         # 取得相關的工單資訊
         try:
-            context['work_order'] = WorkOrder.objects.get(order_number=dispatch.order_number)
-        except WorkOrder.DoesNotExist:
+            # 使用 company_code 和 order_number 組合查詢，避免 MultipleObjectsReturned 錯誤
+            context['work_order'] = WorkOrder.objects.filter(
+                order_number=dispatch.order_number,
+                company_code=dispatch.company_code
+            ).first()
+        except Exception as e:
+            # 記錄錯誤並設定預設值
+            import logging
+            logger = logging.getLogger('workorder')
+            logger.warning(f"取得工單資訊失敗: {dispatch.order_number} (公司: {dispatch.company_code}), 錯誤: {str(e)}")
             context['work_order'] = None
         
         # 取得 ERP 製令單資訊（預定開工日和預定出貨日）
@@ -377,7 +386,12 @@ def bulk_dispatch_view(request):
                         continue
                     
                     try:
-                        work_order = WorkOrder.objects.get(order_number=order_number)
+                        # 使用 company_code 和 order_number 組合查詢，避免 MultipleObjectsReturned 錯誤
+                        # 注意：這裡需要從某個地方獲取 company_code，暫時使用第一個匹配的記錄
+                        work_order = WorkOrder.objects.filter(order_number=order_number).first()
+                        if not work_order:
+                            skipped_count += 1
+                            continue
                         
                         # 建立派工單
                         dispatch = WorkOrderDispatch.objects.create(
@@ -406,7 +420,11 @@ def bulk_dispatch_view(request):
                         
                         created_count += 1
                         
-                    except WorkOrder.DoesNotExist:
+                    except Exception as e:
+                        # 記錄錯誤並跳過
+                        import logging
+                        logger = logging.getLogger('workorder')
+                        logger.warning(f"批量派工時取得工單失敗: {order_number}, 錯誤: {str(e)}")
                         skipped_count += 1
                         continue
             
@@ -440,20 +458,51 @@ def get_work_order_info(request):
         return JsonResponse({'error': '請提供工單號碼'}, status=400)
     
     try:
-        work_order = WorkOrder.objects.get(order_number=order_number)
-        return JsonResponse({
-            'success': True,
-            'data': {
-                'order_number': work_order.order_number,
-                'product_code': work_order.product_code,
-                'product_name': getattr(work_order, 'product_name', ''),
-                'quantity': work_order.quantity,
-                'status': work_order.status,
-                'company_code': work_order.company_code,
-            }
-        })
-    except WorkOrder.DoesNotExist:
-        return JsonResponse({'error': '找不到指定的工單'}, status=404)
+        # 查詢所有匹配的工單（可能有多個公司）
+        work_orders = WorkOrder.objects.filter(order_number=order_number)
+        
+        if work_orders.exists():
+            # 如果只有一個工單，直接返回
+            if work_orders.count() == 1:
+                work_order = work_orders.first()
+                return JsonResponse({
+                    'success': True,
+                    'data': {
+                        'order_number': work_order.order_number,
+                        'product_code': work_order.product_code,
+                        'product_name': getattr(work_order, 'product_name', ''),
+                        'quantity': work_order.quantity,
+                        'status': work_order.status,
+                        'company_code': work_order.company_code,
+                    }
+                })
+            else:
+                # 如果有多個工單，返回所有工單的資訊
+                work_orders_data = []
+                for work_order in work_orders:
+                    work_orders_data.append({
+                        'order_number': work_order.order_number,
+                        'product_code': work_order.product_code,
+                        'product_name': getattr(work_order, 'product_name', ''),
+                        'quantity': work_order.quantity,
+                        'status': work_order.status,
+                        'company_code': work_order.company_code,
+                    })
+                
+                return JsonResponse({
+                    'success': True,
+                    'multiple_found': True,
+                    'message': f'找到 {work_orders.count()} 個相同工單號碼的記錄，請選擇正確的公司',
+                    'data': work_orders_data
+                })
+        else:
+            return JsonResponse({'error': '找不到指定的工單'}, status=404)
+    except Exception as e:
+        # 記錄錯誤並返回錯誤訊息
+        import logging
+        logger = logging.getLogger('workorder')
+        logger.error(f"取得工單資訊失敗: {order_number}, 錯誤: {str(e)}")
+        return JsonResponse({'error': '取得工單資訊時發生錯誤'}, status=500)
 
 
 @login_required

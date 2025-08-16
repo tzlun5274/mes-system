@@ -673,7 +673,8 @@ class CompletedWorkOrder(models.Model):
         verbose_name_plural = "已完工工單"
         db_table = 'workorder_completed_workorder'
         ordering = ['-completed_at']
-        unique_together = (("order_number", "product_code"),)  # 工單號+產品編號唯一
+        # 注意：unique_together 約束已在遷移 0012 中通過 RunSQL 手動添加
+        # 這裡不設定 unique_together，避免 Django 自動生成衝突的遷移
         indexes = [
             models.Index(fields=['order_number']),
             models.Index(fields=['product_code']),
@@ -1216,4 +1217,6 @@ class AutoManagementConfig(models.Model):
             is_enabled=True,
             next_execution__lte=timezone.now()
         )
+
+
 

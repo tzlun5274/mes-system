@@ -11,6 +11,7 @@ from django.db import transaction
 from workorder.models import WorkOrder
 from workorder.workorder_erp.models import PrdMKOrdMain, PrdMkOrdMats, CompanyOrder
 from workorder.fill_work.models import FillWork
+from workorder.workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,18 +32,30 @@ class WorkOrderClearView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         
         # 統計目前資料數量
+        from workorder.models import CompletedWorkOrder, CompletedWorkOrderProcess, CompletedProductionReport
+        
         context.update({
             'workorder_count': WorkOrder.objects.count(),
             'fillwork_count': FillWork.objects.count(),
             'company_order_count': CompanyOrder.objects.count(),
             'mkord_main_count': PrdMKOrdMain.objects.count(),
             'mkord_mats_count': PrdMkOrdMats.objects.count(),
+            'completed_workorder_count': CompletedWorkOrder.objects.count(),
+            'completed_process_count': CompletedWorkOrderProcess.objects.count(),
+            'completed_report_count': CompletedProductionReport.objects.count(),
+            'dispatch_count': WorkOrderDispatch.objects.count(),
+            'dispatch_process_count': WorkOrderDispatchProcess.objects.count(),
             'total_count': (
                 WorkOrder.objects.count() + 
                 FillWork.objects.count() + 
                 CompanyOrder.objects.count() +
                 PrdMKOrdMain.objects.count() +
-                PrdMkOrdMats.objects.count()
+                PrdMkOrdMats.objects.count() +
+                CompletedWorkOrder.objects.count() +
+                CompletedWorkOrderProcess.objects.count() +
+                CompletedProductionReport.objects.count() +
+                WorkOrderDispatch.objects.count() +
+                WorkOrderDispatchProcess.objects.count()
             )
         })
         
@@ -101,12 +114,32 @@ class WorkOrderClearAjaxView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
                 mkord_main_count = PrdMKOrdMain.objects.count()
                 mkord_mats_count = PrdMkOrdMats.objects.count()
                 
+                # 新增：統計已完工工單相關資料
+                from workorder.models import CompletedWorkOrder, CompletedWorkOrderProcess, CompletedProductionReport
+                completed_workorder_count = CompletedWorkOrder.objects.count()
+                completed_process_count = CompletedWorkOrderProcess.objects.count()
+                completed_report_count = CompletedProductionReport.objects.count()
+                
+                # 新增：統計派工單相關資料
+                from workorder.workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess
+                dispatch_count = WorkOrderDispatch.objects.count()
+                dispatch_process_count = WorkOrderDispatchProcess.objects.count()
+                
                 # 刪除資料
                 FillWork.objects.all().delete()
                 CompanyOrder.objects.all().delete()
                 WorkOrder.objects.all().delete()
                 PrdMKOrdMain.objects.all().delete()
                 PrdMkOrdMats.objects.all().delete()
+                
+                # 新增：刪除已完工工單相關資料
+                CompletedProductionReport.objects.all().delete()
+                CompletedWorkOrderProcess.objects.all().delete()
+                CompletedWorkOrder.objects.all().delete()
+                
+                # 新增：刪除派工單相關資料
+                WorkOrderDispatchProcess.objects.all().delete()
+                WorkOrderDispatch.objects.all().delete()
             
             return {
                 'success': True,
@@ -117,7 +150,12 @@ class WorkOrderClearAjaxView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
                     'workorder': workorder_count,
                     'mkord_main': mkord_main_count,
                     'mkord_mats': mkord_mats_count,
-                    'total': fillwork_count + company_order_count + workorder_count + mkord_main_count + mkord_mats_count
+                    'completed_workorder': completed_workorder_count,
+                    'completed_process': completed_process_count,
+                    'completed_report': completed_report_count,
+                    'dispatch': dispatch_count,
+                    'dispatch_process': dispatch_process_count,
+                    'total': fillwork_count + company_order_count + workorder_count + mkord_main_count + mkord_mats_count + completed_workorder_count + completed_process_count + completed_report_count + dispatch_count + dispatch_process_count
                 },
                 'backup_path': backup_path,
                 'clear_time': timezone.now().isoformat()
@@ -157,6 +195,24 @@ class WorkOrderClearAjaxView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
             mkord_mains = PrdMKOrdMain.objects.all()
             with open(f'{backup_dir}/mkord_mains.json', 'w', encoding='utf-8') as f:
                 serializers.serialize('json', mkord_mains, stream=f)
+            
+            # 新增：備份已完工工單相關資料
+            from workorder.models import CompletedWorkOrder, CompletedWorkOrderProcess, CompletedProductionReport
+            
+            # 備份已完工工單
+            completed_workorders = CompletedWorkOrder.objects.all()
+            with open(f'{backup_dir}/completed_workorders.json', 'w', encoding='utf-8') as f:
+                serializers.serialize('json', completed_workorders, stream=f)
+            
+            # 備份已完工工單工序
+            completed_processes = CompletedWorkOrderProcess.objects.all()
+            with open(f'{backup_dir}/completed_processes.json', 'w', encoding='utf-8') as f:
+                serializers.serialize('json', completed_processes, stream=f)
+            
+            # 備份已完工生產報工記錄
+            completed_reports = CompletedProductionReport.objects.all()
+            with open(f'{backup_dir}/completed_reports.json', 'w', encoding='utf-8') as f:
+                serializers.serialize('json', completed_reports, stream=f)
             
             # 備份製令用料
             mkord_mats = PrdMkOrdMats.objects.all()

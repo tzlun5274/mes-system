@@ -1,5 +1,5 @@
 """
-調試版報工紀錄複製到生產中管理命令
+調試版填報紀錄複製到生產中管理命令
 用於詳細追蹤同步過程中的問題
 """
 
@@ -13,7 +13,7 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
-    help = '調試版：將所有已核准的報工記錄複製到生產中工單詳情資料表'
+            help = '調試版：將所有已核准的填報記錄複製到生產中工單詳情資料表'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -27,20 +27,20 @@ class Command(BaseCommand):
         limit = options.get('limit')
         
         self.stdout.write(
-            self.style.SUCCESS('開始調試版報工紀錄複製...')
+            self.style.SUCCESS('開始調試版填報紀錄複製...')
         )
         
         # 顯示同步前的統計資訊
         self._show_statistics('同步前')
         
         try:
-            # 測試作業員報工記錄同步
-            self.stdout.write('開始測試作業員報工記錄同步...')
+            # 測試作業員填報記錄同步
+            self.stdout.write('開始測試作業員填報記錄同步...')
             operator_reports = OperatorSupplementReport.objects.filter(
                 approval_status='approved'
             ).select_related('workorder', 'operator', 'equipment', 'process')[:limit]
             
-            self.stdout.write(f'測試處理 {operator_reports.count()} 筆作業員報工記錄')
+            self.stdout.write(f'測試處理 {operator_reports.count()} 筆作業員填報記錄')
             
             success_count = 0
             error_count = 0
@@ -123,7 +123,7 @@ class Command(BaseCommand):
                     import traceback
                     self.stdout.write(f'  詳細錯誤: {traceback.format_exc()}')
             
-            self.stdout.write(f'作業員報工記錄處理完成: 成功 {success_count} 筆, 錯誤 {error_count} 筆')
+            self.stdout.write(f'作業員填報記錄處理完成: 成功 {success_count} 筆, 錯誤 {error_count} 筆')
             
             # 顯示同步後的統計資訊
             self._show_statistics('同步後')
@@ -147,8 +147,8 @@ class Command(BaseCommand):
             detail_count = WorkOrderProductionDetail.objects.count()
             
             self.stdout.write(f'\n{prefix}統計資訊:')
-            self.stdout.write(f'  已核准作業員報工記錄: {operator_count} 筆')
-            self.stdout.write(f'  已核准SMT報工記錄: {smt_count} 筆')
+            self.stdout.write(f'  已核准作業員填報記錄: {operator_count} 筆')
+            self.stdout.write(f'  已核准SMT填報記錄: {smt_count} 筆')
             self.stdout.write(f'  生產中工單記錄: {production_count} 筆')
             self.stdout.write(f'  生產中工單明細記錄: {detail_count} 筆')
             

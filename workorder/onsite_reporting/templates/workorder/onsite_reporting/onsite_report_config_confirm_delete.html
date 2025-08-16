@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}刪除現場報工配置{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">刪除現場報工配置</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 訊息顯示區域 -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- 警告訊息 -->
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle"></i> 警告</h5>
+                        <p class="mb-0">您即將刪除以下現場報工配置，此操作無法復原：</p>
+                    </div>
+
+                    <!-- 配置資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2">配置資訊</h5>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">配置類型</label>
+                            <p class="form-control-plaintext">{{ object.get_config_type_display }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">配置鍵</label>
+                            <p class="form-control-plaintext">{{ object.config_key }}</p>
+                        </div>
+                        
+                        <div class="col-12 mb-3">
+                            <label class="form-label fw-bold">配置值</label>
+                            <p class="form-control-plaintext">{{ object.config_value }}</p>
+                        </div>
+                        
+                        <div class="col-12 mb-3">
+                            <label class="form-label fw-bold">配置說明</label>
+                            <p class="form-control-plaintext">{{ object.config_description|default:"無" }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">狀態</label>
+                            <p class="form-control-plaintext">
+                                <span class="badge bg-{% if object.is_active %}success{% else %}secondary{% endif %}">
+                                    {% if object.is_active %}啟用{% else %}停用{% endif %}
+                                </span>
+                            </p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">建立人員</label>
+                            <p class="form-control-plaintext">{{ object.created_by }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">建立時間</label>
+                            <p class="form-control-plaintext">{{ object.created_at|date:"Y-m-d H:i:s" }}</p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">更新時間</label>
+                            <p class="form-control-plaintext">{{ object.updated_at|date:"Y-m-d H:i:s" }}</p>
+                        </div>
+                    </div>
+
+                    <!-- 刪除確認表單 -->
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'workorder:onsite_reporting:onsite_report_config' %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> 取消
+                                    </a>
+                                    <button type="submit" class="btn btn-danger" onclick="return confirm('確定要刪除此配置嗎？此操作無法復原。')">
+                                        <i class="fas fa-trash"></i> 確認刪除
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

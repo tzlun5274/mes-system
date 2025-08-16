@@ -3,6 +3,36 @@
 
 {% block title %}主管已審核填報作業{% endblock %}
 
+{% block extra_head %}
+<style>
+    .batch-actions {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 15px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .select-all-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .table th:first-child,
+    .table td:first-child {
+        width: 50px;
+        text-align: center;
+    }
+    
+    .checkbox-custom {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-3">
 	<div class="mb-2">
@@ -20,52 +50,204 @@
 	</div>
 	<h4 class="mb-3"><i class="fas fa-clipboard-list me-2"></i>主管已審核填報作業</h4>
 	<div class="mb-3 text-muted">共 {{ total_count }} 筆（已核准 {{ approved_count }}、已駁回 {{ rejected_count }}）</div>
+	
+	<!-- 批次操作區域 -->
+	<div class="batch-actions" id="batchActions" style="display: none;">
+		<div class="row align-items-center">
+			<div class="col-md-6">
+				<div class="select-all-container">
+					<input type="checkbox" id="selectAll" class="checkbox-custom">
+					<label for="selectAll" class="mb-0">全選</label>
+					<span class="text-muted ms-2">已選擇 <span id="selectedCount">0</span> 筆記錄</span>
+				</div>
+			</div>
+			<div class="col-md-6 text-end">
+				<button type="button" class="btn btn-warning" id="batchUnapproveBtn" disabled>
+					<i class="fas fa-undo"></i> 批次取消審核
+				</button>
+			</div>
+		</div>
+	</div>
+	
 	<div class="card">
 		<div class="card-body p-0">
 			<div class="table-responsive">
-				<table class="table table-hover table-sm mb-0">
-					<thead>
-						<tr>
-							<th>狀態</th>
-							<th>類型</th>
-							<th>作業員/設備</th>
-							<th>工單</th>
-							<th>產品</th>
-							<th>日期</th>
-							<th>開始</th>
-							<th>數量</th>
-							<th class="text-end">操作</th>
-						</tr>
-					</thead>
-					<tbody>
-					{% for r in fill_works %}
-						<tr>
-							<td>
-								{% if r.approval_status == 'approved' %}
-									<span class="badge bg-success">已核准</span>
-								{% else %}
-									<span class="badge bg-danger">已駁回</span>
-								{% endif %}
-							</td>
-							<td>{% if 'SMT' in r.operator|upper or 'SMT' in r.process.name|upper %}SMT{% else %}作業員{% endif %}</td>
-							<td>{{ r.operator|default:r.equipment }}</td>
-							<td>{{ r.workorder }}</td>
-							<td>{{ r.product_id }}</td>
-							<td>{{ r.work_date|date:'Y-m-d' }}</td>
-							<td>{{ r.start_time|time:'H:i' }}</td>
-							<td>{{ r.work_quantity }}</td>
-							<td class="text-end">
-								<a href="{% url 'workorder:fill_work:fill_work_detail' r.id %}" class="btn btn-outline-primary btn-sm"><i class="fas fa-eye"></i></a>
-							</td>
-						</tr>
-					{% empty %}
-						<tr><td colspan="9" class="text-center text-muted py-3">目前沒有已審核的填報</td></tr>
-					{% endfor %}
-					</tbody>
-				</table>
+				<form id="batchForm" method="post" action="{% url 'workorder:fill_work:batch_unapprove_fill_work' %}">
+					{% csrf_token %}
+					<table class="table table-hover table-sm mb-0">
+						<thead>
+							<tr>
+								<th>
+									<input type="checkbox" id="headerCheckbox" class="checkbox-custom">
+								</th>
+								<th>狀態</th>
+								<th>類型</th>
+								<th>作業員/設備</th>
+								<th>工單</th>
+								<th>產品</th>
+								<th>日期</th>
+								<th>開始</th>
+								<th>數量</th>
+								<th class="text-end">操作</th>
+							</tr>
+						</thead>
+						<tbody>
+						{% for r in fill_works %}
+							<tr>
+								<td>
+									<input type="checkbox" name="record_ids" value="{{ r.id }}" class="record-checkbox checkbox-custom">
+								</td>
+								<td>
+									{% if r.approval_status == 'approved' %}
+										<span class="badge bg-success">已核准</span>
+									{% else %}
+										<span class="badge bg-danger">已駁回</span>
+									{% endif %}
+								</td>
+								<td>{% if 'SMT' in r.operator|upper or 'SMT' in r.process.name|upper %}SMT{% else %}作業員{% endif %}</td>
+								<td>{{ r.operator|default:r.equipment }}</td>
+								<td>{{ r.workorder }}</td>
+								<td>{{ r.product_id }}</td>
+								<td>{{ r.work_date|date:'Y-m-d' }}</td>
+								<td>{{ r.start_time|time:'H:i' }}</td>
+								<td>{{ r.work_quantity }}</td>
+								<td class="text-end">
+									<a href="{% url 'workorder:fill_work:fill_work_detail' r.id %}" class="btn btn-outline-primary btn-sm"><i class="fas fa-eye"></i></a>
+								</td>
+							</tr>
+						{% empty %}
+							<tr><td colspan="10" class="text-center text-muted py-3">目前沒有已審核的填報</td></tr>
+						{% endfor %}
+						</tbody>
+					</table>
+				</form>
 			</div>
 		</div>
 	</div>
     {% include 'includes/pagination.html' with page_obj=page_obj %}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('JavaScript 已載入');
+    
+    const headerCheckbox = document.getElementById('headerCheckbox');
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const recordCheckboxes = document.querySelectorAll('.record-checkbox');
+    const batchActions = document.getElementById('batchActions');
+    const selectedCountSpan = document.getElementById('selectedCount');
+    const batchUnapproveBtn = document.getElementById('batchUnapproveBtn');
+    const batchForm = document.getElementById('batchForm');
+    
+    console.log('元素檢查:', {
+        headerCheckbox: !!headerCheckbox,
+        selectAllCheckbox: !!selectAllCheckbox,
+        recordCheckboxes: recordCheckboxes.length,
+        batchActions: !!batchActions,
+        selectedCountSpan: !!selectedCountSpan,
+        batchUnapproveBtn: !!batchUnapproveBtn,
+        batchForm: !!batchForm
+    });
+    
+    // 更新選中數量
+    function updateSelectedCount() {
+        const checkedBoxes = document.querySelectorAll('.record-checkbox:checked');
+        const count = checkedBoxes.length;
+        console.log('選中數量:', count);
+        
+        if (selectedCountSpan) {
+            selectedCountSpan.textContent = count;
+        }
+        
+        // 顯示/隱藏批次操作區域
+        if (batchActions) {
+            if (count > 0) {
+                batchActions.style.display = 'block';
+            } else {
+                batchActions.style.display = 'none';
+            }
+        }
+        
+        // 啟用/禁用批次取消審核按鈕
+        if (batchUnapproveBtn) {
+            batchUnapproveBtn.disabled = count === 0;
+        }
+        
+        // 更新全選狀態
+        const allChecked = checkedBoxes.length === recordCheckboxes.length && recordCheckboxes.length > 0;
+        const someChecked = checkedBoxes.length > 0 && checkedBoxes.length < recordCheckboxes.length;
+        
+        if (headerCheckbox) {
+            headerCheckbox.checked = allChecked;
+            headerCheckbox.indeterminate = someChecked;
+        }
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = allChecked;
+            selectAllCheckbox.indeterminate = someChecked;
+        }
+    }
+    
+    // 表頭勾選框事件
+    if (headerCheckbox) {
+        headerCheckbox.addEventListener('change', function() {
+            console.log('表頭勾選框變更:', this.checked);
+            recordCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateSelectedCount();
+        });
+    }
+    
+    // 全選勾選框事件
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            console.log('全選勾選框變更:', this.checked);
+            recordCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateSelectedCount();
+        });
+    }
+    
+    // 個別記錄勾選框事件
+    recordCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            console.log('個別勾選框變更:', this.checked, this.value);
+            updateSelectedCount();
+        });
+    });
+    
+    // 批次取消審核按鈕事件
+    if (batchUnapproveBtn) {
+        batchUnapproveBtn.addEventListener('click', function() {
+            console.log('批次取消審核按鈕被點擊');
+            const checkedBoxes = document.querySelectorAll('.record-checkbox:checked');
+            console.log('選中的記錄:', checkedBoxes.length);
+            
+            if (checkedBoxes.length === 0) {
+                alert('請選擇要取消審核的記錄');
+                return;
+            }
+            
+            // 檢查表單數據
+            const formData = new FormData(batchForm);
+            const recordIds = formData.getAll('record_ids');
+            console.log('表單中的記錄ID:', recordIds);
+            
+            if (confirm(`確定要取消審核選中的 ${checkedBoxes.length} 筆記錄嗎？\n\n取消審核後，這些記錄將回到待審核狀態。`)) {
+                console.log('提交表單');
+                if (batchForm) {
+                    batchForm.submit();
+                } else {
+                    console.error('找不到表單元素');
+                }
+            }
+        });
+    }
+    
+    // 初始化
+    updateSelectedCount();
+    console.log('初始化完成');
+});
+</script>
 {% endblock %} 

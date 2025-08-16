@@ -25,14 +25,16 @@ def auto_check_workorder_completion():
     自動檢查工單完工狀態
     定期檢查所有生產中工單是否達到完工條件
     支援兩種完工判斷方式：
-    1. 累計出貨包裝數量達到計劃數量
-    2. 手動勾選「已完工」
+    1. 填報完工判斷：累計出貨包裝數量達到計劃數量
+    2. 工序完工判斷：所有工序都已完成
     """
     try:
         workorder_logger.info("=== 開始自動檢查工單完工狀態 ===")
         
         # 導入完工判斷服務
-        from .services.completion_service import WorkOrderCompletionService
+        from .services.completion_service import FillWorkCompletionService
+        from .services.process_completion_service import ProcessCompletionService
+        from .services.completion_manager import CompletionManager
         
         # 取得所有生產中的工單
         in_progress_workorders = WorkOrder.objects.filter(
@@ -54,24 +56,62 @@ def auto_check_workorder_completion():
             try:
                 checked_count += 1
                 
-                # 檢查完工條件
-                completion_check = WorkOrderCompletionService.check_workorder_completion(workorder.id)
+                # 檢查是否已經轉移到已完工模組
+                from .models import CompletedWorkOrder
+                if CompletedWorkOrder.objects.filter(original_workorder_id=workorder.id).exists():
+                    workorder_logger.info(f"工單 {workorder.order_number} 已經轉移到已完工模組，跳過檢查")
+                    continue
                 
-                if completion_check['can_complete']:
-                    workorder_logger.info(f"工單 {workorder.order_number} 達到完工條件：{completion_check['reason']}")
+                # 檢查工單狀態，如果已經是 completed 但未轉移，直接轉移
+                if workorder.status == 'completed':
+                    workorder_logger.info(f"工單 {workorder.order_number} 狀態是完工，執行轉移流程")
+                    try:
+                        FillWorkCompletionService.transfer_workorder_to_completed(workorder.id)
+                        completed_count += 1
+                        workorder_logger.info(f"工單 {workorder.order_number} 轉移成功")
+                        continue
+                    except Exception as e:
+                        workorder_logger.error(f"工單 {workorder.order_number} 轉移失敗：{str(e)}")
+                        continue
+                
+                # 檢查填報完工條件
+                completion_check = FillWorkCompletionService.check_workorder_completion(workorder.id)
+                report_can_complete = completion_check.get('can_complete', False)
+                
+                # 檢查工序完工條件
+                process_completed = ProcessCompletionService.check_process_completion(workorder.id)
+                
+                # 如果任一條件滿足，執行完工
+                if report_can_complete or process_completed:
+                    workorder_logger.info(f"工單 {workorder.order_number} 達到完工條件：填報={report_can_complete}, 工序={process_completed}")
                     
-                    # 執行自動完工
-                    completion_result = WorkOrderCompletionService.auto_complete_workorder(workorder.id)
+                    # 決定完工方式
+                    if report_can_complete and process_completed:
+                        completion_method = 'both'
+                        notes = "填報完工檢查定時任務自動完工（填報+工序）"
+                    elif report_can_complete:
+                        completion_method = 'report'
+                        notes = "填報完工檢查定時任務自動完工（填報）"
+                    else:
+                        completion_method = 'process'
+                        notes = "工序完工檢查定時任務自動完工（工序）"
                     
-                    if completion_result['success']:
+                    # 執行完工
+                    completion_result = CompletionManager.complete_workorder(
+                        workorder.id, 
+                        completion_method=completion_method,
+                        notes=notes
+                    )
+                    
+                    if completion_result:
                         completed_count += 1
                         workorder_logger.info(f"工單 {workorder.order_number} 自動完工成功")
                     else:
-                        workorder_logger.error(f"工單 {workorder.order_number} 自動完工失敗：{completion_result['message']}")
+                        workorder_logger.error(f"工單 {workorder.order_number} 自動完工失敗")
                 else:
                     # 記錄未完工的詳細原因（僅在調試模式下）
                     if workorder_logger.isEnabledFor(logging.DEBUG):
-                        workorder_logger.debug(f"工單 {workorder.order_number} 未達到完工條件：{completion_check['reason']}")
+                        workorder_logger.debug(f"工單 {workorder.order_number} 未達到完工條件：填報={report_can_complete}, 工序={process_completed}")
                         
             except Exception as e:
                 workorder_logger.error(f"檢查工單 {workorder.order_number} 完工狀態時發生錯誤：{str(e)}")
@@ -99,7 +139,7 @@ def auto_check_workorder_completion():
 def auto_allocation_task():
     """
     自動分配任務
-    定期執行自動分配功能，為數量為0的報工記錄分配數量
+    定期執行自動分配功能，為數量為0的填報記錄分配數量
     """
     try:
         workorder_logger.info("=== 開始自動分配任務 ===")
@@ -361,13 +401,24 @@ def auto_batch_dispatch_orders():
         except SystemConfig.DoesNotExist:
             workorder_logger.warning("未找到自動批次派工間隔設定，使用預設值 60 分鐘")
 
-        # 取得所有未派工的工單
+        # 取得所有未派工的工單（排除已完工的工單）
         from .workorder_dispatch.models import WorkOrderDispatch
         undispatched_orders = WorkOrder.objects.exclude(
-            order_number__in=WorkOrderDispatch.objects.values_list("order_number", flat=True)
+            status='completed'  # 排除已完工的工單
         )
         
-        if not undispatched_orders.exists():
+        # 修復：檢查每個工單是否已有對應的派工單（使用 order_number + product_code 組合）
+        # 避免多公司系統中同一個製令單號只建立一個派工單的問題
+        truly_undispatched = []
+        for wo in undispatched_orders:
+            dispatch_exists = WorkOrderDispatch.objects.filter(
+                order_number=wo.order_number,
+                product_code=wo.product_code
+            ).exists()
+            if not dispatch_exists:
+                truly_undispatched.append(wo)
+        
+        if not truly_undispatched:
             workorder_logger.info("沒有需要派工的工單")
             return {
                 "status": "success",
@@ -376,9 +427,10 @@ def auto_batch_dispatch_orders():
             }
 
         created = 0
-        for wo in undispatched_orders:
+        for wo in truly_undispatched:
             try:
-                WorkOrderDispatch.objects.create(
+                # 建立派工單
+                dispatch = WorkOrderDispatch.objects.create(
                     company_code=getattr(wo, "company_code", None),
                     order_number=wo.order_number,
                     product_code=wo.product_code,
@@ -388,6 +440,15 @@ def auto_batch_dispatch_orders():
                 )
                 created += 1
                 workorder_logger.info(f"自動建立派工單：{wo.order_number}")
+                
+                # 立即檢查工序分配並更新派工單狀態
+                try:
+                    from .services.dispatch_status_service import DispatchStatusService
+                    DispatchStatusService.update_dispatch_status_by_process_allocation(wo.id)
+                    workorder_logger.info(f"派工單 {wo.order_number} 狀態已自動更新")
+                except Exception as status_error:
+                    workorder_logger.warning(f"更新派工單 {wo.order_number} 狀態失敗：{status_error}")
+                    
             except Exception as e:
                 workorder_logger.error(f"建立派工單失敗 (工單: {wo.order_number}): {e}")
 
@@ -406,6 +467,48 @@ def auto_batch_dispatch_orders():
         return {
             "status": "error",
             "message": f"自動批次派工失敗：{str(e)}",
+            "timestamp": timezone.now().isoformat(),
+        }
+
+
+@shared_task
+def auto_update_dispatch_statuses():
+    """
+    自動更新派工單狀態任務
+    定期檢查工序分配情況並更新派工單狀態
+    從 SystemConfig 讀取自動更新間隔設定
+    """
+    try:
+        workorder_logger.info("=== 開始自動更新派工單狀態任務 ===")
+
+        # 讀取自動更新間隔設定（預設 30 分鐘）
+        auto_update_interval = 30
+        try:
+            config = SystemConfig.objects.get(key="auto_update_dispatch_status_interval")
+            auto_update_interval = int(config.value)
+            workorder_logger.info(
+                f"讀取到自動更新派工單狀態間隔設定：{auto_update_interval} 分鐘"
+            )
+        except SystemConfig.DoesNotExist:
+            workorder_logger.warning("未找到自動更新派工單狀態間隔設定，使用預設值 30 分鐘")
+
+        # 執行派工單狀態更新
+        from .services.dispatch_status_service import DispatchStatusService
+        updated_count = DispatchStatusService.update_all_dispatch_statuses()
+        
+        workorder_logger.info(f"自動更新派工單狀態完成，共更新 {updated_count} 筆派工單")
+
+        return {
+            "status": "success",
+            "message": f"自動更新派工單狀態完成，共更新 {updated_count} 筆派工單，間隔設定：{auto_update_interval} 分鐘",
+            "timestamp": timezone.now().isoformat(),
+        }
+
+    except Exception as e:
+        workorder_logger.error(f"自動更新派工單狀態失敗：{str(e)}")
+        return {
+            "status": "error",
+            "message": f"自動更新派工單狀態失敗：{str(e)}",
             "timestamp": timezone.now().isoformat(),
         }
 
@@ -431,3 +534,205 @@ def get_standard_processes(product_code):
         {"name": "包裝", "target_hourly_output": 200},
     ]
     return standard_processes
+
+
+@shared_task
+def auto_check_process_completion():
+    """
+    工序完工檢查定時任務
+    定期檢查所有生產中工單的工序進度，當所有工序都完成時觸發完工
+    """
+    try:
+        workorder_logger.info("=== 開始工序完工檢查定時任務 ===")
+        
+        # 導入工序完工判斷服務
+        from .services.process_completion_service import ProcessCompletionService
+        
+        # 取得所有生產中的工單
+        in_progress_workorders = WorkOrder.objects.filter(
+            status__in=['pending', 'in_progress', 'paused']
+        )
+        
+        if not in_progress_workorders.exists():
+            workorder_logger.info("沒有需要檢查的生產中工單")
+            return {
+                "status": "success",
+                "message": "沒有需要檢查的生產中工單",
+                "timestamp": timezone.now().isoformat(),
+            }
+        
+        completed_count = 0
+        checked_count = 0
+        
+        for workorder in in_progress_workorders:
+            try:
+                checked_count += 1
+                
+                # 檢查工序完工條件
+                process_completed = ProcessCompletionService.check_process_completion(workorder.id)
+                
+                if process_completed:
+                    workorder_logger.info(f"工單 {workorder.order_number} 所有工序已完成，觸發完工")
+                    
+                    # 執行工序完工
+                    from .services.completion_manager import CompletionManager
+                    completion_result = CompletionManager.complete_workorder(
+                        workorder.id, 
+                        completion_method='process',
+                        notes="工序完工檢查定時任務自動完工"
+                    )
+                    
+                    if completion_result:
+                        completed_count += 1
+                        workorder_logger.info(f"工單 {workorder.order_number} 工序完工成功")
+                    else:
+                        workorder_logger.error(f"工單 {workorder.order_number} 工序完工失敗")
+                else:
+                    # 記錄未完工的詳細原因（僅在調試模式下）
+                    if workorder_logger.isEnabledFor(logging.DEBUG):
+                        progress = ProcessCompletionService.get_process_completion_progress(workorder.id)
+                        workorder_logger.debug(f"工單 {workorder.order_number} 工序未完成，進度：{progress['progress_percentage']}%")
+                        
+            except Exception as e:
+                workorder_logger.error(f"檢查工單 {workorder.order_number} 工序完工狀態時發生錯誤：{str(e)}")
+        
+        workorder_logger.info(f"工序完工檢查完成，檢查 {checked_count} 個工單，完工 {completed_count} 個工單")
+        
+        return {
+            "status": "success",
+            "message": f"工序完工檢查完成，檢查 {checked_count} 個工單，完工 {completed_count} 個工單",
+            "timestamp": timezone.now().isoformat(),
+            "checked_count": checked_count,
+            "completed_count": completed_count
+        }
+        
+    except Exception as e:
+        workorder_logger.error(f"工序完工檢查定時任務失敗：{str(e)}")
+        return {
+            "status": "error",
+            "message": f"工序完工檢查定時任務失敗：{str(e)}",
+            "timestamp": timezone.now().isoformat(),
+        }
+
+
+@shared_task
+def auto_check_report_completion():
+    """
+    填報完工檢查定時任務
+    定期檢查所有生產中工單的出貨包裝報工數量，當達到目標數量時觸發完工
+    """
+    try:
+        workorder_logger.info("=== 開始填報完工檢查定時任務 ===")
+        
+        # 導入填報完工判斷服務
+        from .services.report_completion_service import ReportCompletionService
+        
+        # 取得所有生產中的工單
+        in_progress_workorders = WorkOrder.objects.filter(
+            status__in=['pending', 'in_progress', 'paused']
+        )
+        
+        if not in_progress_workorders.exists():
+            workorder_logger.info("沒有需要檢查的生產中工單")
+            return {
+                "status": "success",
+                "message": "沒有需要檢查的生產中工單",
+                "timestamp": timezone.now().isoformat(),
+            }
+        
+        completed_count = 0
+        checked_count = 0
+        
+        for workorder in in_progress_workorders:
+            try:
+                checked_count += 1
+                
+                # 檢查填報完工條件
+                report_completed = ReportCompletionService.check_report_completion(workorder.id)
+                
+                if report_completed:
+                    workorder_logger.info(f"工單 {workorder.order_number} 出貨包裝數量已達標，觸發完工")
+                    
+                    # 執行填報完工
+                    from .services.completion_manager import CompletionManager
+                    completion_result = CompletionManager.complete_workorder(
+                        workorder.id, 
+                        completion_method='report',
+                        notes="填報完工檢查定時任務自動完工"
+                    )
+                    
+                    if completion_result:
+                        completed_count += 1
+                        workorder_logger.info(f"工單 {workorder.order_number} 填報完工成功")
+                    else:
+                        workorder_logger.error(f"工單 {workorder.order_number} 填報完工失敗")
+                else:
+                    # 記錄未完工的詳細原因（僅在調試模式下）
+                    if workorder_logger.isEnabledFor(logging.DEBUG):
+                        progress = ReportCompletionService.get_report_completion_progress(workorder.id)
+                        workorder_logger.debug(f"工單 {workorder.order_number} 填報未完成，進度：{progress['progress_percentage']}%")
+                        
+            except Exception as e:
+                workorder_logger.error(f"檢查工單 {workorder.order_number} 填報完工狀態時發生錯誤：{str(e)}")
+        
+        workorder_logger.info(f"填報完工檢查完成，檢查 {checked_count} 個工單，完工 {completed_count} 個工單")
+        
+        return {
+            "status": "success",
+            "message": f"填報完工檢查完成，檢查 {checked_count} 個工單，完工 {completed_count} 個工單",
+            "timestamp": timezone.now().isoformat(),
+            "checked_count": checked_count,
+            "completed_count": completed_count
+        }
+        
+    except Exception as e:
+        workorder_logger.error(f"填報完工檢查定時任務失敗：{str(e)}")
+        return {
+            "status": "error",
+            "message": f"填報完工檢查定時任務失敗：{str(e)}",
+            "timestamp": timezone.now().isoformat(),
+        }
+
+
+@shared_task
+def completion_trigger_task():
+    """
+    完工觸發檢查任務
+    使用新的完工觸發機制，實現雙重累加檢查
+    每5分鐘執行一次，檢查所有待完工工單的觸發條件
+    """
+    try:
+        workorder_logger.info("=== 開始執行完工觸發檢查任務 ===")
+        
+        # 導入完工觸發服務
+        from .services.completion_trigger_service import CompletionTriggerService
+        
+        # 執行批量檢查
+        result = CompletionTriggerService.check_all_pending_workorders()
+        
+        if result['success']:
+            workorder_logger.info(f"完工觸發檢查完成：檢查 {result['checked_count']} 個工單，觸發 {result['triggered_count']} 個完工")
+            
+            return {
+                "status": "success",
+                "message": f"完工觸發檢查完成，檢查 {result['checked_count']} 個工單，觸發 {result['triggered_count']} 個完工",
+                "timestamp": timezone.now().isoformat(),
+                "checked_count": result['checked_count'],
+                "triggered_count": result['triggered_count']
+            }
+        else:
+            workorder_logger.error(f"完工觸發檢查失敗：{result.get('error', '未知錯誤')}")
+            
+            return {
+                "status": "error",
+                "message": f"完工觸發檢查失敗：{result.get('error', '未知錯誤')}",
+                "timestamp": timezone.now().isoformat(),
+            }
+            
+    except Exception as e:
+        workorder_logger.error(f"完工觸發檢查任務執行異常：{str(e)}")
+        return {
+            "status": "error",
+            "message": f"完工觸發檢查任務執行異常：{str(e)}",
+            "timestamp": timezone.now().isoformat(),
+        }

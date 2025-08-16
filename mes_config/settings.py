@@ -44,6 +44,8 @@ INSTALLED_APPS = [
             # "workorder.workorder_completed",  # 已移除
     # "workorder.workorder_reporting",  # 已移除舊報工記錄模組
     "workorder.fill_work",
+    "workorder.onsite_reporting",
+
     "kanban.apps.KanbanConfig",
     "erp_integration.apps.ErpIntegrationConfig",
     "ai.apps.AiConfig",
@@ -64,6 +66,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "mes_config.middleware.DatabaseConnectionMiddleware",  # 資料庫連線檢查中間件
+    "mes_config.middleware.CompanyCodeMiddleware",  # 公司代號中間件
+    "mes_config.middleware.DataIsolationMiddleware",  # 資料隔離中間件
 ]
 
 # CORS 配置（可選，如果前端或模組跨域訪問 API）

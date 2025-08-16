@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}編輯現場報工記錄{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">編輯現場報工記錄</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 訊息顯示區域 -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" id="onsiteReportEditForm">
+                        {% csrf_token %}
+                        
+                        <!-- 基本資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">基本資訊</h5>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">報工類型</label>
+                                <p class="form-control-plaintext">{{ onsite_report.get_report_type_display }}</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">作業員</label>
+                                <p class="form-control-plaintext">{{ onsite_report.operator }}</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">工單號碼</label>
+                                <p class="form-control-plaintext">{{ onsite_report.workorder }}</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">產品編號</label>
+                                <p class="form-control-plaintext">{{ onsite_report.product_id }}</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">工序</label>
+                                <p class="form-control-plaintext">{{ onsite_report.process }}</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">使用的設備</label>
+                                <p class="form-control-plaintext">{{ onsite_report.equipment|default:"未指定" }}</p>
+                            </div>
+                        </div>
+
+                        <!-- 狀態和數量資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">狀態和數量資訊</h5>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label for="status" class="form-label">報工狀態 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="status" name="status" required>
+                                    <option value="started" {% if onsite_report.status == 'started' %}selected{% endif %}>開工</option>
+                                    <option value="paused" {% if onsite_report.status == 'paused' %}selected{% endif %}>暫停</option>
+                                    <option value="resumed" {% if onsite_report.status == 'resumed' %}selected{% endif %}>重啟開工</option>
+                                    <option value="completed" {% if onsite_report.status == 'completed' %}selected{% endif %}>完工</option>
+                                    <option value="stopped" {% if onsite_report.status == 'stopped' %}selected{% endif %}>停工</option>
+                                </select>
+                                <div class="form-text">選擇當前報工狀態</div>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label for="work_quantity" class="form-label">工作數量 <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="work_quantity" name="work_quantity" value="{{ onsite_report.work_quantity }}" min="0" required>
+                                <div class="form-text">此次報工完成的工作數量</div>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label for="defect_quantity" class="form-label">不良品數量</label>
+                                <input type="number" class="form-control" id="defect_quantity" name="defect_quantity" value="{{ onsite_report.defect_quantity }}" min="0">
+                                <div class="form-text">此次報工的不良品數量</div>
+                            </div>
+                        </div>
+
+                        <!-- 時間資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">時間資訊</h5>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">報工日期</label>
+                                <p class="form-control-plaintext">{{ onsite_report.work_date|date:"Y-m-d" }}</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">開始時間</label>
+                                <p class="form-control-plaintext">{{ onsite_report.start_datetime|date:"Y-m-d H:i:s" }}</p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">結束時間</label>
+                                <p class="form-control-plaintext">
+                                    {% if onsite_report.end_datetime %}
+                                        {{ onsite_report.end_datetime|date:"Y-m-d H:i:s" }}
+                                    {% else %}
+                                        進行中
+                                    {% endif %}
+                                </p>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">工作時間</label>
+                                <p class="form-control-plaintext">{{ onsite_report.get_duration_minutes }} 分鐘</p>
+                            </div>
+                        </div>
+
+                        <!-- 備註資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">備註資訊</h5>
+                            </div>
+                            
+                            <div class="col-12 mb-3">
+                                <label for="remarks" class="form-label">備註</label>
+                                <textarea class="form-control" id="remarks" name="remarks" rows="3" placeholder="可記錄此次報工的相關備註">{{ onsite_report.remarks }}</textarea>
+                                <div class="form-text">可記錄此次報工的相關備註</div>
+                            </div>
+                        </div>
+
+                        <!-- 提交按鈕 -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'workorder:onsite_reporting:onsite_report_detail' onsite_report.pk %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> 返回詳情
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> 儲存變更
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 表單驗證
+    document.getElementById('onsiteReportEditForm').addEventListener('submit', function(e) {
+        const workQuantity = parseInt(document.getElementById('work_quantity').value) || 0;
+        const defectQuantity = parseInt(document.getElementById('defect_quantity').value) || 0;
+        
+        if (workQuantity < 0) {
+            e.preventDefault();
+            alert('工作數量不能為負數');
+            return false;
+        }
+        
+        if (defectQuantity < 0) {
+            e.preventDefault();
+            alert('不良品數量不能為負數');
+            return false;
+        }
+        
+        if (defectQuantity > workQuantity) {
+            e.preventDefault();
+            alert('不良品數量不能超過工作數量');
+            return false;
+        }
+    });
+</script>
+{% endblock %} 

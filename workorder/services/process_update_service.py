@@ -61,30 +61,22 @@ class ProcessUpdateService:
             process: WorkOrderProcess 實例
         """
         try:
-            # 獲取該工序的所有已核准報工記錄
-            # 作業員報工記錄：process 是外鍵，需要根據工序名稱查詢
-            operator_reports = OperatorSupplementReport.objects.filter(
-                workorder=process.workorder,
-                process__name=process.process_name,
-                approval_status='approved'
-            )
+            # 獲取該工序的所有已核准填報記錄
+            from workorder.fill_work.models import FillWork
             
-            smt_reports = SMTSupplementReport.objects.filter(
-                workorder=process.workorder,
-                operation=process.process_name,
+            # 填報記錄：根據工序名稱查詢（process 是外鍵到 ProcessName）
+            fill_work_reports = FillWork.objects.filter(
+                workorder=process.workorder.order_number,  # 注意：這裡是 order_number
+                process__name=process.process_name,  # 注意：這裡是 process__name（外鍵查詢）
                 approval_status='approved'
             )
             
             # 計算總完成數量
-            operator_quantity = operator_reports.aggregate(
+            fill_work_quantity = fill_work_reports.aggregate(
                 total=Sum('work_quantity')
             )['total'] or 0
             
-            smt_quantity = smt_reports.aggregate(
-                total=Sum('work_quantity')
-            )['total'] or 0
-            
-            total_completed_quantity = operator_quantity + smt_quantity
+            total_completed_quantity = fill_work_quantity
             
             # 更新工序完成數量
             process.completed_quantity = total_completed_quantity
@@ -100,56 +92,32 @@ class ProcessUpdateService:
             # 如果有報工記錄，設定實際開始時間
             if total_completed_quantity > 0 and not process.actual_start_time:
                 # 獲取最早的報工記錄時間
-                earliest_report = None
-                
-                if operator_reports.exists():
-                    earliest_operator = operator_reports.order_by('work_date', 'start_time').first()
-                    earliest_report = earliest_operator
-                
-                if smt_reports.exists():
-                    earliest_smt = smt_reports.order_by('work_date', 'start_time').first()
-                    if not earliest_report or (
-                        earliest_smt.work_date < earliest_report.work_date or
-                        (earliest_smt.work_date == earliest_report.work_date and 
-                         earliest_smt.start_time < earliest_report.start_time)
-                    ):
-                        earliest_report = earliest_smt
+                earliest_report = fill_work_reports.order_by('work_date', 'start_time').first()
                 
                 if earliest_report:
                     from datetime import datetime
-                    process.actual_start_time = datetime.combine(
-                        earliest_report.work_date, 
-                        earliest_report.start_time
+                    from django.utils import timezone
+                    # 使用 timezone-aware datetime
+                    process.actual_start_time = timezone.make_aware(
+                        datetime.combine(earliest_report.work_date, earliest_report.start_time)
                     )
             
             # 如果工序完成，設定實際結束時間
             if process.status == 'completed' and not process.actual_end_time:
                 # 獲取最晚的報工記錄時間
-                latest_report = None
-                
-                if operator_reports.exists():
-                    latest_operator = operator_reports.order_by('work_date', 'end_time').last()
-                    latest_report = latest_operator
-                
-                if smt_reports.exists():
-                    latest_smt = smt_reports.order_by('work_date', 'end_time').last()
-                    if not latest_report or (
-                        latest_smt.work_date > latest_report.work_date or
-                        (latest_smt.work_date == latest_report.work_date and 
-                         latest_smt.end_time > latest_report.end_time)
-                    ):
-                        latest_report = latest_smt
+                latest_report = fill_work_reports.order_by('work_date', 'end_time').last()
                 
                 if latest_report:
                     from datetime import datetime
-                    process.actual_end_time = datetime.combine(
-                        latest_report.work_date, 
-                        latest_report.end_time
+                    from django.utils import timezone
+                    # 使用 timezone-aware datetime
+                    process.actual_end_time = timezone.make_aware(
+                        datetime.combine(latest_report.work_date, latest_report.end_time)
                     )
             
             process.save()
             
-            logger.debug(f"工序 {process.process_name} 更新完成: 完成數量={total_completed_quantity}, 狀態={process.status}")
+            logger.debug(f"工序 {process.process_name} 更新完成：完成數量={total_completed_quantity}, 狀態={process.status}")
             
         except Exception as e:
             logger.error(f"更新工序 {process.process_name} 失敗: {str(e)}")

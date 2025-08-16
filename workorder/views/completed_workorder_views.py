@@ -16,7 +16,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 
 from ..models import CompletedWorkOrder, CompletedWorkOrderProcess, CompletedProductionReport
-from ..services.completion_service import WorkOrderCompletionService
+from ..services.completion_service import FillWorkCompletionService
 
 import logging
 
@@ -83,7 +83,7 @@ class CompletedWorkOrderDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'completed_workorder'
 
     def get_context_data(self, **kwargs):
-        """添加上下文資料，包括工序統計和所有報工記錄"""
+        """添加上下文資料，包括工序統計和所有填報記錄"""
         context = super().get_context_data(**kwargs)
         completed_workorder = self.get_object()
         
@@ -105,7 +105,7 @@ class CompletedWorkOrderDetailView(LoginRequiredMixin, DetailView):
         completed_processes_count = completed_workorder.processes.filter(status='completed').count()
         context['completed_processes_count'] = completed_processes_count
         
-        # 獲取所有報工記錄
+        # 獲取所有填報記錄
         production_reports = completed_workorder.production_reports.all().order_by('report_date', 'start_time')
         
         # 計算統計資料
@@ -170,7 +170,7 @@ class CompletedWorkOrderDetailView(LoginRequiredMixin, DetailView):
         total_stats['unique_equipment'] = list(total_stats['unique_equipment'])
         
         # 按照工序的實際執行順序排列統計資料
-        # 根據報工記錄的時間順序，確定工序的執行順序
+        # 根據填報記錄的時間順序，確定工序的執行順序
         process_order = {}
         for i, report in enumerate(production_reports):
             process_name = report.process_name
@@ -211,7 +211,7 @@ def transfer_workorder_to_completed(request, workorder_id):
             })
         
         # 執行轉移
-        completed_workorder = WorkOrderCompletionService.transfer_workorder_to_completed(workorder_id)
+        completed_workorder = FillWorkCompletionService.transfer_workorder_to_completed(workorder_id)
         
         return JsonResponse({
             'success': True,
@@ -253,7 +253,7 @@ def batch_transfer_completed_workorders(request):
         
         for workorder in completed_workorders:
             try:
-                WorkOrderCompletionService.transfer_workorder_to_completed(workorder.id)
+                FillWorkCompletionService.transfer_workorder_to_completed(workorder.id)
                 transferred_count += 1
             except Exception as e:
                 errors.append(f'工單 {workorder.order_number}: {str(e)}')

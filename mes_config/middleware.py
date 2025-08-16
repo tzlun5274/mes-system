@@ -9,6 +9,9 @@ from django.contrib.sessions.exceptions import SessionInterrupted
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.contrib.auth import logout
+from django.http import JsonResponse
+from django.shortcuts import redirect
+from django.contrib import messages
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +33,6 @@ class RobustSessionMiddleware(SessionMiddleware):
             
             # 如果是 AJAX 請求，返回 JSON 響應
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                from django.http import JsonResponse
                 return JsonResponse({
                     'error': 'session_interrupted',
                     'message': '會話已中斷，請重新登入',
@@ -45,7 +47,6 @@ class RobustSessionMiddleware(SessionMiddleware):
             
             # 如果是 AJAX 請求，返回 JSON 響應
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                from django.http import JsonResponse
                 return JsonResponse({
                     'error': 'session_error',
                     'message': '會話處理錯誤，請重新登入',
@@ -79,3 +80,74 @@ class DatabaseConnectionMiddleware:
         
         response = self.get_response(request)
         return response 
+
+
+class CompanyCodeMiddleware:
+    """
+    公司代號中間件
+    實現多公司資料隔離
+    """
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # 為請求添加公司代號屬性
+        request.company_code = self._get_company_code(request)
+        response = self.get_response(request)
+        return response
+    
+    def _get_company_code(self, request):
+        """
+        獲取用戶的公司代號
+        優先順序：1. 用戶設定 2. 會話 3. 預設值
+        """
+        if not request.user.is_authenticated:
+            return None
+        
+        # 從用戶設定獲取公司代號
+        if hasattr(request.user, 'profile') and request.user.profile.company_code:
+            return request.user.profile.company_code
+        
+        # 從會話獲取公司代號
+        company_code = request.session.get('company_code')
+        if company_code:
+            return company_code
+        
+        # 預設公司代號（超級用戶可以看到所有公司）
+        if request.user.is_superuser:
+            return None
+        
+        # 一般用戶預設為公司代號 01
+        return '01'
+
+
+class DataIsolationMiddleware:
+    """
+    資料隔離中間件
+    確保用戶只能看到自己公司的資料
+    """
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # 為請求添加資料隔離屬性
+        request.data_isolation_enabled = self._should_enable_isolation(request)
+        response = self.get_response(request)
+        return response
+    
+    def _should_enable_isolation(self, request):
+        """
+        判斷是否啟用資料隔離
+        """
+        # 超級用戶不啟用資料隔離
+        if request.user.is_superuser:
+            return False
+        
+        # 管理員不啟用資料隔離
+        if request.user.is_staff:
+            return False
+        
+        # 一般用戶啟用資料隔離
+        return True 

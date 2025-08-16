@@ -2655,3 +2655,5 @@ class OperatorOnSiteReportForm(forms.ModelForm):
             .order_by("-created_at")
         )
         self.fields["workorder"].queryset = workorders
+
+

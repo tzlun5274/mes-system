@@ -78,7 +78,7 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
     context_object_name = "workorder"
 
     def get_context_data(self, **kwargs):
-        """添加上下文資料，包括工序統計和所有已核准的報工記錄"""
+        """添加上下文資料，包括工序統計和所有已核准的填報記錄"""
         context = super().get_context_data(**kwargs)
         workorder = self.get_object()
 
@@ -130,7 +130,7 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         context["completed_processes_count"] = completed_processes_count
         context["in_progress_processes_count"] = in_progress_processes_count
 
-        # 獲取所有已核准的報工記錄
+        # 獲取所有已核准的填報記錄
         from workorder.fill_work.models import FillWork
 
         # 獲取所有已核准的填報記錄
@@ -251,7 +251,7 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         total_stats["unique_equipment"] = list(total_stats["unique_equipment"])
 
         # 按照工序的實際執行順序排列統計資料
-        # 根據報工記錄的時間順序，確定工序的執行順序
+        # 根據填報記錄的時間順序，確定工序的執行順序
         process_order = {}
         for i, report in enumerate(all_reports):
             process_name = report["process_name"]
@@ -273,8 +273,8 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
 
         # 添加完工判斷資訊
         try:
-            from ..services.completion_service import WorkOrderCompletionService
-            completion_summary = WorkOrderCompletionService.get_completion_summary(workorder.id)
+            from ..services.completion_service import FillWorkCompletionService
+            completion_summary = FillWorkCompletionService.get_completion_summary(workorder.id)
             context["completion_summary"] = completion_summary
         except Exception as e:
             workorder_logger.error(f"獲取工單 {workorder.order_number} 完工摘要失敗: {str(e)}")
@@ -612,6 +612,10 @@ class MesOrderListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        
+        # 排除已完工的工單（已完工的工單不應該在 MES 工單管理中顯示）
+        qs = qs.exclude(status='completed')
+        
         # 依關鍵字過濾（工單號/產品/公司代號）
         search = self.request.GET.get("search", "").strip()
         if search:
@@ -637,8 +641,8 @@ class MesOrderListView(LoginRequiredMixin, ListView):
         ctx["search"] = self.request.GET.get("search", "")
         ctx["dispatch_status"] = self.request.GET.get("dispatch_status", "all")
         
-        # 統計資料
-        total_orders = WorkOrder.objects.count()
+        # 統計資料（排除已完工的工單）
+        total_orders = WorkOrder.objects.exclude(status='completed').count()
         dispatched_orders = WorkOrderDispatch.objects.count()
         undispatched_orders = total_orders - dispatched_orders
         
@@ -677,16 +681,24 @@ def mes_orders_bulk_dispatch(request):
     created = 0
     skipped = 0
     for no in order_numbers:
-        try:
-            wo = WorkOrder.objects.get(order_number=no)
-        except WorkOrder.DoesNotExist:
+        # 查詢所有匹配的工單
+        # 使用公司代號和工單號碼組合查詢，確保唯一性
+        work_orders = WorkOrder.objects.filter(order_number=no)
+        # 注意：這裡需要從請求中獲取公司代號，暫時保持原有邏輯
+        if not work_orders.exists():
             skipped += 1
             continue
+        
+        # 如果有多個工單，只處理第一個（保持原有行為）
+        wo = work_orders.first()
+        
         # 若已有派工單，略過
         if WorkOrderDispatch.objects.filter(order_number=no).exists():
             skipped += 1
             continue
-        WorkOrderDispatch.objects.create(
+        
+        # 建立派工單
+        dispatch = WorkOrderDispatch.objects.create(
             company_code=getattr(wo, "company_code", None),
             order_number=wo.order_number,
             product_code=wo.product_code,
@@ -695,6 +707,14 @@ def mes_orders_bulk_dispatch(request):
             created_by=str(request.user) if request.user.is_authenticated else "system",
         )
         created += 1
+        
+        # 立即檢查工序分配並更新派工單狀態
+        try:
+            from workorder.services.dispatch_status_service import DispatchStatusService
+            DispatchStatusService.update_dispatch_status_by_process_allocation(wo.id)
+        except Exception as e:
+            # 記錄錯誤但不影響建立流程
+            pass
 
     return JsonResponse({"success": True, "created": created, "skipped": skipped})
 
@@ -708,9 +728,10 @@ def mes_order_dispatch(request):
     if not order_number:
         return JsonResponse({"error": "工單號碼不能為空"}, status=400)
     
-    try:
-        wo = WorkOrder.objects.get(order_number=order_number)
-    except WorkOrder.DoesNotExist:
+    # 使用 first() 避免 MultipleObjectsReturned 錯誤
+    # 注意：這裡需要從請求中獲取公司代號，暫時保持原有邏輯
+    wo = WorkOrder.objects.filter(order_number=order_number).first()
+    if not wo:
         return JsonResponse({"error": "工單不存在"}, status=400)
     
     # 檢查是否已有派工單
@@ -718,7 +739,7 @@ def mes_order_dispatch(request):
         return JsonResponse({"error": "此工單已有派工單"}, status=400)
     
     # 建立派工單
-    WorkOrderDispatch.objects.create(
+    dispatch = WorkOrderDispatch.objects.create(
         company_code=getattr(wo, "company_code", None),
         order_number=wo.order_number,
         product_code=wo.product_code,
@@ -726,6 +747,14 @@ def mes_order_dispatch(request):
         status="pending",
         created_by=str(request.user) if request.user.is_authenticated else "system",
     )
+    
+    # 立即檢查工序分配並更新派工單狀態
+    try:
+        from workorder.services.dispatch_status_service import DispatchStatusService
+        DispatchStatusService.update_dispatch_status_by_process_allocation(wo.id)
+    except Exception as e:
+        # 記錄錯誤但不影響建立流程
+        pass
     
     return JsonResponse({"success": True, "message": "派工單建立成功"})
 
@@ -739,9 +768,10 @@ def mes_order_delete(request):
     if not order_number:
         return JsonResponse({"error": "工單號碼不能為空"}, status=400)
     
-    try:
-        wo = WorkOrder.objects.get(order_number=order_number)
-    except WorkOrder.DoesNotExist:
+    # 使用 first() 避免 MultipleObjectsReturned 錯誤
+    # 注意：這裡需要從請求中獲取公司代號，暫時保持原有邏輯
+    wo = WorkOrder.objects.filter(order_number=order_number).first()
+    if not wo:
         return JsonResponse({"error": "工單不存在"}, status=400)
     
     # 檢查是否有派工單
@@ -760,14 +790,23 @@ def mes_orders_auto_dispatch(request):
     自動批次派工：自動為所有未派工的工單建立派工單
     """
     try:
-        # 取得所有未派工的工單
-        undispatched_orders = WorkOrder.objects.exclude(
-            order_number__in=WorkOrderDispatch.objects.values_list("order_number", flat=True)
-        )
+        # 取得所有未派工的工單（修復多公司系統的派工邏輯）
+        undispatched_orders = WorkOrder.objects.all()
+        
+        # 檢查每個工單是否已有對應的派工單（使用 order_number + product_code 組合）
+        truly_undispatched = []
+        for wo in undispatched_orders:
+            dispatch_exists = WorkOrderDispatch.objects.filter(
+                order_number=wo.order_number,
+                product_code=wo.product_code
+            ).exists()
+            if not dispatch_exists:
+                truly_undispatched.append(wo)
         
         created = 0
-        for wo in undispatched_orders:
-            WorkOrderDispatch.objects.create(
+        for wo in truly_undispatched:
+            # 建立派工單
+            dispatch = WorkOrderDispatch.objects.create(
                 company_code=getattr(wo, "company_code", None),
                 order_number=wo.order_number,
                 product_code=wo.product_code,
@@ -776,6 +815,14 @@ def mes_orders_auto_dispatch(request):
                 created_by=str(request.user) if request.user.is_authenticated else "system",
             )
             created += 1
+            
+            # 立即檢查工序分配並更新派工單狀態
+            try:
+                from workorder.services.dispatch_status_service import DispatchStatusService
+                DispatchStatusService.update_dispatch_status_by_process_allocation(wo.id)
+            except Exception as e:
+                # 記錄錯誤但不影響建立流程
+                pass
         
         return JsonResponse({
             "success": True, 

@@ -1,6 +1,7 @@
 """
-工單完工判斷服務
+填報紀錄完工判斷服務
 負責自動判斷工單是否達到完工條件，並執行完工流程
+基於填報紀錄（FillWork）的出貨包裝數量進行判斷
 """
 
 import logging
@@ -17,19 +18,131 @@ from erp_integration.models import CompanyConfig
 
 logger = logging.getLogger(__name__)
 
-class WorkOrderCompletionService:
+class FillWorkCompletionService:
     """
-    工單完工判斷服務類別
+    填報紀錄完工判斷服務類別
     負責自動判斷工單是否達到完工條件，並執行完工流程
+    基於填報紀錄（FillWork）的出貨包裝數量進行判斷
     """
     
     # 完工判斷的工序名稱（可配置）
     PACKAGING_PROCESS_NAME = "出貨包裝"
     
     @staticmethod
+    def check_workorder_completion(workorder_id):
+        """
+        檢查工單完工條件（基於填報紀錄）
+        
+        Args:
+            workorder_id: 工單ID
+            
+        Returns:
+            dict: 完工檢查結果
+        """
+        try:
+            workorder = WorkOrder.objects.get(id=workorder_id)
+            
+            # 獲取出貨包裝累計數量（從填報紀錄）
+            packaging_quantity = FillWorkCompletionService._get_packaging_quantity_from_fillwork(workorder)
+            
+            # 判斷是否達到完工條件
+            can_complete = packaging_quantity >= workorder.quantity
+            
+            # 計算完工進度百分比
+            completion_percentage = (packaging_quantity / workorder.quantity * 100) if workorder.quantity > 0 else 0
+            
+            return {
+                'workorder_id': workorder_id,
+                'order_number': workorder.order_number,
+                'planned_quantity': workorder.quantity,
+                'packaging_quantity': packaging_quantity,
+                'can_complete': can_complete,
+                'completion_percentage': round(completion_percentage, 1),
+                'reason': f"出貨包裝累計數量（填報紀錄）: {packaging_quantity}/{workorder.quantity}",
+                'error': None
+            }
+            
+        except WorkOrder.DoesNotExist:
+            return {
+                'workorder_id': workorder_id,
+                'error': f'工單 {workorder_id} 不存在'
+            }
+        except Exception as e:
+            logger.error(f"檢查工單 {workorder_id} 完工條件時發生錯誤: {str(e)}")
+            return {
+                'workorder_id': workorder_id,
+                'error': f'檢查完工條件時發生錯誤: {str(e)}'
+            }
+    
+    @staticmethod
+    def auto_complete_workorder(workorder_id):
+        """
+        自動完工工單（基於填報紀錄）
+        
+        Args:
+            workorder_id: 工單ID
+            
+        Returns:
+            dict: 完工結果
+        """
+        try:
+            # 先檢查完工條件
+            completion_check = FillWorkCompletionService.check_workorder_completion(workorder_id)
+            
+            if completion_check.get('error'):
+                return {
+                    'success': False,
+                    'message': completion_check['error']
+                }
+            
+            # 執行完工流程
+            with transaction.atomic():
+                # 獲取工單
+                workorder = WorkOrder.objects.get(id=workorder_id)
+                
+                # 檢查是否已經轉移到已完工模組
+                if CompletedWorkOrder.objects.filter(original_workorder_id=workorder_id).exists():
+                    return {
+                        'success': True,
+                        'message': f"工單 {workorder.order_number} 已經轉移到已完工模組"
+                    }
+                
+                # 檢查工單狀態
+                if workorder.status == 'completed':
+                    # 即使狀態是 completed，也要執行轉移
+                    FillWorkCompletionService.transfer_workorder_to_completed(workorder_id)
+                    return {
+                        'success': True,
+                        'message': f"工單 {workorder.order_number} 已成功轉移到已完工模組"
+                    }
+                
+                # 檢查是否達到完工條件
+                if not completion_check['can_complete']:
+                    return {
+                        'success': False,
+                        'message': f"工單 {completion_check['order_number']} 尚未達到完工條件：{completion_check['reason']}"
+                    }
+                
+                # 執行完整完工流程
+                FillWorkCompletionService._complete_workorder(workorder)
+                FillWorkCompletionService.transfer_workorder_to_completed(workorder_id)
+                
+                return {
+                    'success': True,
+                    'message': f"工單 {workorder.order_number} 已成功自動完工並轉移到已完工模組"
+                }
+                
+        except Exception as e:
+            logger.error(f"自動完工工單 {workorder_id} 時發生錯誤: {str(e)}")
+            return {
+                'success': False,
+                'message': f"自動完工失敗: {str(e)}"
+            }
+    
+    @staticmethod
     def check_and_complete_workorder(workorder_id):
         """
-        檢查並完成工單
+        檢查並完成工單（基於填報紀錄）
         
         Args:
             workorder_id: 工單ID
@@ -42,19 +155,26 @@ class WorkOrderCompletionService:
                 # 獲取工單
                 workorder = WorkOrder.objects.get(id=workorder_id)
                 
-                # 檢查工單狀態
-                if workorder.status == 'completed':
-                    logger.info(f"工單 {workorder.order_number} 已經是完工狀態")
+                # 檢查是否已經轉移到已完工模組
+                if CompletedWorkOrder.objects.filter(original_workorder_id=workorder_id).exists():
+                    logger.info(f"工單 {workorder.order_number} 已經轉移到已完工模組")
                     return True
                 
-                # 獲取出貨包裝數量
-                packaging_quantity = WorkOrderCompletionService._get_packaging_quantity(workorder)
+                # 檢查工單狀態
+                if workorder.status == 'completed':
+                    logger.info(f"工單 {workorder.order_number} 狀態是完工，但尚未轉移，執行轉移流程")
+                    # 即使狀態是 completed，也要執行轉移
+                    FillWorkCompletionService.transfer_workorder_to_completed(workorder_id)
+                    return True
+                
+                # 獲取出貨包裝數量（從填報紀錄）
+                packaging_quantity = FillWorkCompletionService._get_packaging_quantity_from_fillwork(workorder)
                 
                 # 判斷完工條件
                 if packaging_quantity >= workorder.quantity:
                     # 執行完工流程
-                    WorkOrderCompletionService._complete_workorder(workorder)
-                    WorkOrderCompletionService.transfer_workorder_to_completed(workorder_id)
+                    FillWorkCompletionService._complete_workorder(workorder)
+                    FillWorkCompletionService.transfer_workorder_to_completed(workorder_id)
                     logger.info(f"工單 {workorder.order_number} 已成功完工並轉移")
                     return True
                 else:
@@ -69,9 +189,9 @@ class WorkOrderCompletionService:
             return False
     
     @staticmethod
-    def _get_packaging_quantity(workorder):
+    def _get_packaging_quantity_from_fillwork(workorder):
         """
-        獲取工單的出貨包裝累積數量（良品+不良品，從生產中工單詳情資料表）
+        從填報紀錄獲取工單的出貨包裝累積數量（良品+不良品）
         
         Args:
             workorder: WorkOrder 實例
@@ -80,10 +200,11 @@ class WorkOrderCompletionService:
             int: 出貨包裝累積總數量（良品+不良品）
         """
         try:
-            # 從生產中工單詳情資料表查詢出貨包裝的報工記錄
-            packaging_reports = WorkOrderProductionDetail.objects.filter(
-                workorder_production__workorder=workorder,
-                process_name="出貨包裝"
+            # 從填報紀錄查詢出貨包裝的填報記錄
+            packaging_reports = FillWork.objects.filter(
+                workorder=workorder.order_number,
+                process__name__icontains='出貨包裝',
+                approval_status='approved'
             )
             
             # 計算良品累積數量
@@ -100,18 +221,18 @@ class WorkOrderCompletionService:
             total_quantity = good_quantity + defect_quantity
             
             # 記錄日誌
-            logger.info(f"工單 {workorder.order_number} 出貨包裝累積數量: 良品={good_quantity}, 不良品={defect_quantity}, 總計={total_quantity}")
+            logger.info(f"工單 {workorder.order_number} 出貨包裝累積數量（填報紀錄）: 良品={good_quantity}, 不良品={defect_quantity}, 總計={total_quantity}")
             
             return total_quantity
             
         except Exception as e:
             logger.error(f"獲取工單 {workorder.order_number} 出貨包裝累積數量時發生錯誤: {str(e)}")
             return 0
-
+    
     @staticmethod
     def get_completion_summary(workorder_id):
         """
-        獲取工單的完工判斷摘要資訊
+        獲取工單的完工判斷摘要資訊（基於填報紀錄）
         
         Args:
             workorder_id: 工單ID
@@ -122,8 +243,8 @@ class WorkOrderCompletionService:
         try:
             workorder = WorkOrder.objects.get(id=workorder_id)
             
-            # 獲取出貨包裝累計數量
-            packaging_quantity = WorkOrderCompletionService._get_packaging_quantity(workorder)
+            # 獲取出貨包裝累計數量（從填報紀錄）
+            packaging_quantity = FillWorkCompletionService._get_packaging_quantity_from_fillwork(workorder)
             
             # 判斷是否達到完工條件
             can_complete = packaging_quantity >= workorder.quantity
@@ -131,24 +252,29 @@ class WorkOrderCompletionService:
             # 計算完工進度百分比
             completion_percentage = (packaging_quantity / workorder.quantity * 100) if workorder.quantity > 0 else 0
             
-            # 獲取出貨包裝報工記錄詳情
-            packaging_reports = WorkOrderProductionDetail.objects.filter(
-                workorder_production__workorder=workorder,
-                process_name="出貨包裝"
-            ).order_by('-report_date', '-start_time')
-            
+            # 獲取出貨包裝填報記錄詳情（從填報紀錄）
             packaging_details = []
+            
+            # 從填報紀錄獲取出貨包裝記錄
+            packaging_reports = FillWork.objects.filter(
+                workorder=workorder.order_number,
+                process__name__icontains='出貨包裝',
+                approval_status='approved'
+            ).order_by('-work_date', '-start_time')
+            
             for report in packaging_reports:
                 packaging_details.append({
-                    'report_date': report.report_date,
+                    'source': '填報紀錄',
+                    'report_date': report.work_date,
                     'operator': report.operator or '-',
                     'equipment': report.equipment or '-',
                     'work_quantity': report.work_quantity or 0,
                     'defect_quantity': report.defect_quantity or 0,
-                    'work_hours': float(report.work_hours or 0),
+                    'work_hours': float(report.work_hours_calculated or 0),
                     'start_time': report.start_time,
                     'end_time': report.end_time,
                     'approval_status': report.approval_status,
+                    'report_time': report.created_at,
                 })
             
             return {
@@ -160,7 +286,7 @@ class WorkOrderCompletionService:
                 'completion_percentage': round(completion_percentage, 1),
                 'packaging_details': packaging_details,
                 'packaging_count': len(packaging_details),
-                'reason': f"出貨包裝累計數量: {packaging_quantity}/{workorder.quantity}",
+                'reason': f"出貨包裝累計數量（填報紀錄）: {packaging_quantity}/{workorder.quantity}",
                 'error': None
             }
             
@@ -169,9 +295,9 @@ class WorkOrderCompletionService:
                 'error': f'工單 {workorder_id} 不存在'
             }
         except Exception as e:
-            logger.error(f"獲取工單 {workorder_id} 完工摘要時發生錯誤: {str(e)}")
+            logger.error(f"獲取工單 {workorder_id} 完工判斷摘要時發生錯誤: {str(e)}")
             return {
-                'error': f'獲取完工摘要失敗: {str(e)}'
+                'error': f'獲取完工判斷摘要時發生錯誤: {str(e)}'
             }
     
     @staticmethod
@@ -232,7 +358,7 @@ class WorkOrderCompletionService:
                     return CompletedWorkOrder.objects.get(original_workorder_id=workorder_id)
                 
                 # 計算統計資料
-                stats = WorkOrderCompletionService._calculate_workorder_stats(workorder)
+                stats = FillWorkCompletionService._calculate_workorder_stats(workorder)
                 
                 # 獲取生產記錄（可能為None）
                 production_record = None
@@ -263,13 +389,13 @@ class WorkOrderCompletionService:
                 )
                 
                 # 轉移工序資料
-                WorkOrderCompletionService._transfer_processes(workorder, completed_workorder)
+                FillWorkCompletionService._transfer_processes(workorder, completed_workorder)
                 
-                # 轉移報工記錄
-                WorkOrderCompletionService._transfer_production_reports(workorder, completed_workorder)
+                # 轉移填報記錄
+                FillWorkCompletionService._transfer_production_reports(workorder, completed_workorder)
                 
                 # 清理生產中工單資料
-                WorkOrderCompletionService._cleanup_production_data(workorder)
+                FillWorkCompletionService._cleanup_production_data(workorder)
                 
                 # 刪除原始工單記錄（已轉移到已完工工單表）
                 workorder.delete()
@@ -299,15 +425,20 @@ class WorkOrderCompletionService:
                 approval_status='approved'
             )
             
-            # 計算統計資料
+            # 計算總工時統計資料（所有工序）
             total_work_hours = sum(report.work_hours_calculated or 0 for report in fill_work_reports)
             total_overtime_hours = sum(report.overtime_hours_calculated or 0 for report in fill_work_reports)
-            total_good_quantity = sum(report.work_quantity or 0 for report in fill_work_reports)
-            total_defect_quantity = sum(report.defect_quantity or 0 for report in fill_work_reports)
+            
+            # 計算出貨包裝工序的數量統計（以出貨包裝為主）
+            packaging_reports = fill_work_reports.filter(
+                process__name__icontains='出貨包裝'
+            )
+            total_good_quantity = sum(report.work_quantity or 0 for report in packaging_reports)
+            total_defect_quantity = sum(report.defect_quantity or 0 for report in packaging_reports)
             
             # 獲取參與人員和設備
             unique_operators = list(set(report.operator for report in fill_work_reports if report.operator))
-            unique_equipment = list(set(report.equipment.name for report in fill_work_reports if report.equipment))
+            unique_equipment = list(set(report.equipment for report in fill_work_reports if report.equipment))
             
             return {
                 'total_work_hours': total_work_hours,
@@ -347,7 +478,7 @@ class WorkOrderCompletionService:
                 # 計算工序統計資料
                 process_reports = FillWork.objects.filter(
                     workorder=workorder.order_number,
-                    process=process.process_name,
+                    process__name=process.process_name,  # 修正：使用 process__name
                     approval_status='approved'
                 )
                 
@@ -378,42 +509,42 @@ class WorkOrderCompletionService:
     @staticmethod
     def _transfer_production_reports(workorder, completed_workorder):
         """
-        轉移報工記錄
+        轉移填報記錄
         
         Args:
             workorder: 原始工單
             completed_workorder: 已完工工單
         """
         try:
-            # 從填報記錄中獲取報工資料
+            # 從填報記錄中獲取填報資料
             fill_work_reports = FillWork.objects.filter(
                 workorder=workorder.order_number,
                 approval_status='approved'
             )
             
             for report in fill_work_reports:
-                # 建立已完工報工記錄
+                # 建立已完工填報記錄
                 CompletedProductionReport.objects.create(
                     completed_workorder=completed_workorder,
                     report_type='fill_work',
+                    report_source='operator',
                     operator=report.operator,
-                    process_name=report.operation,
-                    equipment=report.equipment.name if report.equipment else '',
-                    work_date=report.work_date,
-                    start_time=report.start_time,
-                    end_time=report.end_time,
+                    process_name=report.process.name if hasattr(report.process, 'name') else str(report.process),
+                    equipment=report.equipment or '',
+                    report_date=report.work_date,
+                    start_time=report.start_datetime if hasattr(report, 'start_datetime') else None,
+                    end_time=report.end_datetime if hasattr(report, 'end_datetime') else None,
                     work_quantity=report.work_quantity,
                     defect_quantity=report.defect_quantity,
                     work_hours=report.work_hours_calculated or 0.0,
                     overtime_hours=report.overtime_hours_calculated or 0.0,
                     remarks=report.remarks,
                     abnormal_notes=report.abnormal_notes,
-                    original_report_id=report.id,
-                    original_report_type='fill_work'
+                    approval_status='approved'
                 )
                 
         except Exception as e:
-            logger.error(f"轉移報工記錄時發生錯誤: {str(e)}")
+            logger.error(f"轉移填報記錄時發生錯誤: {str(e)}")
             raise
     
     @staticmethod
@@ -428,9 +559,68 @@ class WorkOrderCompletionService:
             # 刪除工序記錄
             workorder.processes.all().delete()
             
-            # 刪除生產記錄
+            # 刪除生產記錄（如果存在）
             if hasattr(workorder, 'production_record') and workorder.production_record:
+                # 先刪除生產記錄的明細資料
+                workorder.production_record.production_details.all().delete()
+                # 再刪除生產記錄本身
                 workorder.production_record.delete()
+            
+            # 注意：不刪除填報記錄（FillWork），因為它們是原始的填報資料
+            # 只將完工標記設為 True 表示已完工
+            from workorder.fill_work.models import FillWork
+            FillWork.objects.filter(
+                workorder=workorder.order_number,
+                approval_status='approved'
+            ).update(is_completed=True)
+            
+            # 刪除工序日誌記錄
+            from workorder.models import WorkOrderProcessLog
+            WorkOrderProcessLog.objects.filter(
+                workorder_process__workorder=workorder
+            ).delete()
+            
+            # 刪除派工記錄
+            from workorder.models import DispatchLog
+            DispatchLog.objects.filter(
+                workorder=workorder
+            ).delete()
+            
+            # 刪除工單分配記錄
+            from workorder.models import WorkOrderAssignment
+            WorkOrderAssignment.objects.filter(
+                workorder=workorder
+            ).delete()
+            
+            # 刪除工序產能記錄
+            from workorder.models import WorkOrderProcessCapacity
+            WorkOrderProcessCapacity.objects.filter(
+                workorder_process__workorder=workorder
+            ).delete()
+            
+            # 刪除派工單相關記錄
+            try:
+                from workorder.workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess, DispatchHistory
+                
+                # 刪除派工單歷史記錄
+                DispatchHistory.objects.filter(
+                    workorder_dispatch__order_number=workorder.order_number
+                ).delete()
+                
+                # 刪除派工單工序明細
+                WorkOrderDispatchProcess.objects.filter(
+                    workorder_dispatch__order_number=workorder.order_number
+                ).delete()
+                
+                # 刪除派工單主表記錄
+                WorkOrderDispatch.objects.filter(
+                    order_number=workorder.order_number
+                ).delete()
+                
+            except ImportError:
+                logger.warning(f"無法導入派工單模組，跳過派工單記錄清理")
+            except Exception as e:
+                logger.warning(f"清理派工單記錄時發生錯誤: {str(e)}")
             
             logger.info(f"工單 {workorder.order_number} 生產資料已清理")
             

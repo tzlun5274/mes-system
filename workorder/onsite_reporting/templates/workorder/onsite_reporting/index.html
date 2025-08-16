@@ -1,0 +1,369 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}現場報工管理{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .stats-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .stats-label {
+        font-size: 1rem;
+        opacity: 0.9;
+    }
+    
+    .feature-card {
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+        margin-bottom: 20px;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .feature-card .card-header {
+        border-radius: 15px 15px 0 0;
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-weight: bold;
+    }
+    
+    .status-active {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-abnormal {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-completed {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .recent-item {
+        border-left: 4px solid #007bff;
+        padding: 10px;
+        margin-bottom: 10px;
+        background-color: #f8f9fa;
+        border-radius: 0 8px 8px 0;
+    }
+    
+    .progress-bar-custom {
+        height: 8px;
+        border-radius: 4px;
+        background-color: #e9ecef;
+        overflow: hidden;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #28a745, #20c997);
+        transition: width 0.3s ease;
+    }
+    
+    .main-feature-card {
+        border-radius: 20px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        transition: all 0.3s ease;
+        margin-bottom: 30px;
+        border: none;
+    }
+    
+    .main-feature-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 35px rgba(0,0,0,0.2);
+    }
+    
+    .main-feature-card .card-header {
+        border-radius: 20px 20px 0 0;
+        font-weight: bold;
+        font-size: 1.3rem;
+        padding: 25px;
+    }
+    
+    .main-feature-card .card-body {
+        padding: 30px;
+    }
+    
+    .feature-description {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 25px;
+    }
+    
+    .feature-actions {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .feature-actions .btn {
+        padding: 12px 25px;
+        font-size: 1rem;
+        border-radius: 10px;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-clipboard-list"></i> 現場報工管理
+            </h2>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-number">{{ today_total }}</div>
+                <div class="stats-label">今日報工總數</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="stats-number">{{ today_active }}</div>
+                <div class="stats-label">活躍報工</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="stats-number">{{ today_completed }}</div>
+                <div class="stats-label">已完成報工</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                <div class="stats-number">{{ today_stopped }}</div>
+                <div class="stats-label">停工報工</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主要功能入口 - 左右排列 -->
+    <div class="row mb-4">
+        <!-- 作業員現場報工作業 -->
+        <div class="col-md-6">
+            <div class="card main-feature-card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-user-clock"></i> 作業員現場報工作業
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="feature-description">
+                        <strong>作業員現場報工作業管理</strong><br>
+                        提供作業員在生產現場進行即時報工的功能，包含一般作業員報工和RD樣品報工兩種模式。
+                        支援工單選擇、數量輸入、狀態更新等操作，可即時追蹤生產進度、記錄異常狀況。
+                    </div>
+                    <div class="feature-actions">
+                        <a href="{% url 'workorder:onsite_reporting:operator_work_selection' %}" class="btn btn-primary">
+                            <i class="fas fa-tasks"></i> 進入作業員報工作業
+                        </a>
+                        <a href="{% url 'workorder:onsite_reporting:onsite_report_list' %}?report_type=operator" class="btn btn-outline-primary">
+                            <i class="fas fa-list"></i> 查看作業員報工記錄
+                        </a>
+                        <a href="{% url 'workorder:onsite_reporting:onsite_report_monitoring' %}" class="btn btn-outline-info">
+                            <i class="fas fa-eye"></i> 即時監控
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- SMT現場報工作業 -->
+        <div class="col-md-6">
+            <div class="card main-feature-card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-cogs"></i> SMT現場報工作業
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="feature-description">
+                        <strong>SMT設備現場報工作業管理</strong><br>
+                        專為SMT設備設計的自動化報工系統，包含一般SMT報工和SMT_RD樣品報工兩種模式。
+                        支援設備狀態監控、自動數量統計、異常檢測等功能，可與SMT設備直接連接。
+                    </div>
+                    <div class="feature-actions">
+                        <a href="{% url 'workorder:onsite_reporting:smt_work_selection' %}" class="btn btn-success">
+                            <i class="fas fa-tasks"></i> 進入SMT報工作業
+                        </a>
+                        <a href="{% url 'workorder:onsite_reporting:onsite_report_list' %}?report_type=smt" class="btn btn-outline-success">
+                            <i class="fas fa-list"></i> 查看SMT報工記錄
+                        </a>
+                        <a href="{% url 'workorder:onsite_reporting:onsite_report_monitoring' %}" class="btn btn-outline-info">
+                            <i class="fas fa-eye"></i> 設備監控
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近活躍報工 -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card feature-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock"></i> 最近活躍報工
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_active %}
+                        {% for report in recent_active %}
+                        <div class="recent-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ report.operator }}</strong> - {{ report.workorder }}
+                                    <br>
+                                    <small class="text-muted">{{ report.product_id }} | {{ report.process }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="status-badge status-active">{{ report.get_status_display }}</span>
+                                    <br>
+                                    <small class="text-muted">{{ report.work_quantity }}/{{ report.planned_quantity }}</small>
+                                </div>
+                            </div>
+                            <div class="progress-bar-custom mt-2">
+                                <div class="progress-fill" style="width: {{ report.get_progress_percentage }}%"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted text-center">目前沒有活躍的報工記錄</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card feature-card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> 停工報工
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if stopped_reports %}
+                        {% for report in stopped_reports %}
+                        <div class="recent-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ report.operator }}</strong> - {{ report.workorder }}
+                                    <br>
+                                    <small class="text-muted">{{ report.product_id }} | {{ report.process }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="status-badge status-abnormal">{{ report.get_status_display }}</span>
+                                    <br>
+                                    <small class="text-muted">{{ report.updated_at|date:"H:i" }}</small>
+                                </div>
+                            </div>
+                            {% if report.abnormal_notes %}
+                            <small class="text-danger">{{ report.abnormal_notes|truncatechars:50 }}</small>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted text-center">目前沒有停工報工記錄</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報工類型統計 -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card feature-card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie"></i> 今日報工類型統計
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="stats-number text-primary">{{ operator_reports }}</div>
+                            <div class="stats-label">作業員報工</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="stats-number text-success">{{ smt_reports }}</div>
+                            <div class="stats-label">SMT設備報工</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card feature-card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cog"></i> 系統配置
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        管理現場報工系統配置
+                        <br>
+                        包含報工規則、自動化設定等
+                    </p>
+                    <div class="d-grid">
+                        <a href="{% url 'workorder:onsite_reporting:onsite_report_config' %}" class="btn btn-dark">
+                            <i class="fas fa-cog"></i> 系統配置
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 自動刷新頁面（每30秒）
+    setTimeout(function() {
+        location.reload();
+    }, 30000);
+    
+    // 即時更新時間
+    function updateTime() {
+        const now = new Date();
+        document.title = `現場報工管理 - ${now.toLocaleTimeString()}`;
+    }
+    
+    setInterval(updateTime, 1000);
+</script>
+{% endblock %} 

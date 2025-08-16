@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}新增{{ report_type_display }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">新增{{ report_type_display }}</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 訊息顯示區域 -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <!-- 功能說明 -->
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle"></i> 現場報工功能說明</h5>
+                        <ul class="mb-0">
+                            <li><strong>多筆紀錄設計</strong>：每次開始工作建立一筆記錄，結束時完成該筆記錄</li>
+                            <li><strong>自動累積數量</strong>：系統會自動計算累積的生產數量</li>
+                            <li><strong>精確時間記錄</strong>：每筆記錄都有明確的開始和結束時間</li>
+                            <li><strong>即時統計</strong>：可查看整個工單的總工作時間和生產數量</li>
+                        </ul>
+                    </div>
+
+                    <form method="post" id="onsiteReportForm">
+                        {% csrf_token %}
+                        <input type="hidden" name="report_type" value="{{ report_type }}">
+                        
+                        <!-- 基本資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">基本資訊</h5>
+                            </div>
+                            
+                            <!-- 產品編號 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="product_id" class="form-label">產品編號 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="product_id" name="product_id" required>
+                                    <option value="">請選擇產品編號</option>
+                                </select>
+                                <div class="form-text">選擇產品編號會自動更新相關的工單號碼選項</div>
+                            </div>
+
+                            <!-- 工單號碼 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="workorder" class="form-label">工單號碼 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="workorder" name="workorder" required>
+                                    <option value="">請選擇工單號碼</option>
+                                </select>
+                                <div class="form-text">選擇工單號碼會自動填入公司名稱和預設生產數量</div>
+                            </div>
+
+                            <!-- 公司名稱 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="company_name" class="form-label">公司名稱 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="company_name" name="company_name" required>
+                                    <option value="">請選擇公司名稱</option>
+                                </select>
+                                <div class="form-text">選擇公司名稱會更新相關的產品編號選項</div>
+                            </div>
+
+                            <!-- 作業員 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="operator" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="operator" name="operator" required>
+                                    <option value="">請選擇作業員</option>
+                                </select>
+                            </div>
+
+                            <!-- 工序 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="process" class="form-label">工序 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="process" name="process" required>
+                                <div class="form-text">請輸入此次報工的工序</div>
+                            </div>
+
+                            <!-- 使用的設備 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="equipment" class="form-label">使用的設備</label>
+                                <select class="form-select" id="equipment" name="equipment">
+                                    <option value="">請選擇使用的設備</option>
+                                </select>
+                                <div class="form-text">請選擇此次報工使用的設備</div>
+                            </div>
+
+                            <!-- 報工狀態 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="status" class="form-label">報工狀態 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="status" name="status" required>
+                                    <option value="">請選擇報工狀態</option>
+                                    <option value="started" selected>開工</option>
+                                    <option value="paused">暫停</option>
+                                    <option value="resumed">重啟開工</option>
+                                    <option value="completed">完工</option>
+                                    <option value="stopped">停工</option>
+                                </select>
+                                <div class="form-text">選擇此次報工的狀態</div>
+                            </div>
+                        </div>
+
+                        <!-- 數量資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">數量資訊</h5>
+                            </div>
+                            
+                            <!-- 工單預設生產數量 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="planned_quantity" class="form-label">工單預設生產數量</label>
+                                <input type="number" class="form-control" id="planned_quantity" name="planned_quantity" readonly>
+                                <div class="form-text">此為工單規劃的總生產數量，不可修改</div>
+                            </div>
+
+                            <!-- 累積生產數量 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="accumulated_quantity" class="form-label">累積生產數量</label>
+                                <input type="number" class="form-control" id="accumulated_quantity" readonly>
+                                <div class="form-text">目前工單已完成的累積數量</div>
+                            </div>
+
+                            <!-- 剩餘數量 -->
+                            <div class="col-md-4 mb-3">
+                                <label for="remaining_quantity" class="form-label">剩餘數量</label>
+                                <input type="number" class="form-control" id="remaining_quantity" readonly>
+                                <div class="form-text">工單剩餘待生產的數量</div>
+                            </div>
+                        </div>
+
+                        <!-- 備註資訊 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">備註資訊</h5>
+                            </div>
+                            
+                            <!-- 備註 -->
+                            <div class="col-12 mb-3">
+                                <label for="remarks" class="form-label">備註</label>
+                                <textarea class="form-control" id="remarks" name="remarks" rows="3" placeholder="可記錄此次報工的相關備註"></textarea>
+                                <div class="form-text">可記錄此次報工的相關備註</div>
+                            </div>
+                        </div>
+
+                        <!-- 提交按鈕 -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'workorder:onsite_reporting:onsite_report_index' %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> 返回首頁
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-check"></i> 確認
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 載入選項資料
+    document.addEventListener('DOMContentLoaded', function() {
+        loadCompanies();
+        loadOperators();
+        loadEquipments();
+        loadProducts();
+    });
+
+    // 載入公司選項
+    function loadCompanies() {
+        fetch('/workorder/onsite_reporting/api/company-list/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const companySelect = document.getElementById('company_name');
+                    companySelect.innerHTML = '<option value="">請選擇公司名稱</option>';
+                    data.companies.forEach(company => {
+                        const option = document.createElement('option');
+                        option.value = company.company_name;
+                        option.textContent = company.company_name;
+                        companySelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => console.error('載入公司選項失敗:', error));
+    }
+
+    // 載入作業員選項
+    function loadOperators() {
+        fetch('/workorder/onsite_reporting/api/operator-list/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const operatorSelect = document.getElementById('operator');
+                    operatorSelect.innerHTML = '<option value="">請選擇作業員</option>';
+                    data.operators.forEach(operator => {
+                        const option = document.createElement('option');
+                        option.value = operator.name;
+                        option.textContent = operator.name;
+                        operatorSelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => console.error('載入作業員選項失敗:', error));
+    }
+
+    // 載入設備選項
+    function loadEquipments() {
+        fetch('/workorder/onsite_reporting/api/equipment-list/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const equipmentSelect = document.getElementById('equipment');
+                    equipmentSelect.innerHTML = '<option value="">請選擇設備</option>';
+                    data.equipments.forEach(equipment => {
+                        const option = document.createElement('option');
+                        option.value = equipment.name;
+                        option.textContent = equipment.name;
+                        equipmentSelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => console.error('載入設備選項失敗:', error));
+    }
+
+    // 載入產品選項
+    function loadProducts() {
+        fetch('/workorder/onsite_reporting/api/product-list/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const productSelect = document.getElementById('product_id');
+                    productSelect.innerHTML = '<option value="">請選擇產品編號</option>';
+                    data.products.forEach(product => {
+                        const option = document.createElement('option');
+                        option.value = product.product_id;
+                        option.textContent = product.product_id;
+                        productSelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => console.error('載入產品選項失敗:', error));
+    }
+
+    // 產品編號變更時載入工單號碼
+    document.getElementById('product_id').addEventListener('change', function() {
+        const productId = this.value;
+        if (!productId) {
+            document.getElementById('workorder').innerHTML = '<option value="">請選擇工單號碼</option>';
+            return;
+        }
+
+        fetch(`/workorder/onsite_reporting/api/workorder-by-product/?product_id=${productId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const workorderSelect = document.getElementById('workorder');
+                    workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+                    data.workorders.forEach(workorder => {
+                        const option = document.createElement('option');
+                        option.value = workorder.workorder;
+                        option.textContent = workorder.workorder;
+                        option.dataset.company = workorder.company_name;
+                        option.dataset.quantity = workorder.planned_quantity;
+                        workorderSelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => console.error('載入工單號碼失敗:', error));
+    });
+
+    // 工單號碼變更時更新相關資訊
+    document.getElementById('workorder').addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        if (selectedOption && selectedOption.dataset.company) {
+            document.getElementById('company_name').value = selectedOption.dataset.company;
+            document.getElementById('planned_quantity').value = selectedOption.dataset.quantity || 0;
+            updateQuantityInfo();
+        }
+    });
+
+    // 更新數量資訊
+    function updateQuantityInfo() {
+        const workorder = document.getElementById('workorder').value;
+        const operator = document.getElementById('operator').value;
+        const productId = document.getElementById('product_id').value;
+        
+        if (workorder && operator && productId) {
+            fetch(`/workorder/onsite_reporting/api/quantity-info/?workorder=${workorder}&operator=${operator}&product_id=${productId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('accumulated_quantity').value = data.accumulated_quantity;
+                        document.getElementById('remaining_quantity').value = data.remaining_quantity;
+                    }
+                })
+                .catch(error => console.error('更新數量資訊失敗:', error));
+        }
+    }
+
+    // 表單驗證
+    document.getElementById('onsiteReportForm').addEventListener('submit', function(e) {
+        const requiredFields = ['product_id', 'workorder', 'company_name', 'operator', 'process'];
+        let isValid = true;
+
+        requiredFields.forEach(fieldName => {
+            const field = document.getElementById(fieldName);
+            if (!field.value.trim()) {
+                field.classList.add('is-invalid');
+                isValid = false;
+            } else {
+                field.classList.remove('is-invalid');
+            }
+        });
+
+        if (!isValid) {
+            e.preventDefault();
+            alert('請填寫所有必填欄位');
+        }
+    });
+</script>
+{% endblock %} 

@@ -173,7 +173,7 @@
         <div class="alert alert-info mt-4">
             {% if is_completed_workorder %}
                 此完工工單目前沒有報工資料，無法顯示工序明細。
-                <br><small class="text-muted">工序明細會從實際的報工記錄中自動生成。</small>
+                <br><small class="text-muted">工序明細會從實際的填報記錄中自動生成。</small>
             {% else %}
                 此工單尚未建立工序明細。
                 {% if request.user.is_staff or request.user.is_superuser %}

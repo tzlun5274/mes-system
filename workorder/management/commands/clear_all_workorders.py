@@ -141,6 +141,37 @@ class Command(BaseCommand):
         WorkOrder.objects.all().delete()
         self.stdout.write(f"✅ 已刪除 {workorder_count} 筆工單")
         
+        # 新增：刪除已完工工單相關資料
+        from workorder.models import CompletedWorkOrder, CompletedWorkOrderProcess, CompletedProductionReport
+        
+        # 刪除已完工生產報工記錄
+        completed_report_count = CompletedProductionReport.objects.count()
+        CompletedProductionReport.objects.all().delete()
+        self.stdout.write(f"✅ 已刪除 {completed_report_count} 筆已完工生產報工記錄")
+        
+        # 刪除已完工工單工序
+        completed_process_count = CompletedWorkOrderProcess.objects.count()
+        CompletedWorkOrderProcess.objects.all().delete()
+        self.stdout.write(f"✅ 已刪除 {completed_process_count} 筆已完工工單工序")
+        
+        # 刪除已完工工單
+        completed_workorder_count = CompletedWorkOrder.objects.count()
+        CompletedWorkOrder.objects.all().delete()
+        self.stdout.write(f"✅ 已刪除 {completed_workorder_count} 筆已完工工單")
+        
+        # 新增：刪除派工單相關資料
+        from workorder.workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess
+        
+        # 刪除派工單工序
+        dispatch_process_count = WorkOrderDispatchProcess.objects.count()
+        WorkOrderDispatchProcess.objects.all().delete()
+        self.stdout.write(f"✅ 已刪除 {dispatch_process_count} 筆派工單工序")
+        
+        # 刪除派工單
+        dispatch_count = WorkOrderDispatch.objects.count()
+        WorkOrderDispatch.objects.all().delete()
+        self.stdout.write(f"✅ 已刪除 {dispatch_count} 筆派工單")
+        
         # 清理相關的ERP資料（可選）
         self._clean_erp_data()
     
