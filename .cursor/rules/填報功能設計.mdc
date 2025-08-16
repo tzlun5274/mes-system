@@ -127,4 +127,20 @@ end_time - 結束時間
  SMT填報作業首頁 三個卡片 新增SMT填報紀錄 新增SMT_RD樣品填報紀錄 SMT填報資料維護
  主管審核首頁 三個卡片 待審核填報 已審核填報作業 填報功能設定
 
+## 統一API端點規範
 
+### API路徑
+所有工單相關API統一使用 `/workorder/api/` 路徑
+
+### 統一JS模組配置
+```javascript
+apiPrefix: '/workorder/api'
+```
+
+###統一資料來源###
+WorkOrderDispatch
+
+### 實作要求
+1. 所有新功能必須使用統一API端點
+2. 現有功能逐步遷移到統一API
+3. 禁止使用其他API路徑

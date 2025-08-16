@@ -39,10 +39,7 @@ class FillWorkController {
 
         // 產品編號變更事件
         this.productSelect.addEventListener('change', () => {
-            const productId = this.productSelect.value;
-            const companyName = this.companySelect.value;
-            console.log('產品編號變更為:', productId, '公司名稱:', companyName);
-            this.loadWorkorders(productId, companyName);
+            this.handleProductChange();
         });
 
         // 工單號碼變更事件
@@ -56,14 +53,29 @@ class FillWorkController {
         this.loadCompanies();
         this.loadProducts();
         this.loadWorkorders();
+        
+        // 檢查是否有預先填入的產品編號，如果有則觸發載入工單
+        if (this.productSelect.value) {
+            console.log('檢測到預先填入的產品編號:', this.productSelect.value);
+            // 延遲執行，確保DOM完全載入
+            setTimeout(() => {
+                console.log('延遲載入工單，產品編號:', this.productSelect.value);
+                this.handleProductChange();
+            }, 500);
+        } else {
+            console.log('沒有預先填入的產品編號');
+        }
     }
 
     // 載入公司名稱
     async loadCompanies() {
         try {
-            const response = await fetch('/workorder/fill_work/api/workorder-list/');
+            const response = await fetch('/workorder/api/workorder-list/');
             const data = await response.json();
-            if (data.workorders) {
+            if (data.success && data.workorders) {
+                // 保存當前選中的值
+                const currentValue = this.companySelect.value;
+                
                 // 從工單資料中提取公司名稱，過濾掉純數字的公司代號
                 const companies = [...new Set(data.workorders.map(w => w.company_name))]
                     .filter(company => {
@@ -80,6 +92,11 @@ class FillWorkController {
                     this.companySelect.appendChild(option);
                 });
                 
+                // 恢復之前選中的值
+                if (currentValue) {
+                    this.companySelect.value = currentValue;
+                }
+                
                 console.log(`載入公司名稱完成，共 ${companies.length} 個選項`);
             }
         } catch (error) {
@@ -90,14 +107,17 @@ class FillWorkController {
     // 載入產品編號
     async loadProducts(companyName = '') {
         try {
-            let url = '/workorder/fill_work/api/product-list/';
+            let url = '/workorder/api/product-list/';
             if (companyName) {
-                url = `/workorder/fill_work/api/products-by-company/?company_name=${encodeURIComponent(companyName)}`;
+                url = `/workorder/api/products-by-company/?company_name=${encodeURIComponent(companyName)}`;
             }
             
             const response = await fetch(url);
             const data = await response.json();
-            if (data.products) {
+            if (data.success && data.products) {
+                // 保存當前選中的值
+                const currentValue = this.productSelect.value;
+                
                 this.productSelect.innerHTML = '<option value="">請選擇產品編號</option>';
                 data.products.forEach(product => {
                     const option = document.createElement('option');
@@ -111,6 +131,11 @@ class FillWorkController {
                     }
                     this.productSelect.appendChild(option);
                 });
+                
+                // 恢復之前選中的值
+                if (currentValue) {
+                    this.productSelect.value = currentValue;
+                }
             }
         } catch (error) {
             console.error('載入產品編號失敗:', error);
@@ -120,18 +145,26 @@ class FillWorkController {
     // 載入工單號碼
     async loadWorkorders(productId = '', companyName = '') {
         try {
-            let url = '/workorder/fill_work/api/workorder-list/';
+            let url = '/workorder/api/workorder-list/';
             if (productId) {
-                url = `/workorder/fill_work/api/workorder-by-product/?product_id=${encodeURIComponent(productId)}`;
+                url = `/workorder/api/workorder-by-product/?product_id=${encodeURIComponent(productId)}`;
+                console.log('載入特定產品編號的工單:', productId);
+            } else {
+                console.log('載入所有工單');
             }
             
             const response = await fetch(url);
             const data = await response.json();
-            if (data.workorders) {
+            console.log('API回應:', data);
+            
+            if (data.success && data.workorders) {
                 this.workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
                 
                 // 篩選工單（根據產品編號和公司名稱）
                 let filteredWorkorders = data.workorders;
+                if (productId) {
+                    filteredWorkorders = filteredWorkorders.filter(w => w.product_id === productId);
+                }
                 if (companyName) {
                     filteredWorkorders = filteredWorkorders.filter(w => w.company_name === companyName);
                 }
@@ -148,8 +181,8 @@ class FillWorkController {
                 
                 console.log(`載入工單號碼完成，共 ${filteredWorkorders.length} 個選項`);
                 
-                // 如果選擇了產品編號，自動選擇第一個工單
-                if (productId && filteredWorkorders.length > 0) {
+                // 如果選擇了產品編號且只有一個工單，自動選擇
+                if (productId && filteredWorkorders.length === 1) {
                     const firstWorkorder = filteredWorkorders[0].workorder;
                     this.workorderSelect.value = firstWorkorder;
                     // 觸發工單變更事件
@@ -158,6 +191,33 @@ class FillWorkController {
             }
         } catch (error) {
             console.error('載入工單號碼失敗:', error);
+        }
+    }
+
+    // 處理產品編號變更
+    async handleProductChange() {
+        const productId = this.productSelect.value;
+        if (productId) {
+            console.log('產品編號變更為:', productId);
+            
+            // 載入對應的工單號碼
+            await this.loadWorkorders(productId, this.companySelect.value);
+            
+            // 如果只有一個工單，自動選擇並觸發工單變更事件
+            if (this.workorderSelect.options.length === 2) { // 1個選項 + 1個預設選項
+                const workorderOption = this.workorderSelect.options[1]; // 第一個實際選項
+                if (workorderOption) {
+                    this.workorderSelect.value = workorderOption.value;
+                    this.handleWorkorderChange();
+                }
+            }
+        } else {
+            // 清空工單號碼選項
+            this.workorderSelect.innerHTML = '<option value="">請選擇工單號碼</option>';
+            // 清空預設生產數量
+            if (this.plannedQuantityInput) {
+                this.plannedQuantityInput.value = '';
+            }
         }
     }
 
@@ -231,7 +291,7 @@ class OperatorProcessEquipmentController {
             // 是否啟用設備自動填入作業員功能（SMT專用）
             enableEquipmentAutoFill: options.enableEquipmentAutoFill || false,
             // API端點前綴
-            apiPrefix: options.apiPrefix || '/workorder/onsite_reporting/api',
+            apiPrefix: options.apiPrefix || '/workorder/api',
             // 元素ID
             operatorId: options.operatorId || 'operator',
             operatorDisplayId: options.operatorDisplayId || 'operator_display',
@@ -312,29 +372,16 @@ class OperatorProcessEquipmentController {
     // 載入工序（根據表單類型過濾）
     async loadProcesses() {
         try {
-            const response = await fetch(`${this.options.apiPrefix}/process-list/`);
+            const response = await fetch(`${this.options.apiPrefix}/process-list/?form_type=${this.options.formType}`);
             const data = await response.json();
             if (data.success) {
                 this.processSelect.innerHTML = '<option value="">請選擇此次報工的工序</option>';
                 
                 data.processes.forEach(process => {
-                    let shouldInclude = true;
-                    
-                    // 根據表單類型過濾工序
-                    if (this.options.formType === 'smt') {
-                        // SMT表單：只顯示包含SMT的工序
-                        shouldInclude = process.name.includes('SMT');
-                    } else {
-                        // 作業員表單：排除包含SMT的工序
-                        shouldInclude = !process.name.includes('SMT');
-                    }
-                    
-                    if (shouldInclude) {
-                        const option = document.createElement('option');
-                        option.value = process.name;
-                        option.textContent = process.name;
-                        this.processSelect.appendChild(option);
-                    }
+                    const option = document.createElement('option');
+                    option.value = process.name;
+                    option.textContent = process.name;
+                    this.processSelect.appendChild(option);
                 });
                 
                 console.log(`載入工序完成，表單類型: ${this.options.formType}`);
@@ -347,29 +394,16 @@ class OperatorProcessEquipmentController {
     // 載入設備（根據表單類型過濾）
     async loadEquipment() {
         try {
-            const response = await fetch(`${this.options.apiPrefix}/equipment-list/`);
+            const response = await fetch(`${this.options.apiPrefix}/equipment-list/?form_type=${this.options.formType}`);
             const data = await response.json();
             if (data.success) {
                 this.equipmentSelect.innerHTML = '<option value="">請選擇設備</option>';
                 
                 data.equipments.forEach(equipment => {
-                    let shouldInclude = true;
-                    
-                    // 根據表單類型過濾設備
-                    if (this.options.formType === 'smt') {
-                        // SMT表單：只顯示包含SMT的設備
-                        shouldInclude = equipment.name.includes('SMT');
-                    } else {
-                        // 作業員表單：排除包含SMT的設備
-                        shouldInclude = !equipment.name.includes('SMT');
-                    }
-                    
-                    if (shouldInclude) {
-                        const option = document.createElement('option');
-                        option.value = equipment.name;
-                        option.textContent = equipment.name;
-                        this.equipmentSelect.appendChild(option);
-                    }
+                    const option = document.createElement('option');
+                    option.value = equipment.name;
+                    option.textContent = equipment.name;
+                    this.equipmentSelect.appendChild(option);
                 });
                 
                 console.log(`載入設備完成，表單類型: ${this.options.formType}`);

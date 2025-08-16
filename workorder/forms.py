@@ -462,11 +462,11 @@ class SMTSupplementReportForm(ProductionReportBaseForm):
         # 設定 equipment 的 queryset，而不是 choices
         self.fields["equipment"].queryset = smt_equipment
 
-        # 設定工單查詢集（直接從工單表取得）
-        from .models import WorkOrder
+        # 設定工單查詢集（統一使用 WorkOrderDispatch 作為資料來源）
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
         workorders = (
-            WorkOrder.objects.exclude(order_number__icontains="RD樣品")
+            WorkOrderDispatch.objects.exclude(order_number__icontains="RD樣品")
             .exclude(order_number__icontains="RD-樣品")
             .exclude(order_number__icontains="RD樣本")
             .exclude(status="completed")
@@ -510,12 +510,12 @@ class SMTSupplementReportForm(ProductionReportBaseForm):
         )
 
     def get_product_choices(self):
-        """獲取產品編號選項（直接從工單表取得）"""
-        from .models import WorkOrder
+        """獲取產品編號選項（統一使用 WorkOrderDispatch 作為資料來源）"""
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
-        # 直接從工單表中獲取所有產品編號
+        # 從 WorkOrderDispatch 中獲取所有產品編號
         products = (
-            WorkOrder.objects.exclude(order_number__icontains="RD樣品")
+            WorkOrderDispatch.objects.exclude(order_number__icontains="RD樣品")
             .exclude(order_number__icontains="RD-樣品")
             .exclude(order_number__icontains="RD樣本")
             .exclude(status="completed")
@@ -613,11 +613,11 @@ class SMTSupplementBatchForm(forms.Form):
         ).order_by("name")
         self.fields["equipment"].queryset = smt_equipment
 
-        # 設置工單選項
-        from .models import WorkOrder
+        # 設置工單選項（統一使用 WorkOrderDispatch 作為資料來源）
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
         workorders = (
-            WorkOrder.objects.filter(status__in=["pending", "in_progress", "paused"])
+            WorkOrderDispatch.objects.filter(status__in=["pending", "dispatched", "in_production"])
             .exclude(status="completed")  # 排除已完工的工單
             .order_by("-created_at")[:100]
         )
@@ -780,17 +780,19 @@ class BackupOperatorSupplementReportForm(ProductionReportBaseForm):
         )
         self.fields["equipment"].queryset = equipments
 
-        # 載入工單選項（只顯示ERP工單，排除RD樣品）
-        from .models import WorkOrder
+        # 載入工單選項（統一使用 WorkOrderDispatch 作為資料來源）
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
         workorders = (
-            WorkOrder.objects.filter(order_source='erp')
+            WorkOrderDispatch.objects.exclude(order_number__icontains="RD樣品")
+            .exclude(order_number__icontains="RD-樣品")
+            .exclude(order_number__icontains="RD樣本")
             .exclude(status="completed")
             .order_by("-created_at")
         )
         self.fields["workorder"].queryset = workorders
 
-        # 載入產品編號選項（從ERP工單中取得）
+        # 載入產品編號選項（從 WorkOrderDispatch 中取得）
         product_choices = self.get_product_choices()
         self.fields["product_id"].choices = product_choices
 
@@ -801,12 +803,14 @@ class BackupOperatorSupplementReportForm(ProductionReportBaseForm):
             self.fields["work_date"].initial = date.today()
 
     def get_product_choices(self):
-        """獲取產品編號選項（從ERP工單中取得）"""
-        from .models import WorkOrder
+        """獲取產品編號選項（統一使用 WorkOrderDispatch 作為資料來源）"""
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
-        # 從ERP工單中獲取所有產品編號
+        # 從 WorkOrderDispatch 中獲取所有產品編號
         products = (
-            WorkOrder.objects.filter(order_source='erp')
+            WorkOrderDispatch.objects.exclude(order_number__icontains="RD樣品")
+            .exclude(order_number__icontains="RD-樣品")
+            .exclude(order_number__icontains="RD樣本")
             .exclude(status="completed")
             .values_list("product_code", flat=True)
             .distinct()
@@ -1225,11 +1229,11 @@ class OperatorSupplementBatchForm(forms.Form):
         operators = Operator.objects.all().order_by("name")
         self.fields["operator"].queryset = operators
 
-        # 設置工單選項
-        from .models import WorkOrder
+        # 設置工單選項（統一使用 WorkOrderDispatch 作為資料來源）
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
         workorders = (
-            WorkOrder.objects.filter(status__in=["pending", "in_progress", "paused"])
+            WorkOrderDispatch.objects.filter(status__in=["pending", "dispatched", "in_production"])
             .exclude(status="completed")  # 排除已完工的工單
             .order_by("-created_at")[:100]
         )
@@ -2107,11 +2111,11 @@ class OperatorBackfillForm(ProductionReportBaseForm):
             print(f"初始化表單時發生錯誤: {e}")
 
     def get_workorder_queryset(self):
-        """獲取工單查詢集"""
-        from .models import WorkOrder
+        """獲取工單查詢集（統一使用 WorkOrderDispatch 作為資料來源）"""
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
         return (
-            WorkOrder.objects.exclude(order_number__icontains="RD樣品")
+            WorkOrderDispatch.objects.exclude(order_number__icontains="RD樣品")
             .exclude(order_number__icontains="RD-樣品")
             .exclude(order_number__icontains="RD樣本")
             .exclude(status="completed")
@@ -2119,12 +2123,12 @@ class OperatorBackfillForm(ProductionReportBaseForm):
         )
 
     def get_product_choices(self):
-        """獲取產品編號選項"""
-        from .models import WorkOrder
+        """獲取產品編號選項（統一使用 WorkOrderDispatch 作為資料來源）"""
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
-        # 從工單中獲取所有產品編號
+        # 從 WorkOrderDispatch 中獲取所有產品編號
         products = (
-            WorkOrder.objects.exclude(order_number__icontains="RD樣品")
+            WorkOrderDispatch.objects.exclude(order_number__icontains="RD樣品")
             .exclude(order_number__icontains="RD-樣品")
             .exclude(order_number__icontains="RD樣本")
             .exclude(status="completed")
@@ -2360,11 +2364,11 @@ class SMTBackfillForm(ProductionReportBaseForm):
         # 設定 equipment 的 queryset，而不是 choices
         self.fields["equipment"].queryset = smt_equipment
 
-        # 設定工單查詢集（直接從工單表取得）
-        from .models import WorkOrder
+        # 設定工單查詢集（統一使用 WorkOrderDispatch 作為資料來源）
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
         workorders = (
-            WorkOrder.objects.exclude(order_number__icontains="RD樣品")
+            WorkOrderDispatch.objects.exclude(order_number__icontains="RD樣品")
             .exclude(order_number__icontains="RD-樣品")
             .exclude(order_number__icontains="RD樣本")
             .exclude(status="completed")
@@ -2389,12 +2393,12 @@ class SMTBackfillForm(ProductionReportBaseForm):
         self.fields["process"].queryset = processes
 
     def get_product_choices(self):
-        """獲取產品編號選項（直接從工單表取得）"""
-        from .models import WorkOrder
+        """獲取產品編號選項（統一使用 WorkOrderDispatch 作為資料來源）"""
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
-        # 從工單中獲取所有產品編號
+        # 從 WorkOrderDispatch 中獲取所有產品編號
         products = (
-            WorkOrder.objects.exclude(order_number__icontains="RD樣品")
+            WorkOrderDispatch.objects.exclude(order_number__icontains="RD樣品")
             .exclude(order_number__icontains="RD-樣品")
             .exclude(order_number__icontains="RD樣本")
             .exclude(status="completed")
@@ -2647,11 +2651,14 @@ class OperatorOnSiteReportForm(forms.ModelForm):
         equipments = Equipment.objects.all().order_by("name")
         self.fields["equipment"].queryset = equipments
 
-        # 載入工單選項
-        from .models import WorkOrder
+        # 載入工單選項（統一使用 WorkOrderDispatch 作為資料來源）
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
 
         workorders = (
-            WorkOrder.objects.exclude(status="completed")
+            WorkOrderDispatch.objects.exclude(order_number__icontains="RD樣品")
+            .exclude(order_number__icontains="RD-樣品")
+            .exclude(order_number__icontains="RD樣本")
+            .exclude(status="completed")
             .order_by("-created_at")
         )
         self.fields["workorder"].queryset = workorders

@@ -113,7 +113,20 @@ urlpatterns = [
     # 公司製令單管理 - 使用類別視圖
     path("company/", CompanyOrderListView.as_view(), name="company_orders"),
     
-    # API 路由
+    # 統一API路由 - 整合填報和現場報工的API
+    path("api/workorder-list/", workorder_views.get_workorder_list_unified, name="workorder_list"),
+    path("api/workorder-by-product/", workorder_views.get_workorder_by_product_unified, name="workorder_by_product"),
+    path("api/workorder-detail/", workorder_views.get_workorder_detail_unified, name="workorder_detail"),
+    path("api/workorder-data/", workorder_views.get_workorder_data_unified, name="workorder_data"),
+    path("api/workorder-info/", workorder_views.get_workorder_info_unified, name="workorder_info"),
+    path("api/product-list/", workorder_views.get_product_list_unified, name="product_list"),
+    path("api/products-by-company/", workorder_views.get_products_by_company_unified, name="products_by_company"),
+    path("api/company-list/", workorder_views.get_company_list_unified, name="company_list"),
+    path("api/operator-list/", workorder_views.get_operator_list_unified, name="operator_list"),
+    path("api/process-list/", workorder_views.get_process_list_unified, name="process_list"),
+    path("api/equipment-list/", workorder_views.get_equipment_list_unified, name="equipment_list"),
+    
+    # 原有API路由（保留作為備用）
     path("api/company_order_info/", get_company_order_info, name="get_company_order_info"),
     path("api/get_workorders_by_product/", workorder_views.get_workorders_by_product, name="get_workorders_by_product"),
     path("api/get_product_by_workorder/", workorder_views.get_product_by_workorder, name="get_product_by_workorder"),
@@ -133,7 +146,7 @@ urlpatterns = [
     path("report/", RedirectView.as_view(url="/workorder/fill_work/", permanent=True)),
     
     # 填報作業管理首頁
-    path("fill_work/", include('workorder.fill_work.urls')),
+    path("fill_work/", include('workorder.fill_work.urls', namespace='fill_work')),
     
     # 現場報工管理子模組
     path("onsite_reporting/", include(('workorder.onsite_reporting.urls', 'onsite_reporting'))),

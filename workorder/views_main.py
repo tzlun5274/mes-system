@@ -4673,6 +4673,481 @@ def get_product_by_workorder(request):
             'message': str(e)
         })
 
+# ==================== 統一API視圖函數 ====================
+
+@require_GET
+@login_required
+def get_workorder_list_unified(request):
+    """統一工單列表API - 統一使用 WorkOrderDispatch 資料來源"""
+    try:
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        
+        # 統一使用 WorkOrderDispatch 作為資料來源，不檢查狀態
+        workorders = WorkOrderDispatch.objects.all().order_by('-created_at')
+        
+        workorder_list = []
+        for workorder in workorders:
+            # 獲取公司名稱
+            company_name = workorder.company_code
+            try:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
+                if company_config:
+                    company_name = company_config.company_name
+            except:
+                pass
+            
+            workorder_list.append({
+                'id': workorder.id,
+                'workorder': workorder.order_number,
+                'product_id': workorder.product_code,
+                'company_name': company_name,
+                'planned_quantity': workorder.planned_quantity or 0,
+                'display_name': f"{workorder.order_number} - {workorder.product_code}"
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'workorders': workorder_list
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
+@require_GET
+@login_required
+def get_workorder_by_product_unified(request):
+    """統一根據產品編號取得工單API - 統一使用 WorkOrderDispatch 資料來源"""
+    try:
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        
+        product_id = request.GET.get('product_id')
+        if not product_id:
+            return JsonResponse({
+                'success': False,
+                'message': '缺少產品編號參數'
+            }, status=400)
+        
+        print(f"查詢產品編號: {product_id}")
+        
+        # 統一使用 WorkOrderDispatch 作為資料來源
+        workorders = WorkOrderDispatch.objects.filter(product_code=product_id).order_by('-created_at')
+        print(f"WorkOrderDispatch 查詢結果: {workorders.count()} 筆")
+        
+        workorder_list = []
+        for workorder in workorders:
+            # 獲取公司名稱
+            company_name = workorder.company_code
+            try:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
+                if company_config:
+                    company_name = company_config.company_name
+            except:
+                pass
+            
+            workorder_list.append({
+                'id': workorder.id,
+                'workorder': workorder.order_number,
+                'product_id': workorder.product_code,
+                'company_name': company_name,
+                'planned_quantity': workorder.planned_quantity or 0,
+                'display_name': f"{workorder.order_number} - {workorder.product_code}"
+            })
+        
+        print(f"最終結果: {len(workorder_list)} 筆工單")
+        
+        return JsonResponse({
+            'success': True,
+            'workorders': workorder_list
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
+@require_GET
+@login_required
+def get_workorder_detail_unified(request):
+    """統一工單詳細資訊API - 統一使用 WorkOrderDispatch 資料來源"""
+    try:
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        
+        workorder_id = request.GET.get('workorder_id')
+        if not workorder_id:
+            return JsonResponse({
+                'success': False,
+                'message': '缺少工單號碼參數'
+            }, status=400)
+        
+        # 統一使用 WorkOrderDispatch 作為資料來源
+        workorder = WorkOrderDispatch.objects.filter(order_number=workorder_id).first()
+        if not workorder:
+            return JsonResponse({
+                'success': False,
+                'message': '工單不存在'
+            }, status=404)
+        
+        # 獲取公司名稱
+        company_name = workorder.company_code
+        try:
+            from erp_integration.models import CompanyConfig
+            company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
+            if company_config:
+                company_name = company_config.company_name
+        except:
+            pass
+        
+        return JsonResponse({
+            'success': True,
+            'workorder': {
+                'id': workorder.id,
+                'workorder': workorder.order_number,
+                'product_id': workorder.product_code,
+                'company_name': company_name,
+                'planned_quantity': workorder.planned_quantity or 0
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
+@require_GET
+@login_required
+def get_product_list_unified(request):
+    """統一產品清單API - 統一使用 WorkOrderDispatch 資料來源"""
+    try:
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        
+        # 統一使用 WorkOrderDispatch 作為資料來源
+        products = WorkOrderDispatch.objects.values_list('product_code', flat=True).distinct().order_by('product_code')
+        print(f"產品編號查詢結果: {len(products)} 個產品")
+        
+        product_list = []
+        for product in products:
+            if product:  # 排除空值
+                product_list.append({
+                    'product_id': product
+                })
+        
+        return JsonResponse({
+            'success': True,
+            'products': product_list
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
+@require_GET
+@login_required
+def get_products_by_company_unified(request):
+    """統一根據公司名稱取得產品清單API - 統一使用 WorkOrderDispatch 資料來源"""
+    try:
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        
+        company_name = request.GET.get('company_name')
+        if not company_name:
+            return JsonResponse({
+                'success': False,
+                'message': '缺少公司名稱參數'
+            }, status=400)
+        
+        # 根據公司名稱找到 company_code，再查產品
+        company_code = company_name
+        try:
+            from erp_integration.models import CompanyConfig
+            company_config = CompanyConfig.objects.filter(company_name=company_name).first()
+            if company_config:
+                company_code = company_config.company_code
+        except:
+            pass
+        
+        # 統一使用 WorkOrderDispatch 作為資料來源
+        products = WorkOrderDispatch.objects.filter(company_code=company_code).values_list('product_code', flat=True).distinct().order_by('product_code')
+        
+        product_list = []
+        for product in products:
+            if product:  # 排除空值
+                product_list.append({
+                    'product_id': product
+                })
+        
+        return JsonResponse({
+            'success': True,
+            'products': product_list
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
+@require_GET
+@login_required
+def get_company_list_unified(request):
+    """統一公司清單API - 統一使用 WorkOrderDispatch 資料來源"""
+    try:
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        
+        # 統一使用 WorkOrderDispatch 作為資料來源
+        company_codes = WorkOrderDispatch.objects.values_list('company_code', flat=True).distinct().order_by('company_code')
+        
+        company_list = []
+        for company_code in company_codes:
+            if company_code:  # 排除空值
+                company_name = company_code
+                try:
+                    from erp_integration.models import CompanyConfig
+                    company_config = CompanyConfig.objects.filter(company_code=company_code).first()
+                    if company_config:
+                        company_name = company_config.company_name
+                except:
+                    pass
+                
+                company_list.append({
+                    'company_code': company_code,
+                    'company_name': company_name
+                })
+        
+        return JsonResponse({
+            'success': True,
+            'companies': company_list
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
+@require_GET
+@login_required
+def get_operator_list_unified(request):
+    """統一作業員清單API"""
+    try:
+        from process.models import Operator
+        
+        # 取得所有作業員
+        operators = Operator.objects.values('name').distinct().order_by('name')
+        
+        return JsonResponse({
+            'success': True,
+            'operators': list(operators)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
+@require_GET
+@login_required
+def get_process_list_unified(request):
+    """統一工序清單API"""
+    try:
+        from process.models import ProcessName
+        
+        # 取得表單類型參數
+        form_type = request.GET.get('form_type', 'operator')  # 預設為作業員表單
+        
+        # 取得所有工序
+        processes = ProcessName.objects.values('name').distinct().order_by('name')
+        
+        # 根據表單類型過濾工序
+        filtered_processes = []
+        for process in processes:
+            process_name = process['name']
+            should_include = True
+            
+            if form_type == 'smt':
+                # SMT表單：只顯示包含SMT的工序
+                should_include = 'SMT' in process_name.upper()
+            else:
+                # 作業員表單：排除包含SMT的工序
+                should_include = 'SMT' not in process_name.upper()
+            
+            if should_include:
+                filtered_processes.append(process)
+        
+        return JsonResponse({
+            'success': True,
+            'processes': filtered_processes
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
+@require_GET
+@login_required
+def get_equipment_list_unified(request):
+    """統一設備清單API"""
+    try:
+        from equip.models import Equipment
+        
+        # 取得表單類型參數
+        form_type = request.GET.get('form_type', 'operator')  # 預設為作業員表單
+        
+        # 取得所有設備
+        equipments = Equipment.objects.values('name').distinct().order_by('name')
+        
+        # 根據表單類型過濾設備
+        filtered_equipments = []
+        for equipment in equipments:
+            equipment_name = equipment['name']
+            should_include = True
+            
+            if form_type == 'smt':
+                # SMT表單：只顯示包含SMT的設備
+                should_include = 'SMT' in equipment_name.upper()
+            else:
+                # 作業員表單：排除包含SMT的設備
+                should_include = 'SMT' not in equipment_name.upper()
+            
+            if should_include:
+                filtered_equipments.append(equipment)
+        
+        return JsonResponse({
+            'success': True,
+            'equipments': filtered_equipments
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
+@require_GET
+@login_required
+def get_workorder_data_unified(request):
+    """統一工單資料API - 統一使用 WorkOrderDispatch 資料來源"""
+    try:
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        from erp_integration.models import CompanyConfig
+        
+        product_id = request.GET.get('product_id')
+        workorder_id = request.GET.get('workorder_id')
+        
+        if product_id:
+            # 根據產品編號獲取工單資料
+            workorder = WorkOrderDispatch.objects.filter(product_code=product_id).first()
+            
+            if workorder:
+                # 獲取公司名稱
+                company_name = workorder.company_code
+                try:
+                    company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
+                    if company_config:
+                        company_name = company_config.company_name
+                except:
+                    pass
+                
+                return JsonResponse({
+                    'success': True,
+                    'workorder': workorder.order_number,
+                    'company_name': company_name,
+                    'planned_quantity': workorder.planned_quantity
+                })
+        
+        elif workorder_id:
+            # 根據工單號碼獲取工單資料
+            workorder = WorkOrderDispatch.objects.filter(order_number=workorder_id).first()
+            
+            if workorder:
+                # 獲取公司名稱
+                company_name = workorder.company_code
+                try:
+                    company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
+                    if company_config:
+                        company_name = company_config.company_name
+                except:
+                    pass
+                
+                return JsonResponse({
+                    'success': True,
+                    'product_id': workorder.product_code,
+                    'company_name': company_name,
+                    'planned_quantity': workorder.planned_quantity
+                })
+        
+        return JsonResponse({
+            'success': False,
+            'message': '未找到相關資料'
+        }, status=404)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
+@require_GET
+@login_required
+def get_workorder_info_unified(request):
+    """統一根據工單號碼獲取工單詳細資訊API - 統一使用 WorkOrderDispatch 資料來源"""
+    try:
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        from erp_integration.models import CompanyConfig
+        
+        workorder_id = request.GET.get('workorder_id')
+        if not workorder_id:
+            return JsonResponse({
+                'success': False,
+                'message': '缺少工單號碼參數'
+            }, status=400)
+        
+        # 根據工單號碼獲取工單資料
+        workorder = WorkOrderDispatch.objects.filter(order_number=workorder_id).first()
+        
+        if workorder:
+            # 獲取公司名稱
+            company_name = None
+            try:
+                company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
+                if company_config:
+                    company_name = company_config.company_name
+            except:
+                pass
+            
+            # 只有當找到有效的公司設定時才回傳資料
+            if company_name:
+                return JsonResponse({
+                    'success': True,
+                    'workorder': workorder.order_number,
+                    'product_id': workorder.product_code,
+                    'company_name': company_name,
+                    'planned_quantity': workorder.planned_quantity
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': '找不到對應的公司設定'
+                }, status=404)
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': '未找到工單資料'
+            }, status=404)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'載入失敗: {str(e)}'
+        }, status=400)
+
 @require_GET
 @login_required
 def get_product_codes_for_autocomplete(request):

@@ -42,29 +42,6 @@ urlpatterns = [
     path("config/create/", views.onsite_report_config_create, name="onsite_report_config_create"),
     path("config/edit/<int:pk>/", views.onsite_report_config_update, name="onsite_report_config_edit"),
     path("config/delete/<int:pk>/", views.OnsiteReportConfigDeleteView.as_view(), name="onsite_report_config_delete"),
-
-    # API 路由
-    path("api/update-status/<int:pk>/", views.update_onsite_report_status, name="update_onsite_report_status"),
-    path("api/complete/<int:pk>/", views.complete_onsite_report, name="complete_onsite_report"),
-    path("api/pause/<int:pk>/", views.pause_onsite_report, name="pause_onsite_report"),
-    path("api/resume/<int:pk>/", views.resume_onsite_report, name="resume_onsite_report"),
-
-    # 動態載入 API
-    path("api/product-list/", views.product_list_api, name="product_list_api"),
-    path("api/company-list/", views.company_list_api, name="company_list_api"),
-    path("api/workorder-list/", views.workorder_list_api, name="workorder_list_api"),
-    path("api/operator-list/", views.operator_list_api, name="operator_list_api"),
-    path("api/equipment-list/", views.equipment_list_api, name="equipment_list_api"),
-    path("api/process-list/", views.process_list_api, name="process_list_api"),
-    path("api/workorder-by-product/", views.workorder_by_product_api, name="workorder_by_product_api"),
-    path("api/products-by-company/", views.products_by_company_api, name="products_by_company_api"),
-    path("api/workorder-detail/", views.workorder_detail_api, name="workorder_detail_api"),
-    path("api/workorder-debug/", views.workorder_debug_api, name="workorder_debug_api"),
-    path("api/simple-test/", views.simple_test_api, name="simple_test_api"),
-    
-    # 自動加入工序 API
-    path("api/auto-add-process/", views.auto_add_process_to_workorder, name="auto_add_process_to_workorder"),
-    path("api/get-workorder-processes/", views.get_workorder_processes, name="get_workorder_processes"),
     
     # RD 樣品工單管理
     path("rd-sample-workorder/list/", views.rd_sample_workorder_list, name="rd_sample_workorder_list"),
