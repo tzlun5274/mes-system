@@ -243,59 +243,80 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 設定預設日期為今天
     const today = new Date().toISOString().split('T')[0];
-    $('#id_work_date').val(today);
+    document.getElementById('id_work_date').value = today;
     
     // 設定預設時間
-    $('#start_hour').val('08');
-    $('#start_minute').val('30');
-    $('#end_hour').val('16');
-    $('#end_minute').val('30');
+    document.getElementById('start_hour').value = '08';
+    document.getElementById('start_minute').value = '30';
+    document.getElementById('end_hour').value = '16';
+    document.getElementById('end_minute').value = '30';
     
     // 更新隱藏時間欄位
     updateTimeFields();
-    $('#start_hour, #start_minute, #end_hour, #end_minute').change(updateTimeFields);
+    
+    // 時間選擇變更事件
+    const timeSelects = ['start_hour', 'start_minute', 'end_hour', 'end_minute'];
+    timeSelects.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', updateTimeFields);
+        }
+    });
 
     // 設備選擇變更事件 - 自動填入作業員
-    $('#equipment').change(function() {
-        const equipmentName = $(this).val();
-        if (equipmentName) {
-            $('#operator_display').val(equipmentName);
-            $('#operator').val(equipmentName);
-        } else {
-            $('#operator_display').val('');
-            $('#operator').val('');
-        }
-    });
+    const equipmentElement = document.getElementById('equipment');
+    if (equipmentElement) {
+        equipmentElement.addEventListener('change', function() {
+            const equipmentName = this.value;
+            const operatorDisplayElement = document.getElementById('operator_display');
+            const operatorElement = document.getElementById('operator');
+            
+            if (equipmentName) {
+                if (operatorDisplayElement) operatorDisplayElement.value = equipmentName;
+                if (operatorElement) operatorElement.value = equipmentName;
+            } else {
+                if (operatorDisplayElement) operatorDisplayElement.value = '';
+                if (operatorElement) operatorElement.value = '';
+            }
+        });
+    }
     
     // 表單提交前驗證
-    $('#fillWorkForm').submit(function(e) {
-        if (!validateForm()) {
-            e.preventDefault();
-            return false;
-        }
-    });
+    const formElement = document.getElementById('fillWorkForm');
+    if (formElement) {
+        formElement.addEventListener('submit', function(e) {
+            if (!validateForm()) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    }
 });
 
 function updateTimeFields() {
-    const sh = $('#start_hour').val();
-    const sm = $('#start_minute').val();
-    const eh = $('#end_hour').val();
-    const em = $('#end_minute').val();
-    if (sh && sm) { $('#start_time').val(`${sh}:${sm}`); }
-    if (eh && em) { $('#end_time').val(`${eh}:${em}`); }
+    const sh = document.getElementById('start_hour').value;
+    const sm = document.getElementById('start_minute').value;
+    const eh = document.getElementById('end_hour').value;
+    const em = document.getElementById('end_minute').value;
+    if (sh && sm) { 
+        document.getElementById('start_time').value = `${sh}:${sm}`; 
+    }
+    if (eh && em) { 
+        document.getElementById('end_time').value = `${eh}:${em}`; 
+    }
 }
 
 // 表單驗證（頂部顯示詳細錯誤）
 function validateForm() {
     // 依實際元素 id 對應選擇器（Django 自動產生 id_*）
     const selectors = {
-        company_name: '#company_name',
-        process: '#id_process',
-        equipment: '#equipment',
-        work_quantity: '#id_work_quantity'
+        company_name: 'company_name',
+        process: 'id_process',
+        equipment: 'equipment',
+        work_quantity: 'id_work_quantity'
     };
     const labelMap = {
         company_name: '公司名稱',
@@ -305,12 +326,14 @@ function validateForm() {
     };
     const missing = [];
     Object.keys(selectors).forEach(key => {
-        const sel = selectors[key];
-        const v = (($(sel).val()) || '').toString().trim();
+        const element = document.getElementById(selectors[key]);
+        const v = element ? (element.value || '').toString().trim() : '';
         if (!v) missing.push(labelMap[key] || key);
     });
-    const startTime = $('#start_time').val();
-    const endTime = $('#end_time').val();
+    const startTimeElement = document.getElementById('start_time');
+    const endTimeElement = document.getElementById('end_time');
+    const startTime = startTimeElement ? startTimeElement.value : '';
+    const endTime = endTimeElement ? endTimeElement.value : '';
     let timeError = '';
     if (!startTime || !endTime) {
         timeError = '請選擇完整的開始時間與結束時間';
@@ -323,11 +346,19 @@ function validateForm() {
         const parts = [];
         if (missing.length) parts.push('請填寫必填欄位：' + missing.join('、'));
         if (timeError) parts.push(timeError);
-        $('#clientError').removeClass('d-none').text(parts.join('；'));
+        const clientErrorElement = document.getElementById('clientError');
+        if (clientErrorElement) {
+            clientErrorElement.classList.remove('d-none');
+            clientErrorElement.textContent = parts.join('；');
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return false;
     }
-    $('#clientError').addClass('d-none').text('');
+    const clientErrorElement = document.getElementById('clientError');
+    if (clientErrorElement) {
+        clientErrorElement.classList.add('d-none');
+        clientErrorElement.textContent = '';
+    }
     return true;
 }
 </script>

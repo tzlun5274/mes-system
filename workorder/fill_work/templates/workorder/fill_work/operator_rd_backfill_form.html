@@ -261,44 +261,53 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 設定預設時間
-    $('#start_hour').val('08');
-    $('#start_minute').val('30');
-    $('#end_hour').val('17');
-    $('#end_minute').val('30');
+    document.getElementById('start_hour').value = '08';
+    document.getElementById('start_minute').value = '30';
+    document.getElementById('end_hour').value = '17';
+    document.getElementById('end_minute').value = '30';
     
     // 更新隱藏的時間欄位
     updateTimeFields();
     
     // 時間選擇變更事件
-    $('#start_hour, #start_minute, #end_hour, #end_minute').change(function() {
-        updateTimeFields();
-        // 同步到手動輸入欄位
-        syncToManualInput();
+    const timeSelects = ['start_hour', 'start_minute', 'end_hour', 'end_minute'];
+    timeSelects.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', function() {
+                updateTimeFields();
+                // 同步到手動輸入欄位
+                syncToManualInput();
+            });
+        }
     });
     
     // 表單提交前驗證
-    $('#fillWorkForm').submit(function(e) {
-        console.log('=== 表單提交事件觸發 ===');
-        
-        // 先更新隱藏欄位
-        updateTimeFields();
-        
-        // 驗證表單
-        if (!validateForm()) {
-            console.log('表單驗證失敗');
-            e.preventDefault();
-            return false;
-        }
-        
-        console.log('表單驗證通過');
-        // 驗證通過，顯示載入指示器
-        showLoading();
-        
-        // 允許表單提交
-        return true;
-    });
+    const formElement = document.getElementById('fillWorkForm');
+    if (formElement) {
+        formElement.addEventListener('submit', function(e) {
+            console.log('=== 表單提交事件觸發 ===');
+            
+            // 先更新隱藏欄位
+            updateTimeFields();
+            
+            // 驗證表單
+            if (!validateForm()) {
+                console.log('表單驗證失敗');
+                e.preventDefault();
+                return false;
+            }
+            
+            console.log('表單驗證通過');
+            // 驗證通過，顯示載入指示器
+            showLoading();
+            
+            // 允許表單提交
+            return true;
+        });
+    }
     
     // 檢查是否有成功訊息，如果有則延遲跳轉
     {% if messages %}
@@ -314,19 +323,19 @@ $(document).ready(function() {
 
 // 更新隱藏的時間欄位
 function updateTimeFields() {
-    const startHour = $('#start_hour').val();
-    const startMinute = $('#start_minute').val();
-    const endHour = $('#end_hour').val();
-    const endMinute = $('#end_minute').val();
+    const startHour = document.getElementById('start_hour').value;
+    const startMinute = document.getElementById('start_minute').value;
+    const endHour = document.getElementById('end_hour').value;
+    const endMinute = document.getElementById('end_minute').value;
     
     if (startHour && startMinute) {
         const startTime = `${startHour}:${startMinute}`;
-        $('#start_time').val(startTime);
+        document.getElementById('start_time').value = startTime;
     }
     
     if (endHour && endMinute) {
         const endTime = `${endHour}:${endMinute}`;
-        $('#end_time').val(endTime);
+        document.getElementById('end_time').value = endTime;
     }
 }
 
@@ -338,12 +347,12 @@ function syncToManualInput() {
 
 // 顯示載入指示器
 function showLoading() {
-    $('#loadingIndicator').show();
+    document.getElementById('loadingIndicator').style.display = 'block';
 }
 
 // 隱藏載入指示器
 function hideLoading() {
-    $('#loadingIndicator').hide();
+    document.getElementById('loadingIndicator').style.display = 'none';
 }
 
 // 表單驗證
@@ -359,17 +368,18 @@ function validateForm() {
     ];
     
     for (let field of requiredFields) {
-        const value = $(`#${field.id}`).val();
+        const element = document.getElementById(field.id);
+        const value = element ? element.value : '';
         if (!value || value === '') {
             errorMessages.push(`• ${field.name} 為必填欄位`);
         }
     }
     
     // 驗證時間
-    const startHour = $('#start_hour').val();
-    const startMinute = $('#start_minute').val();
-    const endHour = $('#end_hour').val();
-    const endMinute = $('#end_minute').val();
+    const startHour = document.getElementById('start_hour').value;
+    const startMinute = document.getElementById('start_minute').value;
+    const endHour = document.getElementById('end_hour').value;
+    const endMinute = document.getElementById('end_minute').value;
     
     if (!startHour || !startMinute) {
         errorMessages.push('• 開始時間 為必填欄位');
@@ -390,13 +400,15 @@ function validateForm() {
     }
     
     // 驗證工作數量
-    const workQuantity = parseInt($('#id_work_quantity').val());
+    const workQuantityElement = document.getElementById('id_work_quantity');
+    const workQuantity = workQuantityElement ? parseInt(workQuantityElement.value) : 0;
     if (isNaN(workQuantity) || workQuantity < 0) {
         errorMessages.push('• 工作數量 不能為負數');
     }
     
     // 驗證不良品數量
-    const defectQuantity = parseInt($('#id_defect_quantity').val()) || 0;
+    const defectQuantityElement = document.getElementById('id_defect_quantity');
+    const defectQuantity = defectQuantityElement ? parseInt(defectQuantityElement.value) || 0 : 0;
     if (defectQuantity < 0) {
         errorMessages.push('• 不良品數量 不能為負數');
     }

@@ -232,7 +232,7 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 初始化現場報工控制器
     class OnsiteReportController {
         constructor() {
@@ -258,9 +258,12 @@ $(document).ready(function() {
             });
 
             // 表單提交驗證
-            document.getElementById('rdOnsiteReportForm').addEventListener('submit', (e) => {
-                this.validateForm(e);
-            });
+            const formElement = document.getElementById('rdOnsiteReportForm');
+            if (formElement) {
+                formElement.addEventListener('submit', (e) => {
+                    this.validateForm(e);
+                });
+            }
         }
 
         // 更新數量欄位狀態
@@ -273,27 +276,39 @@ $(document).ready(function() {
                 
                 // 開工和重啟開工時，數量欄位唯讀且設為0
                 if (status === 'started' || status === 'resumed') {
-                    this.workQuantityInput.setAttribute('readonly', 'readonly');
-                    this.defectQuantityInput.setAttribute('readonly', 'readonly');
-                    this.workQuantityInput.value = '0';
-                    this.defectQuantityInput.value = '0';
-                    this.workQuantityInput.classList.add('bg-light');
-                    this.defectQuantityInput.classList.add('bg-light');
+                    if (this.workQuantityInput) {
+                        this.workQuantityInput.setAttribute('readonly', 'readonly');
+                        this.workQuantityInput.value = '0';
+                        this.workQuantityInput.classList.add('bg-light');
+                    }
+                    if (this.defectQuantityInput) {
+                        this.defectQuantityInput.setAttribute('readonly', 'readonly');
+                        this.defectQuantityInput.value = '0';
+                        this.defectQuantityInput.classList.add('bg-light');
+                    }
                     console.log('數量欄位設為唯讀，數值重置為0');
                 } else {
                     // 暫停、完工、停工時，數量欄位可編輯
-                    this.workQuantityInput.removeAttribute('readonly');
-                    this.defectQuantityInput.removeAttribute('readonly');
-                    this.workQuantityInput.classList.remove('bg-light');
-                    this.defectQuantityInput.classList.remove('bg-light');
+                    if (this.workQuantityInput) {
+                        this.workQuantityInput.removeAttribute('readonly');
+                        this.workQuantityInput.classList.remove('bg-light');
+                    }
+                    if (this.defectQuantityInput) {
+                        this.defectQuantityInput.removeAttribute('readonly');
+                        this.defectQuantityInput.classList.remove('bg-light');
+                    }
                     console.log('數量欄位設為可編輯');
                 }
             } else {
                 // 沒有選擇狀態時，預設為可編輯
-                this.workQuantityInput.removeAttribute('readonly');
-                this.defectQuantityInput.removeAttribute('readonly');
-                this.workQuantityInput.classList.remove('bg-light');
-                this.defectQuantityInput.classList.remove('bg-light');
+                if (this.workQuantityInput) {
+                    this.workQuantityInput.removeAttribute('readonly');
+                    this.workQuantityInput.classList.remove('bg-light');
+                }
+                if (this.defectQuantityInput) {
+                    this.defectQuantityInput.removeAttribute('readonly');
+                    this.defectQuantityInput.classList.remove('bg-light');
+                }
                 console.log('數量欄位預設為可編輯');
             }
         }
@@ -305,10 +320,10 @@ $(document).ready(function() {
 
             requiredFields.forEach(fieldName => {
                 const field = document.getElementById(fieldName);
-                if (!field.value.trim()) {
+                if (field && !field.value.trim()) {
                     field.classList.add('is-invalid');
                     isValid = false;
-                } else {
+                } else if (field) {
                     field.classList.remove('is-invalid');
                 }
             });
@@ -342,12 +357,18 @@ $(document).ready(function() {
 
 // 顯示載入指示器
 function showLoading() {
-    $('#loadingIndicator').show();
+    const loadingElement = document.getElementById('loadingIndicator');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
 }
 
 // 隱藏載入指示器
 function hideLoading() {
-    $('#loadingIndicator').hide();
+    const loadingElement = document.getElementById('loadingIndicator');
+    if (loadingElement) {
+        loadingElement.style.display = 'none';
+    }
 }
 
 // 表單驗證
@@ -363,20 +384,23 @@ function validateForm() {
     ];
     
     for (let field of requiredFields) {
-        const value = $(`#${field.id}`).val();
+        const element = document.getElementById(field.id);
+        const value = element ? element.value : '';
         if (!value || value === '') {
             errorMessages.push(`• ${field.name} 為必填欄位`);
         }
     }
     
     // 驗證工作數量
-    const workQuantity = parseInt($('#work_quantity').val());
+    const workQuantityElement = document.getElementById('work_quantity');
+    const workQuantity = workQuantityElement ? parseInt(workQuantityElement.value) : 0;
     if (isNaN(workQuantity) || workQuantity < 0) {
         errorMessages.push('• 工作數量 不能為負數');
     }
     
     // 驗證不良品數量
-    const defectQuantity = parseInt($('#defect_quantity').val()) || 0;
+    const defectQuantityElement = document.getElementById('defect_quantity');
+    const defectQuantity = defectQuantityElement ? parseInt(defectQuantityElement.value) || 0 : 0;
     if (defectQuantity < 0) {
         errorMessages.push('• 不良品數量 不能為負數');
     }

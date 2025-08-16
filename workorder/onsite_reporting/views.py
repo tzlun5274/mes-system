@@ -975,22 +975,22 @@ def smt_rd_onsite_report_create(request):
         except Exception as e:
             messages.error(request, f'SMT_RD樣品現場報工記錄建立失敗：{str(e)}')
     
-    # 取得作業員列表（過濾非SMT）
+    # 取得作業員列表（只顯示SMT相關）
     from process.models import Operator
     operators = Operator.objects.filter(
-        ~Q(name__icontains='SMT')
+        Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
-    # 取得工序列表（過濾非SMT）
+    # 取得工序列表（只顯示SMT相關）
     from process.models import ProcessName
     processes = ProcessName.objects.filter(
-        ~Q(name__icontains='SMT')
+        Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
-    # 取得設備列表（過濾非SMT）
+    # 取得設備列表（只顯示SMT相關）
     from equip.models import Equipment
     equipments = Equipment.objects.filter(
-        ~Q(name__icontains='SMT')
+        Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
     # 取得公司名稱列表
