@@ -41,8 +41,8 @@ class CompanyCodeMixin:
         if company_code:
             return company_code
         
-        # 預設公司代號
-        return '01'
+        # 預設公司代號（耀儀科技）
+        return '10'
 
 
 class DataIsolationMixin(CompanyCodeMixin):

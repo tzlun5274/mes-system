@@ -24,8 +24,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--company-code',
             type=str,
-            default='01',
-            help='公司代號（預設：01）'
+            default='10',
+            help='公司代號（預設：10，耀儀科技）'
         )
         parser.add_argument(
             '--product-id',
@@ -148,7 +148,7 @@ class Command(BaseCommand):
 
     def find_or_create_workorder(self, fill_work, dry_run, force):
         """查找或建立工單"""
-        company_code = fill_work.company_code or '01'
+        company_code = fill_work.company_code or '10'
         rd_workorder_number = f"RD樣品-{fill_work.product_id}"
         product_code = fill_work.product_id
 

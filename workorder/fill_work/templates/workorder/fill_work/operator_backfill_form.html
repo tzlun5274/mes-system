@@ -313,6 +313,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化統一的填報表單控制器
     new FillWorkController();
     
+    // 初始化統一的作業員、工序、設備控制器（作業員表單）
+    window.operatorProcessEquipmentController = new OperatorProcessEquipmentController({
+        formType: 'operator',
+        enableEquipmentAutoFill: false,
+        apiPrefix: '/workorder/onsite_reporting/api',
+        operatorId: 'operator',
+        processId: 'process',
+        equipmentId: 'equipment'
+    });
+    
     console.log('作業員補登填報表單初始化完成');
 });
 

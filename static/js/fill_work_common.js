@@ -64,8 +64,14 @@ class FillWorkController {
             const response = await fetch('/workorder/fill_work/api/workorder-list/');
             const data = await response.json();
             if (data.workorders) {
-                // 從工單資料中提取公司名稱
-                const companies = [...new Set(data.workorders.map(w => w.company_name))].sort();
+                // 從工單資料中提取公司名稱，過濾掉純數字的公司代號
+                const companies = [...new Set(data.workorders.map(w => w.company_name))]
+                    .filter(company => {
+                        // 過濾掉純數字的公司代號（如 "01", "02" 等）
+                        return !/^\d+$/.test(company) && company.trim() !== '';
+                    })
+                    .sort();
+                
                 this.companySelect.innerHTML = '<option value="">請選擇公司名稱</option>';
                 companies.forEach(company => {
                     const option = document.createElement('option');
@@ -73,6 +79,8 @@ class FillWorkController {
                     option.textContent = company;
                     this.companySelect.appendChild(option);
                 });
+                
+                console.log(`載入公司名稱完成，共 ${companies.length} 個選項`);
             }
         } catch (error) {
             console.error('載入公司名稱失敗:', error);
@@ -211,12 +219,249 @@ class FillWorkController {
     }
 }
 
+/**
+ * 作業員、工序、設備統一管理模組
+ * 處理所有填報表單中的作業員、工序、設備選擇功能
+ */
+class OperatorProcessEquipmentController {
+    constructor(options = {}) {
+        this.options = {
+            // 表單類型：'operator'（作業員）或 'smt'（SMT）
+            formType: options.formType || 'operator',
+            // 是否啟用設備自動填入作業員功能（SMT專用）
+            enableEquipmentAutoFill: options.enableEquipmentAutoFill || false,
+            // API端點前綴
+            apiPrefix: options.apiPrefix || '/workorder/onsite_reporting/api',
+            // 元素ID
+            operatorId: options.operatorId || 'operator',
+            operatorDisplayId: options.operatorDisplayId || 'operator_display',
+            processId: options.processId || 'process',
+            equipmentId: options.equipmentId || 'equipment',
+            ...options
+        };
+        
+        this.initializeElements();
+        this.initializeEventListeners();
+        this.loadInitialData();
+        
+        console.log(`作業員、工序、設備控制器初始化完成，表單類型: ${this.options.formType}`);
+    }
+
+    // 初始化 DOM 元素
+    initializeElements() {
+        this.operatorSelect = document.getElementById(this.options.operatorId);
+        this.operatorDisplay = document.getElementById(this.options.operatorDisplayId);
+        this.processSelect = document.getElementById(this.options.processId);
+        this.equipmentSelect = document.getElementById(this.options.equipmentId);
+        
+        // 檢查必要元素是否存在
+        if (!this.processSelect) {
+            console.error('找不到必要的工序下拉選單元素');
+            return;
+        }
+    }
+
+    // 初始化事件監聽器
+    initializeEventListeners() {
+        // 設備選擇事件（SMT專用）
+        if (this.equipmentSelect && this.options.enableEquipmentAutoFill) {
+            this.equipmentSelect.addEventListener('change', () => {
+                this.handleEquipmentChange();
+            });
+        }
+    }
+
+    // 載入初始資料
+    loadInitialData() {
+        this.loadOperators();
+        this.loadProcesses();
+        if (this.equipmentSelect) {
+            this.loadEquipment();
+        }
+    }
+
+    // 載入作業員
+    async loadOperators() {
+        try {
+            const response = await fetch(`${this.options.apiPrefix}/operator-list/`);
+            const data = await response.json();
+            if (data.success) {
+                // 如果是SMT表單且有作業員顯示欄位，不需要載入作業員選項
+                if (this.options.formType === 'smt' && this.operatorDisplay) {
+                    console.log('SMT表單：作業員欄位為唯讀顯示，不載入選項');
+                    return;
+                }
+                
+                // 如果是作業員表單，載入作業員選項
+                if (this.operatorSelect) {
+                    this.operatorSelect.innerHTML = '<option value="">請選擇作業員</option>';
+                    data.operators.forEach(operator => {
+                        const option = document.createElement('option');
+                        option.value = operator.name;
+                        option.textContent = operator.name;
+                        this.operatorSelect.appendChild(option);
+                    });
+                    console.log(`載入作業員完成，共 ${data.operators.length} 個選項`);
+                }
+            }
+        } catch (error) {
+            console.error('載入作業員失敗:', error);
+        }
+    }
+
+    // 載入工序（根據表單類型過濾）
+    async loadProcesses() {
+        try {
+            const response = await fetch(`${this.options.apiPrefix}/process-list/`);
+            const data = await response.json();
+            if (data.success) {
+                this.processSelect.innerHTML = '<option value="">請選擇此次報工的工序</option>';
+                
+                data.processes.forEach(process => {
+                    let shouldInclude = true;
+                    
+                    // 根據表單類型過濾工序
+                    if (this.options.formType === 'smt') {
+                        // SMT表單：只顯示包含SMT的工序
+                        shouldInclude = process.name.includes('SMT');
+                    } else {
+                        // 作業員表單：排除包含SMT的工序
+                        shouldInclude = !process.name.includes('SMT');
+                    }
+                    
+                    if (shouldInclude) {
+                        const option = document.createElement('option');
+                        option.value = process.name;
+                        option.textContent = process.name;
+                        this.processSelect.appendChild(option);
+                    }
+                });
+                
+                console.log(`載入工序完成，表單類型: ${this.options.formType}`);
+            }
+        } catch (error) {
+            console.error('載入工序失敗:', error);
+        }
+    }
+
+    // 載入設備（根據表單類型過濾）
+    async loadEquipment() {
+        try {
+            const response = await fetch(`${this.options.apiPrefix}/equipment-list/`);
+            const data = await response.json();
+            if (data.success) {
+                this.equipmentSelect.innerHTML = '<option value="">請選擇設備</option>';
+                
+                data.equipments.forEach(equipment => {
+                    let shouldInclude = true;
+                    
+                    // 根據表單類型過濾設備
+                    if (this.options.formType === 'smt') {
+                        // SMT表單：只顯示包含SMT的設備
+                        shouldInclude = equipment.name.includes('SMT');
+                    } else {
+                        // 作業員表單：排除包含SMT的設備
+                        shouldInclude = !equipment.name.includes('SMT');
+                    }
+                    
+                    if (shouldInclude) {
+                        const option = document.createElement('option');
+                        option.value = equipment.name;
+                        option.textContent = equipment.name;
+                        this.equipmentSelect.appendChild(option);
+                    }
+                });
+                
+                console.log(`載入設備完成，表單類型: ${this.options.formType}`);
+            }
+        } catch (error) {
+            console.error('載入設備失敗:', error);
+        }
+    }
+
+    // 處理設備變更（SMT專用）
+    handleEquipmentChange() {
+        if (!this.options.enableEquipmentAutoFill) return;
+        
+        const equipmentName = this.equipmentSelect.value;
+        if (equipmentName) {
+            // 自動填入作業員欄位為設備名稱
+            if (this.options.formType === 'smt' && this.operatorDisplay) {
+                // SMT表單：填入顯示欄位和隱藏欄位
+                this.operatorDisplay.value = equipmentName;
+                if (this.operatorSelect) {
+                    this.operatorSelect.value = equipmentName;
+                }
+                console.log('SMT表單：設備選擇時自動填入作業員:', equipmentName);
+            } else if (this.operatorSelect) {
+                // 作業員表單：填入下拉選單
+                this.operatorSelect.value = equipmentName;
+                console.log('作業員表單：設備選擇時自動填入作業員:', equipmentName);
+            }
+        } else {
+            // 如果沒有選擇設備，清空作業員欄位
+            if (this.options.formType === 'smt' && this.operatorDisplay) {
+                this.operatorDisplay.value = '';
+                if (this.operatorSelect) {
+                    this.operatorSelect.value = '';
+                }
+            } else if (this.operatorSelect) {
+                this.operatorSelect.value = '';
+            }
+        }
+    }
+
+    // 重置所有選項
+    resetAllOptions() {
+        if (this.operatorSelect) {
+            this.operatorSelect.innerHTML = '<option value="">請選擇作業員</option>';
+        }
+        if (this.processSelect) {
+            this.processSelect.innerHTML = '<option value="">請選擇此次報工的工序</option>';
+        }
+        if (this.equipmentSelect) {
+            this.equipmentSelect.innerHTML = '<option value="">請選擇設備</option>';
+        }
+        this.loadInitialData();
+    }
+
+    // 取得選中的值
+    getSelectedValues() {
+        return {
+            operator: this.operatorSelect ? this.operatorSelect.value : '',
+            process: this.processSelect ? this.processSelect.value : '',
+            equipment: this.equipmentSelect ? this.equipmentSelect.value : ''
+        };
+    }
+
+    // 設定值
+    setValues(values) {
+        if (values.operator && this.operatorSelect) {
+            this.operatorSelect.value = values.operator;
+        }
+        if (values.process && this.processSelect) {
+            this.processSelect.value = values.process;
+        }
+        if (values.equipment && this.equipmentSelect) {
+            this.equipmentSelect.value = values.equipment;
+        }
+    }
+}
+
 // 全域函數，供其他腳本使用
 window.FillWorkController = FillWorkController;
+window.OperatorProcessEquipmentController = OperatorProcessEquipmentController;
 
 // 全域重置函數，供按 F5 時使用
 window.resetFillWorkForm = function() {
     if (window.fillWorkController) {
         window.fillWorkController.resetAllOptions();
+    }
+};
+
+// 全域作業員、工序、設備重置函數
+window.resetOperatorProcessEquipmentForm = function() {
+    if (window.operatorProcessEquipmentController) {
+        window.operatorProcessEquipmentController.resetAllOptions();
     }
 }; 

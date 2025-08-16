@@ -118,8 +118,8 @@ class CompanyCodeMiddleware:
         if request.user.is_superuser:
             return None
         
-        # 一般用戶預設為公司代號 01
-        return '01'
+        # 一般用戶預設為公司代號 10（耀儀科技）
+        return '10'
 
 
 class DataIsolationMiddleware:

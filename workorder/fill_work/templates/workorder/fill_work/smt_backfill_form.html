@@ -93,20 +93,17 @@
                             <!-- 工序 -->
                             <div class="col-md-4 mb-3">
                                 <label for="process" class="form-label">工序 <span class="text-danger">*</span></label>
-                                {{ form.process }}
+                                <select class="form-select" id="process" name="process" required>
+                                    <option value="">請選擇此次填報的工序</option>
+                                </select>
                                 <div class="form-text">請選擇此次填報的工序</div>
                             </div>
 
                             <!-- 使用的設備 -->
                             <div class="col-md-4 mb-3">
-                                <label for="equipment" class="form-label">使用的設備 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="equipment" name="equipment" required>
+                                <label for="equipment" class="form-label">使用的設備</label>
+                                <select class="form-select" id="equipment" name="equipment">
                                     <option value="">請選擇使用的設備</option>
-                                    {% for value, label in form.fields.equipment.choices %}
-                                        {% if value %}
-                                            <option value="{{ value }}">{{ label }}</option>
-                                        {% endif %}
-                                    {% endfor %}
                                 </select>
                                 <div class="form-text">請選擇此次填報使用的設備，選擇後會自動填入作業員欄位</div>
                             </div>
@@ -260,213 +257,94 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/fill_work_common.js' %}"></script>
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 設定預設日期為今天
     const today = new Date().toISOString().split('T')[0];
-    $('#id_work_date').val(today);
+    const workDateElement = document.getElementById('id_work_date');
+    if (workDateElement) {
+        workDateElement.value = today;
+    }
     
     // 設定預設時間
-    $('#start_hour').val('08');
-    $('#start_minute').val('30');
-    $('#end_hour').val('16');
-    $('#end_minute').val('30');
+    const startHourElement = document.getElementById('start_hour');
+    const startMinuteElement = document.getElementById('start_minute');
+    const endHourElement = document.getElementById('end_hour');
+    const endMinuteElement = document.getElementById('end_minute');
     
-    // 初始化 product/workorder 下拉
-    $('#product_id').html('<option value="">請選擇產品編號</option>');
-    $('#workorder').html('<option value="">請選擇工單號碼</option>');
-    // 載入全部產品清單
-    $.ajax({
-        url: '{% url "workorder:fill_work:get_product_list" %}',
-        success: function(data){ updateProductOptions(data); }
-    });
-    // 載入全部工單號碼
-    $.ajax({
-        url: '{% url "workorder:fill_work:get_all_workorder_numbers" %}',
-        success: function(data){
-            const arr = (data && data.workorders) ? data.workorders : [];
-            let options = '<option value="">請選擇工單號碼</option>';
-            arr.forEach(function(no){ options += `<option value="${no}">${no}</option>`; });
-            $('#workorder').html(options);
-        }
-    });
+    if (startHourElement) startHourElement.value = '08';
+    if (startMinuteElement) startMinuteElement.value = '30';
+    if (endHourElement) endHourElement.value = '16';
+    if (endMinuteElement) endMinuteElement.value = '30';
     
     // 更新隱藏的時間欄位
     updateTimeFields();
-    $('#start_hour, #start_minute, #end_hour, #end_minute').change(updateTimeFields);
     
-    // 產品編號變更事件
-    $('#product_id').change(function() {
-        const productId = $(this).val();
-        if (productId) {
-            showLoading();
-            $.ajax({
-                url: '{% url "workorder:fill_work:get_workorder_by_product" %}',
-                data: { product_id: productId },
-                success: function(data) {
-                    const items = data && data.workorders ? data.workorders : [];
-                    updateWorkorderOptions(items);
-                    if (items.length > 0) {
-                        const firstNo = items[0].workorder;
-                        $('#workorder').val(firstNo).trigger('change');
-                    }
-                    hideLoading();
-                },
-                error: function() {
-                    hideLoading();
-                    showFormMessage('danger', '獲取工單資料失敗');
-                }
-            });
-        } else {
-            $('#workorder').html('<option value="">請選擇工單號碼</option>');
-            $('#planned_quantity').val('');
-            $('#company_name').val('');
+    // 時間選擇變更事件
+    const timeSelects = ['start_hour', 'start_minute', 'end_hour', 'end_minute'];
+    timeSelects.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', updateTimeFields);
         }
     });
     
-    // 工單號碼變更事件
-    $('#workorder').change(function() {
-        const workorderId = $(this).val();
-        if (workorderId) {
-            showLoading();
-            $.ajax({
-                url: '{% url "workorder:fill_work:get_workorder_info" %}',
-                data: { workorder_id: workorderId },
-                success: function(data) {
-                    $('#planned_quantity').val(data.planned_quantity);
-                    $('#company_name').val(data.company_name);
-                    // 同步設定產品編號下拉（若不存在於選項，先加入再選取）
-                    if (data.product_id) {
-                        const $pid = $('#product_id');
-                        if ($pid.find(`option[value='${data.product_id}']`).length === 0) {
-                            $pid.append(`<option value="${data.product_id}">${data.product_id}</option>`);
-                        }
-                        $pid.val(data.product_id);
-                    }
-                    hideLoading();
-                },
-                error: function() {
-                    hideLoading();
-                    showFormMessage('danger', '獲取工單資訊失敗');
-                }
-            });
-        } else {
-            $('#planned_quantity').val('');
-            $('#company_name').val('');
-        }
-    });
+    // 初始化統一的填報控制器（處理產品編號、工單號碼、公司名稱的雙向關聯選擇）
+    new FillWorkController();
     
-    // 公司名稱變更事件
-    $('#company_name').change(function() {
-        const companyName = $(this).val();
-        if (companyName) {
-            showLoading();
-            $.ajax({
-                url: '{% url "workorder:fill_work:get_products_by_company" %}',
-                data: { company_name: companyName },
-                success: function(data) {
-                    updateProductOptions(data);
-                    // 若有產品清單，預設選第一筆並觸發變更，更新工單清單
-                    const products = (data && data.products) ? data.products : [];
-                    if (products.length > 0) {
-                        $('#product_id').val(products[0]).trigger('change');
-                    } else {
-                        $('#product_id').val('');
-                        $('#workorder').html('<option value="">請選擇工單號碼</option>');
-                        $('#planned_quantity').val('');
-                    }
-                    hideLoading();
-                },
-                error: function() {
-                    hideLoading();
-                    showFormMessage('danger', '獲取產品資料失敗');
-                }
-            });
-        }
-    });
-    
-    // 設備選擇變更事件 - 自動填入作業員
-    $('#equipment').change(function() {
-        const equipmentName = $(this).val();
-        if (equipmentName) {
-            $('#operator_display').val(equipmentName);
-            $('#operator').val(equipmentName);
-        } else {
-            $('#operator_display').val('');
-            $('#operator').val('');
-        }
+    // 初始化統一的作業員、工序、設備控制器（SMT表單）
+    window.operatorProcessEquipmentController = new OperatorProcessEquipmentController({
+        formType: 'smt',
+        enableEquipmentAutoFill: true,
+        apiPrefix: '/workorder/onsite_reporting/api',
+        operatorId: 'operator',
+        operatorDisplayId: 'operator_display',
+        processId: 'process',
+        equipmentId: 'equipment'
     });
     
     // 表單提交前驗證
-    $('#fillWorkForm').submit(function(e) {
-        if (!validateForm()) {
-            e.preventDefault();
-            return false;
-        }
-    });
+    const formElement = document.getElementById('fillWorkForm');
+    if (formElement) {
+        formElement.addEventListener('submit', function(e) {
+            if (!validateForm()) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    }
 });
 
-// 顯示頁面內提示訊息
-function showFormMessage(type, text) {
-    const container = $('#formMessageContainer');
-    const alertHtml = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">${text}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>`;
-    container.html(alertHtml);
-    if (container.length && container[0].scrollIntoView) {
-        container[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-}
-
-// 更新工單選項
-function updateWorkorderOptions(workorders) {
-    let options = '<option value="">請選擇工單號碼</option>';
-    workorders.forEach(function(workorder) {
-        options += `<option value="${workorder.workorder}" data-planned-quantity="${workorder.planned_quantity}" data-company-name="${workorder.company_name}">${workorder.workorder}</option>`;
-    });
-    $('#workorder').html(options);
-}
-
-// 更新產品選項
-function updateProductOptions(data) {
-    const products = (data && data.products) ? data.products : [];
-    let options = '<option value="">請選擇產品編號</option>';
-    products.forEach(function(pid) {
-        options += `<option value="${pid}">${pid}</option>`;
-    });
-    $('#product_id').html(options);
-}
 // 組合隱藏時間欄位
 function updateTimeFields() {
-    const sh = $('#start_hour').val();
-    const sm = $('#start_minute').val();
-    const eh = $('#end_hour').val();
-    const em = $('#end_minute').val();
-    if (sh && sm) { $('#start_time').val(`${sh}:${sm}`); }
-    if (eh && em) { $('#end_time').val(`${eh}:${em}`); }
-}
-
-// 顯示載入指示器
-function showLoading() {
-    $('#loadingIndicator').show();
-}
-
-// 隱藏載入指示器
-function hideLoading() {
-    $('#loadingIndicator').hide();
+    const startHourElement = document.getElementById('start_hour');
+    const startMinuteElement = document.getElementById('start_minute');
+    const endHourElement = document.getElementById('end_hour');
+    const endMinuteElement = document.getElementById('end_minute');
+    const startTimeElement = document.getElementById('start_time');
+    const endTimeElement = document.getElementById('end_time');
+    
+    if (startHourElement && startMinuteElement && startTimeElement && startHourElement.value && startMinuteElement.value) {
+        startTimeElement.value = `${startHourElement.value}:${startMinuteElement.value}`;
+    }
+    
+    if (endHourElement && endMinuteElement && endTimeElement && endHourElement.value && endMinuteElement.value) {
+        endTimeElement.value = `${endHourElement.value}:${endMinuteElement.value}`;
+    }
 }
 
 // 表單驗證
 function validateForm() {
     // 對應實際欄位 id
     const selectors = {
-        product_id: '#product_id',
-        workorder: '#workorder',
-        company_name: '#company_name',
-        process: '#id_process',
-        equipment: '#equipment',
-        work_quantity: '#id_work_quantity',
-        operator: '#operator'
+        product_id: 'product_id',
+        workorder: 'workorder',
+        company_name: 'company_name',
+        process: 'process',
+        equipment: 'equipment',
+        work_quantity: 'id_work_quantity',
+        operator: 'operator'
     };
     const labelMap = {
         product_id: '產品編號',
@@ -477,29 +355,35 @@ function validateForm() {
         work_quantity: '工作數量',
         operator: '作業員'
     };
+    
     for (const key of Object.keys(selectors)) {
-        const sel = selectors[key];
-        const v = (($(sel).val()) || '').toString().trim();
-        if (!v) {
-            showFormMessage('danger', `請填寫必填欄位：${labelMap[key] || key}`);
-            if ($(sel).length) { $(sel).focus(); }
-            return false;
+        const element = document.getElementById(selectors[key]);
+        if (element) {
+            const value = (element.value || '').toString().trim();
+            if (!value) {
+                alert(`請填寫必填欄位：${labelMap[key] || key}`);
+                element.focus();
+                return false;
+            }
         }
     }
     
-    const startTime = $('#start_time').val();
-    const endTime = $('#end_time').val();
+    const startTimeElement = document.getElementById('start_time');
+    const endTimeElement = document.getElementById('end_time');
     
-    if (!startTime || !endTime) {
-        showFormMessage('danger', '請選擇完整的開始時間和結束時間');
+    if (!startTimeElement || !endTimeElement || !startTimeElement.value || !endTimeElement.value) {
+        alert('請選擇完整的開始時間和結束時間');
         return false;
     }
+    
+    const startTime = startTimeElement.value;
+    const endTime = endTimeElement.value;
     
     const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
     const endMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
     
     if (endMinutes <= startMinutes) {
-        showFormMessage('danger', '結束時間必須晚於開始時間');
+        alert('結束時間必須晚於開始時間');
         return false;
     }
     

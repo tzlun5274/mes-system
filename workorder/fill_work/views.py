@@ -1351,7 +1351,7 @@ def get_workorder_list(request):
             workorder_list = []
             for workorder in workorders:
                 # 獲取公司名稱
-                company_name = workorder.company_code
+                company_name = None
                 try:
                     company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
                     if company_config:
@@ -1359,13 +1359,15 @@ def get_workorder_list(request):
                 except:
                     pass
                 
-                workorder_list.append({
-                    'id': workorder.id,
-                    'workorder': workorder.order_number,
-                    'product_id': workorder.product_code,
-                    'company_name': company_name,
-                    'planned_quantity': workorder.planned_quantity
-                })
+                # 只有當找到有效的公司設定時才加入清單
+                if company_name:
+                    workorder_list.append({
+                        'id': workorder.id,
+                        'workorder': workorder.order_number,
+                        'product_id': workorder.product_code,
+                        'company_name': company_name,
+                        'planned_quantity': workorder.planned_quantity
+                    })
             
             return JsonResponse({'workorders': workorder_list})
         else:
@@ -1401,7 +1403,7 @@ def get_workorder_by_product(request):
         workorder_list = []
         for workorder in workorders:
             # 獲取公司名稱
-            company_name = workorder.company_code
+            company_name = None
             try:
                 company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
                 if company_config:
@@ -1409,14 +1411,16 @@ def get_workorder_by_product(request):
             except:
                 pass
             
-            workorder_list.append({
-                'id': workorder.id,
-                'workorder': workorder.order_number,
-                'product_id': workorder.product_code,
-                'company_name': company_name,
-                'planned_quantity': workorder.planned_quantity,
-                'display_name': f"{workorder.order_number} - {workorder.product_code}"
-            })
+            # 只有當找到有效的公司設定時才加入清單
+            if company_name:
+                workorder_list.append({
+                    'id': workorder.id,
+                    'workorder': workorder.order_number,
+                    'product_id': workorder.product_code,
+                    'company_name': company_name,
+                    'planned_quantity': workorder.planned_quantity,
+                    'display_name': f"{workorder.order_number} - {workorder.product_code}"
+                })
         
         return JsonResponse({'workorders': workorder_list})
         
@@ -1436,7 +1440,7 @@ def get_workorder_info(request):
         
         if workorder:
             # 獲取公司名稱
-            company_name = workorder.company_code
+            company_name = None
             try:
                 company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
                 if company_config:
@@ -1444,12 +1448,16 @@ def get_workorder_info(request):
             except:
                 pass
             
-            return JsonResponse({
-                'workorder': workorder.order_number,
-                'product_id': workorder.product_code,
-                'company_name': company_name,
-                'planned_quantity': workorder.planned_quantity
-            })
+            # 只有當找到有效的公司設定時才回傳資料
+            if company_name:
+                return JsonResponse({
+                    'workorder': workorder.order_number,
+                    'product_id': workorder.product_code,
+                    'company_name': company_name,
+                    'planned_quantity': workorder.planned_quantity
+                })
+            else:
+                return JsonResponse({'error': '找不到對應的公司設定'}, status=404)
         else:
             return JsonResponse({'error': '未找到工單資料'}, status=404)
         

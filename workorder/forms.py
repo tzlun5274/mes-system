@@ -1923,7 +1923,7 @@ class RDSampleWorkOrderForm(forms.ModelForm):
         
         # 設定預設公司代號
         if not self.instance.pk:
-            self.fields["company_code"].initial = "01"
+            self.fields["company_code"].initial = "10"
 
     def save(self, commit=True):
         """儲存RD樣品工單"""

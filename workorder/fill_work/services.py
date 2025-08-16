@@ -61,7 +61,8 @@ class RDSampleWorkOrderService:
         """
         try:
             # 使用公司代號+RD樣品+產品編號作為唯一識別
-            company_code = fill_work_record.company_code or '01'  # 預設公司代號
+            # 如果沒有公司代號，預設為耀儀科技（RD樣品通常屬於耀儀科技）
+            company_code = fill_work_record.company_code or '10'
             rd_workorder_number = f"RD樣品-{fill_work_record.product_id}"
             product_code = fill_work_record.product_id
             
