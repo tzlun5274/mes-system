@@ -237,6 +237,38 @@ class FillWorkApprovalService:
                     fill_work_record, approved_by
                 )
                 
+                # 更新工單狀態
+                try:
+                    from workorder.services.workorder_status_service import WorkOrderStatusService
+                    from workorder.models import WorkOrder
+                    from erp_integration.models import CompanyConfig
+                    
+                    # 查找對應的工單
+                    company_config = CompanyConfig.objects.filter(
+                        company_name=fill_work_record.company_name
+                    ).first()
+                    
+                    if company_config:
+                        workorder = WorkOrder.objects.filter(
+                            company_code=company_config.company_code,
+                            order_number=fill_work_record.workorder,
+                            product_code=fill_work_record.product_id
+                        ).first()
+                    else:
+                        workorder = WorkOrder.objects.filter(
+                            order_number=fill_work_record.workorder,
+                            product_code=fill_work_record.product_id
+                        ).first()
+                    
+                    if workorder:
+                        WorkOrderStatusService.update_workorder_status(workorder.id)
+                        logger.info(f"工單 {workorder.order_number} 狀態更新成功")
+                    else:
+                        logger.warning(f"找不到對應的工單: {fill_work_record.workorder}")
+                        
+                except Exception as status_error:
+                    logger.error(f"工單狀態更新失敗: {str(status_error)}")
+                
                 result = {
                     'success': True,
                     'message': '填報記錄核准成功',

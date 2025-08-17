@@ -75,6 +75,7 @@ class OnsiteReport(models.Model):
         verbose_name_plural = "現場報工記錄"
         db_table = 'workorder_onsite_report'
         ordering = ['-created_at']
+        unique_together = (("company_code", "order_number", "product_code"),)  # 公司代號+工單號碼+產品編號唯一
         indexes = [
             models.Index(fields=['company_code']),
             models.Index(fields=['operator']),

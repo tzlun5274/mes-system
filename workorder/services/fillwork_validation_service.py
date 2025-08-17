@@ -97,9 +97,17 @@ class FillWorkValidationService:
                         continue
                     
                     # 檢查工單是否存在
-                    # 使用公司代號和工單號碼組合查詢，確保唯一性
-                    workorder = WorkOrder.objects.filter(order_number=fillwork.workorder).first()
-                    # 注意：這裡需要從填報記錄中獲取公司代號，暫時保持原有邏輯
+                    # 根據多公司架構，需要同時檢查公司代號、工單號碼和產品編號
+                    workorder = WorkOrder.objects.filter(
+                        order_number=fillwork.workorder,
+                        product_code=fillwork.product_id
+                    ).first()
+                    
+                    # 如果找到工單，進一步檢查公司代號是否匹配
+                    if workorder and workorder.company_code:
+                        if workorder.company_code != company_config.company_code:
+                            # 公司代號不匹配，視為找不到工單
+                            workorder = None
                     
                     if not workorder:
                         # 工單號碼不存在
@@ -161,14 +169,13 @@ class FillWorkValidationService:
                                     'work_date': fillwork.work_date,
                                     'issue': '公司代號不匹配'
                                 })
-                        
                 except Exception as e:
                     logger.error(f"檢查填報紀錄時發生錯誤: {e}")
                     results['errors'].append({
                         'fillwork_id': fillwork.id if hasattr(fillwork, 'id') else 'Unknown',
                         'error': str(e)
                     })
-            
+        
         except Exception as e:
             logger.error(f"檢查填報紀錄相符性時發生錯誤: {e}")
             results['errors'].append({
@@ -258,9 +265,10 @@ class FillWorkValidationService:
         missing_workorders = []
         
         for fillwork in fillwork_records:
-            # 檢查工單號碼是否存在（不管產品編號）
+            # 檢查工單號碼是否存在（使用多公司架構唯一識別）
             workorder = WorkOrder.objects.filter(
-                order_number=fillwork.workorder
+                order_number=fillwork.workorder,
+                product_code=fillwork.product_id
             ).first()
             
             # 只有工單號碼完全不存在才算是缺失工單

@@ -53,6 +53,7 @@ class WorkOrderDispatch(models.Model):
         verbose_name_plural = "派工單管理"
         db_table = "workorder_dispatch"
         ordering = ["-created_at"]
+        unique_together = (("company_code", "order_number", "product_code"),)  # 公司代號+工單號碼+產品編號唯一
         indexes = [
             models.Index(fields=['order_number']),
             models.Index(fields=['product_code']),

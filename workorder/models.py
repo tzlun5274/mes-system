@@ -4,6 +4,7 @@ from process.models import Operator
 from equip.models import Equipment
 import logging
 from datetime import datetime
+from django.db.models import Sum
 
 # 導入派工單子模組的模型（使用字串引用避免循環依賴）
 # from .workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess
@@ -610,6 +611,7 @@ class WorkOrderProductionDetail(models.Model):
         verbose_name_plural = "生產報工明細"
         db_table = "workorder_production_detail"
         ordering = ["process_name", "start_time", "report_time"]  # 按工序名稱、開始時間、報工時間排序
+        unique_together = (("workorder_production", "process_name", "report_date"),)  # 生產記錄+工序名稱+報工日期唯一
         indexes = [
             # 優化完工判斷查詢的複合索引
             models.Index(fields=['workorder_production', 'process_name', 'report_source'], 
@@ -673,8 +675,7 @@ class CompletedWorkOrder(models.Model):
         verbose_name_plural = "已完工工單"
         db_table = 'workorder_completed_workorder'
         ordering = ['-completed_at']
-        # 注意：unique_together 約束已在遷移 0012 中通過 RunSQL 手動添加
-        # 這裡不設定 unique_together，避免 Django 自動生成衝突的遷移
+        unique_together = (("company_code", "order_number", "product_code"),)  # 公司代號+工單號碼+產品編號唯一
         indexes = [
             models.Index(fields=['order_number']),
             models.Index(fields=['product_code']),
@@ -1217,6 +1218,8 @@ class AutoManagementConfig(models.Model):
             is_enabled=True,
             next_execution__lte=timezone.now()
         )
+
+# 生產中監控資料表已移至 workorder.production_monitoring.models.ProductionMonitoringData
 
 
 

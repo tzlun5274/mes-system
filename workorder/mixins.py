@@ -92,16 +92,25 @@ class WorkOrderQueryMixin(CompanyCodeMixin):
     提供標準化的工單查詢方法
     """
     
-    def get_workorder_by_number(self, order_number, company_code=None):
+    def get_workorder_by_number(self, order_number, company_code=None, product_code=None):
         """
-        根據工單號碼和公司代號獲取工單
+        根據多公司架構唯一識別條件獲取工單
+        唯一識別：公司代號 + 工單號碼 + 產品編號
         """
         from .models import WorkOrder
         
         if not company_code:
             company_code = self.get_user_company_code()
         
-        if company_code:
+        if company_code and product_code:
+            # 完整的多公司架構查詢
+            return WorkOrder.objects.filter(
+                company_code=company_code,
+                order_number=order_number,
+                product_code=product_code
+            ).first()
+        elif company_code:
+            # 只有公司代號和工單號碼
             return WorkOrder.objects.filter(
                 company_code=company_code,
                 order_number=order_number
@@ -132,37 +141,58 @@ class FillWorkQueryMixin(CompanyCodeMixin):
     提供標準化的填報記錄查詢方法
     """
     
-    def get_fillwork_by_company(self, company_code=None):
+    def get_fillwork_by_company(self, company_name=None):
         """
-        根據公司代號獲取填報記錄列表
+        根據公司名稱獲取填報記錄列表
         """
         from .fill_work.models import FillWork
         
-        if not company_code:
+        if not company_name:
+            # 如果沒有提供公司名稱，嘗試從用戶的公司代號獲取公司名稱
             company_code = self.get_user_company_code()
+            if company_code:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(company_code=company_code).first()
+                if company_config:
+                    company_name = company_config.company_name
         
-        if company_code:
-            return FillWork.objects.filter(company_code=company_code)
+        if company_name:
+            return FillWork.objects.filter(company_name=company_name)
         else:
-            # 如果沒有公司代號，返回所有填報記錄（超級用戶）
+            # 如果沒有公司名稱，返回所有填報記錄（超級用戶）
             return FillWork.objects.all()
     
-    def get_fillwork_by_workorder(self, workorder_number, company_code=None):
+    def get_fillwork_by_workorder(self, workorder_number, company_name=None, product_code=None):
         """
-        根據工單號碼和公司代號獲取填報記錄
+        根據多公司架構唯一識別條件獲取填報記錄
+        唯一識別：公司名稱 + 工單號碼 + 產品編號
         """
         from .fill_work.models import FillWork
         
-        if not company_code:
+        if not company_name:
+            # 如果沒有提供公司名稱，嘗試從用戶的公司代號獲取公司名稱
             company_code = self.get_user_company_code()
+            if company_code:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(company_code=company_code).first()
+                if company_config:
+                    company_name = company_config.company_name
         
-        if company_code:
+        if company_name and product_code:
+            # 完整的多公司架構查詢
             return FillWork.objects.filter(
-                company_code=company_code,
+                company_name=company_name,
+                workorder=workorder_number,
+                product_id=product_code
+            )
+        elif company_name:
+            # 只有公司名稱和工單號碼
+            return FillWork.objects.filter(
+                company_name=company_name,
                 workorder=workorder_number
             )
         else:
-            # 如果沒有公司代號，使用舊方式查詢（向後相容）
+            # 如果沒有公司名稱，使用舊方式查詢（向後相容）
             return FillWork.objects.filter(workorder=workorder_number)
 
 
@@ -187,16 +217,25 @@ class DispatchQueryMixin(CompanyCodeMixin):
             # 如果沒有公司代號，返回所有派工單（超級用戶）
             return WorkOrderDispatch.objects.all()
     
-    def get_dispatch_by_workorder(self, workorder_number, company_code=None):
+    def get_dispatch_by_workorder(self, workorder_number, company_code=None, product_code=None):
         """
-        根據工單號碼和公司代號獲取派工單
+        根據多公司架構唯一識別條件獲取派工單
+        唯一識別：公司代號 + 工單號碼 + 產品編號
         """
         from .workorder_dispatch.models import WorkOrderDispatch
         
         if not company_code:
             company_code = self.get_user_company_code()
         
-        if company_code:
+        if company_code and product_code:
+            # 完整的多公司架構查詢
+            return WorkOrderDispatch.objects.filter(
+                company_code=company_code,
+                order_number=workorder_number,
+                product_code=product_code
+            )
+        elif company_code:
+            # 只有公司代號和工單號碼
             return WorkOrderDispatch.objects.filter(
                 company_code=company_code,
                 order_number=workorder_number

@@ -84,8 +84,11 @@ class FillWork(models.Model):
         verbose_name_plural = "填報作業"
         db_table = 'workorder_fill_work'
         ordering = ['-created_at']
+        # 移除過於嚴格的唯一性約束，允許同一工單的不同工序、不同時間、不同作業員填報
+        # unique_together = (("company_name", "workorder", "product_id"),)  # 公司名稱+工單號碼+產品編號唯一
         indexes = [
             models.Index(fields=['company_code']),
+            models.Index(fields=['company_name']),
             models.Index(fields=['work_date']),
             models.Index(fields=['operator']),
             models.Index(fields=['workorder']),
@@ -101,6 +104,29 @@ class FillWork(models.Model):
         """儲存時自動計算工時
         若實體有臨時屬性 `_skip_auto_hours_calculation=True`，則跳過自動計算（例如：匯入時已提供工時）。
         """
+        # 檢查是否為新增記錄且存在重複
+        if not self.pk:  # 新增記錄
+            # 檢查是否已存在相同的記錄（更合理的唯一性檢查）
+            # 考慮：公司名稱 + 工單號碼 + 產品編號 + 工序 + 作業員 + 工作日期 + 開始時間
+            existing_record = FillWork.objects.filter(
+                company_name=self.company_name,
+                workorder=self.workorder,
+                product_id=self.product_id,
+                operation=self.operation,
+                operator=self.operator,
+                work_date=self.work_date,
+                start_time=self.start_time
+            ).first()
+            
+            if existing_record:
+                # 如果存在重複記錄，拋出異常
+                raise ValueError(
+                    f"已存在相同的填報記錄：公司名稱={self.company_name}, "
+                    f"工單號碼={self.workorder}, 產品編號={self.product_id}, "
+                    f"工序={self.operation}, 作業員={self.operator}, "
+                    f"工作日期={self.work_date}, 開始時間={self.start_time}"
+                )
+        
         # 計算工作時數和加班時數（允許在匯入時以臨時旗標跳過）
         if not getattr(self, '_skip_auto_hours_calculation', False):
             self.calculate_work_hours()

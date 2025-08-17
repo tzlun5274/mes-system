@@ -143,7 +143,7 @@ class CompanyOrder(models.Model):
     class Meta:
         verbose_name = "公司製令單"
         verbose_name_plural = "公司製令單"
-        unique_together = (("company_code", "mkordno"),)
+        unique_together = (("company_code", "mkordno", "product_id"),)
 
     def __str__(self):
         # 格式化公司代號，確保是兩位數格式（例如：2 -> 02）

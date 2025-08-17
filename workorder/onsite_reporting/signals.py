@@ -21,6 +21,33 @@ def onsite_report_post_save(sender, instance, created, **kwargs):
     當現場報工記錄被建立或更新時，自動更新對應工單的工序完成數量
     """
     try:
+        # 查找對應的工單
+        from workorder.models import WorkOrder
+        try:
+            workorder = WorkOrder.objects.filter(
+                order_number=instance.order_number,
+                product_code=instance.product_code
+            ).first()
+            
+            # 如果工單有公司代號，進一步檢查公司代號是否匹配
+            if workorder and workorder.company_code and instance.company_code:
+                if workorder.company_code != instance.company_code:
+                    # 公司代號不匹配，視為找不到工單
+                    workorder = None
+            
+            if workorder:
+                # 更新工單狀態 - 新增
+                from workorder.services.workorder_status_service import WorkOrderStatusService
+                updated = WorkOrderStatusService.update_workorder_status(workorder.id)
+                
+                if updated:
+                    logger.info(f"現場報工記錄觸發工單狀態更新成功：工單 {workorder.order_number}")
+                else:
+                    logger.warning(f"現場報工記錄觸發工單狀態更新失敗：工單 {workorder.order_number}")
+            
+        except Exception as e:
+            logger.error(f"現場報工記錄查找工單失敗：{str(e)}")
+        
         # 只處理已完成的報工記錄
         if instance.status == 'completed':
             logger.info(f"現場報工記錄完成，更新工序：{instance.order_number} - {instance.process}")

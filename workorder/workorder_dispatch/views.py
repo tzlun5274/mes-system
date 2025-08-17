@@ -240,10 +240,11 @@ class DispatchDetailView(LoginRequiredMixin, DetailView):
         
         # 取得相關的工單資訊
         try:
-            # 使用 company_code 和 order_number 組合查詢，避免 MultipleObjectsReturned 錯誤
+            # 使用多公司架構唯一識別：公司代號 + 工單號碼 + 產品編號
             context['work_order'] = WorkOrder.objects.filter(
                 order_number=dispatch.order_number,
-                company_code=dispatch.company_code
+                company_code=dispatch.company_code,
+                product_code=dispatch.product_code
             ).first()
         except Exception as e:
             # 記錄錯誤並設定預設值
@@ -477,7 +478,7 @@ def get_work_order_info(request):
                     }
                 })
             else:
-                # 如果有多個工單，返回所有工單的資訊
+                # 如果有多個工單，返回所有工單的資訊（需要前端選擇）
                 work_orders_data = []
                 for work_order in work_orders:
                     work_orders_data.append({

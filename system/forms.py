@@ -5,7 +5,7 @@ from .models import (
     EmailConfig, 
     BackupSchedule, 
     OperationLogConfig,
-    CompletionCheckConfig
+    UserWorkPermission
 )
 
 
@@ -106,93 +106,272 @@ class CustomUserCreationForm(forms.ModelForm):
         return user
 
 
-class CompletionCheckConfigForm(forms.ModelForm):
-    """
-    完工檢查配置表單
-    """
+class UserWorkPermissionForm(forms.ModelForm):
+    """使用者工作權限設定表單"""
+    
+    # 多選欄位
+    operator_codes_multiple = forms.MultipleChoiceField(
+        choices=[],
+        required=False,
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-control',
+            'size': '8',
+            'id': 'operator_codes_multiple'
+        }),
+        label="作業員編號（多選）",
+        help_text="按住 Ctrl 鍵可多選，留空表示可操作所有作業員"
+    )
+    
+    process_names_multiple = forms.MultipleChoiceField(
+        choices=[],
+        required=False,
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-control',
+            'size': '8',
+            'id': 'process_names_multiple'
+        }),
+        label="工序名稱（多選）",
+        help_text="按住 Ctrl 鍵可多選，留空表示可操作所有工序"
+    )
     
     class Meta:
-        model = CompletionCheckConfig
+        model = UserWorkPermission
         fields = [
-            'enabled',
-            'interval_minutes', 
-            'start_time',
-            'end_time',
-            'max_workorders_per_check',
-            'enable_notifications'
+            'user',
+            'operator_codes',
+            'process_names',
+            'permission_type',
+            'is_active',
+            'notes'
         ]
         widgets = {
-            'enabled': forms.CheckboxInput(attrs={
-                'class': 'form-check-input',
-                'id': 'enabled'
-            }),
-            'interval_minutes': forms.NumberInput(attrs={
+            'user': forms.Select(attrs={
                 'class': 'form-control',
-                'min': '1',
-                'max': '60',
-                'step': '1',
-                'placeholder': '5'
+                'id': 'user_select'
             }),
-            'start_time': forms.TimeInput(attrs={
+            'operator_codes': forms.Textarea(attrs={
                 'class': 'form-control',
-                'type': 'time',
-                'placeholder': '08:00'
+                'rows': 3,
+                'placeholder': '例如：OP001, OP002, OP003\n留空表示可操作所有作業員',
+                'id': 'operator_codes_text',
+                'style': 'display: none;'
             }),
-            'end_time': forms.TimeInput(attrs={
-                'class': 'form-control', 
-                'type': 'time',
-                'placeholder': '18:00'
-            }),
-            'max_workorders_per_check': forms.NumberInput(attrs={
+            'process_names': forms.Textarea(attrs={
                 'class': 'form-control',
-                'min': '10',
-                'max': '1000',
-                'step': '10',
-                'placeholder': '100'
+                'rows': 3,
+                'placeholder': '例如：SMT貼片, 插件, 測試\n留空表示可操作所有工序',
+                'id': 'process_names_text',
+                'style': 'display: none;'
             }),
-            'enable_notifications': forms.CheckboxInput(attrs={
-                'class': 'form-check-input',
-                'id': 'enable_notifications'
+            'permission_type': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+            'is_active': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
+            'notes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': '備註說明'
             })
         }
         labels = {
-            'enabled': '啟用完工檢查',
-            'interval_minutes': '檢查間隔（分鐘）',
-            'start_time': '開始時間',
-            'end_time': '結束時間', 
-            'max_workorders_per_check': '每次檢查最大工單數',
-            'enable_notifications': '啟用完工通知'
+            'user': '使用者',
+            'operator_codes': '作業員編號',
+            'process_names': '工序名稱',
+            'permission_type': '權限類型',
+            'is_active': '啟用狀態',
+            'notes': '備註'
         }
         help_texts = {
-            'enabled': '啟用或停用完工檢查定時任務',
-            'interval_minutes': '每多少分鐘檢查一次完工狀態（建議5-15分鐘）',
-            'start_time': '每日開始檢查的時間',
-            'end_time': '每日結束檢查的時間',
-            'max_workorders_per_check': '每次檢查最多處理多少個工單，避免系統負載過重',
-            'enable_notifications': '工單完工時是否發送通知'
+            'operator_codes': '可操作的作業員編號，多個用逗號分隔，留空表示可操作所有作業員',
+            'process_names': '可操作的工序名稱，多個用逗號分隔，留空表示可操作所有工序',
+            'permission_type': '選擇使用者可以進行的報工類型',
+            'is_active': '啟用或停用此權限設定'
+        }
+        labels = {
+            'user': '使用者',
+            'operator_codes': '作業員編號',
+            'process_names': '工序名稱',
+            'permission_type': '權限類型',
+            'is_active': '啟用狀態',
+            'notes': '備註'
+        }
+        help_texts = {
+            'operator_codes': '可操作的作業員編號，多個用逗號分隔，留空表示可操作所有作業員',
+            'process_names': '可操作的工序名稱，多個用逗號分隔，留空表示可操作所有工序',
+            'permission_type': '選擇使用者可以進行的報工類型',
+            'is_active': '啟用或停用此權限設定'
         }
     
-    def clean_interval_minutes(self):
-        """驗證檢查間隔"""
-        interval = self.cleaned_data.get('interval_minutes')
-        if interval < 1 or interval > 60:
-            raise forms.ValidationError('檢查間隔必須在1-60分鐘之間')
-        return interval
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # 將原始欄位設為非必填
+        self.fields['operator_codes'].required = False
+        self.fields['process_names'].required = False
+        
+        # 動態獲取作業員和工序選項
+        self.fields['operator_codes_multiple'].choices = self._get_operator_choices()
+        self.fields['process_names_multiple'].choices = self._get_process_choices()
+        
+        # 如果有實例，設定多選欄位的初始值
+        if self.instance and self.instance.pk:
+            if self.instance.operator_codes:
+                operator_codes = [code.strip() for code in self.instance.operator_codes.split(',') if code.strip()]
+                self.fields['operator_codes_multiple'].initial = operator_codes
+            
+            if self.instance.process_names:
+                process_names = [name.strip() for name in self.instance.process_names.split(',') if name.strip()]
+                self.fields['process_names_multiple'].initial = process_names
     
-    def clean_max_workorders_per_check(self):
-        """驗證最大工單數"""
-        max_workorders = self.cleaned_data.get('max_workorders_per_check')
-        if max_workorders < 10 or max_workorders > 1000:
-            raise forms.ValidationError('每次檢查最大工單數必須在10-1000之間')
-        return max_workorders
+    def _get_operator_choices(self):
+        """獲取作業員選項"""
+        try:
+            # 優先從製程模組獲取作業員資料
+            try:
+                from process.models import Operator
+                operators = Operator.objects.all().order_by('name')
+                if operators.exists():
+                    return [(op.name, f"{op.name} - 作業員") for op in operators]
+            except (ImportError, AttributeError):
+                pass
+            
+            # 嘗試從填報記錄中獲取作業員資料
+            try:
+                from workorder.fill_work.models import FillWork
+                from django.db.models import Q
+                operators = FillWork.objects.values_list('operator', flat=True).distinct().exclude(
+                    Q(operator__isnull=True) | Q(operator='')
+                ).order_by('operator')
+                if operators.exists():
+                    return [(op, f"{op} - 作業員") for op in operators]
+            except (ImportError, AttributeError):
+                pass
+            
+            # 嘗試從現場報工記錄中獲取作業員資料
+            try:
+                from workorder.onsite_reporting.models import OnsiteReportSession
+                from django.db.models import Q
+                operators = OnsiteReportSession.objects.values_list('operator', flat=True).distinct().exclude(
+                    Q(operator__isnull=True) | Q(operator='')
+                ).order_by('operator')
+                if operators.exists():
+                    return [(op, f"{op} - 作業員") for op in operators]
+            except (ImportError, AttributeError):
+                pass
+            
+            # 如果沒有找到任何作業員資料，返回空列表
+            return []
+        except Exception as e:
+            # 如果發生任何錯誤，返回空列表
+            return []
+    
+    def _get_process_choices(self):
+        """獲取工序選項"""
+        try:
+            # 嘗試從工單模組獲取工序資料
+            try:
+                from workorder.models import Process
+                processes = Process.objects.filter(is_active=True).order_by('name')
+                if processes.exists():
+                    return [(proc.name, proc.name) for proc in processes]
+            except (ImportError, AttributeError):
+                pass
+            
+            # 嘗試從製程模組獲取工序資料
+            try:
+                from process.models import Process
+                processes = Process.objects.filter(is_active=True).order_by('name')
+                if processes.exists():
+                    return [(proc.name, proc.name) for proc in processes]
+            except (ImportError, AttributeError):
+                pass
+            
+            # 嘗試從填報記錄中獲取工序資料
+            try:
+                from workorder.fill_work.models import FillWork
+                from django.db.models import Q
+                processes = FillWork.objects.values_list('process__name', flat=True).distinct().exclude(
+                    Q(process__name__isnull=True) | Q(process__name='')
+                ).order_by('process__name')
+                if processes.exists():
+                    return [(proc, proc) for proc in processes]
+            except (ImportError, AttributeError):
+                pass
+            
+            # 如果沒有找到任何工序資料，返回空列表
+            return []
+        except Exception:
+            return []
+    
+    def clean_operator_codes_multiple(self):
+        """驗證多選作業員編號"""
+        operator_codes = self.cleaned_data.get('operator_codes_multiple')
+        if operator_codes:
+            # 將多選結果轉換為逗號分隔的字串
+            if isinstance(operator_codes, list):
+                return ', '.join(operator_codes)
+            else:
+                return operator_codes
+        return ''
+    
+    def clean_process_names_multiple(self):
+        """驗證多選工序名稱"""
+        process_names = self.cleaned_data.get('process_names_multiple')
+        if process_names:
+            # 將多選結果轉換為逗號分隔的字串
+            if isinstance(process_names, list):
+                return ', '.join(process_names)
+            else:
+                return process_names
+        return ''
     
     def clean(self):
         """整體驗證"""
         cleaned_data = super().clean()
-        start_time = cleaned_data.get('start_time')
-        end_time = cleaned_data.get('end_time')
         
-        if start_time and end_time and start_time >= end_time:
-            raise forms.ValidationError('開始時間必須早於結束時間')
+        # 將多選結果同步到原始欄位
+        cleaned_data['operator_codes'] = self.clean_operator_codes_multiple()
+        cleaned_data['process_names'] = self.clean_process_names_multiple()
+        
+        user = cleaned_data.get('user')
+        permission_type = cleaned_data.get('permission_type')
+        
+        # 檢查是否已存在相同使用者和權限類型的記錄
+        if user and permission_type:
+            existing = UserWorkPermission.objects.filter(
+                user=user,
+                permission_type=permission_type
+            )
+            if self.instance.pk:
+                existing = existing.exclude(pk=self.instance.pk)
+            
+            if existing.exists():
+                permission_type_display = dict(self.fields["permission_type"].choices)[permission_type]
+                raise forms.ValidationError(f'使用者 {user.username} 的 {permission_type_display} 權限已存在')
         
         return cleaned_data
+    
+    def save(self, commit=True):
+        """儲存時處理多選欄位"""
+        instance = super().save(commit=False)
+        
+        # 確保多選欄位的資料被正確設定
+        if 'operator_codes_multiple' in self.cleaned_data:
+            instance.operator_codes = self.clean_operator_codes_multiple()
+        
+        if 'process_names_multiple' in self.cleaned_data:
+            instance.process_names = self.clean_process_names_multiple()
+        
+        if commit:
+            instance.save()
+        
+        return instance
+
+
+# 完工判斷設定已整合到現有的工單管理設定中
+# 使用 workorder.workorder_erp.models.SystemConfig 來管理設定
+
+
+

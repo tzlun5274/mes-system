@@ -28,7 +28,7 @@
                 <i class="fas fa-trash"></i> 刪除派工單
             </a>
             {% if work_order %}
-            <a href="{% url 'workorder:detail' work_order.id %}" class="btn btn-info">
+            <a href="{% url 'workorder:production_workorder_detail' work_order.id %}" class="btn btn-info">
                 <i class="fas fa-eye"></i> 查看工單詳情
             </a>
             {% endif %}
@@ -54,7 +54,7 @@
                                     <th>工單號碼：</th>
                                     <td>
                                         {% if work_order %}
-                                        <a href="{% url 'workorder:detail' work_order.id %}" 
+                                        <a href="{% url 'workorder:production_workorder_detail' work_order.id %}" 
                                            class="text-decoration-none">
                                             {{ dispatch.order_number }}
                                         </a>
@@ -195,7 +195,7 @@
                             <td>{{ work_order.get_order_source_display }}</td>
                         </tr>
                     </table>
-                    <a href="{% url 'workorder:detail' work_order.id %}" class="btn btn-outline-primary btn-sm">
+                    <a href="{% url 'workorder:production_workorder_detail' work_order.id %}" class="btn btn-outline-primary btn-sm">
                         <i class="fas fa-external-link-alt"></i> 查看工單詳情
                     </a>
                 </div>

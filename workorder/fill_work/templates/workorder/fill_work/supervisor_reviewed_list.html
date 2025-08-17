@@ -30,6 +30,31 @@
         height: 18px;
         cursor: pointer;
     }
+    
+    .filter-form {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 15px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .filter-form .form-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.25rem;
+    }
+    
+    .filter-form .form-control {
+        font-size: 0.875rem;
+    }
+    
+    .filter-actions {
+        border-top: 1px solid #dee2e6;
+        padding-top: 10px;
+        margin-top: 10px;
+    }
 </style>
 {% endblock %}
 
@@ -50,6 +75,92 @@
 	</div>
 	<h4 class="mb-3"><i class="fas fa-clipboard-list me-2"></i>主管已審核填報作業</h4>
 	<div class="mb-3 text-muted">共 {{ total_count }} 筆（已核准 {{ approved_count }}、已駁回 {{ rejected_count }}）</div>
+	
+	<!-- 篩選條件摘要 -->
+	{% if filter_operator or filter_workorder or filter_product_id or filter_operation or filter_approval_status or filter_report_type or filter_start_date or filter_end_date %}
+	<div class="alert alert-info alert-dismissible fade show" role="alert">
+		<strong><i class="fas fa-filter"></i> 篩選條件：</strong>
+		{% if filter_operator %}<span class="badge bg-primary me-1">作業員: {{ filter_operator }}</span>{% endif %}
+		{% if filter_workorder %}<span class="badge bg-primary me-1">工單: {{ filter_workorder }}</span>{% endif %}
+		{% if filter_product_id %}<span class="badge bg-primary me-1">產品: {{ filter_product_id }}</span>{% endif %}
+		{% if filter_operation %}<span class="badge bg-primary me-1">工序: {{ filter_operation }}</span>{% endif %}
+		{% if filter_approval_status == 'approved' %}<span class="badge bg-success me-1">已核准</span>{% endif %}
+		{% if filter_approval_status == 'rejected' %}<span class="badge bg-danger me-1">已駁回</span>{% endif %}
+		{% if filter_report_type == 'operator' %}<span class="badge bg-info me-1">作業員</span>{% endif %}
+		{% if filter_report_type == 'smt' %}<span class="badge bg-warning me-1">SMT</span>{% endif %}
+		{% if filter_start_date %}<span class="badge bg-secondary me-1">開始: {{ filter_start_date }}</span>{% endif %}
+		{% if filter_end_date %}<span class="badge bg-secondary me-1">結束: {{ filter_end_date }}</span>{% endif %}
+		<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+	</div>
+	{% endif %}
+	
+	<!-- 篩選表單 -->
+	<form method="get" class="filter-form">
+		<div class="row g-2 align-items-end">
+		<div class="col-sm-2">
+			<label class="form-label">作業員</label>
+			<input type="text" name="operator" value="{{ filter_operator }}" class="form-control" placeholder="輸入作業員">
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">工單號碼</label>
+			<input type="text" name="workorder" value="{{ filter_workorder }}" class="form-control" placeholder="輸入工單號碼">
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">產品編號</label>
+			<input type="text" name="product_id" value="{{ filter_product_id }}" class="form-control" placeholder="輸入產品編號">
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">工序</label>
+			<input type="text" name="operation" value="{{ filter_operation }}" class="form-control" placeholder="輸入工序名稱">
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">審核狀態</label>
+			<select name="approval_status" class="form-control">
+				<option value="">全部</option>
+				<option value="approved" {% if filter_approval_status == 'approved' %}selected{% endif %}>已核准</option>
+				<option value="rejected" {% if filter_approval_status == 'rejected' %}selected{% endif %}>已駁回</option>
+			</select>
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">報工類型</label>
+			<select name="report_type" class="form-control">
+				<option value="">全部</option>
+				<option value="operator" {% if filter_report_type == 'operator' %}selected{% endif %}>作業員</option>
+				<option value="smt" {% if filter_report_type == 'smt' %}selected{% endif %}>SMT</option>
+			</select>
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">開始日期</label>
+			<input type="date" name="start_date" value="{{ filter_start_date }}" class="form-control">
+		</div>
+		<div class="col-sm-2">
+			<label class="form-label">結束日期</label>
+			<input type="date" name="end_date" value="{{ filter_end_date }}" class="form-control">
+		</div>
+		</div>
+		<div class="filter-actions d-flex justify-content-between align-items-center">
+			<div>
+				<button type="submit" class="btn btn-primary">
+					<i class="fas fa-search"></i> 篩選
+				</button>
+				<a href="{% url 'workorder:fill_work:supervisor_reviewed_list' %}" class="btn btn-outline-secondary">
+					<i class="fas fa-times"></i> 清除篩選
+				</a>
+				<button type="button" class="btn btn-outline-info" id="todayFilter">
+					<i class="fas fa-calendar-day"></i> 今天
+				</button>
+				<button type="button" class="btn btn-outline-warning" id="weekFilter">
+					<i class="fas fa-calendar-week"></i> 本週
+				</button>
+				<button type="button" class="btn btn-outline-success" id="exportFilter">
+					<i class="fas fa-download"></i> 匯出
+				</button>
+			</div>
+			<div class="text-muted">
+				<small>顯示 {{ page_obj.start_index|default:0 }} - {{ page_obj.end_index|default:0 }} 筆，共 {{ page_obj.paginator.count|default:0 }} 筆記錄</small>
+			</div>
+		</div>
+	</form>
 	
 	<!-- 批次操作區域 -->
 	<div class="batch-actions" id="batchActions" style="display: none;">
@@ -131,6 +242,50 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('JavaScript 已載入');
     
+    // 篩選功能
+    const filterForm = document.querySelector('.filter-form');
+    const filterInputs = filterForm.querySelectorAll('input, select');
+    
+    // 自動提交篩選（當選擇狀態或類型時）
+    const autoSubmitSelects = filterForm.querySelectorAll('select[name="approval_status"], select[name="report_type"]');
+    autoSubmitSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            filterForm.submit();
+        });
+    });
+    
+    // 快速篩選功能
+    const todayFilter = document.getElementById('todayFilter');
+    const weekFilter = document.getElementById('weekFilter');
+    
+    todayFilter.addEventListener('click', function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.querySelector('input[name="start_date"]').value = today;
+        document.querySelector('input[name="end_date"]').value = today;
+        filterForm.submit();
+    });
+    
+    weekFilter.addEventListener('click', function() {
+        const today = new Date();
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        const endOfWeek = new Date(today);
+        endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
+        
+        document.querySelector('input[name="start_date"]').value = startOfWeek.toISOString().split('T')[0];
+        document.querySelector('input[name="end_date"]').value = endOfWeek.toISOString().split('T')[0];
+        filterForm.submit();
+    });
+    
+    // 匯出功能
+    const exportFilter = document.getElementById('exportFilter');
+    exportFilter.addEventListener('click', function() {
+        const currentUrl = new URL(window.location);
+        currentUrl.searchParams.set('export', 'excel');
+        window.open(currentUrl.toString(), '_blank');
+    });
+    
+    // 批次操作功能
     const headerCheckbox = document.getElementById('headerCheckbox');
     const selectAllCheckbox = document.getElementById('selectAll');
     const recordCheckboxes = document.querySelectorAll('.record-checkbox');

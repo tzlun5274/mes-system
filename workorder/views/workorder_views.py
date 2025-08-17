@@ -16,7 +16,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.shortcuts import redirect, render
-from django.db.models import Q
+from django.db.models import Q, Sum
+from django.db import transaction
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
@@ -24,13 +25,16 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+from django.core.management import call_command
 import logging
 
-from ..models import WorkOrder
-from ..workorder_erp.models import CompanyOrder, SystemConfig
+from ..models import WorkOrder, WorkOrderProductionDetail
+from ..production_monitoring.models import ProductionMonitoringData
+from ..workorder_erp.models import CompanyOrder, SystemConfig, PrdMKOrdMain
 from ..forms import WorkOrderForm
 from erp_integration.models import CompanyConfig
 from ..workorder_dispatch.models import WorkOrderDispatch
+from ..fill_work.models import FillWork
 
 # 設定 logger
 workorder_logger = logging.getLogger('workorder')
@@ -78,17 +82,20 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
     context_object_name = "workorder"
 
     def get_context_data(self, **kwargs):
-        """添加上下文資料，包括工序統計和所有已核准的填報記錄"""
+        """添加上下文資料，使用 ProductionMonitoringData 作為資料來源"""
         context = super().get_context_data(**kwargs)
         workorder = self.get_object()
 
+        # 取得或建立監控資料
+        monitoring_data = ProductionMonitoringData.get_or_create_for_workorder(workorder)
+        monitoring_data.update_all_statistics()
+        
         # 取得公司名稱（若 company_code 為空，嘗試推導）
         company_name = workorder.company_code or '-'
         code = workorder.company_code
         if not code:
             # 1) 嘗試從 CompanyOrder 推導
             try:
-                from ..workorder_erp.models import CompanyOrder
                 co = CompanyOrder.objects.filter(mkordno=workorder.order_number).first()
                 if co and co.company_code:
                     code = co.company_code
@@ -96,13 +103,15 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
                 pass
             # 2) 若仍無，保留 None
         if code:
-            config = CompanyConfig.objects.filter(company_code=code).first()
-            if config:
-                company_name = config.company_name
+            try:
+                config = CompanyConfig.objects.filter(company_code=code).first()
+                if config:
+                    company_name = config.company_name
+            except Exception:
+                pass
         # 3) 最後後備：從填報記錄直接取公司名稱（以實際填報為準）
         if company_name in (None, '-', ''):
             try:
-                from workorder.fill_work.models import FillWork
                 fw = (
                     FillWork.objects
                     .filter(workorder=workorder.order_number)
@@ -117,159 +126,40 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
                 pass
         context['company_name'] = company_name
 
-        # 計算已完成工序數量
-        completed_processes_count = workorder.processes.filter(
-            status="completed"
-        ).count()
+        # 從監控資料取得工序統計
+        context["completed_processes_count"] = monitoring_data.completed_processes
+        context["in_progress_processes_count"] = monitoring_data.in_progress_processes
+        context["pending_processes_count"] = monitoring_data.pending_processes
+        context["total_processes_count"] = monitoring_data.total_processes
 
-        # 計算進行中工序數量
-        in_progress_processes_count = workorder.processes.filter(
-            status="in_progress"
-        ).count()
-
-        context["completed_processes_count"] = completed_processes_count
-        context["in_progress_processes_count"] = in_progress_processes_count
-
-        # 獲取所有已核准的填報記錄
-        from workorder.fill_work.models import FillWork
-
-        # 獲取所有已核准的填報記錄
-        fill_work_reports = FillWork.objects.filter(
-            workorder=workorder.order_number,
-            approval_status="approved"
-        ).order_by("work_date", "start_time")
-
-        # 處理填報記錄
-        all_reports = []
-
-        for report in fill_work_reports:
-            all_reports.append(
-                {
-                    "type": "fill_work",
-                    "report_date": report.work_date,
-                    "process_name": report.operation or "未指定",
-                    "operator": report.operator or "-",
-                    "equipment": report.equipment or "-",
-                    "work_quantity": report.work_quantity or 0,
-                    "defect_quantity": report.defect_quantity or 0,
-                    "work_hours": report.work_hours_calculated or 0,
-                    "overtime_hours": report.overtime_hours_calculated or 0,
-                    "report_source": "填報作業",
-                    "report_time": report.start_time,
-                    "start_time": report.start_time,
-                    "end_time": report.end_time,
-                    "remarks": report.remarks or "",
-                    "abnormal_notes": report.abnormal_notes or "",
-                    "approved_by": report.approved_by or "",
-                    "approved_at": report.approved_at,
-                }
-            )
-
-        # 按報工日期和開始時間排序（最早的在前）
-        all_reports.sort(
-            key=lambda x: (x["report_date"], x["start_time"]), reverse=False
-        )
-
-        # 計算統計資料
-        from collections import defaultdict
-
-        stats_by_process = defaultdict(
-            lambda: {
-                "process_name": "",
-                "total_good_quantity": 0,
-                "total_defect_quantity": 0,
-                "report_count": 0,
-                "total_work_hours": 0.0,
-                "operators": set(),
-                "equipment": set(),
-            }
-        )
-
-        # 總計資料
+        # 從監控資料取得統計資訊
+        context["monitoring_data"] = monitoring_data
+        
+        # 總計資料（從監控資料取得）
         total_stats = {
-            "total_good_quantity": 0,
-            "total_defect_quantity": 0,
-            "total_report_count": len(all_reports),
-            "total_work_hours": 0.0,
-            "total_overtime_hours": 0.0,
-            "total_all_hours": 0.0,
-            "unique_operators": set(),
-            "unique_equipment": set(),
+            "total_good_quantity": monitoring_data.total_good_quantity,
+            "total_defect_quantity": monitoring_data.total_defect_quantity,
+            "total_quantity": monitoring_data.total_quantity,
+            "total_report_count": monitoring_data.fillwork_report_count + monitoring_data.onsite_report_count,
+            "total_work_hours": float(monitoring_data.total_work_hours),
+            "total_overtime_hours": float(monitoring_data.total_overtime_hours),
+            "total_all_hours": float(monitoring_data.total_all_hours),
+            "unique_operators": monitoring_data.unique_operators,
+            "unique_equipment": monitoring_data.unique_equipment,
         }
-
-        # 按工序分組統計
-        for report in all_reports:
-            process_name = report["process_name"]
-
-            # 更新工序統計
-            stats_by_process[process_name]["process_name"] = process_name
-            stats_by_process[process_name]["total_good_quantity"] += report[
-                "work_quantity"
-            ]
-            stats_by_process[process_name]["total_defect_quantity"] += report[
-                "defect_quantity"
-            ]
-            stats_by_process[process_name]["report_count"] += 1
-            # 確保工作時數為 float 類型
-            work_hours = (
-                float(report["work_hours"]) if report["work_hours"] is not None else 0.0
-            )
-            stats_by_process[process_name]["total_work_hours"] += work_hours
-
-            # 更新總計
-            total_stats["total_good_quantity"] += report["work_quantity"]
-            total_stats["total_defect_quantity"] += report["defect_quantity"]
-            total_stats["total_work_hours"] += work_hours
-            # 確保加班時數為 float 類型
-            overtime_hours = (
-                float(report["overtime_hours"])
-                if report["overtime_hours"] is not None
-                else 0.0
-            )
-            total_stats["total_overtime_hours"] += overtime_hours
-
-            # 記錄作業員和設備
-            if report["operator"] != "-":
-                stats_by_process[process_name]["operators"].add(report["operator"])
-                total_stats["unique_operators"].add(report["operator"])
-
-            if report["equipment"] != "-":
-                stats_by_process[process_name]["equipment"].add(report["equipment"])
-                total_stats["unique_equipment"].add(report["equipment"])
-
-        # 計算總時數
-        total_stats["total_all_hours"] = (
-            total_stats["total_work_hours"] + total_stats["total_overtime_hours"]
-        )
-
-        # 轉換 set 為 list 以便在模板中使用
-        for process_stats in stats_by_process.values():
-            process_stats["operators"] = list(process_stats["operators"])
-            process_stats["equipment"] = list(process_stats["equipment"])
-
-        total_stats["unique_operators"] = list(total_stats["unique_operators"])
-        total_stats["unique_equipment"] = list(total_stats["unique_equipment"])
-
-        # 按照工序的實際執行順序排列統計資料
-        # 根據填報記錄的時間順序，確定工序的執行順序
-        process_order = {}
-        for i, report in enumerate(all_reports):
-            process_name = report["process_name"]
-            if process_name not in process_order:
-                process_order[process_name] = i
-
-        # 按照工序執行順序排序統計資料
-        sorted_stats_by_process = dict(
-            sorted(
-                stats_by_process.items(),
-                key=lambda x: process_order.get(x[0], 999),  # 如果找不到順序，排在最後
-            )
-        )
-
-        context["all_production_reports"] = all_reports
-        context["total_reports_count"] = len(all_reports)
-        context["production_stats_by_process"] = sorted_stats_by_process
+        
+        # 出貨包裝專項統計
+        packaging_stats = {
+            "packaging_good_quantity": monitoring_data.packaging_good_quantity,
+            "packaging_defect_quantity": monitoring_data.packaging_defect_quantity,
+            "packaging_total_quantity": monitoring_data.packaging_total_quantity,
+            "packaging_completion_rate": float(monitoring_data.packaging_completion_rate),
+        }
+        
         context["production_total_stats"] = total_stats
+        context["packaging_stats"] = packaging_stats
+        context["can_complete"] = monitoring_data.can_complete
+        context["completion_rate"] = float(monitoring_data.completion_rate)
 
         # 添加完工判斷資訊
         try:
@@ -280,38 +170,73 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
             workorder_logger.error(f"獲取工單 {workorder.order_number} 完工摘要失敗: {str(e)}")
             context["completion_summary"] = {'error': '獲取完工摘要失敗'}
 
-        # 計算出貨包裝累計數量（良品+不良品，用於顯示）
+        # 取得所有報工記錄（填報記錄 + 現場報工）
         try:
-            from workorder.models import WorkOrderProductionDetail
-            from django.db.models import Sum
-            packaging_reports = WorkOrderProductionDetail.objects.filter(
-                workorder_production__workorder=workorder,
-                process_name="出貨包裝"
-            )
+            from ..fill_work.models import FillWork
+            from ..onsite_reporting.models import OnsiteReport
             
-            # 計算良品數量
-            good_quantity = packaging_reports.aggregate(
-                total=Sum('work_quantity')
-            )['total'] or 0
+            # 取得已核准的填報記錄
+            approved_fillwork = FillWork.objects.filter(
+                workorder=workorder.order_number,
+                product_id=workorder.product_code,
+                approval_status='approved'
+            ).order_by('work_date', 'start_time')
             
-            # 計算不良品數量
-            defect_quantity = packaging_reports.aggregate(
-                total=Sum('defect_quantity')
-            )['total'] or 0
+            # 取得現場報工記錄
+            onsite_reports = OnsiteReport.objects.filter(
+                order_number=workorder.order_number,
+                product_code=workorder.product_code
+            ).order_by('work_date', 'start_datetime')
             
-            # 總數量 = 良品 + 不良品
-            packaging_quantity = good_quantity + defect_quantity
+            # 合併報工記錄
+            all_production_reports = []
             
-            context["packaging_quantity"] = packaging_quantity
-            context["packaging_good_quantity"] = good_quantity
-            context["packaging_defect_quantity"] = defect_quantity
-            context["can_complete"] = packaging_quantity >= workorder.quantity
+            # 處理填報記錄
+            for fillwork in approved_fillwork:
+                all_production_reports.append({
+                    'report_date': fillwork.work_date,
+                    'process_name': fillwork.operation or fillwork.process.name if fillwork.process else '未知工序',
+                    'operator': fillwork.operator,
+                    'equipment': fillwork.equipment or '-',
+                    'work_quantity': fillwork.work_quantity,
+                    'defect_quantity': fillwork.defect_quantity,
+                    'work_hours': float(fillwork.work_hours_calculated or 0),
+                    'overtime_hours': float(fillwork.overtime_hours_calculated or 0),
+                    'report_source': '填報記錄',
+                    'report_type': 'fillwork'
+                })
+            
+            # 處理現場報工記錄
+            for onsite in onsite_reports:
+                all_production_reports.append({
+                    'report_date': onsite.work_date,
+                    'process_name': onsite.operation or onsite.process,
+                    'operator': onsite.operator,
+                    'equipment': onsite.equipment or '-',
+                    'work_quantity': onsite.work_quantity,
+                    'defect_quantity': onsite.defect_quantity,
+                    'work_hours': float(onsite.work_minutes / 60 if onsite.work_minutes else 0),
+                    'overtime_hours': 0,  # 現場報工暫時不計算加班時數
+                    'report_source': '現場報工',
+                    'report_type': 'onsite'
+                })
+            
+            # 按日期和時間排序
+            all_production_reports.sort(key=lambda x: (x['report_date'], x.get('start_time', '00:00')))
+            
+            context['all_production_reports'] = all_production_reports
+            
+            # 計算報工記錄統計
+            production_total_stats = {
+                'total_work_hours': sum(r['work_hours'] for r in all_production_reports),
+                'total_overtime_hours': sum(r['overtime_hours'] for r in all_production_reports),
+            }
+            context['production_total_stats'] = production_total_stats
+            
         except Exception as e:
-            workorder_logger.error(f"計算出貨包裝數量失敗: {str(e)}")
-            context["packaging_quantity"] = 0
-            context["packaging_good_quantity"] = 0
-            context["packaging_defect_quantity"] = 0
-            context["can_complete"] = False
+            workorder_logger.error(f"獲取工單 {workorder.order_number} 報工記錄失敗: {str(e)}")
+            context['all_production_reports'] = []
+            context['production_total_stats'] = {'total_work_hours': 0, 'total_overtime_hours': 0}
 
         return context
 
@@ -432,8 +357,6 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
 
         # 取得所有公司配置
-        from erp_integration.models import CompanyConfig
-
         context["companies"] = CompanyConfig.objects.all()
 
         # 取得所有公司代號供篩選使用
@@ -450,8 +373,6 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
         context["unconverted_orders"] = queryset.filter(is_converted=False).count()
 
         # 讀取系統設定
-        from workorder.workorder_erp.models import SystemConfig
-
         # 自動轉換工單間隔設定（預設 30 分鐘）
         auto_convert_interval = 30
         try:
@@ -500,10 +421,6 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
         if not (request.user.is_staff or request.user.is_superuser):
             messages.error(request, "您沒有權限執行此操作")
             return self.get(request, *args, **kwargs)
-
-        from workorder.workorder_erp.models import SystemConfig
-        from django.core.management import call_command
-        import logging
 
         workorder_logger = logging.getLogger("workorder")
 
@@ -943,13 +860,6 @@ class CreateMissingWorkOrdersView(LoginRequiredMixin, View):
         """執行工單創建功能"""
         # 直接定義函數，避免循環導入問題
         def create_missing_workorders_from_fillwork():
-            from ..fill_work.models import FillWork
-            from ..models import WorkOrder
-            from erp_integration.models import CompanyConfig
-            from ..workorder_erp.models import PrdMKOrdMain, CompanyOrder
-            from django.db import transaction
-            import logging
-            
             logger = logging.getLogger(__name__)
             
             # 統計資訊

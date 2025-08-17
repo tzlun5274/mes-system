@@ -27,6 +27,12 @@ urlpatterns = [
         name="permission_detail",
     ),
     path("permission/assign/", views.permission_assign, name="permission_assign"),
+    # 使用者工作權限管理路由
+    path("user_work_permission/list/", views.user_work_permission_list, name="user_work_permission_list"),
+    path("user_work_permission/add/", views.user_work_permission_add, name="user_work_permission_add"),
+    path("user_work_permission/edit/<int:permission_id>/", views.user_work_permission_edit, name="user_work_permission_edit"),
+    path("user_work_permission/delete/<int:permission_id>/", views.user_work_permission_delete, name="user_work_permission_delete"),
+    path("user_work_permission/detail/<int:permission_id>/", views.user_work_permission_detail, name="user_work_permission_detail"),
     path("email_config/", views.email_config, name="email_config"),
     path("backup/", views.backup_database, name="backup"),
     path(
@@ -47,7 +53,7 @@ urlpatterns = [
         views.change_password,
         name="change_password"
     ),
-    path("workorder_settings/", views.workorder_settings, name="workorder_settings"),
+    # path("workorder_settings/", views.workorder_settings, name="workorder_settings"),
     # 環境管理相關路由
     path("environment/", views.environment_management, name="environment_management"),
     path("environment/log/<str:filename>/", views.view_log_file, name="view_log_file"),
@@ -58,7 +64,10 @@ urlpatterns = [
     ),
     path("environment/clean_logs/", views.clean_logs, name="clean_logs"),
 
-    # 完工檢查配置
-    path('completion-check/config/', views.completion_check_config, name='completion_check_config'),
-    path('completion-check/status/', views.completion_check_status, name='completion_check_status'),
+    # 工單管理設定（已整合完工判斷功能）
+    path("workorder_settings/", views.workorder_settings, name="workorder_settings"),
+
+    # 完工檢查配置（已整合到工單管理設定中）
+    # path('completion-check/config/', views.completion_check_config, name='completion_check_config'),
+    # path('completion-check/status/', views.completion_check_status, name='completion_check_status'),
 ]

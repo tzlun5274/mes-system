@@ -350,7 +350,7 @@
                                 <i class="fas fa-calendar-check"></i>
                                 <span>{{ workorder.created_at|date:"m-d" }}</span>
                             </div>
-                            <a href="{% url 'workorder:detail' workorder.id %}" class="btn btn-sm btn-primary" title="查看詳情" style="flex-shrink: 0;">
+                            <a href="{% url 'workorder:production_workorder_detail' workorder.id %}" class="btn btn-sm btn-primary" title="查看詳情" style="flex-shrink: 0;">
                                 <i class="fas fa-eye me-1"></i>
                                 詳情
                             </a>

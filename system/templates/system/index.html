@@ -118,36 +118,26 @@
                     <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> 工單管理設定</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">管理工單系統相關設定，包含審核流程、通知功能、檔案大小限制等。</p>
+                    <p class="card-text">管理工單完工判斷和資料轉移設定，包含自動完工檢查、資料轉移排程等。</p>
                     <a href="{% url 'system:workorder_settings' %}" class="btn btn-warning text-dark"><i class="bi bi-gear"></i> 工單管理設定</a>
                 </div>
             </div>
         </div>
-        
-        <!-- 完工檢查配置 -->
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="mb-3">
-                        <i class="fas fa-clock fa-3x text-primary"></i>
-                    </div>
-                    <h5 class="card-title">完工檢查配置</h5>
-                    <p class="card-text text-muted">
-                        管理工單完工檢查的定時任務設定，包括檢查間隔、運行時間等
-                    </p>
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'system:completion_check_config' %}" class="btn btn-primary">
-                            <i class="fas fa-cog"></i>
-                            配置設定
-                        </a>
-                        <a href="{% url 'system:completion_check_status' %}" class="btn btn-outline-secondary">
-                            <i class="fas fa-chart-line"></i>
-                            查看狀態
-                        </a>
-                    </div>
+
+        <!-- 使用者工作權限管理 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-person-check"></i> 使用者工作權限管理</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">設定使用者可以針對哪些作業員和工序進行填報報工，控制操作權限。</p>
+                    <a href="{% url 'system:user_work_permission_list' %}" class="btn btn-success"><i class="bi bi-list"></i> 權限列表</a>
+                    <a href="{% url 'system:user_work_permission_add' %}" class="btn btn-outline-success ms-2"><i class="bi bi-plus-circle"></i> 新增權限</a>
                 </div>
             </div>
         </div>
+
 
         <!-- 報表設定 -->
         <div class="col">

@@ -208,7 +208,7 @@
                         <div class="setting-description">設定上傳檔案的最大大小限制</div>
                     </div>
                     <div class="input-group" style="width: 150px;">
-                        <input type="number" class="form-control" name="max_file_size" value="{{ system_options.max_file_size }}" min="1" max="100">
+                        <input type="number" class="form-control" name="max_file_size" value="{{ max_file_size }}" min="1" max="100">
                         <div class="input-group-append">
                             <span class="input-group-text">MB</span>
                         </div>
@@ -223,7 +223,7 @@
                         <div class="setting-description">設定使用者會話自動登出的時間</div>
                     </div>
                     <div class="input-group" style="width: 150px;">
-                        <input type="number" class="form-control" name="session_timeout" value="{{ system_options.session_timeout }}" min="5" max="480">
+                        <input type="number" class="form-control" name="session_timeout" value="{{ session_timeout }}" min="5" max="480">
                         <div class="input-group-append">
                             <span class="input-group-text">分鐘</span>
                         </div>
@@ -236,86 +236,6 @@
         <div class="settings-section">
             <div class="section-title">
                 <i class="fas fa-clock mr-2"></i>定時任務設定
-            </div>
-            
-            <!-- 工序完工檢查定時任務 -->
-            <div class="setting-item">
-                <div class="setting-header">
-                    <div>
-                        <div class="setting-title">工序完工檢查定時任務</div>
-                        <div class="setting-description">自動檢查工單工序進度，當所有工序都完成時觸發完工</div>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" name="process_completion_check_enabled" {% if process_completion_task.enabled %}checked{% endif %}>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="mt-3">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label class="form-label">檢查間隔</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="process_completion_check_interval" 
-                                       value="{{ process_completion_task.interval_minutes }}" min="5" max="1440">
-                                <div class="input-group-append">
-                                    <span class="input-group-text">分鐘</span>
-                                </div>
-                            </div>
-                            <small class="form-text text-muted">建議設定：15-30分鐘</small>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">任務狀態</label>
-                            <div class="task-status">
-                                <span class="badge {% if process_completion_task.enabled %}badge-success{% else %}badge-secondary{% endif %}">
-                                    {% if process_completion_task.enabled %}啟用{% else %}停用{% endif %}
-                                </span>
-                                {% if process_completion_task.last_run %}
-                                <br><small class="text-muted">最後執行：{{ process_completion_task.last_run|date:"Y-m-d H:i" }}</small>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 填報完工檢查定時任務 -->
-            <div class="setting-item">
-                <div class="setting-header">
-                    <div>
-                        <div class="setting-title">填報完工檢查定時任務</div>
-                        <div class="setting-description">自動檢查出貨包裝報工數量，當達到目標數量時觸發完工</div>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" name="report_completion_check_enabled" {% if report_completion_task.enabled %}checked{% endif %}>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="mt-3">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label class="form-label">檢查間隔</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="report_completion_check_interval" 
-                                       value="{{ report_completion_task.interval_minutes }}" min="5" max="1440">
-                                <div class="input-group-append">
-                                    <span class="input-group-text">分鐘</span>
-                                </div>
-                            </div>
-                            <small class="form-text text-muted">建議設定：15-30分鐘</small>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">任務狀態</label>
-                            <div class="task-status">
-                                <span class="badge {% if report_completion_task.enabled %}badge-success{% else %}badge-secondary{% endif %}">
-                                    {% if report_completion_task.enabled %}啟用{% else %}停用{% endif %}
-                                </span>
-                                {% if report_completion_task.last_run %}
-                                <br><small class="text-muted">最後執行：{{ report_completion_task.last_run|date:"Y-m-d H:i" }}</small>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
             
             <div class="setting-item">
@@ -352,6 +272,112 @@
                                 <br><small class="text-muted">最後執行：{{ auto_allocation_task.last_run|date:"Y-m-d H:i" }}</small>
                                 {% endif %}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 完工判斷設定 -->
+        <div class="settings-section">
+            <div class="section-title">
+                <i class="fas fa-check-circle mr-2"></i>完工判斷設定
+            </div>
+            
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">自動完工判斷</div>
+                        <div class="setting-description">啟用後，系統會自動檢查工單是否達到完工條件</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="completion_check_enabled" {% if completion_check_enabled %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="mt-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">檢查間隔</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="completion_check_interval" 
+                                       value="{{ completion_check_interval }}" min="5" max="1440">
+                                <div class="input-group-append">
+                                    <span class="input-group-text">分鐘</span>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted">建議設定：30-60分鐘</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">出貨包裝工序名稱</label>
+                            <input type="text" class="form-control" name="packaging_process_name" 
+                                   value="{{ packaging_process_name }}" placeholder="例如：出貨包裝">
+                            <small class="form-text text-muted">用於完工判斷的工序名稱</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">資料轉移功能</div>
+                        <div class="setting-description">啟用後，已完工工單會自動轉移到已完工模組</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="data_transfer_enabled" {% if data_transfer_enabled %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="mt-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">批次轉移數量</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="transfer_batch_size" 
+                                       value="{{ transfer_batch_size }}" min="1" max="1000">
+                                <div class="input-group-append">
+                                    <span class="input-group-text">個</span>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted">每次批次轉移的工單數量</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">資料保留天數</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="transfer_retention_days" 
+                                       value="{{ transfer_retention_days }}" min="1" max="3650">
+                                <div class="input-group-append">
+                                    <span class="input-group-text">天</span>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted">已轉移工單在主表的保留天數</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 手動執行按鈕 -->
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">手動執行</div>
+                        <div class="setting-description">手動執行完工檢查和資料轉移</div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button type="button" class="btn btn-success" onclick="executeCompletionCheck()">
+                                <i class="fas fa-check-circle mr-2"></i>執行完工檢查
+                            </button>
+                            <div id="completion-check-result" class="mt-2"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <button type="button" class="btn btn-info" onclick="executeDataTransfer()">
+                                <i class="fas fa-exchange-alt mr-2"></i>執行資料轉移
+                            </button>
+                            <div id="data-transfer-result" class="mt-2"></div>
                         </div>
                     </div>
                 </div>

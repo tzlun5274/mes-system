@@ -1193,11 +1193,26 @@ def approve_fill_work(request, pk: int):
         
         # 嘗試同步到生產執行監控
         try:
-            # 使用公司代號和工單號碼組合查詢，確保唯一性
-            workorder = WorkOrder.objects.filter(
-                company_code=record.company_code,
-                order_number=record.workorder
+            # 使用公司名稱查找對應的工單，確保資料分離正確
+            from erp_integration.models import CompanyConfig
+            
+            # 先從公司名稱找到公司代號
+            company_config = CompanyConfig.objects.filter(
+                company_name=record.company_name
             ).first()
+            
+            if company_config:
+                # 使用公司代號和工單號碼查詢工單
+                workorder = WorkOrder.objects.filter(
+                    company_code=company_config.company_code,
+                    order_number=record.workorder
+                ).first()
+            else:
+                # 如果找不到公司配置，使用舊方式查詢（向後相容）
+                workorder = WorkOrder.objects.filter(
+                    order_number=record.workorder
+                ).first()
+            
             if workorder:
                 # 判斷類型：SMT 或 作業員
                 is_smt = False
@@ -1245,6 +1260,17 @@ def approve_fill_work(request, pk: int):
                     approved_at=timezone.now(),
                     approval_remarks=record.approval_remarks or ''
                 )
+                
+                # 更新工單狀態
+                try:
+                    from workorder.services.workorder_status_service import WorkOrderStatusService
+                    WorkOrderStatusService.update_workorder_status(workorder.id)
+                except Exception as status_error:
+                    # 狀態更新錯誤不阻斷使用者操作
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"工單狀態更新失敗: {str(status_error)}")
+                    
         except Exception:
             # 同步錯誤不阻斷使用者操作
             pass
@@ -1274,11 +1300,26 @@ def cancel_approve_fill_work(request, pk: int):
 
         # 2) 嘗試移除對應生產監控的明細（以來源鍵對應）
         try:
-            # 使用公司代號和工單號碼組合查詢，確保唯一性
-            workorder = WorkOrder.objects.filter(
-                company_code=record.company_code,
-                order_number=record.workorder
+            # 使用公司名稱查找對應的工單，確保資料分離正確
+            from erp_integration.models import CompanyConfig
+            
+            # 先從公司名稱找到公司代號
+            company_config = CompanyConfig.objects.filter(
+                company_name=record.company_name
             ).first()
+            
+            if company_config:
+                # 使用公司代號和工單號碼查詢工單
+                workorder = WorkOrder.objects.filter(
+                    company_code=company_config.company_code,
+                    order_number=record.workorder
+                ).first()
+            else:
+                # 如果找不到公司配置，使用舊方式查詢（向後相容）
+                workorder = WorkOrder.objects.filter(
+                    order_number=record.workorder
+                ).first()
+            
             if workorder:
                 from workorder.models import WorkOrderProduction, WorkOrderProductionDetail
                 production_record = WorkOrderProduction.objects.filter(workorder=workorder).first()
@@ -2125,15 +2166,167 @@ class SupervisorReviewedListView(LoginRequiredMixin, UserPassesTestMixin, ListVi
         return user.is_superuser or user.groups.filter(name__in=['系統管理員', '主管']).exists()
 
     def get_queryset(self):
-        return FillWork.objects.exclude(approval_status='pending').order_by('-work_date', '-start_time', '-created_at')
+        from datetime import datetime
+        qs = FillWork.objects.exclude(approval_status='pending')
+        
+        # 篩選參數
+        operator = self.request.GET.get('operator', '').strip()
+        workorder = self.request.GET.get('workorder', '').strip()
+        product_id = self.request.GET.get('product_id', '').strip()
+        operation = self.request.GET.get('operation', '').strip()
+        approval_status = self.request.GET.get('approval_status', '').strip()
+        start_date = self.request.GET.get('start_date', '').strip()
+        end_date = self.request.GET.get('end_date', '').strip()
+        report_type = self.request.GET.get('report_type', '').strip()
+        
+        # 應用篩選條件
+        if operator:
+            qs = qs.filter(operator__icontains=operator)
+        if workorder:
+            qs = qs.filter(workorder__icontains=workorder)
+        if product_id:
+            qs = qs.filter(product_id__icontains=product_id)
+        if operation:
+            qs = qs.filter(Q(operation__icontains=operation) | Q(process__name__icontains=operation))
+        if approval_status:
+            qs = qs.filter(approval_status=approval_status)
+        if start_date:
+            try:
+                d1 = datetime.strptime(start_date, '%Y-%m-%d').date()
+                qs = qs.filter(work_date__gte=d1)
+            except ValueError:
+                pass
+        if end_date:
+            try:
+                d2 = datetime.strptime(end_date, '%Y-%m-%d').date()
+                qs = qs.filter(work_date__lte=d2)
+            except ValueError:
+                pass
+        if report_type:
+            if report_type == 'smt':
+                qs = qs.filter(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT'))
+            elif report_type == 'operator':
+                qs = qs.exclude(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT'))
+        
+        return qs.order_by('-work_date', '-start_time', '-created_at')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         base_qs = FillWork.objects.exclude(approval_status='pending')
+        
+        # 統計數據
         context['total_count'] = base_qs.count()
         context['approved_count'] = base_qs.filter(approval_status='approved').count()
         context['rejected_count'] = base_qs.filter(approval_status='rejected').count()
+        
+        # 篩選參數（用於保持表單狀態）
+        context['filter_operator'] = self.request.GET.get('operator', '')
+        context['filter_workorder'] = self.request.GET.get('workorder', '')
+        context['filter_product_id'] = self.request.GET.get('product_id', '')
+        context['filter_operation'] = self.request.GET.get('operation', '')
+        context['filter_approval_status'] = self.request.GET.get('approval_status', '')
+        context['filter_start_date'] = self.request.GET.get('start_date', '')
+        context['filter_end_date'] = self.request.GET.get('end_date', '')
+        context['filter_report_type'] = self.request.GET.get('report_type', '')
+        
+        # 處理匯出功能
+        if self.request.GET.get('export') == 'excel':
+            return self.export_to_excel()
+        
         return context
+    
+    def export_to_excel(self):
+        """匯出篩選結果到 Excel"""
+        import io
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from django.http import HttpResponse
+        
+        # 獲取篩選後的數據
+        queryset = self.get_queryset()
+        
+        # 創建 Excel 工作簿
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "已審核填報作業"
+        
+        # 設定標題行
+        headers = [
+            '狀態', '類型', '作業員/設備', '工單', '產品', '日期', 
+            '開始時間', '結束時間', '數量', '不良品數量', '工作時數', 
+            '加班時數', '工序', '備註', '異常記錄', '審核人', '審核時間'
+        ]
+        
+        # 設定標題樣式
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+        
+        # 填充數據
+        for row, record in enumerate(queryset, 2):
+            # 判斷類型
+            report_type = 'SMT' if ('SMT' in (record.operator or '').upper() or 
+                                   'SMT' in (record.process.name if record.process else '').upper()) else '作業員'
+            
+            # 狀態
+            status = '已核准' if record.approval_status == 'approved' else '已駁回'
+            
+            # 審核時間
+            review_time = record.approved_at if record.approved_at else record.rejected_at
+            
+            ws.cell(row=row, column=1, value=status)
+            ws.cell(row=row, column=2, value=report_type)
+            ws.cell(row=row, column=3, value=record.operator or record.equipment or '')
+            ws.cell(row=row, column=4, value=record.workorder or '')
+            ws.cell(row=row, column=5, value=record.product_id or '')
+            ws.cell(row=row, column=6, value=record.work_date.strftime('%Y-%m-%d') if record.work_date else '')
+            ws.cell(row=row, column=7, value=record.start_time.strftime('%H:%M') if record.start_time else '')
+            ws.cell(row=row, column=8, value=record.end_time.strftime('%H:%M') if record.end_time else '')
+            ws.cell(row=row, column=9, value=record.work_quantity or 0)
+            ws.cell(row=row, column=10, value=record.defect_quantity or 0)
+            ws.cell(row=row, column=11, value=record.work_hours_calculated or 0)
+            ws.cell(row=row, column=12, value=record.overtime_hours_calculated or 0)
+            ws.cell(row=row, column=13, value=record.operation or (record.process.name if record.process else '') or '')
+            ws.cell(row=row, column=14, value=record.remarks or '')
+            ws.cell(row=row, column=15, value=record.abnormal_notes or '')
+            ws.cell(row=row, column=16, value=record.approved_by or record.rejected_by or '')
+            ws.cell(row=row, column=17, value=review_time.strftime('%Y-%m-%d %H:%M:%S') if review_time else '')
+        
+        # 調整欄寬
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # 保存到記憶體
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        # 生成檔案名稱
+        from datetime import datetime
+        filename = f"已審核填報作業_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        # 返回 Excel 檔案
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
 
 @login_required
@@ -2195,16 +2388,26 @@ def batch_approve_fill_work(request):
             
             if synced_workorders:
                 for workorder_number in synced_workorders:
-                    # 使用公司代號和工單號碼組合查詢，確保唯一性
-                    # 注意：這裡需要從填報記錄中獲取公司代號
+                    # 使用公司名稱和工單號碼組合查詢，確保唯一性
+                    # 注意：這裡需要從填報記錄中獲取公司名稱
                     fill_work_record = FillWork.objects.filter(workorder=workorder_number).first()
-                    if fill_work_record and fill_work_record.company_code:
-                        workorder = WorkOrder.objects.filter(
-                            company_code=fill_work_record.company_code,
-                            order_number=workorder_number
+                    if fill_work_record and fill_work_record.company_name:
+                        # 先從公司名稱找到公司代號，再查詢工單
+                        from erp_integration.models import CompanyConfig
+                        company_config = CompanyConfig.objects.filter(
+                            company_name=fill_work_record.company_name
                         ).first()
+                        
+                        if company_config:
+                            workorder = WorkOrder.objects.filter(
+                                company_code=company_config.company_code,
+                                order_number=workorder_number
+                            ).first()
+                        else:
+                            # 如果找不到公司配置，使用舊方式查詢（向後相容）
+                            workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
                     else:
-                        # 如果沒有公司代號，使用舊方式查詢（向後相容）
+                        # 如果沒有公司名稱，使用舊方式查詢（向後相容）
                         workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
                     if workorder:
                         # 取得該工單的所有已核准填報記錄
@@ -2265,6 +2468,44 @@ def batch_approve_fill_work(request):
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"批次同步填報記錄到生產詳情失敗: {str(sync_error)}")
+        
+        # 批量更新工單狀態
+        try:
+            from workorder.services.workorder_status_service import WorkOrderStatusService
+            
+            # 取得所有相關工單並更新狀態
+            synced_workorders = set()
+            for record in approved_records:
+                if record.workorder:
+                    synced_workorders.add(record.workorder)
+            
+            for workorder_number in synced_workorders:
+                # 查找對應的工單
+                fill_work_record = FillWork.objects.filter(workorder=workorder_number).first()
+                if fill_work_record and fill_work_record.company_name:
+                    from erp_integration.models import CompanyConfig
+                    company_config = CompanyConfig.objects.filter(
+                        company_name=fill_work_record.company_name
+                    ).first()
+                    
+                    if company_config:
+                        workorder = WorkOrder.objects.filter(
+                            company_code=company_config.company_code,
+                            order_number=workorder_number
+                        ).first()
+                    else:
+                        workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
+                else:
+                    workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
+                
+                if workorder:
+                    WorkOrderStatusService.update_workorder_status(workorder.id)
+                    
+        except Exception as status_error:
+            # 狀態更新錯誤不阻斷使用者操作
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"批量工單狀態更新失敗: {str(status_error)}")
         
     except Exception as e:
         messages.error(request, f'批次核准失敗: {str(e)}')
@@ -2332,7 +2573,7 @@ def batch_unapprove_fill_work(request):
         return redirect('workorder:fill_work:supervisor_reviewed_list')
     
     # 檢查權限
-    if not (request.user.is_superuser or request.user.groups.filter(name__in=['系統管理員', '主管']).exists()):
+    if not (request.user.is_superuser or request.user.is_staff or request.user.groups.filter(name__in=['系統管理員', '主管', '工單使用者']).exists()):
         messages.error(request, '您沒有權限執行批次取消審核操作')
         return redirect('workorder:fill_work:supervisor_reviewed_list')
     
@@ -2359,12 +2600,12 @@ def batch_unapprove_fill_work(request):
         for record in reviewed_records:
             # 重置審核狀態
             record.approval_status = 'pending'
-            record.approved_by = None
+            record.approved_by = ''  # 設為空字串而不是 None
             record.approved_at = None
-            record.approval_remarks = None
-            record.rejected_by = None
+            record.approval_remarks = ''
+            record.rejected_by = ''
             record.rejected_at = None
-            record.rejection_reason = None
+            record.rejection_reason = ''
             record.save()
             unapproved_count += 1
         

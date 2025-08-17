@@ -1136,12 +1136,18 @@ def auto_add_process_to_workorder(request):
             
             # 查找工單
             try:
-                workorder = WorkOrder.objects.get(order_number=workorder_number)
-            except WorkOrder.DoesNotExist:
+                # 使用多公司架構唯一識別查詢工單
+                workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
+                if not workorder:
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'找不到工單：{workorder_number}'
+                    }, status=404)
+            except Exception as e:
                 return JsonResponse({
                     'success': False,
-                    'message': f'找不到工單：{workorder_number}'
-                }, status=404)
+                    'message': f'查詢工單失敗：{str(e)}'
+                }, status=500)
             
             # 檢查工序是否已存在
             existing_process = WorkOrderProcess.objects.filter(
@@ -1216,7 +1222,14 @@ def get_workorder_processes(request):
         }, status=400)
     
     try:
-        workorder = WorkOrder.objects.get(order_number=workorder_number)
+        # 使用多公司架構唯一識別查詢工單
+        workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
+        if not workorder:
+            return JsonResponse({
+                'success': False,
+                'message': f'找不到工單：{workorder_number}'
+            }, status=404)
+        
         processes = WorkOrderProcess.objects.filter(
             workorder=workorder
         ).order_by('step_order')

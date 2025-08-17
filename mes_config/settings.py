@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     # "workorder.workorder_reporting",  # 已移除舊報工記錄模組
     "workorder.fill_work",
     "workorder.onsite_reporting",
+    "workorder.production_monitoring.apps.ProductionMonitoringConfig",
 
     "kanban.apps.KanbanConfig",
     "erp_integration.apps.ErpIntegrationConfig",

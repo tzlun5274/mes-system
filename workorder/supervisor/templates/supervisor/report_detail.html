@@ -139,7 +139,7 @@
                             </p>
                             <p><strong>工單號:</strong> 
                                 {% if report.workorder %}
-                                <a href="{% url 'workorder:detail' report.workorder.id %}" target="_blank">
+                                <a href="{% url 'workorder:production_workorder_detail' report.workorder.id %}" target="_blank">
                                     {{ report.workorder.order_number }}
                                 </a>
                                 {% elif report.original_workorder_number %}
@@ -288,7 +288,7 @@
                 <div class="card-body">
                     <div class="list-group list-group-flush">
                         {% if report.workorder %}
-                        <a href="{% url 'workorder:detail' report.workorder.id %}" class="list-group-item list-group-item-action" target="_blank">
+                        <a href="{% url 'workorder:production_workorder_detail' report.workorder.id %}" class="list-group-item list-group-item-action" target="_blank">
                             <i class="fas fa-file-alt"></i> 查看工單詳情
                         </a>
                         {% endif %}

@@ -50,7 +50,11 @@ class AutoAllocationService:
             pending_reports = zero_quantity_reports.filter(workorder__in=completed_order_numbers)
             
             if company_code:
-                pending_reports = pending_reports.filter(company_name__icontains=company_code)
+                # 根據多公司架構，需要同時檢查公司代號、工單號碼和產品編號
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(company_code=company_code).first()
+                if company_config:
+                    pending_reports = pending_reports.filter(company_name=company_config.company_name)
             
             # 按工序統計
             processes_summary = {}
@@ -180,7 +184,11 @@ class AutoAllocationService:
                 )
                 
                 if company_code:
-                    zero_reports = zero_reports.filter(company_name__icontains=company_code)
+                    # 根據多公司架構，需要同時檢查公司代號、工單號碼和產品編號
+                    from erp_integration.models import CompanyConfig
+                    company_config = CompanyConfig.objects.filter(company_code=company_code).first()
+                    if company_config:
+                        zero_reports = zero_reports.filter(company_name=company_config.company_name)
                 
                 if not zero_reports.exists():
                     return {
@@ -301,8 +309,16 @@ class AutoAllocationService:
             # 獲取該工單的所有填報紀錄
             all_reports = FillWork.objects.filter(
                 workorder=workorder_number,
+                product_id=completed_workorder.product_code,
                 approval_status='approved'
             )
+            
+            # 如果工單有公司代號，則按公司分離過濾
+            if completed_workorder.company_code:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(company_code=completed_workorder.company_code).first()
+                if company_config:
+                    all_reports = all_reports.filter(company_name=company_config.company_name)
             
             # 按工序統計
             processes_summary = {}

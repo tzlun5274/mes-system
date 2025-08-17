@@ -1,5 +1,8 @@
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class EmailConfig(models.Model):
@@ -219,134 +222,154 @@ class ReportSyncSettings(models.Model):
         return f"{self.get_sync_type_display()} - {self.get_sync_frequency_display()}"
 
 
-class CompletionCheckConfig(models.Model):
+class UserWorkPermission(models.Model):
     """
-    完工檢查定時任務配置
-    用於管理完工檢查定時任務的運行時間和啟用狀態
+    使用者工作權限模型
+    定義每個使用者可以針對哪些作業員和工序進行填報報工
     """
     
-    # 基本配置
-    enabled = models.BooleanField(default=True, verbose_name="啟用狀態")
-    interval_minutes = models.IntegerField(
-        default=5, 
-        verbose_name="檢查間隔（分鐘）",
-        help_text="每多少分鐘檢查一次完工狀態"
+    # 關聯使用者
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        verbose_name="使用者",
+        related_name="work_permissions"
     )
     
-    # 運行時間設定
-    start_time = models.TimeField(
-        default="08:00",
-        verbose_name="開始時間",
-        help_text="每日開始檢查的時間"
-    )
-    end_time = models.TimeField(
-        default="18:00", 
-        verbose_name="結束時間",
-        help_text="每日結束檢查的時間"
+    # 作業員編號（支援多個，用逗號分隔）
+    operator_codes = models.TextField(
+        verbose_name="作業員編號",
+        help_text="可操作的作業員編號，多個用逗號分隔，留空表示可操作所有作業員"
     )
     
-    # 進階設定
-    max_workorders_per_check = models.IntegerField(
-        default=100,
-        verbose_name="每次檢查最大工單數",
-        help_text="每次檢查最多處理多少個工單，避免系統負載過重"
+    # 工序名稱（支援多個，用逗號分隔）
+    process_names = models.TextField(
+        verbose_name="工序名稱",
+        help_text="可操作的工序名稱，多個用逗號分隔，留空表示可操作所有工序"
     )
     
-    # 通知設定
-    enable_notifications = models.BooleanField(
+    # 權限類型
+    PERMISSION_TYPES = [
+        ('fill_work', '填報報工'),
+        ('onsite_reporting', '現場報工'),
+        ('both', '填報報工 + 現場報工'),
+    ]
+    
+    permission_type = models.CharField(
+        max_length=20,
+        choices=PERMISSION_TYPES,
+        default='both',
+        verbose_name="權限類型"
+    )
+    
+    # 是否啟用
+    is_active = models.BooleanField(
         default=True,
-        verbose_name="啟用通知",
-        help_text="完工時是否發送通知"
+        verbose_name="啟用狀態"
+    )
+    
+    # 備註
+    notes = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="備註"
     )
     
     # 系統欄位
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
-    updated_by = models.CharField(
-        max_length=100, 
-        blank=True, 
-        null=True, 
-        verbose_name="最後更新者"
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="建立者",
+        related_name="created_work_permissions"
     )
     
     class Meta:
-        verbose_name = "完工檢查配置"
-        verbose_name_plural = "完工檢查配置"
-        db_table = "system_completion_check_config"
+        verbose_name = "使用者工作權限"
+        verbose_name_plural = "使用者工作權限"
+        db_table = "system_user_work_permission"
+        unique_together = ['user', 'permission_type']
     
     def __str__(self):
-        return f"完工檢查配置 (間隔{self.interval_minutes}分鐘)"
+        return f"{self.user.username} - {self.get_permission_type_display()}"
     
-    def save(self, *args, **kwargs):
-        """儲存時自動更新定時任務"""
-        # 記錄更新者
-        if not self.updated_by:
-            # 這裡可以從request中獲取當前用戶，暫時設為系統
-            self.updated_by = "系統"
-        
-        super().save(*args, **kwargs)
-        
-        # 自動更新定時任務設定
-        try:
-            self._update_periodic_task()
-        except Exception as e:
-            # 記錄錯誤但不中斷儲存
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"更新定時任務失敗：{str(e)}")
+    def get_operator_codes_list(self):
+        """獲取作業員編號列表"""
+        if not self.operator_codes:
+            return []
+        return [code.strip() for code in self.operator_codes.split(',') if code.strip()]
     
-    def _update_periodic_task(self):
-        """更新定時任務設定"""
-        try:
-            from django_celery_beat.models import PeriodicTask, IntervalSchedule
-            
-            # 建立或取得間隔排程
-            interval_schedule, created = IntervalSchedule.objects.get_or_create(
-                every=self.interval_minutes,
-                period=IntervalSchedule.MINUTES,
-            )
-            
-            # 更新現有的完工觸發檢查任務
-            task_name = 'workorder.tasks.completion_trigger_task'
-            task = PeriodicTask.objects.filter(name='完工觸發檢查任務').first()
-            
-            if task:
-                # 更新現有任務
-                task.interval = interval_schedule
-                task.enabled = self.enabled
-                task.description = f'每 {self.interval_minutes} 分鐘檢查工單完工觸發條件，支援工序記錄和填報記錄雙重累加機制'
-                task.save()
-            else:
-                # 如果任務不存在，建立新任務
-                task = PeriodicTask.objects.create(
-                    name='完工觸發檢查任務',
-                    task=task_name,
-                    interval=interval_schedule,
-                    enabled=self.enabled,
-                    description=f'每 {self.interval_minutes} 分鐘檢查工單完工觸發條件，支援工序記錄和填報記錄雙重累加機制'
-                )
-                
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"更新定時任務設定失敗：{str(e)}")
+    def get_process_names_list(self):
+        """獲取工序名稱列表"""
+        if not self.process_names:
+            return []
+        return [name.strip() for name in self.process_names.split(',') if name.strip()]
+    
+    def can_operate_operator(self, operator_code):
+        """檢查是否可以操作指定作業員"""
+        if not self.is_active:
+            return False
+        
+        # 如果沒有設定作業員限制，表示可以操作所有作業員
+        if not self.operator_codes:
+            return True
+        
+        return operator_code in self.get_operator_codes_list()
+    
+    def can_operate_process(self, process_name):
+        """檢查是否可以操作指定工序"""
+        if not self.is_active:
+            return False
+        
+        # 如果沒有設定工序限制，表示可以操作所有工序
+        if not self.process_names:
+            return True
+        
+        return process_name in self.get_process_names_list()
+    
+    def can_fill_work(self):
+        """檢查是否可以進行填報報工"""
+        return self.is_active and self.permission_type in ['fill_work', 'both']
+    
+    def can_onsite_reporting(self):
+        """檢查是否可以進行現場報工"""
+        return self.is_active and self.permission_type in ['onsite_reporting', 'both']
     
     @classmethod
-    def get_config(cls):
-        """取得配置，如果不存在則建立預設配置"""
-        config, created = cls.objects.get_or_create(
-            id=1,
-            defaults={
-                'enabled': True,
-                'interval_minutes': 5,
-                'start_time': '08:00',
-                'end_time': '18:00',
-                'max_workorders_per_check': 100,
-                'enable_notifications': True,
-                'updated_by': '系統'
-            }
-        )
-        return config
+    def get_user_permission(cls, user, permission_type='both'):
+        """獲取使用者的工作權限"""
+        try:
+            return cls.objects.get(user=user, permission_type=permission_type, is_active=True)
+        except cls.DoesNotExist:
+            return None
+    
+    @classmethod
+    def check_user_permission(cls, user, operator_code=None, process_name=None, permission_type='both'):
+        """檢查使用者是否有權限進行操作"""
+        permission = cls.get_user_permission(user, permission_type)
+        
+        if not permission:
+            return False
+        
+        # 檢查作業員權限
+        if operator_code and not permission.can_operate_operator(operator_code):
+            return False
+        
+        # 檢查工序權限
+        if process_name and not permission.can_operate_process(process_name):
+            return False
+        
+        return True
+
+
+# 完工判斷設定已整合到 workorder.workorder_erp.models.SystemConfig
+# 使用現有的 SystemConfig 模型來管理完工判斷相關設定
+
+
+
 
 
 

@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    {% if is_add %}新增使用者工作權限{% else %}編輯使用者工作權限{% endif %} - MES 系統
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 多選功能增強
+    const operatorSelect = document.getElementById('operator_codes_multiple');
+    const processSelect = document.getElementById('process_names_multiple');
+    
+    // 為多選下拉選單增加全選/取消全選功能
+    function addSelectAllOption(selectElement, label) {
+        if (!selectElement) return;
+        
+        // 增加全選選項
+        const selectAllOption = document.createElement('option');
+        selectAllOption.value = 'select_all';
+        selectAllOption.textContent = `--- ${label} ---`;
+        selectAllOption.style.fontWeight = 'bold';
+        selectAllOption.style.backgroundColor = '#f8f9fa';
+        selectElement.insertBefore(selectAllOption, selectElement.firstChild);
+        
+        // 全選功能
+        selectElement.addEventListener('change', function(e) {
+            if (e.target.value === 'select_all') {
+                // 如果點擊全選，則選擇所有選項
+                Array.from(this.options).forEach(option => {
+                    if (option.value !== 'select_all') {
+                        option.selected = true;
+                    }
+                });
+                e.target.value = ''; // 重置全選選項
+            }
+        });
+    }
+    
+    // 為兩個多選下拉選單增加全選功能
+    addSelectAllOption(operatorSelect, '全選作業員');
+    addSelectAllOption(processSelect, '全選工序');
+    
+    // 表單提交前驗證
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const operatorSelected = Array.from(operatorSelect.options).some(option => 
+            option.selected && option.value !== 'select_all'
+        );
+        const processSelected = Array.from(processSelect.options).some(option => 
+            option.selected && option.value !== 'select_all'
+        );
+        
+        // 如果都沒有選擇，顯示提示（但允許提交，表示無限制）
+        if (!operatorSelected && !processSelected) {
+            if (!confirm('您沒有選擇任何作業員和工序，這表示該使用者可以操作所有作業員和工序。確定要繼續嗎？')) {
+                e.preventDefault();
+                return;
+            }
+        }
+    });
+    
+    // 顯示已選擇的項目數量
+    function updateSelectionCount(selectElement, label) {
+        const selectedCount = Array.from(selectElement.options).filter(option => 
+            option.selected && option.value !== 'select_all'
+        ).length;
+        
+        const totalCount = selectElement.options.length - 1; // 減去全選選項
+        
+        // 更新標籤顯示
+        const labelElement = selectElement.previousElementSibling;
+        if (labelElement && labelElement.tagName === 'LABEL') {
+            const originalText = labelElement.textContent.replace(/\(\d+\/\d+\)/, '');
+            labelElement.textContent = `${originalText} (${selectedCount}/${totalCount})`;
+        }
+    }
+    
+    // 監聽選擇變化
+    operatorSelect.addEventListener('change', () => updateSelectionCount(operatorSelect, '作業員'));
+    processSelect.addEventListener('change', () => updateSelectionCount(processSelect, '工序'));
+    
+    // 初始化顯示
+    updateSelectionCount(operatorSelect, '作業員');
+    updateSelectionCount(processSelect, '工序');
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-user-check text-success"></i>
+                    {% if is_add %}新增使用者工作權限{% else %}編輯使用者工作權限{% endif %}
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'system:user_work_permission_list' %}">使用者工作權限管理</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            {% if is_add %}新增權限{% else %}編輯權限{% endif %}
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit"></i>
+                        {% if is_add %}新增使用者工作權限{% else %}編輯使用者工作權限{% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- 使用者選擇 -->
+                        <div class="mb-3">
+                            <label for="{{ form.user.id_for_label }}" class="form-label">
+                                <i class="fas fa-user"></i> {{ form.user.label }}
+                            </label>
+                            {{ form.user }}
+                            {% if form.user.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.user.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if form.user.help_text %}
+                                <div class="form-text">{{ form.user.help_text }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 權限類型 -->
+                        <div class="mb-3">
+                            <label for="{{ form.permission_type.id_for_label }}" class="form-label">
+                                <i class="fas fa-shield-alt"></i> {{ form.permission_type.label }}
+                            </label>
+                            {{ form.permission_type }}
+                            {% if form.permission_type.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.permission_type.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if form.permission_type.help_text %}
+                                <div class="form-text">{{ form.permission_type.help_text }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 作業員編號（多選） -->
+                        <div class="mb-3">
+                            <label for="{{ form.operator_codes_multiple.id_for_label }}" class="form-label">
+                                <i class="fas fa-users"></i> {{ form.operator_codes_multiple.label }}
+                            </label>
+                            {{ form.operator_codes_multiple }}
+                            {% if form.operator_codes_multiple.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.operator_codes_multiple.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if form.operator_codes_multiple.help_text %}
+                                <div class="form-text">{{ form.operator_codes_multiple.help_text }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 工序名稱（多選） -->
+                        <div class="mb-3">
+                            <label for="{{ form.process_names_multiple.id_for_label }}" class="form-label">
+                                <i class="fas fa-cogs"></i> {{ form.process_names_multiple.label }}
+                            </label>
+                            {{ form.process_names_multiple }}
+                            {% if form.process_names_multiple.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.process_names_multiple.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if form.process_names_multiple.help_text %}
+                                <div class="form-text">{{ form.process_names_multiple.help_text }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 啟用狀態 -->
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.is_active }}
+                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                    <i class="fas fa-toggle-on"></i> {{ form.is_active.label }}
+                                </label>
+                            </div>
+                            {% if form.is_active.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.is_active.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if form.is_active.help_text %}
+                                <div class="form-text">{{ form.is_active.help_text }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 備註 -->
+                        <div class="mb-3">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                <i class="fas fa-sticky-note"></i> {{ form.notes.label }}
+                            </label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.notes.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if form.notes.help_text %}
+                                <div class="form-text">{{ form.notes.help_text }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 按鈕 -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'system:user_work_permission_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> 返回列表
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save"></i>
+                                {% if is_add %}建立權限{% else %}更新權限{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 說明卡片 -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle"></i> 使用說明
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li><strong>作業員編號</strong>：從下拉選單中選擇可操作的作業員，按住 Ctrl 鍵可多選</li>
+                        <li><strong>工序名稱</strong>：從下拉選單中選擇可操作的工序，按住 Ctrl 鍵可多選</li>
+                        <li><strong>留空表示無限制</strong>：如果不選擇任何作業員或工序，表示該使用者可以操作所有作業員或工序</li>
+                        <li><strong>權限類型</strong>：選擇使用者可以進行的報工類型（填報報工、現場報工或兩者都可以）</li>
+                        <li><strong>多選操作</strong>：按住 Ctrl 鍵點擊可選擇多個項目，按住 Shift 鍵可選擇範圍</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

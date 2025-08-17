@@ -90,23 +90,59 @@ class WorkOrderStatusService:
                 logger.debug(f"工單 {workorder.order_number} 有工序記錄")
                 return True
             
-            # 2. 檢查填報核准記錄
-            has_approved_reports = FillWork.objects.filter(
-                workorder=workorder.order_number,
-                approval_status='approved'
-            ).exists()
+            # 2. 檢查現場報工記錄
+            try:
+                from onsite_reporting.models import OnsiteReport
+                onsite_reports = OnsiteReport.objects.filter(
+                    order_number=workorder.order_number,
+                    product_code=workorder.product_code
+                )
+                
+                # 如果工單有公司代號，則按公司分離過濾
+                if workorder.company_code:
+                    onsite_reports = onsite_reports.filter(company_code=workorder.company_code)
+                
+                has_onsite_reports = onsite_reports.exists()
+                
+                if has_onsite_reports:
+                    logger.debug(f"工單 {workorder.order_number} 有現場報工記錄")
+                    return True
+            except ImportError:
+                # 如果現場報工模組不存在，跳過檢查
+                logger.debug(f"現場報工模組不存在，跳過檢查")
+                has_onsite_reports = False
+            
+            # 3. 檢查填報核准記錄
+            # 根據多公司架構，需要同時檢查公司名稱、工單號碼和產品編號
+            from erp_integration.models import CompanyConfig
+            
+            # 先找到對應的公司配置
+            company_config = CompanyConfig.objects.filter(
+                company_code=workorder.company_code
+            ).first()
+            
+            if company_config:
+                has_approved_reports = FillWork.objects.filter(
+                    workorder=workorder.order_number,
+                    product_id=workorder.product_code,
+                    company_name=company_config.company_name,
+                    approval_status='approved'
+                ).exists()
+            else:
+                has_approved_reports = False
             
             if has_approved_reports:
                 logger.debug(f"工單 {workorder.order_number} 有已核准填報記錄")
                 return True
             
-            # 3. 檢查是否有生產記錄
+            # 4. 檢查是否有生產記錄
             has_production_record = hasattr(workorder, 'production_record') and workorder.production_record is not None
             
             if has_production_record:
                 logger.debug(f"工單 {workorder.order_number} 有生產記錄")
                 return True
             
+            logger.debug(f"工單 {workorder.order_number} 沒有任何生產活動")
             return False
             
         except Exception as e:
@@ -213,10 +249,21 @@ class WorkOrderStatusService:
                 workorder_production__workorder=workorder
             ).count()
             
+            # 根據多公司架構，需要同時檢查公司代號、工單號碼和產品編號
             approved_reports_count = FillWork.objects.filter(
                 workorder=workorder.order_number,
+                product_id=workorder.product_code,
                 approval_status='approved'
-            ).count()
+            )
+            
+            # 如果工單有公司代號，則按公司分離過濾
+            if workorder.company_code:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
+                if company_config:
+                    approved_reports_count = approved_reports_count.filter(company_name=company_config.company_name)
+            
+            approved_reports_count = approved_reports_count.count()
             
             has_production_record = hasattr(workorder, 'production_record') and workorder.production_record is not None
             

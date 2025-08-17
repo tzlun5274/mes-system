@@ -64,12 +64,20 @@ class ProcessUpdateService:
             # 獲取該工序的所有已核准填報記錄
             from workorder.fill_work.models import FillWork
             
-            # 填報記錄：根據工序名稱查詢（process 是外鍵到 ProcessName）
+            # 填報記錄：根據多公司架構唯一識別查詢
             fill_work_reports = FillWork.objects.filter(
-                workorder=process.workorder.order_number,  # 注意：這裡是 order_number
-                process__name=process.process_name,  # 注意：這裡是 process__name（外鍵查詢）
+                workorder=process.workorder.order_number,  # 工單號碼
+                product_id=process.workorder.product_code,  # 產品編號
+                process__name=process.process_name,  # 工序名稱
                 approval_status='approved'
             )
+            
+            # 如果工單有公司代號，則按公司分離過濾
+            if process.workorder.company_code:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(company_code=process.workorder.company_code).first()
+                if company_config:
+                    fill_work_reports = fill_work_reports.filter(company_name=company_config.company_name)
             
             # 計算總完成數量
             fill_work_quantity = fill_work_reports.aggregate(

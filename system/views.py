@@ -10,31 +10,33 @@ from .forms import (
     CustomUserCreationForm,
     BackupScheduleForm,
     OperationLogConfigForm,
-    CompletionCheckConfigForm,
+    UserWorkPermissionForm
 )
 from .models import (
     EmailConfig, 
     BackupSchedule, 
     OperationLogConfig,
-    CompletionCheckConfig,
+    UserWorkPermission
 )
 from django.core.mail import get_connection, send_mail
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse, FileResponse, JsonResponse
 import os
 import subprocess
 import datetime
 import smtplib
-from django_celery_beat.models import PeriodicTask, CrontabSchedule
+from django_celery_beat.models import PeriodicTask, CrontabSchedule, IntervalSchedule
 from .tasks import auto_backup_database
 import csv
 import openpyxl
 from django.utils import timezone
-from django.urls import get_resolver
+from django.urls import get_resolver, reverse_lazy
 from django.conf import settings
 import shutil
 import glob
 from django.db.models import Q
 from datetime import timedelta
+from django.views.generic import UpdateView, View
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
 # 設定系統管理模組的日誌記錄器
 system_logger = logging.getLogger("system")
@@ -1573,13 +1575,119 @@ def permission_assign(request):
 
 @login_required
 @user_passes_test(superuser_required, login_url="/accounts/login/")
+def user_work_permission_list(request):
+    """
+    使用者工作權限列表
+    """
+    permissions = UserWorkPermission.objects.select_related('user').order_by('user__username', 'permission_type')
+    
+    context = {
+        'permissions': permissions,
+        'page_title': '使用者工作權限管理',
+    }
+    
+    return render(request, 'system/user_work_permission_list.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def user_work_permission_add(request):
+    """
+    新增使用者工作權限
+    """
+    if request.method == 'POST':
+        form = UserWorkPermissionForm(request.POST)
+        if form.is_valid():
+            permission = form.save(commit=False)
+            permission.created_by = request.user
+            permission.save()
+            messages.success(request, f'使用者 {permission.user.username} 的工作權限設定已成功建立！')
+            return redirect('system:user_work_permission_list')
+    else:
+        form = UserWorkPermissionForm()
+    
+    context = {
+        'form': form,
+        'page_title': '新增使用者工作權限',
+        'is_add': True,
+    }
+    
+    return render(request, 'system/user_work_permission_form.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def user_work_permission_edit(request, permission_id):
+    """
+    編輯使用者工作權限
+    """
+    permission = get_object_or_404(UserWorkPermission, id=permission_id)
+    
+    if request.method == 'POST':
+        form = UserWorkPermissionForm(request.POST, instance=permission)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'使用者 {permission.user.username} 的工作權限設定已成功更新！')
+            return redirect('system:user_work_permission_list')
+    else:
+        form = UserWorkPermissionForm(instance=permission)
+    
+    context = {
+        'form': form,
+        'permission': permission,
+        'page_title': '編輯使用者工作權限',
+        'is_edit': True,
+    }
+    
+    return render(request, 'system/user_work_permission_form.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def user_work_permission_delete(request, permission_id):
+    """
+    刪除使用者工作權限
+    """
+    permission = get_object_or_404(UserWorkPermission, id=permission_id)
+    
+    if request.method == 'POST':
+        username = permission.user.username
+        permission.delete()
+        messages.success(request, f'使用者 {username} 的工作權限設定已成功刪除！')
+        return redirect('system:user_work_permission_list')
+    
+    context = {
+        'permission': permission,
+        'page_title': '刪除使用者工作權限',
+    }
+    
+    return render(request, 'system/user_work_permission_confirm_delete.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def user_work_permission_detail(request, permission_id):
+    """
+    查看使用者工作權限詳情
+    """
+    permission = get_object_or_404(UserWorkPermission, id=permission_id)
+    
+    context = {
+        'permission': permission,
+        'page_title': '使用者工作權限詳情',
+    }
+    
+    return render(request, 'system/user_work_permission_detail.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
 def workorder_settings(request):
     """
     工單管理設定頁面
-    管理工單系統相關設定，包含審核流程和定時任務等
+    管理工單系統相關設定，包含審核流程、定時任務和完工判斷等
     """
-    from workorder.models import SystemConfig
-    from django_celery_beat.models import PeriodicTask, IntervalSchedule
+    from workorder.workorder_erp.models import SystemConfig
     
     if request.method == "POST":
         # 處理表單提交
@@ -1590,12 +1698,16 @@ def workorder_settings(request):
         session_timeout = request.POST.get('session_timeout', 30)
         
         # 定時任務設定
-        process_completion_check_enabled = request.POST.get('process_completion_check_enabled') == 'on'
-        process_completion_check_interval = int(request.POST.get('process_completion_check_interval', 15))
-        report_completion_check_enabled = request.POST.get('report_completion_check_enabled') == 'on'
-        report_completion_check_interval = int(request.POST.get('report_completion_check_interval', 15))
         auto_allocation_enabled = request.POST.get('auto_allocation_enabled') == 'on'
         auto_allocation_interval = int(request.POST.get('auto_allocation_interval', 30))
+        
+        # 完工判斷設定
+        completion_check_enabled = request.POST.get('completion_check_enabled') == 'on'
+        completion_check_interval = int(request.POST.get('completion_check_interval', 30))
+        packaging_process_name = request.POST.get('packaging_process_name', '出貨包裝')
+        data_transfer_enabled = request.POST.get('data_transfer_enabled') == 'on'
+        transfer_batch_size = int(request.POST.get('transfer_batch_size', 50))
+        transfer_retention_days = int(request.POST.get('transfer_retention_days', 365))
         
         # 更新系統設定
         SystemConfig.objects.update_or_create(
@@ -1619,32 +1731,34 @@ def workorder_settings(request):
             defaults={"value": str(session_timeout)}
         )
         
+        # 更新完工判斷設定
+        SystemConfig.objects.update_or_create(
+            key="completion_check_enabled",
+            defaults={"value": str(completion_check_enabled)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="completion_check_interval",
+            defaults={"value": str(completion_check_interval)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="packaging_process_name",
+            defaults={"value": packaging_process_name}
+        )
+        SystemConfig.objects.update_or_create(
+            key="data_transfer_enabled",
+            defaults={"value": str(data_transfer_enabled)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="transfer_batch_size",
+            defaults={"value": str(transfer_batch_size)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="transfer_retention_days",
+            defaults={"value": str(transfer_retention_days)}
+        )
+        
         # 更新定時任務設定
         try:
-            # 工序完工檢查定時任務
-            process_completion_task = PeriodicTask.objects.get(name='工序完工檢查定時任務')
-            process_completion_task.enabled = process_completion_check_enabled
-            if process_completion_check_interval != process_completion_task.interval.every:
-                # 更新間隔
-                interval_schedule, _ = IntervalSchedule.objects.get_or_create(
-                    every=process_completion_check_interval,
-                    period=IntervalSchedule.MINUTES,
-                )
-                process_completion_task.interval = interval_schedule
-            process_completion_task.save()
-            
-            # 填報完工檢查定時任務
-            report_completion_task = PeriodicTask.objects.get(name='填報完工檢查定時任務')
-            report_completion_task.enabled = report_completion_check_enabled
-            if report_completion_check_interval != report_completion_task.interval.every:
-                # 更新間隔
-                interval_schedule, _ = IntervalSchedule.objects.get_or_create(
-                    every=report_completion_check_interval,
-                    period=IntervalSchedule.MINUTES,
-                )
-                report_completion_task.interval = interval_schedule
-            report_completion_task.save()
-            
             # 自動分配定時任務
             auto_allocation_task = PeriodicTask.objects.get(name='自動分配任務')
             auto_allocation_task.enabled = auto_allocation_enabled
@@ -1688,27 +1802,38 @@ def workorder_settings(request):
     except (SystemConfig.DoesNotExist, ValueError):
         session_timeout = 30
     
+    # 取得完工判斷設定
+    try:
+        completion_check_enabled = SystemConfig.objects.get(key="completion_check_enabled").value == "True"
+    except SystemConfig.DoesNotExist:
+        completion_check_enabled = True
+        
+    try:
+        completion_check_interval = int(SystemConfig.objects.get(key="completion_check_interval").value)
+    except (SystemConfig.DoesNotExist, ValueError):
+        completion_check_interval = 30
+        
+    try:
+        packaging_process_name = SystemConfig.objects.get(key="packaging_process_name").value
+    except SystemConfig.DoesNotExist:
+        packaging_process_name = "出貨包裝"
+        
+    try:
+        data_transfer_enabled = SystemConfig.objects.get(key="data_transfer_enabled").value == "True"
+    except SystemConfig.DoesNotExist:
+        data_transfer_enabled = True
+        
+    try:
+        transfer_batch_size = int(SystemConfig.objects.get(key="transfer_batch_size").value)
+    except (SystemConfig.DoesNotExist, ValueError):
+        transfer_batch_size = 50
+        
+    try:
+        transfer_retention_days = int(SystemConfig.objects.get(key="transfer_retention_days").value)
+    except (SystemConfig.DoesNotExist, ValueError):
+        transfer_retention_days = 365
+    
     # 取得定時任務狀態
-    try:
-        process_completion_task = PeriodicTask.objects.get(name='工序完工檢查定時任務')
-        process_completion_task.interval_minutes = process_completion_task.interval.every
-    except PeriodicTask.DoesNotExist:
-        process_completion_task = type('obj', (object,), {
-            'enabled': False,
-            'interval_minutes': 15,
-            'last_run': None
-        })
-    
-    try:
-        report_completion_task = PeriodicTask.objects.get(name='填報完工檢查定時任務')
-        report_completion_task.interval_minutes = report_completion_task.interval.every
-    except PeriodicTask.DoesNotExist:
-        report_completion_task = type('obj', (object,), {
-            'enabled': False,
-            'interval_minutes': 15,
-            'last_run': None
-        })
-    
     try:
         auto_allocation_task = PeriodicTask.objects.get(name='自動分配任務')
         auto_allocation_task.interval_minutes = auto_allocation_task.interval.every
@@ -1725,151 +1850,23 @@ def workorder_settings(request):
         'audit_log_enabled': audit_log_enabled,
         'max_file_size': max_file_size,
         'session_timeout': session_timeout,
-        'process_completion_task': process_completion_task,
-        'report_completion_task': report_completion_task,
         'auto_allocation_task': auto_allocation_task,
+        'completion_check_enabled': completion_check_enabled,
+        'completion_check_interval': completion_check_interval,
+        'packaging_process_name': packaging_process_name,
+        'data_transfer_enabled': data_transfer_enabled,
+        'transfer_batch_size': transfer_batch_size,
+        'transfer_retention_days': transfer_retention_days,
     }
     
     return render(request, 'system/workorder_settings.html', context)
 
 
-@login_required
-def completion_check_config(request):
-    """
-    完工檢查配置管理視圖
-    """
-    if not request.user.is_staff:
-        messages.error(request, "只有管理員可以管理完工檢查配置")
-        return redirect("system:index")
-    
-    # 取得或建立配置
-    config = CompletionCheckConfig.get_config()
-    
-    if request.method == "POST":
-        form = CompletionCheckConfigForm(request.POST, instance=config)
-        if form.is_valid():
-            # 記錄更新者
-            config = form.save(commit=False)
-            config.updated_by = request.user.username
-            config.save()
-            
-            messages.success(request, "完工檢查配置已更新")
-            return redirect("system:completion_check_config")
-        else:
-            messages.error(request, "配置更新失敗，請檢查輸入資料")
-    else:
-        form = CompletionCheckConfigForm(instance=config)
-    
-    # 取得當前定時任務狀態
-    try:
-        from django_celery_beat.models import PeriodicTask
-        task = PeriodicTask.objects.filter(name='完工觸發檢查任務').first()
-        task_status = {
-            'exists': task is not None,
-            'enabled': task.enabled if task else False,
-            'last_run': task.last_run_at if task else None,
-            'interval': f"{task.interval.every} {task.interval.period}" if task and task.interval else None
-        }
-    except Exception as e:
-        task_status = {
-            'exists': False,
-            'enabled': False,
-            'last_run': None,
-            'interval': None,
-            'error': str(e)
-        }
-    
-    context = {
-        'form': form,
-        'config': config,
-        'task_status': task_status,
-        'page_title': '完工檢查配置',
-        'breadcrumb': [
-            ('系統管理', 'system:index'),
-            ('完工檢查配置', 'system:completion_check_config')
-        ]
-    }
-    
-    return render(request, 'system/completion_check_config.html', context)
+# 完工判斷功能已整合到現有的 SimpleCompletionService 中
+# 手動執行功能可以通過現有的管理命令實現
 
 
-@login_required
-def completion_check_status(request):
-    """
-    完工檢查狀態查看視圖
-    """
-    if not request.user.is_staff:
-        messages.error(request, "只有管理員可以查看完工檢查狀態")
-        return redirect("system:index")
-    
-    # 取得配置
-    config = CompletionCheckConfig.get_config()
-    
-    # 取得定時任務狀態
-    try:
-        from django_celery_beat.models import PeriodicTask
-        task = PeriodicTask.objects.filter(name='完工觸發檢查任務').first()
-        task_status = {
-            'exists': task is not None,
-            'enabled': task.enabled if task else False,
-            'last_run': task.last_run_at if task else None,
-            'interval': f"{task.interval.every} {task.interval.period}" if task and task.interval else None,
-            'next_run': task.last_run_at + timedelta(minutes=config.interval_minutes) if task and task.last_run_at else None
-        }
-    except Exception as e:
-        task_status = {
-            'exists': False,
-            'enabled': False,
-            'last_run': None,
-            'interval': None,
-            'next_run': None,
-            'error': str(e)
-        }
-    
-    # 取得最近的完工統計
-    try:
-        from workorder.models import CompletedWorkOrder
-        from django.utils import timezone
-        from datetime import timedelta
-        
-        today = timezone.now().date()
-        yesterday = today - timedelta(days=1)
-        
-        today_completed = CompletedWorkOrder.objects.filter(
-            completed_at__date=today
-        ).count()
-        
-        yesterday_completed = CompletedWorkOrder.objects.filter(
-            completed_at__date=yesterday
-        ).count()
-        
-        total_completed = CompletedWorkOrder.objects.count()
-        
-        completion_stats = {
-            'today': today_completed,
-            'yesterday': yesterday_completed,
-            'total': total_completed
-        }
-    except Exception as e:
-        completion_stats = {
-            'today': 0,
-            'yesterday': 0,
-            'total': 0,
-            'error': str(e)
-        }
-    
-    context = {
-        'config': config,
-        'task_status': task_status,
-        'completion_stats': completion_stats,
-        'page_title': '完工檢查狀態',
-        'breadcrumb': [
-            ('系統管理', 'system:index'),
-            ('完工檢查狀態', 'system:completion_check_status')
-        ]
-    }
-    
-    return render(request, 'system/completion_check_status.html', context)
+
 
 
 

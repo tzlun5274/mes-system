@@ -64,3 +64,6 @@ WorkOrderDispatch
 1. 所有新功能必須使用統一API端點
 2. 現有功能逐步遷移到統一API
 3. 禁止使用其他API路徑
+
+###唯一性要求###
+company_name + workorder + product_id + operation + operator + work_date + start_time

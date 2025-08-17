@@ -71,9 +71,11 @@ def update_workorder_status_on_report_approval(sender, instance, created, **kwar
             pass
         
         if company_code:
+            # 根據多公司架構，需要同時檢查公司代號、工單號碼和產品編號
             workorder = WorkOrder.objects.filter(
                 company_code=company_code,
-                order_number=instance.workorder
+                order_number=instance.workorder,
+                product_code=instance.product_id
             ).first()
             
             if workorder:

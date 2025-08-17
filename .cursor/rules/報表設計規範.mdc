@@ -1,0 +1,75 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+
+1. 建立報表專用資料表
+- class WorkOrderReportData(models.Model):
+    """工單報表專用資料表 - 支援週月季年度統計"""
+    workorder_id = models.CharField(max_length=50, verbose_name="工單編號")
+    company = models.CharField(max_length=10, verbose_name="公司代號")
+    
+    # 時間維度資料
+    work_date = models.DateField(verbose_name="工作日期")
+    work_week = models.IntegerField(verbose_name="工作週數")
+    work_month = models.IntegerField(verbose_name="工作月份")
+    work_quarter = models.IntegerField(verbose_name="工作季度")
+    work_year = models.IntegerField(verbose_name="工作年度")
+    
+    # 工作時數資料
+    daily_work_hours = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="日工作時數")
+    weekly_work_hours = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="週工作時數")
+    monthly_work_hours = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="月工作時數")
+    
+    # 統計資料
+    operator_count = models.IntegerField(default=1, verbose_name="作業員人數")
+    equipment_hours = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="設備使用時數")
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    
+    class Meta:
+        db_table = 'workorder_report_data'
+        indexes = [
+            models.Index(fields=['company', 'work_date']),
+            models.Index(fields=['company', 'work_year', 'work_month']),
+            models.Index(fields=['company', 'work_year', 'work_quarter']),
+            models.Index(fields=['company', 'work_year']),
+        ]
+		
+2. 報表功能架構
+- class WorkHourReportService:
+    """工作時數報表服務"""
+    
+    def get_weekly_report(self, company_code, year, week):
+        """週報表"""
+        return WorkOrderReportData.objects.filter(
+            company=company_code,
+            work_year=year,
+            work_week=week
+        )
+    
+    def get_monthly_report(self, company_code, year, month):
+        """月報表"""
+        return WorkOrderReportData.objects.filter(
+            company=company_code,
+            work_year=year,
+            work_month=month
+        )
+    
+    def get_quarterly_report(self, company_code, year, quarter):
+        """季報表"""
+        return WorkOrderReportData.objects.filter(
+            company=company_code,
+            work_year=year,
+            work_quarter=quarter
+        )
+    
+    def get_yearly_report(self, company_code, year):
+        """年報表"""
+        return WorkOrderReportData.objects.filter(
+            company=company_code,
+            work_year=year
+        )
+		
