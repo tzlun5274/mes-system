@@ -219,16 +219,27 @@
                 this.initializeElements();
                 this.initializeEventListeners();
                 this.loadInitialData();
+                this.updateQuantityFields(); // 初始化數量欄位狀態
             }
 
             // 初始化 DOM 元素
             initializeElements() {
                 this.workDateInput = document.getElementById('work_date');
                 this.startDatetimeInput = document.getElementById('start_datetime');
+                this.workQuantityInput = document.getElementById('work_quantity');
+                this.defectQuantityInput = document.getElementById('defect_quantity');
+                this.statusRadios = document.querySelectorAll('input[name="status"]');
             }
 
             // 初始化事件監聽器
             initializeEventListeners() {
+                // 報工狀態變更事件
+                this.statusRadios.forEach(radio => {
+                    radio.addEventListener('change', () => {
+                        this.updateQuantityFields();
+                    });
+                });
+
                 // 表單提交驗證
                 document.getElementById('onsiteReportForm').addEventListener('submit', (e) => {
                     this.validateForm(e);
@@ -252,6 +263,53 @@
                 const now = new Date();
                 const nowString = now.toISOString().slice(0, 16);
                 this.startDatetimeInput.value = nowString;
+            }
+
+            // 更新數量欄位狀態
+            updateQuantityFields() {
+                const selectedStatus = document.querySelector('input[name="status"]:checked');
+                
+                if (selectedStatus) {
+                    const status = selectedStatus.value;
+                    console.log('報工狀態變更為:', status);
+                    
+                    // 開工和重啟開工時，數量欄位唯讀且設為0
+                    if (status === 'started' || status === 'resumed') {
+                        if (this.workQuantityInput) {
+                            this.workQuantityInput.setAttribute('readonly', 'readonly');
+                            this.workQuantityInput.value = '0';
+                            this.workQuantityInput.classList.add('bg-light');
+                        }
+                        if (this.defectQuantityInput) {
+                            this.defectQuantityInput.setAttribute('readonly', 'readonly');
+                            this.defectQuantityInput.value = '0';
+                            this.defectQuantityInput.classList.add('bg-light');
+                        }
+                        console.log('數量欄位設為唯讀，數值重置為0');
+                    } else {
+                        // 暫停、完工、停工時，數量欄位可編輯
+                        if (this.workQuantityInput) {
+                            this.workQuantityInput.removeAttribute('readonly');
+                            this.workQuantityInput.classList.remove('bg-light');
+                        }
+                        if (this.defectQuantityInput) {
+                            this.defectQuantityInput.removeAttribute('readonly');
+                            this.defectQuantityInput.classList.remove('bg-light');
+                        }
+                        console.log('數量欄位設為可編輯');
+                    }
+                } else {
+                    // 沒有選擇狀態時，預設為可編輯
+                    if (this.workQuantityInput) {
+                        this.workQuantityInput.removeAttribute('readonly');
+                        this.workQuantityInput.classList.remove('bg-light');
+                    }
+                    if (this.defectQuantityInput) {
+                        this.defectQuantityInput.removeAttribute('readonly');
+                        this.defectQuantityInput.classList.remove('bg-light');
+                    }
+                    console.log('數量欄位預設為可編輯');
+                }
             }
 
             // 表單驗證

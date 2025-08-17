@@ -37,7 +37,7 @@ class OnsiteReport(models.Model):
     report_type = models.CharField(max_length=20, choices=REPORT_TYPE_CHOICES, verbose_name="報工類型")
     operator = models.CharField(max_length=100, verbose_name="作業員")
     company_code = models.CharField(max_length=10, verbose_name="公司代號", null=True, blank=True)
-    company_name = models.CharField(max_length=100, verbose_name="公司名稱", help_text="公司名稱")
+    company_name = models.CharField(max_length=100, verbose_name="公司名稱", help_text="公司名稱", default='')
     
     # 工單相關欄位 - 統一與填報模型命名一致
     workorder = models.CharField(max_length=100, verbose_name="工單號碼")  # 統一：order_number -> workorder

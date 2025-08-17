@@ -16,7 +16,7 @@ class OnsiteReportForm(ModelForm):
     """現場報工基本表單"""
 
     # 產品編號 - 下拉式選單
-    product_code = forms.CharField(
+    product_id = forms.CharField(
         label="產品編號",
         widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇產品編號'}),
         required=True,

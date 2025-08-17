@@ -78,7 +78,7 @@ class OnsiteReportListView(LoginRequiredMixin, ListView):
                 Q(operator__icontains=search) |
                             Q(workorder__icontains=search) |
             Q(product_id__icontains=search) |
-            Q(company_code__icontains=search)
+            Q(company_name__icontains=search)
             )
         
         # 報工類型篩選
@@ -92,9 +92,9 @@ class OnsiteReportListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(status=status)
         
         # 公司篩選
-        company_code = self.request.GET.get("company_code", "")
-        if company_code:
-            queryset = queryset.filter(company_code=company_code)
+        company_name = self.request.GET.get("company_name", "")
+        if company_name:
+            queryset = queryset.filter(company_name=company_name)
         
         # 日期範圍篩選
         date_from = self.request.GET.get("date_from", "")
@@ -740,17 +740,17 @@ def product_list_api(request):
         if company_name:
             # 根據公司代號篩選產品編號
             products = WorkOrderDispatch.objects.filter(
-                company_code=company_name
-            ).values('product_code').distinct().order_by('product_code')
+                company_name=company_name
+            ).values('product_id').distinct().order_by('product_id')
         else:
             # 取得所有產品編號
-            products = WorkOrderDispatch.objects.values('product_code').distinct().order_by('product_code')
+            products = WorkOrderDispatch.objects.values('product_id').distinct().order_by('product_id')
         
         # 格式化資料
         product_list = []
         for product in products:
             product_list.append({
-                'product_code': product['product_code']
+                'product_id': product['product_id']
             })
         
         return JsonResponse({
@@ -816,8 +816,8 @@ def operator_rd_onsite_report_create(request):
                 remarks = request.POST.get('remarks', '')
                 abnormal_notes = request.POST.get('abnormal_notes', '')
                 company_code = request.POST.get('company_code', '')
-                product_code = request.POST.get('product_code', 'PFP-CCT')  # 從表單取得產品編號
-                order_number = request.POST.get('order_number', 'RD樣品')   # 從表單取得工單號碼
+                product_code = request.POST.get('product_id', 'PFP-CCT')  # 從表單取得產品編號
+                order_number = request.POST.get('workorder', 'RD樣品')   # 從表單取得工單號碼
                 
                 # 驗證必填欄位
                 if not all([operator, process, status]):
@@ -850,9 +850,9 @@ def operator_rd_onsite_report_create(request):
                     operator=operator,
                     equipment=equipment,
                     process=process,
-                    product_code='PFP-CCT',  # 固定產品編號
+                    product_id='PFP-CCT',  # 固定產品編號
                     workorder='RD樣品',   # 固定工單號碼
-                    company_code=company_code,
+                    company_name=company_name,
                     work_quantity=int(work_quantity) if work_quantity else 0,
                     defect_quantity=int(defect_quantity) if defect_quantity else 0,
                     status=status,
@@ -1422,7 +1422,7 @@ def workorder_debug_api(request):
         
         # 取得前10筆工單作為範例
         sample_workorders = WorkOrderDispatch.objects.all()[:10].values(
-            'id', 'order_number', 'product_code', 'company_code', 'planned_quantity', 'status'
+            'id', 'workorder', 'product_id', 'company_code', 'planned_quantity', 'status'
         )
         
         # 取得公司代號統計
@@ -1431,9 +1431,9 @@ def workorder_debug_api(request):
         ).order_by('company_code')
         
         # 取得產品編號統計
-        product_stats = WorkOrderDispatch.objects.values('product_code').annotate(
+        product_stats = WorkOrderDispatch.objects.values('product_id').annotate(
             count=Count('id')
-        ).order_by('product_code')[:10]
+        ).order_by('product_id')[:10]
         
         return JsonResponse({
             'success': True,

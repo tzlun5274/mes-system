@@ -117,7 +117,7 @@ class OnsiteReportSessionAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('基本資訊', {
-            'fields': ('operator', 'order_number', 'product_code', 'company_code')
+            'fields': ('operator', 'workorder', 'product_id', 'company_code')
         }),
         ('製程資訊', {
             'fields': ('process', 'operation', 'equipment')

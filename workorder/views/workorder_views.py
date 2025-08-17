@@ -218,9 +218,9 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         
         # 取得現場報工記錄
         onsite_reports = OnsiteReport.objects.filter(
-            order_number=workorder.order_number,
-            product_code=workorder.product_code,
-            company_code=workorder.company_code
+            workorder=workorder.order_number,
+            product_id=workorder.product_code,
+            company_name=company_name
         ).order_by('work_date', 'start_datetime')
         
         # 合併報工記錄
