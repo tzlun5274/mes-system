@@ -33,6 +33,8 @@ urlpatterns = [
     path("user_work_permission/edit/<int:permission_id>/", views.user_work_permission_edit, name="user_work_permission_edit"),
     path("user_work_permission/delete/<int:permission_id>/", views.user_work_permission_delete, name="user_work_permission_delete"),
     path("user_work_permission/detail/<int:permission_id>/", views.user_work_permission_detail, name="user_work_permission_detail"),
+    path("auto-approval-settings/", views.auto_approval_settings, name="auto_approval_settings"),
+    path("test-switches/", views.test_switches, name="test_switches"),
     path("email_config/", views.email_config, name="email_config"),
     path("backup/", views.backup_database, name="backup"),
     path(

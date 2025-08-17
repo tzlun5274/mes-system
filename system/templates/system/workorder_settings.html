@@ -159,10 +159,10 @@
                 <div class="setting-header">
                     <div>
                         <div class="setting-title">自動審核</div>
-                        <div class="setting-description">啟用後，符合條件的報工將自動審核通過</div>
+                        <div class="setting-description">啟用後，符合條件的報工將自動審核通過（可在下方設定詳細條件）</div>
                     </div>
                     <label class="toggle-switch">
-                        <input type="checkbox" name="auto_approval" {% if system_options.auto_approval %}checked{% endif %}>
+                        <input type="checkbox" name="auto_approval" {% if auto_approval %}checked{% endif %}>
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -175,7 +175,7 @@
                         <div class="setting-description">啟用後，系統將發送異常和審核通知</div>
                     </div>
                     <label class="toggle-switch">
-                        <input type="checkbox" name="notification_enabled" {% if system_options.notification_enabled %}checked{% endif %}>
+                        <input type="checkbox" name="notification_enabled" {% if notification_enabled %}checked{% endif %}>
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -188,9 +188,137 @@
                         <div class="setting-description">啟用後，系統將記錄所有操作日誌</div>
                     </div>
                     <label class="toggle-switch">
-                        <input type="checkbox" name="audit_log_enabled" {% if system_options.audit_log_enabled %}checked{% endif %}>
+                        <input type="checkbox" name="audit_log_enabled" {% if audit_log_enabled %}checked{% endif %}>
                         <span class="slider"></span>
                     </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 自動審核設定 -->
+        <div class="settings-section" id="auto-approval-settings" style="display: {% if auto_approval %}block{% else %}none{% endif %};">
+            <div class="section-title">
+                <i class="fas fa-robot mr-2"></i>自動審核設定
+            </div>
+            
+            <!-- 工作時數設定 -->
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">自動審核工作時數</div>
+                        <div class="setting-description">工作時數在正常範圍內時自動審核</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="auto_approve_work_hours" {% if auto_approve_work_hours %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <label>最大工作時數：</label>
+                        <div class="input-group" style="width: 150px;">
+                            <input type="number" class="form-control" name="max_work_hours" value="{{ max_work_hours }}" min="0" max="24" step="0.5">
+                            <div class="input-group-append">
+                                <span class="input-group-text">小時</span>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">超過此時數的報工需要人工審核</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 不良率設定 -->
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">自動審核不良率</div>
+                        <div class="setting-description">不良率在正常範圍內時自動審核</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="auto_approve_defect_rate" {% if auto_approve_defect_rate %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <label>最大不良率：</label>
+                        <div class="input-group" style="width: 150px;">
+                            <input type="number" class="form-control" name="max_defect_rate" value="{{ max_defect_rate }}" min="0" max="100" step="0.1">
+                            <div class="input-group-append">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">超過此不良率的報工需要人工審核</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 加班設定 -->
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">自動審核加班</div>
+                        <div class="setting-description">加班時數在正常範圍內時自動審核</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="auto_approve_overtime" {% if auto_approve_overtime %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <label>最大加班時數：</label>
+                        <div class="input-group" style="width: 150px;">
+                            <input type="number" class="form-control" name="max_overtime_hours" value="{{ max_overtime_hours }}" min="0" max="12" step="0.5">
+                            <div class="input-group-append">
+                                <span class="input-group-text">小時</span>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">超過此時數的加班需要人工審核</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 排除設定 -->
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">排除設定</div>
+                        <div class="setting-description">設定不需要自動審核的作業員和工序</div>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <label>排除作業員：</label>
+                        <textarea class="form-control" name="exclude_operators" rows="3" placeholder="請輸入要排除的作業員編號，每行一個">{{ exclude_operators_text }}</textarea>
+                        <small class="form-text text-muted">這些作業員的報工不會自動審核</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label>排除工序：</label>
+                        <textarea class="form-control" name="exclude_processes" rows="3" placeholder="請輸入要排除的工序名稱，每行一個">{{ exclude_processes_text }}</textarea>
+                        <small class="form-text text-muted">這些工序的報工不會自動審核</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 通知設定 -->
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">自動審核通知</div>
+                        <div class="setting-description">自動審核後發送通知給主管</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="auto_approval_notification_enabled" {% if auto_approval_notification_enabled %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-12">
+                        <label>通知收件人：</label>
+                        <textarea class="form-control" name="auto_approval_notification_recipients" rows="3" placeholder="請輸入通知收件人郵件地址，每行一個">{{ auto_approval_notification_recipients_text }}</textarea>
+                        <small class="form-text text-muted">自動審核通知的收件人清單</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -430,6 +558,20 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // 自動審核開關控制
+    const autoApprovalToggle = document.querySelector('input[name="auto_approval"]');
+    const autoApprovalSettings = document.getElementById('auto-approval-settings');
+    
+    if (autoApprovalToggle) {
+        autoApprovalToggle.addEventListener('change', function() {
+            if (this.checked) {
+                autoApprovalSettings.style.display = 'block';
+            } else {
+                autoApprovalSettings.style.display = 'none';
+            }
+        });
+    }
 });
 
 // 手動執行自動分配

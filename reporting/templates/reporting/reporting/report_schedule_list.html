@@ -1,0 +1,271 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}報表排程管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">報表排程管理</li>
+        </ol>
+    </nav>
+
+    <!-- 訊息顯示區塊 -->
+    {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        <div class="col-12 d-flex justify-content-between align-items-center">
+            <h2 class="mb-0"><i class="fas fa-clock text-primary"></i> 報表排程管理</h2>
+            <a href="{% url 'reporting:report_schedule_add' %}" class="btn btn-success">
+                <i class="fas fa-plus"></i> 新增排程
+            </a>
+        </div>
+    </div>
+
+    <!-- 排程列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-list"></i> 排程列表</h5>
+        </div>
+        <div class="card-body">
+            {% if schedules %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>排程名稱</th>
+                                <th>報表類型</th>
+                                <th>公司代號</th>
+                                <th>執行時間</th>
+                                <th>執行日期</th>
+                                <th>狀態</th>
+                                <th>收件人</th>
+                                <th>建立時間</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for schedule in schedules %}
+                            <tr>
+                                <td>
+                                    <strong>{{ schedule.name }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if schedule.report_type == 'weekly' %}info{% elif schedule.report_type == 'monthly' %}success{% elif schedule.report_type == 'quarterly' %}warning{% else %}danger{% endif %}">
+                                        {{ schedule.get_report_type_display }}
+                                    </span>
+                                </td>
+                                <td>{{ schedule.company }}</td>
+                                <td>{{ schedule.schedule_time|time:"H:i" }}</td>
+                                <td>
+                                    {% if schedule.schedule_day %}
+                                        {% if schedule.report_type == 'weekly' %}
+                                            週{{ schedule.schedule_day }}
+                                        {% else %}
+                                            {{ schedule.schedule_day }}號
+                                        {% endif %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if schedule.status == 'active' %}
+                                        <span class="badge bg-success">啟用</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">停用</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if schedule.email_recipients %}
+                                        <span class="text-success">
+                                            <i class="fas fa-envelope"></i> 已設定
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">
+                                            <i class="fas fa-times"></i> 未設定
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ schedule.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{% url 'reporting:report_schedule_edit' schedule.id %}" class="btn btn-sm btn-outline-primary" title="編輯">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'reporting:execute_report_schedule' schedule.id %}" class="btn btn-sm btn-outline-success" title="手動執行" onclick="return confirm('確定要手動執行此排程嗎？')">
+                                            <i class="fas fa-play"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" title="刪除" onclick="deleteSchedule({{ schedule.id }}, '{{ schedule.name }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分頁 -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="分頁導航">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1">&laquo; 第一頁</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一頁</a>
+                            </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}">下一頁</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">最後一頁 &raquo;</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-clock fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">目前沒有排程設定</h5>
+                    <p class="text-muted">點擊上方「新增排程」按鈕來建立第一個報表排程</p>
+                    <a href="{% url 'reporting:report_schedule_add' %}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> 新增排程
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="row mt-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-primary">{{ schedules.count }}</h3>
+                    <p class="text-muted mb-0">總排程數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-success">{{ schedules|dictsort:"status"|length }}</h3>
+                    <p class="text-muted mb-0">啟用排程</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-info">{{ schedules|dictsort:"report_type"|length }}</h3>
+                    <p class="text-muted mb-0">週報表</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-warning">{{ schedules|dictsort:"report_type"|length }}</h3>
+                    <p class="text-muted mb-0">月報表</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 刪除確認模態框 -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle text-danger"></i> 確認刪除</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>確定要刪除排程「<span id="scheduleName"></span>」嗎？</p>
+                <p class="text-danger"><small>此操作無法復原！</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">確定刪除</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.table th {
+    font-weight: 600;
+    background-color: #343a40;
+    color: white;
+}
+
+.badge {
+    font-size: 0.8em;
+}
+
+.btn-group .btn {
+    margin-right: 2px;
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+}
+
+.pagination .page-link {
+    color: #007bff;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+</style>
+
+<script>
+function deleteSchedule(scheduleId, scheduleName) {
+    document.getElementById('scheduleName').textContent = scheduleName;
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    modal.show();
+    
+    document.getElementById('confirmDelete').onclick = function() {
+        // 這裡可以加入刪除的AJAX請求
+        // 目前先關閉模態框
+        modal.hide();
+        alert('刪除功能待實作');
+    };
+}
+</script>
+{% endblock %} 

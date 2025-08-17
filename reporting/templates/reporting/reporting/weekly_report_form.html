@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}週報表{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'reporting:work_hour_report_index' %}">工作時數報表</a></li>
+            <li class="breadcrumb-item active" aria-current="page">週報表</li>
+        </ol>
+    </nav>
+
+    <!-- 訊息顯示區塊 -->
+    {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3"><i class="fas fa-calendar-week text-info"></i> 週報表</h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cog"></i> 報表設定</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'reporting:weekly_report' %}">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="company_code" class="form-label">公司代號 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="company_code" name="company_code" required>
+                                    <option value="">請選擇公司</option>
+                                    <option value="01">中儀科技</option>
+                                    <option value="02">其他公司</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-3 mb-3">
+                                <label for="year" class="form-label">年度 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="year" name="year" required>
+                                    {% for year in years %}
+                                        <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-3 mb-3">
+                                <label for="week" class="form-label">週數 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="week" name="week" required>
+                                    {% for week in weeks %}
+                                        <option value="{{ week }}" {% if week == current_week %}selected{% endif %}>第{{ week }}週</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="format" class="form-label">輸出格式</label>
+                                <select class="form-select" id="format" name="format">
+                                    <option value="excel">Excel (.xlsx)</option>
+                                    <option value="csv">CSV (.csv)</option>
+                                    <option value="web">網頁顯示</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-chart-line"></i> 生成週報表
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表說明 -->
+    <div class="row mt-4">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> 報表說明</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>週報表內容包含：</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> 總工作時數統計</li>
+                                <li><i class="fas fa-check text-success"></i> 作業員人數統計</li>
+                                <li><i class="fas fa-check text-success"></i> 設備使用時數</li>
+                                <li><i class="fas fa-check text-success"></i> 工單數量統計</li>
+                                <li><i class="fas fa-check text-success"></i> 平均日工作時數</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>使用說明：</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-info text-info"></i> 選擇公司代號和時間範圍</li>
+                                <li><i class="fas fa-info text-info"></i> 選擇輸出格式（Excel/CSV/網頁）</li>
+                                <li><i class="fas fa-info text-info"></i> 點擊生成報表按鈕</li>
+                                <li><i class="fas fa-info text-info"></i> 系統會自動計算並生成報表</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速選擇 -->
+    <div class="row mt-4">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-bolt"></i> 快速選擇</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setCurrentWeek()">
+                                本週
+                            </button>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setLastWeek()">
+                                上週
+                            </button>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setCurrentYear()">
+                                本年
+                            </button>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="setLastYear()">
+                                去年
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.form-label {
+    font-weight: 500;
+}
+
+.btn {
+    border-radius: 6px;
+}
+
+.list-unstyled li {
+    margin-bottom: 8px;
+}
+</style>
+
+<script>
+function setCurrentWeek() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const week = getWeekNumber(now);
+    
+    document.getElementById('year').value = year;
+    document.getElementById('week').value = week;
+}
+
+function setLastWeek() {
+    const now = new Date();
+    const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const year = lastWeek.getFullYear();
+    const week = getWeekNumber(lastWeek);
+    
+    document.getElementById('year').value = year;
+    document.getElementById('week').value = week;
+}
+
+function setCurrentYear() {
+    const now = new Date();
+    document.getElementById('year').value = now.getFullYear();
+}
+
+function setLastYear() {
+    const now = new Date();
+    document.getElementById('year').value = now.getFullYear() - 1;
+}
+
+function getWeekNumber(date) {
+    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+    const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+}
+
+// 頁面載入時設定預設值
+document.addEventListener('DOMContentLoaded', function() {
+    // 設定預設公司代號
+    document.getElementById('company_code').value = '01';
+});
+</script>
+{% endblock %} 

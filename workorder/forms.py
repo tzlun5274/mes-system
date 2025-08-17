@@ -105,8 +105,8 @@ class ProductionReportBaseForm(forms.ModelForm):
     """
 
     # 工單號碼欄位
-    workorder = forms.ModelChoiceField(
-        queryset=None,
+    workorder = forms.ChoiceField(
+        choices=[],
         label="工單號碼",
         widget=forms.Select(
             attrs={
@@ -547,8 +547,8 @@ class SMTSupplementBatchForm(forms.Form):
         help_text="請選擇SMT設備",
     )
 
-    workorder = forms.ModelChoiceField(
-        queryset=None,
+    workorder = forms.ChoiceField(
+        choices=[],
         label="工單",
         widget=forms.Select(
             attrs={"class": "form-control", "id": "batch_workorder_select"}
@@ -621,7 +621,10 @@ class SMTSupplementBatchForm(forms.Form):
             .exclude(status="completed")  # 排除已完工的工單
             .order_by("-created_at")[:100]
         )
-        self.fields["workorder"].queryset = workorders
+        
+        # 將 queryset 轉換為 choices
+        workorder_choices = [(wo.id, f"{wo.order_number} - {wo.product_code}") for wo in workorders]
+        self.fields["workorder"].choices = workorder_choices
 
         # 設置預設日期為今天
         from datetime import date

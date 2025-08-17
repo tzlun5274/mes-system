@@ -1,0 +1,289 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}已完工工單報表詳情 - 報表管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-eye"></i> 已完工工單報表詳情
+                    </h3>
+                    <div class="card-tools">
+                        <a href="{% url 'reporting:completed_workorder_report_list' %}" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-arrow-left"></i> 返回列表
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- 基本資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-info-circle text-primary"></i> 基本資訊
+                            </h5>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-primary">
+                                <div class="card-body">
+                                    <h6 class="card-title text-primary">工單編號</h6>
+                                    <p class="card-text h5">{{ report_data.workorder_id }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-success">
+                                <div class="card-body">
+                                    <h6 class="card-title text-success">產品編號</h6>
+                                    <p class="card-text h5">{{ report_data.product_code }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-info">
+                                <div class="card-body">
+                                    <h6 class="card-title text-info">公司</h6>
+                                    <p class="card-text h5">{{ report_data.company_name|default:report_data.company_code }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-warning">
+                                <div class="card-body">
+                                    <h6 class="card-title text-warning">完工日期</h6>
+                                    <p class="card-text h5">{{ report_data.completion_date|date:"Y-m-d" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 數量統計 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-chart-bar text-success"></i> 數量統計
+                            </h5>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.planned_quantity|floatformat:0 }}</h4>
+                                    <p class="mb-0">計劃數量</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.completed_quantity|floatformat:0 }}</h4>
+                                    <p class="mb-0">完成數量</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.completion_rate|floatformat:1 }}%</h4>
+                                    <p class="mb-0">完工率</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.hourly_output|floatformat:1 }}</h4>
+                                    <p class="mb-0">平均時產出</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 品質統計 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-award text-warning"></i> 品質統計
+                            </h5>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.total_good_quantity|floatformat:0 }}</h4>
+                                    <p class="mb-0">合格品數量</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.total_defect_quantity|floatformat:0 }}</h4>
+                                    <p class="mb-0">不良品數量</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card bg-secondary text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.defect_rate|floatformat:1 }}%</h4>
+                                    <p class="mb-0">不良率</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 時數統計 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-clock text-info"></i> 時數統計
+                            </h5>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.total_work_hours|floatformat:1 }}</h4>
+                                    <p class="mb-0">工作時數</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.total_overtime_hours|floatformat:1 }}</h4>
+                                    <p class="mb-0">加班時數</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.total_all_hours|floatformat:1 }}</h4>
+                                    <p class="mb-0">總時數</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.efficiency_rate|floatformat:1 }}%</h4>
+                                    <p class="mb-0">效率率</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 人員設備統計 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-users text-primary"></i> 人員設備統計
+                            </h5>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.unique_operators_count }}</h4>
+                                    <p class="mb-0">參與作業員數</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.unique_equipment_count }}</h4>
+                                    <p class="mb-0">使用設備數</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.total_report_count }}</h4>
+                                    <p class="mb-0">總報工次數</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ report_data.completed_processes }}/{{ report_data.total_processes }}</h4>
+                                    <p class="mb-0">完成工序數</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 時間維度 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-calendar-alt text-secondary"></i> 時間維度
+                            </h5>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-secondary">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title text-secondary">完工週數</h6>
+                                    <p class="card-text h5">{{ report_data.completion_week }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-secondary">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title text-secondary">完工月份</h6>
+                                    <p class="card-text h5">{{ report_data.completion_month }}月</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-secondary">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title text-secondary">完工季度</h6>
+                                    <p class="card-text h5">第{{ report_data.completion_quarter }}季</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card border-secondary">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title text-secondary">完工年度</h6>
+                                    <p class="card-text h5">{{ report_data.completion_year }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 系統資訊 -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-cog text-muted"></i> 系統資訊
+                            </h5>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-muted">
+                                <div class="card-body">
+                                    <h6 class="card-title text-muted">建立時間</h6>
+                                    <p class="card-text">{{ report_data.created_at|date:"Y-m-d H:i:s" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-muted">
+                                <div class="card-body">
+                                    <h6 class="card-title text-muted">更新時間</h6>
+                                    <p class="card-text">{{ report_data.updated_at|date:"Y-m-d H:i:s" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

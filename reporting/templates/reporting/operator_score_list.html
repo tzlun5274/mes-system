@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}作業員評分清單{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-users"></i> 作業員評分清單
+                    </h4>
+                    <div class="card-tools">
+                        <a href="{% url 'reporting:scoring_dashboard' %}" class="btn btn-info btn-sm">
+                            <i class="fas fa-chart-line"></i> 評分儀表板
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- 篩選表單 -->
+                    <form method="get" class="mb-4">
+                        <div class="row">
+                            <div class="col-md-2">
+                                {{ form.company_code.label_tag }}
+                                {{ form.company_code }}
+                            </div>
+                            <div class="col-md-2">
+                                {{ form.operator_id.label_tag }}
+                                {{ form.operator_id }}
+                            </div>
+                            <div class="col-md-2">
+                                {{ form.process_name.label_tag }}
+                                {{ form.process_name }}
+                            </div>
+                            <div class="col-md-2">
+                                {{ form.start_date.label_tag }}
+                                {{ form.start_date }}
+                            </div>
+                            <div class="col-md-2">
+                                {{ form.end_date.label_tag }}
+                                {{ form.end_date }}
+                            </div>
+                            <div class="col-md-2">
+                                {{ form.has_supervisor_score.label_tag }}
+                                {{ form.has_supervisor_score }}
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-search"></i> 搜尋
+                                </button>
+                                <a href="{% url 'reporting:operator_score_list' %}" class="btn btn-secondary btn-sm">
+                                    <i class="fas fa-times"></i> 清除
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- 評分清單 -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>作業員</th>
+                                    <th>工序</th>
+                                    <th>工作日期</th>
+                                    <th>生產效率 (80%)</th>
+                                    <th>主管評分 (20%)</th>
+                                    <th>總評分</th>
+                                    <th>等級</th>
+                                    <th>主管評分狀態</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for score in page_obj %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ score.operator_name }}</strong><br>
+                                        <small class="text-muted">{{ score.operator_id }}</small>
+                                    </td>
+                                    <td>{{ score.process_name }}</td>
+                                    <td>{{ score.work_date }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if score.capacity_score >= 90 %}success{% elif score.capacity_score >= 80 %}info{% elif score.capacity_score >= 70 %}warning{% else %}danger{% endif %}">
+                                            {{ score.capacity_score }}分
+                                        </span>
+                                        <br><small class="text-muted">產能比率: {{ score.capacity_ratio }}</small>
+                                    </td>
+                                    <td>
+                                        {% if score.is_supervisor_scored %}
+                                            <span class="badge bg-primary">{{ score.supervisor_score }}分</span>
+                                            <br><small class="text-muted">{{ score.supervisor_name }}</small>
+                                        {% else %}
+                                            <span class="badge bg-secondary">80分 (預設)</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if score.total_score >= 90 %}success{% elif score.total_score >= 80 %}info{% elif score.total_score >= 70 %}warning{% else %}danger{% endif %}">
+                                            {{ score.total_score }}分
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if score.overall_grade == '優秀' %}success{% elif score.overall_grade == '良好' %}info{% elif score.overall_grade == '及格' %}warning{% else %}danger{% endif %}">
+                                            {{ score.overall_grade }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if score.is_supervisor_scored %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check"></i> 已評分
+                                            </span>
+                                            <br><small class="text-muted">{{ score.supervisor_date|date:"m-d H:i" }}</small>
+                                        {% else %}
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-clock"></i> 未評分
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'reporting:operator_score_detail' score.id %}" 
+                                               class="btn btn-info" title="查看詳情">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'reporting:supervisor_score_form' score.id %}" 
+                                               class="btn btn-primary" title="主管評分">
+                                                <i class="fas fa-star"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted">
+                                        <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                                        暫無評分資料
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分頁 -->
+                    {% if page_obj.has_other_pages %}
+                    <nav aria-label="評分分頁">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=1{% if request.GET.company_code %}&company_code={{ request.GET.company_code }}{% endif %}{% if request.GET.operator_id %}&operator_id={{ request.GET.operator_id }}{% endif %}{% if request.GET.process_name %}&process_name={{ request.GET.process_name }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}{% if request.GET.has_supervisor_score %}&has_supervisor_score={{ request.GET.has_supervisor_score }}{% endif %}">
+                                        <i class="fas fa-angle-double-left"></i>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.company_code %}&company_code={{ request.GET.company_code }}{% endif %}{% if request.GET.operator_id %}&operator_id={{ request.GET.operator_id }}{% endif %}{% if request.GET.process_name %}&process_name={{ request.GET.process_name }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}{% if request.GET.has_supervisor_score %}&has_supervisor_score={{ request.GET.has_supervisor_score }}{% endif %}">
+                                        <i class="fas fa-angle-left"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}{% if request.GET.company_code %}&company_code={{ request.GET.company_code }}{% endif %}{% if request.GET.operator_id %}&operator_id={{ request.GET.operator_id }}{% endif %}{% if request.GET.process_name %}&process_name={{ request.GET.process_name }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}{% if request.GET.has_supervisor_score %}&has_supervisor_score={{ request.GET.has_supervisor_score }}{% endif %}">
+                                            {{ num }}
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.company_code %}&company_code={{ request.GET.company_code }}{% endif %}{% if request.GET.operator_id %}&operator_id={{ request.GET.operator_id }}{% endif %}{% if request.GET.process_name %}&process_name={{ request.GET.process_name }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}{% if request.GET.has_supervisor_score %}&has_supervisor_score={{ request.GET.has_supervisor_score }}{% endif %}">
+                                        <i class="fas fa-angle-right"></i>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.company_code %}&company_code={{ request.GET.company_code }}{% endif %}{% if request.GET.operator_id %}&operator_id={{ request.GET.operator_id }}{% endif %}{% if request.GET.process_name %}&process_name={{ request.GET.process_name }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}{% if request.GET.has_supervisor_score %}&has_supervisor_score={{ request.GET.has_supervisor_score }}{% endif %}">
+                                        <i class="fas fa-angle-double-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    <!-- 統計資訊 -->
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <strong>統計資訊：</strong>
+                                共 {{ page_obj.paginator.count }} 筆記錄，
+                                第 {{ page_obj.number }} 頁，共 {{ page_obj.paginator.num_pages }} 頁
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

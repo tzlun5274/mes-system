@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}評分週期管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-calendar-alt"></i> 評分週期管理
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- 公司選擇 -->
+                    <form method="get" class="mb-4">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="company_code">公司代號</label>
+                                <input type="text" name="company_code" id="company_code" 
+                                       class="form-control" value="{{ company_code }}" 
+                                       placeholder="請輸入公司代號">
+                            </div>
+                            <div class="col-md-2">
+                                <label>&nbsp;</label>
+                                <button type="submit" class="btn btn-primary form-control">
+                                    <i class="fas fa-search"></i> 查詢
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    {% if company_code %}
+                        <!-- 週期操作 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5>週期操作</h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createPeriodModal">
+                                        <i class="fas fa-plus"></i> 建立評分週期
+                                    </button>
+                                    <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#closePeriodModal">
+                                        <i class="fas fa-lock"></i> 關閉評分週期
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 週期摘要 -->
+                        <div class="row">
+                            {% for period_type, summary in period_summaries.items %}
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="card-title">
+                                            {% if period_type == 'monthly' %}
+                                                <i class="fas fa-calendar-day"></i> 月評分
+                                            {% elif period_type == 'quarterly' %}
+                                                <i class="fas fa-calendar-week"></i> 季評分
+                                            {% else %}
+                                                <i class="fas fa-calendar"></i> 年評分
+                                            {% endif %}
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <h6>{{ summary.period_name }}</h6>
+                                        <p class="text-muted">{{ summary.start_date }} 至 {{ summary.end_date }}</p>
+                                        
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <small class="text-muted">總記錄數</small>
+                                                <div class="h5">{{ summary.total_records }}</div>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">平均總評分</small>
+                                                <div class="h5 text-primary">{{ summary.avg_total_score|floatformat:1 }}分</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row mt-2">
+                                            <div class="col-6">
+                                                <small class="text-muted">主管評分率</small>
+                                                <div class="h6 text-info">{{ summary.supervisor_score_rate|floatformat:1 }}%</div>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">狀態</small>
+                                                <div class="h6">
+                                                    {% if summary.is_closed %}
+                                                        <span class="badge bg-success">已關閉</span>
+                                                    {% else %}
+                                                        <span class="badge bg-warning">進行中</span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mt-3">
+                                            <a href="{% url 'reporting:score_period_detail' period_type %}?company_code={{ company_code }}" 
+                                               class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-eye"></i> 查看詳情
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i> 尚未建立任何評分週期記錄
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 請選擇公司代號以查看評分週期資訊
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 建立評分週期 Modal -->
+<div class="modal fade" id="createPeriodModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">建立評分週期</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_period">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="create_company_code" class="form-label">公司代號</label>
+                        <input type="text" class="form-control" id="create_company_code" 
+                               name="company_code" value="{{ company_code }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="create_period_type" class="form-label">評分週期</label>
+                        <select class="form-control" id="create_period_type" name="period_type" required>
+                            <option value="monthly">月評分</option>
+                            <option value="quarterly">季評分</option>
+                            <option value="yearly">年評分</option>
+                        </select>
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        此操作將根據選擇的週期建立評分記錄，如果已存在相同週期的記錄，將會重新建立。
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-success">建立</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 關閉評分週期 Modal -->
+<div class="modal fade" id="closePeriodModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">關閉評分週期</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="close_period">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="close_company_code" class="form-label">公司代號</label>
+                        <input type="text" class="form-control" id="close_company_code" 
+                               name="company_code" value="{{ company_code }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="close_period_type" class="form-label">評分週期</label>
+                        <select class="form-control" id="close_period_type" name="period_type" required>
+                            <option value="monthly">月評分</option>
+                            <option value="quarterly">季評分</option>
+                            <option value="yearly">年評分</option>
+                        </select>
+                    </div>
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        關閉後將無法再修改該週期的評分記錄，請確認所有主管評分已完成。
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-warning">關閉週期</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

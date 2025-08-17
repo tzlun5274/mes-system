@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}作業員評分詳情 - {{ score_record.operator_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-user"></i> 作業員評分詳情
+                    </h4>
+                    <div class="card-tools">
+                        <a href="{% url 'reporting:operator_score_list' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> 返回清單
+                        </a>
+                        <a href="{% url 'reporting:supervisor_score_form' score_record.id %}" class="btn btn-warning btn-sm">
+                            <i class="fas fa-star"></i> 主管評分
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- 基本資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-user-circle"></i> 作業員資訊</h5>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>作業員姓名：</strong></td>
+                                    <td>{{ score_record.operator_name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>作業員編號：</strong></td>
+                                    <td>{{ score_record.operator_id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>公司代號：</strong></td>
+                                    <td>{{ score_record.company_code }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>產品代號：</strong></td>
+                                    <td>{{ score_record.product_code }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>工序名稱：</strong></td>
+                                    <td>{{ score_record.process_name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>工單編號：</strong></td>
+                                    <td>{{ score_record.workorder_id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>工作日期：</strong></td>
+                                    <td>{{ score_record.work_date }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>工作時數：</strong></td>
+                                    <td>{{ score_record.work_hours }} 小時</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-chart-bar"></i> 評分結果</h5>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>生產效率 (80%)：</strong></td>
+                                    <td>
+                                        <span class="badge bg-{% if score_record.capacity_score >= 90 %}success{% elif score_record.capacity_score >= 80 %}info{% elif score_record.capacity_score >= 70 %}warning{% else %}danger{% endif %}">
+                                            {{ score_record.capacity_score }}分
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>主管評分 (20%)：</strong></td>
+                                    <td>
+                                        {% if score_record.is_supervisor_scored %}
+                                            <span class="badge bg-primary">{{ score_record.supervisor_score }}分</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">80分 (預設)</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>總評分：</strong></td>
+                                    <td>
+                                        <span class="badge bg-{% if score_record.total_score >= 90 %}success{% elif score_record.total_score >= 80 %}info{% elif score_record.total_score >= 70 %}warning{% else %}danger{% endif %}">
+                                            {{ score_record.total_score }}分
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>總體等級：</strong></td>
+                                    <td>
+                                        <span class="badge bg-{% if score_record.overall_grade == '優秀' %}success{% elif score_record.overall_grade == '良好' %}info{% elif score_record.overall_grade == '及格' %}warning{% else %}danger{% endif %}">
+                                            {{ score_record.overall_grade }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 生產效率詳情 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5><i class="fas fa-industry"></i> 生產效率詳情</h5>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="card border-primary">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title">標準產能</h6>
+                                            <h4 class="text-primary">{{ score_record.standard_capacity_per_hour }}/小時</h4>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card border-info">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title">實際產能</h6>
+                                            <h4 class="text-info">{{ score_record.actual_capacity_per_hour }}/小時</h4>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card border-success">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title">完成數量</h6>
+                                            <h4 class="text-success">{{ score_record.completed_quantity }}</h4>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card border-warning">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title">產能比率</h6>
+                                            <h4 class="text-warning">{{ score_record.capacity_ratio }}</h4>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+
+                    <!-- 主管評分資訊 -->
+                    {% if score_record.is_supervisor_scored %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5><i class="fas fa-user-tie"></i> 主管評分資訊</h5>
+                            <div class="card border-info">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <strong>評分主管：</strong><br>
+                                            {{ score_record.supervisor_name }}
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>評分日期：</strong><br>
+                                            {{ score_record.supervisor_date|date:"Y-m-d H:i" }}
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>主管評分：</strong><br>
+                                            <span class="badge bg-primary">{{ score_record.supervisor_score }}分</span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>評分狀態：</strong><br>
+                                            <span class="badge bg-success">已評分</span>
+                                        </div>
+                                    </div>
+                                    {% if score_record.supervisor_comment %}
+                                    <div class="row mt-3">
+                                        <div class="col-12">
+                                            <strong>主管評語：</strong><br>
+                                            <div class="alert alert-info">
+                                                {{ score_record.supervisor_comment }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5><i class="fas fa-user-tie"></i> 主管評分資訊</h5>
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>尚未評分</strong> - 主管尚未對此作業員進行評分，目前使用預設分數80分。
+                                <a href="{% url 'reporting:supervisor_score_form' score_record.id %}" class="btn btn-warning btn-sm ml-2">
+                                    <i class="fas fa-star"></i> 立即評分
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- 評分計算說明 -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h5><i class="fas fa-calculator"></i> 評分計算說明</h5>
+                            <div class="alert alert-info">
+                                <h6>評分權重分配：</h6>
+                                <ul class="mb-0">
+                                    <li><strong>生產效率 (80%)：</strong>基於產能比率計算，產能比率 = 實際產能 / 標準產能</li>
+                                    <li><strong>主管評分 (20%)：</strong>主管根據工作態度、團隊合作、學習能力等主觀評價</li>
+                                    <li><strong>總評分 = 生產效率 × 80% + 主管評分 × 20%</strong></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 可以添加一些互動功能
+    console.log('作業員評分詳情頁面已載入');
+});
+</script>
+{% endblock %} 

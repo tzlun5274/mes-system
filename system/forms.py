@@ -5,7 +5,8 @@ from .models import (
     EmailConfig, 
     BackupSchedule, 
     OperationLogConfig,
-    UserWorkPermission
+    UserWorkPermission,
+    AutoApprovalSettings
 )
 
 
@@ -372,6 +373,142 @@ class UserWorkPermissionForm(forms.ModelForm):
 
 # 完工判斷設定已整合到現有的工單管理設定中
 # 使用 workorder.workorder_erp.models.SystemConfig 來管理設定
+
+
+class AutoApprovalSettingsForm(forms.ModelForm):
+    """自動審核設定表單"""
+    
+    class Meta:
+        model = AutoApprovalSettings
+        fields = [
+            'is_enabled',
+            'auto_approve_work_hours',
+            'max_work_hours',
+            'auto_approve_defect_rate',
+            'max_defect_rate',
+            'auto_approve_overtime',
+            'max_overtime_hours',
+            'exclude_operators',
+            'exclude_processes',
+            'notification_enabled',
+            'notification_recipients'
+        ]
+        widgets = {
+            'is_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'auto_approve_work_hours': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'max_work_hours': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'max': '24',
+                'step': '0.5',
+                'placeholder': '請輸入最大工作時數'
+            }),
+            'auto_approve_defect_rate': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'max_defect_rate': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'max': '100',
+                'step': '0.1',
+                'placeholder': '請輸入最大不良率'
+            }),
+            'auto_approve_overtime': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'max_overtime_hours': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'max': '12',
+                'step': '0.5',
+                'placeholder': '請輸入最大加班時數'
+            }),
+            'exclude_operators': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': '請輸入要排除的作業員編號，每行一個'
+            }),
+            'exclude_processes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': '請輸入要排除的工序名稱，每行一個'
+            }),
+            'notification_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notification_recipients': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': '請輸入通知收件人郵件地址，每行一個'
+            })
+        }
+        labels = {
+            'is_enabled': '啟用自動審核',
+            'auto_approve_work_hours': '自動審核工作時數',
+            'max_work_hours': '最大工作時數',
+            'auto_approve_defect_rate': '自動審核不良率',
+            'max_defect_rate': '最大不良率(%)',
+            'auto_approve_overtime': '自動審核加班',
+            'max_overtime_hours': '最大加班時數',
+            'exclude_operators': '排除作業員',
+            'exclude_processes': '排除工序',
+            'notification_enabled': '啟用通知',
+            'notification_recipients': '通知收件人'
+        }
+        help_texts = {
+            'is_enabled': '啟用後，符合條件的報工將自動審核通過',
+            'auto_approve_work_hours': '工作時數在正常範圍內時自動審核',
+            'max_work_hours': '超過此時數的報工需要人工審核',
+            'auto_approve_defect_rate': '不良率在正常範圍內時自動審核',
+            'max_defect_rate': '超過此不良率的報工需要人工審核',
+            'auto_approve_overtime': '加班時數在正常範圍內時自動審核',
+            'max_overtime_hours': '超過此時數的加班需要人工審核',
+            'exclude_operators': '這些作業員的報工不會自動審核',
+            'exclude_processes': '這些工序的報工不會自動審核',
+            'notification_enabled': '自動審核後發送通知給主管',
+            'notification_recipients': '自動審核通知的收件人清單'
+        }
+
+    def clean_exclude_operators(self):
+        """清理排除作業員資料"""
+        data = self.cleaned_data['exclude_operators']
+        if data:
+            # 將文字轉換為列表
+            operators = [op.strip() for op in data.split('\n') if op.strip()]
+            return operators
+        return []
+
+    def clean_exclude_processes(self):
+        """清理排除工序資料"""
+        data = self.cleaned_data['exclude_processes']
+        if data:
+            # 將文字轉換為列表
+            processes = [proc.strip() for proc in data.split('\n') if proc.strip()]
+            return processes
+        return []
+
+    def clean_notification_recipients(self):
+        """清理通知收件人資料"""
+        data = self.cleaned_data['notification_recipients']
+        if data:
+            # 將文字轉換為列表
+            recipients = [email.strip() for email in data.split('\n') if email.strip()]
+            return recipients
+        return []
+
+    def clean(self):
+        """整體驗證"""
+        cleaned_data = super().clean()
+        
+        # 如果啟用自動審核，至少要有一個審核條件
+        if cleaned_data.get('is_enabled'):
+            has_condition = (
+                cleaned_data.get('auto_approve_work_hours') or
+                cleaned_data.get('auto_approve_defect_rate') or
+                cleaned_data.get('auto_approve_overtime')
+            )
+            if not has_condition:
+                raise forms.ValidationError('啟用自動審核時，至少需要設定一個審核條件')
+        
+        return cleaned_data
+
+
+
+
 
 
 

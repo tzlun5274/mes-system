@@ -2440,12 +2440,18 @@ def batch_approve_fill_work(request):
             if batch_result.get('rd_dispatches_created', 0) > 0:
                 success_message += f"，已自動建立 {batch_result['rd_dispatches_created']} 個RD樣品派工單"
             
+            # 如果有警告訊息，添加到成功訊息中
+            if batch_result.get('warnings'):
+                warning_text = '；'.join(batch_result['warnings'])
+                success_message += f"（注意：{warning_text}）"
+            
             # 如果是 AJAX 請求，返回 JSON 回應
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
                     'success': True,
                     'message': success_message,
-                    'approved_count': batch_result.get('approved_count', 0)
+                    'approved_count': batch_result.get('approved_count', 0),
+                    'warnings': batch_result.get('warnings', [])
                 })
             
             messages.success(request, success_message)

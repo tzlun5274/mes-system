@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}工作時數報表{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">工作時數報表</li>
+        </ol>
+    </nav>
+
+    <!-- 訊息顯示區塊 -->
+    {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3"><i class="fas fa-clock text-primary"></i> 工作時數報表</h2>
+        </div>
+    </div>
+
+    <!-- 報表功能卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-calendar-week fa-3x text-info mb-3"></i>
+                    <h5 class="card-title">週報表</h5>
+                    <p class="card-text">按週統計工作時數和作業員資料</p>
+                    <a href="{% url 'reporting:weekly_report' %}" class="btn btn-outline-info">
+                        <i class="fas fa-chart-line"></i> 生成週報表
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-calendar-alt fa-3x text-success mb-3"></i>
+                    <h5 class="card-title">月報表</h5>
+                    <p class="card-text">按月統計工作時數和作業員資料</p>
+                    <a href="{% url 'reporting:monthly_report' %}" class="btn btn-outline-success">
+                        <i class="fas fa-chart-bar"></i> 生成月報表
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-calendar-check fa-3x text-warning mb-3"></i>
+                    <h5 class="card-title">季報表</h5>
+                    <p class="card-text">按季統計工作時數和作業員資料</p>
+                    <a href="{% url 'reporting:quarterly_report' %}" class="btn btn-outline-warning">
+                        <i class="fas fa-chart-pie"></i> 生成季報表
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-calendar fa-3x text-danger mb-3"></i>
+                    <h5 class="card-title">年報表</h5>
+                    <p class="card-text">按年統計工作時數和作業員資料</p>
+                    <a href="{% url 'reporting:yearly_report' %}" class="btn btn-outline-danger">
+                        <i class="fas fa-chart-area"></i> 生成年報表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理功能 -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cogs"></i> 報表管理</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'reporting:report_schedule_list' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-clock"></i> 報表排程管理
+                        </a>
+                        <a href="{% url 'reporting:report_execution_log' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-list-alt"></i> 執行日誌
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-database"></i> 資料管理</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'reporting:sync_report_data' %}" class="btn btn-outline-info">
+                            <i class="fas fa-sync-alt"></i> 同步報表資料
+                        </a>
+                        <button type="button" class="btn btn-outline-warning" onclick="showDataStats()">
+                            <i class="fas fa-chart-line"></i> 資料統計
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速統計 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-tachometer-alt"></i> 快速統計</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="quickStats">
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-primary" id="totalRecords">-</h3>
+                                <p class="text-muted">總記錄數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-success" id="totalHours">-</h3>
+                                <p class="text-muted">總工作時數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-info" id="totalOperators">-</h3>
+                                <p class="text-muted">總作業員數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-warning" id="avgDailyHours">-</h3>
+                                <p class="text-muted">平均日工作時數</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 資料統計模態框 -->
+<div class="modal fade" id="dataStatsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-chart-line"></i> 資料統計</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="statsContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">載入中...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.stat-item {
+    padding: 20px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    margin-bottom: 15px;
+}
+
+.stat-item h3 {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.card {
+    transition: transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+</style>
+
+<script>
+// 載入快速統計
+document.addEventListener('DOMContentLoaded', function() {
+    loadQuickStats();
+});
+
+function loadQuickStats() {
+    // 這裡可以透過AJAX載入實際的統計資料
+    // 目前使用模擬資料
+    document.getElementById('totalRecords').textContent = '1,234';
+    document.getElementById('totalHours').textContent = '8,567.5';
+    document.getElementById('totalOperators').textContent = '45';
+    document.getElementById('avgDailyHours').textContent = '8.2';
+}
+
+function showDataStats() {
+    const modal = new bootstrap.Modal(document.getElementById('dataStatsModal'));
+    modal.show();
+    
+    // 載入詳細統計資料
+    loadDetailedStats();
+}
+
+function loadDetailedStats() {
+    const statsContent = document.getElementById('statsContent');
+    statsContent.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>按月份統計</h6>
+                <canvas id="monthlyChart" width="400" height="200"></canvas>
+            </div>
+            <div class="col-md-6">
+                <h6>按公司統計</h6>
+                <canvas id="companyChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    `;
+    
+    // 這裡可以加入Chart.js來繪製圖表
+}
+</script>
+{% endblock %} 

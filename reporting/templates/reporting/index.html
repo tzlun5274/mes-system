@@ -4,6 +4,7 @@
 {% block title %}報表管理 - MES系統{% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
@@ -24,32 +25,36 @@
                         <div class="col-md-3 mb-3">
                             <div class="card bg-primary text-white">
                                 <div class="card-body text-center">
-                                    <h4>{{ total_workorders }}</h4>
-                                    <p class="mb-0">總工單數</p>
+                                    <h4 id="totalReportsCount">{{ total_reports }}</h4>
+                                    <p class="mb-0">總報表數</p>
+                                    <small class="text-light">即時更新</small>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
                             <div class="card bg-success text-white">
                                 <div class="card-body text-center">
-                                    <h4>{{ active_workorders }}</h4>
-                                    <p class="mb-0">進行中派工單</p>
+                                    <h4 id="todayReportsCount">{{ today_reports }}</h4>
+                                    <p class="mb-0">今日匯出</p>
+                                    <small class="text-light">即時更新</small>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
                             <div class="card bg-warning text-white">
                                 <div class="card-body text-center">
-                                    <h4>{{ total_operators }}</h4>
-                                    <p class="mb-0">作業員數</p>
+                                    <h4 id="pendingReportsCount">{{ pending_reports }}</h4>
+                                    <p class="mb-0">待處理</p>
+                                    <small class="text-light">即時更新</small>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-3 mb-3">
                             <div class="card bg-info text-white">
                                 <div class="card-body text-center">
-                                    <h4>{{ total_equipment }}</h4>
-                                    <p class="mb-0">設備數</p>
+                                    <h4 id="completedReportsCount">{{ completed_reports }}</h4>
+                                    <p class="mb-0">已完成</p>
+                                    <small class="text-light">即時更新</small>
                                 </div>
                             </div>
                         </div>
@@ -62,19 +67,42 @@
                                 <i class="fas fa-file-alt text-success"></i> 報表功能
                             </h5>
                         </div>
-                        <div class="col-md-12 mb-3">
+                        <div class="col-md-4 mb-3">
                             <div class="card h-100">
                                 <div class="card-body text-center">
-                                    <i class="fas fa-file-export fa-3x text-primary mb-3"></i>
-                                    <h5 class="card-title">報表匯出</h5>
-                                    <p class="card-text">生成各種類型的生產報表，支援 Excel、CSV 和 PDF 格式</p>
-                                    <a href="{% url 'reporting:report_export' %}" class="btn btn-primary">
-                                        <i class="fas fa-download"></i> 開始匯出
+                                    <i class="fas fa-clock fa-3x text-info mb-3"></i>
+                                    <h5 class="card-title">工作時數報表</h5>
+                                    <p class="card-text">生成週、月、季、年度工作時數統計報表</p>
+                                    <a href="{% url 'reporting:work_hour_report_index' %}" class="btn btn-info">
+                                        <i class="fas fa-chart-line"></i> 工作時數報表
                                     </a>
                                 </div>
                             </div>
                         </div>
-
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                                    <h5 class="card-title">已完工工單報表</h5>
+                                    <p class="card-text">查看已完工工單的統計分析和趨勢圖表</p>
+                                    <a href="{% url 'reporting:completed_workorder_report_index' %}" class="btn btn-success">
+                                        <i class="fas fa-chart-bar"></i> 已完工工單報表
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-star fa-3x text-warning mb-3"></i>
+                                    <h5 class="card-title">評分報表</h5>
+                                    <p class="card-text">作業員評分、製程能力評分和主管評分報表</p>
+                                    <a href="{% url 'reporting:scoring_dashboard' %}" class="btn btn-warning">
+                                        <i class="fas fa-star"></i> 評分報表
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- 報表類型 -->
@@ -84,59 +112,157 @@
                                 <i class="fas fa-chart-line text-info"></i> 報表類型
                             </h5>
                         </div>
-                        <div class="col-md-3 mb-3">
+                        <div class="col-md-2 mb-3">
                             <div class="card border-primary">
                                 <div class="card-header bg-primary text-white">
-                                    <h6 class="mb-0"><i class="fas fa-calendar-day"></i> 工作報表</h6>
+                                    <h6 class="mb-0"><i class="fas fa-calendar-day"></i> 工作時數報表</h6>
                                 </div>
                                 <div class="card-body">
                                     <ul class="list-unstyled mb-0">
-                                        <li><i class="fas fa-check text-success"></i> 日工作報表</li>
-                                        <li><i class="fas fa-check text-success"></i> 週工作報表</li>
-                                        <li><i class="fas fa-check text-success"></i> 月工作報表</li>
+                                        <li><i class="fas fa-check text-success"></i> 週工作時數報表</li>
+                                        <li><i class="fas fa-check text-success"></i> 月工作時數報表</li>
+                                        <li><i class="fas fa-check text-success"></i> 季工作時數報表</li>
+                                        <li><i class="fas fa-check text-success"></i> 年工作時數報表</li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card border-success">
-                                <div class="card-header bg-success text-white">
-                                    <h6 class="mb-0"><i class="fas fa-clock"></i> 工時報表</h6>
-                                </div>
-                                <div class="card-body">
-                                    <ul class="list-unstyled mb-0">
-                                        <li><i class="fas fa-check text-success"></i> 作業員工時</li>
-                                        <li><i class="fas fa-check text-success"></i> SMT設備工時</li>
-                                        <li><i class="fas fa-check text-success"></i> 加班統計</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
+                        <div class="col-md-2 mb-3">
                             <div class="card border-warning">
                                 <div class="card-header bg-warning text-white">
-                                    <h6 class="mb-0"><i class="fas fa-star"></i> 績效報表</h6>
+                                    <h6 class="mb-0"><i class="fas fa-star"></i> 評分報表</h6>
                                 </div>
                                 <div class="card-body">
                                     <ul class="list-unstyled mb-0">
-                                        <li><i class="fas fa-check text-success"></i> 作業員績效</li>
-                                        <li><i class="fas fa-check text-success"></i> 設備效率</li>
-                                        <li><i class="fas fa-check text-success"></i> 品質分析</li>
+                                        <li><i class="fas fa-check text-success"></i> 生產效率評分 (80%)</li>
+                                        <li><i class="fas fa-check text-success"></i> 主管評分 (20%)</li>
+                                        <li><i class="fas fa-check text-success"></i> 評分週期管理</li>
+                                        <li><i class="fas fa-check text-success"></i> 自動評分計算</li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card border-danger">
-                                <div class="card-header bg-danger text-white">
-                                    <h6 class="mb-0"><i class="fas fa-exclamation-triangle"></i> 異常報表</h6>
+                        <div class="col-md-2 mb-3">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0"><i class="fas fa-clock"></i> 資料來源</h6>
                                 </div>
                                 <div class="card-body">
                                     <ul class="list-unstyled mb-0">
-                                        <li><i class="fas fa-check text-success"></i> 異常報工</li>
-                                        <li><i class="fas fa-check text-success"></i> 效率分析</li>
-                                        <li><i class="fas fa-check text-success"></i> 統計報告</li>
+                                        <li><i class="fas fa-check text-success"></i> 填報資料（已核准）</li>
+                                        <li><i class="fas fa-check text-success"></i> 現場報工資料（已完成）</li>
+                                        <li><i class="fas fa-check text-success"></i> 多公司資料支援</li>
                                     </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0"><i class="fas fa-file-export"></i> 匯出格式</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-unstyled mb-0">
+                                        <li><i class="fas fa-check text-success"></i> Excel 格式</li>
+                                        <li><i class="fas fa-check text-success"></i> CSV 格式</li>
+                                        <li><i class="fas fa-check text-success"></i> 網頁格式</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card border-danger">
+                                <div class="card-header bg-danger text-white">
+                                    <h6 class="mb-0"><i class="fas fa-cog"></i> 自動化功能</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-unstyled mb-0">
+                                        <li><i class="fas fa-check text-success"></i> 自動報表排程</li>
+                                        <li><i class="fas fa-check text-success"></i> 郵件自動發送</li>
+                                        <li><i class="fas fa-check text-success"></i> 資料自動同步</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card border-secondary">
+                                <div class="card-header bg-secondary text-white">
+                                    <h6 class="mb-0"><i class="fas fa-chart-bar"></i> 已完工工單</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-unstyled mb-0">
+                                        <li><i class="fas fa-check text-success"></i> 完工統計分析</li>
+                                        <li><i class="fas fa-check text-success"></i> 趨勢圖表</li>
+                                        <li><i class="fas fa-check text-success"></i> 效率分析</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 圖表視覺化 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-chart-area text-primary"></i> 圖表視覺化
+                            </h5>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-chart-line"></i> 工作時數趨勢</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="workHoursChart" width="400" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-chart-pie"></i> 公司工作時數分布</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="companyChart" width="400" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 資料列表 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-table text-success"></i> 最新報表資料
+                            </h5>
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">最新工作時數資料</h6>
+                                        <a href="{% url 'reporting:work_hour_report_index' %}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-eye"></i> 查看完整報表
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>工單編號</th>
+                                                    <th>公司</th>
+                                                    <th>工作日期</th>
+                                                    <th>日工作時數</th>
+                                                    <th>週工作時數</th>
+                                                    <th>月工作時數</th>
+                                                    <th>作業員人數</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="reportDataTable">
+                                                <!-- 資料將由 JavaScript 動態載入 -->
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -145,15 +271,82 @@
                     <!-- 快速操作 -->
                     <div class="row">
                         <div class="col-12">
-                            <div class="alert alert-info">
-                                <h5><i class="fas fa-info-circle"></i> 使用說明</h5>
-                                <p class="mb-2">報表管理系統提供完整的生產數據分析和匯出功能。</p>
-                                <ul class="mb-0">
-                                    <li>選擇「報表匯出」可以生成各種類型的生產報表</li>
-                                    <li>支援 Excel、CSV 和 PDF 三種匯出格式</li>
-                                    <li>可以選擇今日、本週、本月或自訂日期範圍</li>
-                                    <li>審核管理功能請至「工單管理」→「主管功能」→「審核管理」</li>
-                                </ul>
+                            <h5 class="mb-3">
+                                <i class="fas fa-bolt text-warning"></i> 快速操作
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-2 mb-3">
+                                    <div class="card border-primary">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-sync-alt fa-2x text-primary mb-2"></i>
+                                            <h6>同步資料</h6>
+                                            <p class="small text-muted">同步填報和現場報工資料</p>
+                                            <button class="btn btn-sm btn-outline-primary" onclick="syncData()">
+                                                <i class="fas fa-sync"></i> 立即同步
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <div class="card border-success">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-file-excel fa-2x text-success mb-2"></i>
+                                            <h6>匯出報表</h6>
+                                            <p class="small text-muted">生成 Excel 格式報表</p>
+                                            <a href="{% url 'reporting:work_hour_report_index' %}" class="btn btn-sm btn-outline-success">
+                                                <i class="fas fa-download"></i> 開始匯出
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <div class="card border-warning">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-star fa-2x text-warning mb-2"></i>
+                                            <h6>評分報表</h6>
+                                            <p class="small text-muted">查看作業員評分報表</p>
+                                            <a href="{% url 'reporting:scoring_dashboard' %}" class="btn btn-sm btn-outline-warning">
+                                                <i class="fas fa-star"></i> 評分報表
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <div class="card border-info">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-calendar-alt fa-2x text-info mb-2"></i>
+                                            <h6>排程管理</h6>
+                                            <p class="small text-muted">設定自動化報表排程</p>
+                                            <a href="{% url 'reporting:report_schedule_list' %}" class="btn btn-sm btn-outline-info">
+                                                <i class="fas fa-cog"></i> 管理排程
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <div class="card border-secondary">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-chart-bar fa-2x text-secondary mb-2"></i>
+                                            <h6>查看報表</h6>
+                                            <p class="small text-muted">瀏覽完整報表資料</p>
+                                            <a href="{% url 'reporting:work_hour_report_index' %}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-eye"></i> 查看報表
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <div class="card border-danger">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-check-circle fa-2x text-danger mb-2"></i>
+                                            <h6>完工工單</h6>
+                                            <p class="small text-muted">查看已完工工單報表</p>
+                                            <a href="{% url 'reporting:completed_workorder_report_index' %}" class="btn btn-sm btn-outline-danger">
+                                                <i class="fas fa-check"></i> 完工報表
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -162,4 +355,204 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(document).ready(function() {
+    // 載入圖表資料
+    loadChartData();
+    // 載入資料列表
+    loadReportData();
+    // 載入統計資料
+    loadDashboardStats();
+    
+    // 每30秒更新一次統計資料
+    setInterval(loadDashboardStats, 30000);
+});
+
+function loadChartData() {
+    // 工作時數趨勢圖
+    $.ajax({
+        url: '{% url "reporting:chart_data" %}',
+        method: 'GET',
+        data: { chart_type: 'work_hours_trend' },
+        success: function(data) {
+            createWorkHoursChart(data);
+        },
+        error: function() {
+            console.log('載入工作時數趨勢圖失敗');
+        }
+    });
+
+    // 公司分布圖
+    $.ajax({
+        url: '{% url "reporting:chart_data" %}',
+        method: 'GET',
+        data: { chart_type: 'company_distribution' },
+        success: function(data) {
+            createCompanyChart(data);
+        },
+        error: function() {
+            console.log('載入公司分布圖失敗');
+        }
+    });
+}
+
+function createWorkHoursChart(data) {
+    const ctx = document.getElementById('workHoursChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: '日工作時數',
+                data: data.values,
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '工作時數'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '日期'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function createCompanyChart(data) {
+    const ctx = document.getElementById('companyChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.values,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 205, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(153, 102, 255, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function loadReportData() {
+    $.ajax({
+        url: '{% url "reporting:report_data_list" %}',
+        method: 'GET',
+        success: function(data) {
+            const tbody = $('#reportDataTable');
+            tbody.empty();
+            
+            data.forEach(function(item) {
+                const row = `
+                    <tr>
+                        <td>${item.workorder_id}</td>
+                        <td>${item.company}</td>
+                        <td>${item.work_date}</td>
+                        <td>${item.daily_work_hours}</td>
+                        <td>${item.weekly_work_hours}</td>
+                        <td>${item.monthly_work_hours}</td>
+                        <td>${item.operator_count}</td>
+                    </tr>
+                `;
+                tbody.append(row);
+            });
+        },
+        error: function() {
+            $('#reportDataTable').html('<tr><td colspan="7" class="text-center text-muted">載入資料失敗</td></tr>');
+        }
+    });
+}
+
+function loadDashboardStats() {
+    $.ajax({
+        url: '{% url "reporting:dashboard_stats" %}',
+        method: 'GET',
+        success: function(data) {
+            $('#totalReportsCount').text(data.total_reports);
+            $('#todayReportsCount').text(data.today_reports);
+            $('#pendingReportsCount').text(data.pending_reports);
+            $('#completedReportsCount').text(data.completed_reports);
+        },
+        error: function() {
+            console.log('載入統計資料失敗');
+        }
+    });
+}
+
+function syncData() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // 顯示載入狀態
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 同步中...';
+    button.disabled = true;
+    
+    $.ajax({
+        url: '{% url "reporting:sync_report_data" %}',
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            // 顯示成功訊息
+            button.innerHTML = '<i class="fas fa-check"></i> 同步完成';
+            button.className = 'btn btn-sm btn-success';
+            
+            // 更新統計資料
+            loadDashboardStats();
+            loadReportData();
+            
+            // 3秒後恢復原狀
+            setTimeout(function() {
+                button.innerHTML = originalText;
+                button.className = 'btn btn-sm btn-outline-primary';
+                button.disabled = false;
+            }, 3000);
+        },
+        error: function() {
+            // 顯示錯誤訊息
+            button.innerHTML = '<i class="fas fa-times"></i> 同步失敗';
+            button.className = 'btn btn-sm btn-danger';
+            
+            // 3秒後恢復原狀
+            setTimeout(function() {
+                button.innerHTML = originalText;
+                button.className = 'btn btn-sm btn-outline-primary';
+                button.disabled = false;
+            }, 3000);
+        }
+    });
+}
+</script>
 {% endblock %} 

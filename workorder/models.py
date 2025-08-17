@@ -130,7 +130,7 @@ class WorkOrder(models.Model):
     @property
     def completed_quantity(self):
         """計算工單完成數量（所有工序完成數量的平均值）"""
-        processes = self.processes.all()
+        processes = WorkOrderProcess.objects.filter(workorder_id=self.id)
         if processes.count() > 0:
             total_completed = sum(process.completed_quantity for process in processes)
             return round(total_completed / processes.count())
@@ -140,9 +140,9 @@ class WorkOrder(models.Model):
     def progress(self):
         """計算工單進度百分比"""
         # 計算已完成工序的百分比
-        total_processes = self.processes.count()
+        total_processes = WorkOrderProcess.objects.filter(workorder_id=self.id).count()
         if total_processes > 0:
-            completed_processes = self.processes.filter(status='completed').count()
+            completed_processes = WorkOrderProcess.objects.filter(workorder_id=self.id, status='completed').count()
             return round((completed_processes / total_processes) * 100, 1)
         return 0.0
 
@@ -157,7 +157,7 @@ class WorkOrder(models.Model):
     @property
     def current_operator(self):
         """取得當前負責的作業員"""
-        current_process = self.processes.filter(status="in_progress").first()
+        current_process = WorkOrderProcess.objects.filter(workorder_id=self.id, status="in_progress").first()
         if current_process and current_process.assigned_operator:
             return current_process.assigned_operator
         return "未分配"
@@ -165,7 +165,7 @@ class WorkOrder(models.Model):
     @property
     def current_process(self):
         """取得當前進行的工序"""
-        current_process = self.processes.filter(status="in_progress").first()
+        current_process = WorkOrderProcess.objects.filter(workorder_id=self.id, status="in_progress").first()
         if current_process:
             return current_process.process_name
         return "無進行中工序"
@@ -175,7 +175,7 @@ class WorkOrder(models.Model):
         """取得工單開始時間（第一個工序的開始時間或工單狀態變更時間）"""
         # 優先顯示第一個工序的實際開始時間
         first_process = (
-            self.processes.filter(actual_start_time__isnull=False)
+            WorkOrderProcess.objects.filter(workorder_id=self.id, actual_start_time__isnull=False)
             .order_by("actual_start_time")
             .first()
         )
@@ -204,12 +204,7 @@ class WorkOrderProcess(models.Model):
     派工單工序明細：記錄每個工單的具體工序執行狀況
     """
 
-    workorder = models.ForeignKey(
-        WorkOrder,
-        on_delete=models.CASCADE,
-        verbose_name="工單",
-        related_name="processes",
-    )
+    workorder_id = models.IntegerField(verbose_name="工單ID", default=0)
     process_name = models.CharField(
         max_length=100, verbose_name="工序名稱"
     )  # 例如：SMT、DIP、測試
@@ -268,8 +263,8 @@ class WorkOrderProcess(models.Model):
     class Meta:
         verbose_name = "工單工序明細"
         verbose_name_plural = "工單工序明細"
-        unique_together = (("workorder", "step_order"),)
-        ordering = ["workorder", "step_order"]
+        unique_together = (("workorder_id", "step_order"),)
+        ordering = ["workorder_id", "step_order"]
 
     def __str__(self):
         # 只顯示工序名稱和步驟，不顯示工單號
@@ -338,12 +333,7 @@ class WorkOrderProcessLog(models.Model):
     工單工序執行日誌：記錄每個工序的詳細執行記錄
     """
 
-    workorder_process = models.ForeignKey(
-        WorkOrderProcess,
-        on_delete=models.CASCADE,
-        verbose_name="工單工序",
-        related_name="logs",
-    )
+    workorder_process_id = models.IntegerField(verbose_name="工單工序ID", default=0)
     action = models.CharField(
         max_length=50,
         verbose_name="操作類型",
@@ -379,15 +369,15 @@ class WorkOrderProcessLog(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.workorder_process} - {self.action} - {self.created_at}"
+        process = WorkOrderProcess.objects.filter(id=self.workorder_process_id).first()
+        process_name = process.process_name if process else f"工序{self.workorder_process_id}"
+        return f"{process_name} - {self.action} - {self.created_at}"
 
 # 工單分配記錄模型
 class WorkOrderAssignment(models.Model):
     """工單分配記錄：記錄工單與設備、作業員的分配關係"""
 
-    workorder = models.ForeignKey(
-        "WorkOrder", on_delete=models.CASCADE, verbose_name="工單"
-    )
+    workorder_id = models.IntegerField(verbose_name="工單ID", default=0)
     equipment_id = models.CharField(max_length=50, verbose_name="分配設備ID")
     operator_id = models.CharField(max_length=50, verbose_name="分配作業員ID")
     assigned_at = models.DateTimeField("分配時間", auto_now_add=True)
@@ -399,17 +389,15 @@ class WorkOrderAssignment(models.Model):
         verbose_name_plural = "工單分配記錄"
 
     def __str__(self):
-        return (
-            f"{self.workorder.order_number} - {self.equipment_id} - {self.operator_id}"
-        )
+        workorder = WorkOrder.objects.filter(id=self.workorder_id).first()
+        workorder_number = workorder.order_number if workorder else f"工單{self.workorder_id}"
+        return f"{workorder_number} - {self.equipment_id} - {self.operator_id}"
 
 # 工序產能設定表
 class WorkOrderProcessCapacity(models.Model):
     """工序產能設定表 - 定義工序的產能參數"""
 
-    workorder_process = models.OneToOneField(
-        WorkOrderProcess, on_delete=models.CASCADE, related_name="capacity"
-    )
+    workorder_process_id = models.IntegerField(verbose_name="工單工序ID", unique=True, default=0)
     max_operators = models.IntegerField(default=1, verbose_name="最大作業員數")
     max_equipments = models.IntegerField(default=1, verbose_name="最大設備數")
     target_hourly_output = models.IntegerField(default=0, verbose_name="目標每小時產出")
@@ -424,7 +412,9 @@ class WorkOrderProcessCapacity(models.Model):
         verbose_name_plural = "工序產能設定"
 
     def __str__(self):
-        return f"{self.workorder_process.process_name} - 產能設定"
+        process = WorkOrderProcess.objects.filter(id=self.workorder_process_id).first()
+        process_name = process.process_name if process else f"工序{self.workorder_process_id}"
+        return f"{process_name} - 產能設定"
 
 # 新增：只在最後一天計算產量的工序關鍵字設定
 # key: final_day_only_process_keywords，value: 以逗號分隔的關鍵字字串
@@ -439,26 +429,9 @@ class DispatchLog(models.Model):
     包含工單、工序、作業員、派工數量、建立人員、建立時間。
     """
 
-    workorder = models.ForeignKey(
-        WorkOrder,
-        on_delete=models.CASCADE,
-        verbose_name="工單",
-        related_name="dispatch_logs",
-    )
-    process = models.ForeignKey(
-        WorkOrderProcess,
-        on_delete=models.CASCADE,
-        verbose_name="工序",
-        related_name="dispatch_logs",
-    )
-    operator = models.ForeignKey(
-        Operator,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        verbose_name="作業員",
-        help_text="派工時選擇的作業員，可空白",
-    )
+    workorder_id = models.IntegerField(verbose_name="工單ID", default=0)
+    process_id = models.IntegerField(verbose_name="工序ID", default=0)
+    operator_id = models.IntegerField(verbose_name="作業員ID", null=True, blank=True)
     quantity = models.PositiveIntegerField(default=0, verbose_name="派工數量")
     created_by = models.CharField(max_length=100, verbose_name="建立人員")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
@@ -469,7 +442,15 @@ class DispatchLog(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.workorder} - {self.process} - {self.operator} - {self.quantity}"
+        workorder = WorkOrder.objects.filter(id=self.workorder_id).first()
+        process = WorkOrderProcess.objects.filter(id=self.process_id).first()
+        operator = Operator.objects.filter(id=self.operator_id).first() if self.operator_id else None
+        
+        workorder_number = workorder.order_number if workorder else f"工單{self.workorder_id}"
+        process_name = process.process_name if process else f"工序{self.process_id}"
+        operator_name = operator.name if operator else "未分配"
+        
+        return f"{workorder_number} - {process_name} - {operator_name} - {self.quantity}"
 
 # ============================================================================
 # 重新設計的工單資料表架構
@@ -488,14 +469,7 @@ class WorkOrderProduction(models.Model):
     ]
 
     # 關聯工單
-    workorder = models.OneToOneField(
-        WorkOrder,
-        on_delete=models.CASCADE,
-        verbose_name="工單",
-        related_name="production_record",
-        null=True,
-        blank=True
-    )
+    workorder_id = models.IntegerField(verbose_name="工單ID", unique=True, null=True, blank=True)
     
     # 生產狀態
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="in_production", verbose_name="生產狀態")
@@ -517,19 +491,16 @@ class WorkOrderProduction(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"生產中：{self.workorder.order_number}"
+        workorder = WorkOrder.objects.filter(id=self.workorder_id).first()
+        workorder_number = workorder.order_number if workorder else f"工單{self.workorder_id}"
+        return f"生產中：{workorder_number}"
 
 class WorkOrderProductionDetail(models.Model):
     """
     生產中工單報工明細：記錄生產過程中的所有報工記錄
     例如：電測報了幾次、出貨包裝包了幾次
     """
-    workorder_production = models.ForeignKey(
-        WorkOrderProduction,
-        on_delete=models.CASCADE,
-        verbose_name="生產中工單",
-        related_name="production_details"
-    )
+    workorder_production_id = models.IntegerField(verbose_name="生產中工單ID", default=0)
     
     # 報工資訊
     process_name = models.CharField(max_length=100, verbose_name="工序名稱")
@@ -611,10 +582,10 @@ class WorkOrderProductionDetail(models.Model):
         verbose_name_plural = "生產報工明細"
         db_table = "workorder_production_detail"
         ordering = ["process_name", "start_time", "report_time"]  # 按工序名稱、開始時間、報工時間排序
-        unique_together = (("workorder_production", "process_name", "report_date"),)  # 生產記錄+工序名稱+報工日期唯一
+        unique_together = (("workorder_production_id", "process_name", "report_date"),)  # 生產記錄+工序名稱+報工日期唯一
         indexes = [
             # 優化完工判斷查詢的複合索引
-            models.Index(fields=['workorder_production', 'process_name', 'report_source'], 
+            models.Index(fields=['workorder_production_id', 'process_name', 'report_source'], 
                         name='idx_prod_detail_completion'),
             # 優化按日期查詢的索引
             models.Index(fields=['report_date'], name='idx_prod_detail_date'),
@@ -625,7 +596,13 @@ class WorkOrderProductionDetail(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.workorder_production.workorder.order_number} - {self.process_name} - {self.report_date}"
+        production = WorkOrderProduction.objects.filter(id=self.workorder_production_id).first()
+        if production:
+            workorder = WorkOrder.objects.filter(id=production.workorder_id).first()
+            workorder_number = workorder.order_number if workorder else f"工單{production.workorder_id}"
+        else:
+            workorder_number = f"生產記錄{self.workorder_production_id}"
+        return f"{workorder_number} - {self.process_name} - {self.report_date}"
 
 class CompletedWorkOrder(models.Model):
     """
@@ -650,13 +627,7 @@ class CompletedWorkOrder(models.Model):
     completed_at = models.DateTimeField(auto_now_add=True, verbose_name="完工時間")
     
     # 生產記錄資訊
-    production_record = models.ForeignKey(
-        'WorkOrderProduction', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        verbose_name="生產記錄"
-    )
+    production_record_id = models.IntegerField(verbose_name="生產記錄ID", null=True, blank=True, default=0)
     
     # 統計資訊
     total_work_hours = models.FloatField(default=0.0, verbose_name="總工作時數")
@@ -702,12 +673,7 @@ class CompletedWorkOrderProcess(models.Model):
     已完工工單工序模型
     儲存已完工工單的工序資訊
     """
-    completed_workorder = models.ForeignKey(
-        CompletedWorkOrder, 
-        on_delete=models.CASCADE, 
-        related_name='processes',
-        verbose_name="已完工工單"
-    )
+    completed_workorder_id = models.IntegerField(verbose_name="已完工工單ID", default=0)
     
     # 工序資訊
     process_name = models.CharField(max_length=100, verbose_name="工序名稱")
@@ -737,7 +703,9 @@ class CompletedWorkOrderProcess(models.Model):
         ordering = ['process_order']
 
     def __str__(self):
-        return f"{self.completed_workorder.order_number} - {self.process_name}"
+        completed_workorder = CompletedWorkOrder.objects.filter(id=self.completed_workorder_id).first()
+        workorder_number = completed_workorder.order_number if completed_workorder else f"已完工工單{self.completed_workorder_id}"
+        return f"{workorder_number} - {self.process_name}"
 
     def get_completion_rate(self):
         """計算工序完工率"""
@@ -750,12 +718,7 @@ class CompletedProductionReport(models.Model):
     已完工生產報工記錄模型
     儲存已完工工單的所有報工記錄
     """
-    completed_workorder = models.ForeignKey(
-        CompletedWorkOrder, 
-        on_delete=models.CASCADE, 
-        related_name='production_reports',
-        verbose_name="已完工工單"
-    )
+    completed_workorder_id = models.IntegerField(verbose_name="已完工工單ID", default=0)
     
     # 報工基本資訊
     report_date = models.DateField(verbose_name="報工日期")
@@ -800,7 +763,9 @@ class CompletedProductionReport(models.Model):
         ordering = ['report_date', 'start_time']
 
     def __str__(self):
-        return f"{self.completed_workorder.order_number} - {self.process_name} - {self.report_date}"
+        completed_workorder = CompletedWorkOrder.objects.filter(id=self.completed_workorder_id).first()
+        workorder_number = completed_workorder.order_number if completed_workorder else f"已完工工單{self.completed_workorder_id}"
+        return f"{workorder_number} - {self.process_name} - {self.report_date}"
 
 class AutoAllocationSettings(models.Model):
     """

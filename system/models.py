@@ -134,6 +134,96 @@ class ReportDataSyncLog(models.Model):
         return f"{self.sync_type} - {self.period_start} ~ {self.period_end} - {self.get_status_display()}"
 
 
+class AutoApprovalSettings(models.Model):
+    """自動審核設定"""
+    is_enabled = models.BooleanField(
+        default=False,
+        verbose_name="啟用自動審核",
+        help_text="啟用後，符合條件的報工將自動審核通過"
+    )
+    approval_conditions = models.JSONField(
+        default=dict,
+        verbose_name="審核條件",
+        help_text="自動審核的條件設定"
+    )
+    auto_approve_work_hours = models.BooleanField(
+        default=True,
+        verbose_name="自動審核工作時數",
+        help_text="工作時數在正常範圍內時自動審核"
+    )
+    max_work_hours = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=12.0,
+        verbose_name="最大工作時數",
+        help_text="超過此時數的報工需要人工審核"
+    )
+    auto_approve_defect_rate = models.BooleanField(
+        default=True,
+        verbose_name="自動審核不良率",
+        help_text="不良率在正常範圍內時自動審核"
+    )
+    max_defect_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=5.0,
+        verbose_name="最大不良率(%)",
+        help_text="超過此不良率的報工需要人工審核"
+    )
+    auto_approve_overtime = models.BooleanField(
+        default=False,
+        verbose_name="自動審核加班",
+        help_text="加班時數在正常範圍內時自動審核"
+    )
+    max_overtime_hours = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=4.0,
+        verbose_name="最大加班時數",
+        help_text="超過此時數的加班需要人工審核"
+    )
+    exclude_operators = models.JSONField(
+        default=list,
+        verbose_name="排除作業員",
+        help_text="這些作業員的報工不會自動審核"
+    )
+    exclude_processes = models.JSONField(
+        default=list,
+        verbose_name="排除工序",
+        help_text="這些工序的報工不會自動審核"
+    )
+    notification_enabled = models.BooleanField(
+        default=True,
+        verbose_name="啟用通知",
+        help_text="自動審核後發送通知給主管"
+    )
+    notification_recipients = models.JSONField(
+        default=list,
+        verbose_name="通知收件人",
+        help_text="自動審核通知的收件人清單"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+
+    class Meta:
+        verbose_name = "自動審核設定"
+        verbose_name_plural = "自動審核設定"
+
+    def __str__(self):
+        return f"自動審核設定 - {'啟用' if self.is_enabled else '停用'}"
+
+    def get_approval_conditions_summary(self):
+        """取得審核條件摘要"""
+        conditions = []
+        if self.auto_approve_work_hours:
+            conditions.append(f"工作時數 ≤ {self.max_work_hours}小時")
+        if self.auto_approve_defect_rate:
+            conditions.append(f"不良率 ≤ {self.max_defect_rate}%")
+        if self.auto_approve_overtime:
+            conditions.append(f"加班時數 ≤ {self.max_overtime_hours}小時")
+        return "、".join(conditions) if conditions else "無自動審核條件"
+
+
 class ReportSyncSettings(models.Model):
     """報表同步設定"""
     sync_type = models.CharField(

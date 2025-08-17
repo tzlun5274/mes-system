@@ -84,8 +84,8 @@ class FillWork(models.Model):
         verbose_name_plural = "填報作業"
         db_table = 'workorder_fill_work'
         ordering = ['-created_at']
-        # 移除過於嚴格的唯一性約束，允許同一工單的不同工序、不同時間、不同作業員填報
-        # unique_together = (("company_name", "workorder", "product_id"),)  # 公司名稱+工單號碼+產品編號唯一
+        # 唯一性約束：company_name + workorder + product_id + operation + operator + work_date + start_time
+        unique_together = (("company_name", "workorder", "product_id", "operation", "operator", "work_date", "start_time"),)
         indexes = [
             models.Index(fields=['company_code']),
             models.Index(fields=['company_name']),

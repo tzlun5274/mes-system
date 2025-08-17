@@ -376,7 +376,14 @@ document.getElementById('btnBatchApprove')?.addEventListener('click', async func
 		if (response.ok) {
 			const data = await response.json();
 			if (data.success) {
-				alert(`批次核准完成！\n成功核准 ${data.approved_count || 0} 筆記錄`);
+				let message = `批次核准完成！\n成功核准 ${data.approved_count || 0} 筆記錄`;
+				
+				// 如果有警告訊息，添加到提示中
+				if (data.warnings && data.warnings.length > 0) {
+					message += '\n\n注意事項：\n' + data.warnings.join('\n');
+				}
+				
+				alert(message);
 				window.location.reload();
 			} else {
 				throw new Error(data.message || '核准失敗');

@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}自動審核設定 - MES 系統{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-robot"></i> 自動審核設定
+                    </h4>
+                    <div class="card-tools">
+                        <a href="{% url 'system:index' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> 返回系統管理
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- 統計資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ total_pending }}</h4>
+                                    <p class="mb-0">待審核報工</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ total_approved }}</h4>
+                                    <p class="mb-0">已審核報工</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ settings.is_enabled|yesno:"啟用,停用" }}</h4>
+                                    <p class="mb-0">自動審核狀態</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ conditions_summary|truncatechars:20 }}</h4>
+                                    <p class="mb-0">審核條件</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 設定表單 -->
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- 基本設定 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5><i class="fas fa-cog"></i> 基本設定</h5>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="form-check mb-3">
+                                            {{ form.is_enabled }}
+                                            <label class="form-check-label" for="{{ form.is_enabled.id_for_label }}">
+                                                <strong>{{ form.is_enabled.label }}</strong>
+                                            </label>
+                                            <small class="form-text text-muted d-block">{{ form.is_enabled.help_text }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 審核條件 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5><i class="fas fa-list-check"></i> 審核條件</h5>
+                                
+                                <!-- 工作時數設定 -->
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">工作時數設定</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-check mb-3">
+                                                    {{ form.auto_approve_work_hours }}
+                                                    <label class="form-check-label" for="{{ form.auto_approve_work_hours.id_for_label }}">
+                                                        {{ form.auto_approve_work_hours.label }}
+                                                    </label>
+                                                    <small class="form-text text-muted d-block">{{ form.auto_approve_work_hours.help_text }}</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="{{ form.max_work_hours.id_for_label }}">{{ form.max_work_hours.label }}</label>
+                                                {{ form.max_work_hours }}
+                                                <small class="form-text text-muted">{{ form.max_work_hours.help_text }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 不良率設定 -->
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">不良率設定</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-check mb-3">
+                                                    {{ form.auto_approve_defect_rate }}
+                                                    <label class="form-check-label" for="{{ form.auto_approve_defect_rate.id_for_label }}">
+                                                        {{ form.auto_approve_defect_rate.label }}
+                                                    </label>
+                                                    <small class="form-text text-muted d-block">{{ form.auto_approve_defect_rate.help_text }}</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="{{ form.max_defect_rate.id_for_label }}">{{ form.max_defect_rate.label }}</label>
+                                                {{ form.max_defect_rate }}
+                                                <small class="form-text text-muted">{{ form.max_defect_rate.help_text }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 加班設定 -->
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">加班設定</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-check mb-3">
+                                                    {{ form.auto_approve_overtime }}
+                                                    <label class="form-check-label" for="{{ form.auto_approve_overtime.id_for_label }}">
+                                                        {{ form.auto_approve_overtime.label }}
+                                                    </label>
+                                                    <small class="form-text text-muted d-block">{{ form.auto_approve_overtime.help_text }}</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="{{ form.max_overtime_hours.id_for_label }}">{{ form.max_overtime_hours.label }}</label>
+                                                {{ form.max_overtime_hours }}
+                                                <small class="form-text text-muted">{{ form.max_overtime_hours.help_text }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 排除設定 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5><i class="fas fa-ban"></i> 排除設定</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0">排除作業員</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <label for="{{ form.exclude_operators.id_for_label }}">{{ form.exclude_operators.label }}</label>
+                                                {{ form.exclude_operators }}
+                                                <small class="form-text text-muted">{{ form.exclude_operators.help_text }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0">排除工序</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <label for="{{ form.exclude_processes.id_for_label }}">{{ form.exclude_processes.label }}</label>
+                                                {{ form.exclude_processes }}
+                                                <small class="form-text text-muted">{{ form.exclude_processes.help_text }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 通知設定 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5><i class="fas fa-bell"></i> 通知設定</h5>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-check mb-3">
+                                                    {{ form.notification_enabled }}
+                                                    <label class="form-check-label" for="{{ form.notification_enabled.id_for_label }}">
+                                                        {{ form.notification_enabled.label }}
+                                                    </label>
+                                                    <small class="form-text text-muted d-block">{{ form.notification_enabled.help_text }}</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="{{ form.notification_recipients.id_for_label }}">{{ form.notification_recipients.label }}</label>
+                                                {{ form.notification_recipients }}
+                                                <small class="form-text text-muted">{{ form.notification_recipients.help_text }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 提交按鈕 -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> 儲存設定
+                                    </button>
+                                    <a href="{% url 'system:index' %}" class="btn btn-secondary">
+                                        <i class="fas fa-times"></i> 取消
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 當啟用自動審核時，顯示相關設定
+    $('#id_is_enabled').change(function() {
+        if ($(this).is(':checked')) {
+            $('.card-body').show();
+        } else {
+            $('.card-body').hide();
+        }
+    });
+    
+    // 初始化顯示狀態
+    if ($('#id_is_enabled').is(':checked')) {
+        $('.card-body').show();
+    } else {
+        $('.card-body').hide();
+    }
+});
+</script>
+{% endblock %} 

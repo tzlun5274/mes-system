@@ -10,13 +10,15 @@ from .forms import (
     CustomUserCreationForm,
     BackupScheduleForm,
     OperationLogConfigForm,
-    UserWorkPermissionForm
+    UserWorkPermissionForm,
+    AutoApprovalSettingsForm
 )
 from .models import (
     EmailConfig, 
     BackupSchedule, 
     OperationLogConfig,
-    UserWorkPermission
+    UserWorkPermission,
+    AutoApprovalSettings
 )
 from django.core.mail import get_connection, send_mail
 from django.http import HttpResponse, FileResponse, JsonResponse
@@ -1697,6 +1699,18 @@ def workorder_settings(request):
         max_file_size = request.POST.get('max_file_size', 10)
         session_timeout = request.POST.get('session_timeout', 30)
         
+        # 自動審核設定
+        auto_approve_work_hours = request.POST.get('auto_approve_work_hours') == 'on'
+        max_work_hours = request.POST.get('max_work_hours', 12.0)
+        auto_approve_defect_rate = request.POST.get('auto_approve_defect_rate') == 'on'
+        max_defect_rate = request.POST.get('max_defect_rate', 5.0)
+        auto_approve_overtime = request.POST.get('auto_approve_overtime') == 'on'
+        max_overtime_hours = request.POST.get('max_overtime_hours', 4.0)
+        exclude_operators = request.POST.get('exclude_operators', '')
+        exclude_processes = request.POST.get('exclude_processes', '')
+        auto_approval_notification_enabled = request.POST.get('auto_approval_notification_enabled') == 'on'
+        auto_approval_notification_recipients = request.POST.get('auto_approval_notification_recipients', '')
+        
         # 定時任務設定
         auto_allocation_enabled = request.POST.get('auto_allocation_enabled') == 'on'
         auto_allocation_interval = int(request.POST.get('auto_allocation_interval', 30))
@@ -1729,6 +1743,48 @@ def workorder_settings(request):
         SystemConfig.objects.update_or_create(
             key="session_timeout",
             defaults={"value": str(session_timeout)}
+        )
+        
+        # 儲存自動審核設定
+        SystemConfig.objects.update_or_create(
+            key="auto_approve_work_hours",
+            defaults={"value": str(auto_approve_work_hours)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="max_work_hours",
+            defaults={"value": str(max_work_hours)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="auto_approve_defect_rate",
+            defaults={"value": str(auto_approve_defect_rate)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="max_defect_rate",
+            defaults={"value": str(max_defect_rate)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="auto_approve_overtime",
+            defaults={"value": str(auto_approve_overtime)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="max_overtime_hours",
+            defaults={"value": str(max_overtime_hours)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="exclude_operators",
+            defaults={"value": exclude_operators}
+        )
+        SystemConfig.objects.update_or_create(
+            key="exclude_processes",
+            defaults={"value": exclude_processes}
+        )
+        SystemConfig.objects.update_or_create(
+            key="auto_approval_notification_enabled",
+            defaults={"value": str(auto_approval_notification_enabled)}
+        )
+        SystemConfig.objects.update_or_create(
+            key="auto_approval_notification_recipients",
+            defaults={"value": auto_approval_notification_recipients}
         )
         
         # 更新完工判斷設定
@@ -1802,6 +1858,57 @@ def workorder_settings(request):
     except (SystemConfig.DoesNotExist, ValueError):
         session_timeout = 30
     
+    # 取得自動審核設定
+    try:
+        auto_approve_work_hours = SystemConfig.objects.get(key="auto_approve_work_hours").value == "True"
+    except SystemConfig.DoesNotExist:
+        auto_approve_work_hours = True
+        
+    try:
+        max_work_hours = float(SystemConfig.objects.get(key="max_work_hours").value)
+    except (SystemConfig.DoesNotExist, ValueError):
+        max_work_hours = 12.0
+        
+    try:
+        auto_approve_defect_rate = SystemConfig.objects.get(key="auto_approve_defect_rate").value == "True"
+    except SystemConfig.DoesNotExist:
+        auto_approve_defect_rate = True
+        
+    try:
+        max_defect_rate = float(SystemConfig.objects.get(key="max_defect_rate").value)
+    except (SystemConfig.DoesNotExist, ValueError):
+        max_defect_rate = 5.0
+        
+    try:
+        auto_approve_overtime = SystemConfig.objects.get(key="auto_approve_overtime").value == "True"
+    except SystemConfig.DoesNotExist:
+        auto_approve_overtime = False
+        
+    try:
+        max_overtime_hours = float(SystemConfig.objects.get(key="max_overtime_hours").value)
+    except (SystemConfig.DoesNotExist, ValueError):
+        max_overtime_hours = 4.0
+        
+    try:
+        exclude_operators_text = SystemConfig.objects.get(key="exclude_operators").value
+    except SystemConfig.DoesNotExist:
+        exclude_operators_text = ""
+        
+    try:
+        exclude_processes_text = SystemConfig.objects.get(key="exclude_processes").value
+    except SystemConfig.DoesNotExist:
+        exclude_processes_text = ""
+        
+    try:
+        auto_approval_notification_enabled = SystemConfig.objects.get(key="auto_approval_notification_enabled").value == "True"
+    except SystemConfig.DoesNotExist:
+        auto_approval_notification_enabled = True
+        
+    try:
+        auto_approval_notification_recipients_text = SystemConfig.objects.get(key="auto_approval_notification_recipients").value
+    except SystemConfig.DoesNotExist:
+        auto_approval_notification_recipients_text = ""
+    
     # 取得完工判斷設定
     try:
         completion_check_enabled = SystemConfig.objects.get(key="completion_check_enabled").value == "True"
@@ -1857,6 +1964,17 @@ def workorder_settings(request):
         'data_transfer_enabled': data_transfer_enabled,
         'transfer_batch_size': transfer_batch_size,
         'transfer_retention_days': transfer_retention_days,
+        # 自動審核設定
+        'auto_approve_work_hours': auto_approve_work_hours,
+        'max_work_hours': max_work_hours,
+        'auto_approve_defect_rate': auto_approve_defect_rate,
+        'max_defect_rate': max_defect_rate,
+        'auto_approve_overtime': auto_approve_overtime,
+        'max_overtime_hours': max_overtime_hours,
+        'exclude_operators_text': exclude_operators_text,
+        'exclude_processes_text': exclude_processes_text,
+        'auto_approval_notification_enabled': auto_approval_notification_enabled,
+        'auto_approval_notification_recipients_text': auto_approval_notification_recipients_text,
     }
     
     return render(request, 'system/workorder_settings.html', context)
@@ -1971,6 +2089,88 @@ def execute_data_transfer(request):
 
 # 完工判斷功能已整合到現有的 SimpleCompletionService 中
 # 手動執行功能可以通過現有的管理命令實現
+
+
+@login_required
+def auto_approval_settings(request):
+    """自動審核設定"""
+    # 取得或建立自動審核設定
+    settings, created = AutoApprovalSettings.objects.get_or_create(
+        id=1,
+        defaults={
+            'is_enabled': False,
+            'auto_approve_work_hours': True,
+            'max_work_hours': 12.0,
+            'auto_approve_defect_rate': True,
+            'max_defect_rate': 5.0,
+            'auto_approve_overtime': False,
+            'max_overtime_hours': 4.0,
+            'exclude_operators': [],
+            'exclude_processes': [],
+            'notification_enabled': True,
+            'notification_recipients': []
+        }
+    )
+    
+    if request.method == 'POST':
+        form = AutoApprovalSettingsForm(request.POST, instance=settings)
+        if form.is_valid():
+            form.save()
+            messages.success(request, '自動審核設定已成功儲存！')
+            return redirect('system:auto_approval_settings')
+    else:
+        # 將列表轉換為文字格式顯示
+        initial_data = {
+            'exclude_operators': '\n'.join(settings.exclude_operators) if settings.exclude_operators else '',
+            'exclude_processes': '\n'.join(settings.exclude_processes) if settings.exclude_processes else '',
+            'notification_recipients': '\n'.join(settings.notification_recipients) if settings.notification_recipients else ''
+        }
+        form = AutoApprovalSettingsForm(instance=settings, initial=initial_data)
+    
+    # 取得統計資料
+    from workorder.models import FillWorkRecord
+    total_pending = FillWorkRecord.objects.filter(approval_status='pending').count()
+    total_approved = FillWorkRecord.objects.filter(approval_status='approved').count()
+    
+    context = {
+        'form': form,
+        'settings': settings,
+        'total_pending': total_pending,
+        'total_approved': total_approved,
+        'conditions_summary': settings.get_approval_conditions_summary()
+    }
+    
+    return render(request, 'system/auto_approval_settings.html', context)
+
+
+@login_required
+def test_switches(request):
+    """測試開關功能"""
+    from workorder.workorder_erp.models import SystemConfig
+    
+    # 取得設定值
+    try:
+        auto_approval = SystemConfig.objects.get(key="auto_approval").value == "True"
+    except SystemConfig.DoesNotExist:
+        auto_approval = False
+        
+    try:
+        notification_enabled = SystemConfig.objects.get(key="notification_enabled").value == "True"
+    except SystemConfig.DoesNotExist:
+        notification_enabled = True
+        
+    try:
+        audit_log_enabled = SystemConfig.objects.get(key="audit_log_enabled").value == "True"
+    except SystemConfig.DoesNotExist:
+        audit_log_enabled = True
+    
+    context = {
+        'auto_approval': auto_approval,
+        'notification_enabled': notification_enabled,
+        'audit_log_enabled': audit_log_enabled,
+    }
+    
+    return render(request, 'system/test_switches.html', context)
 
 
 

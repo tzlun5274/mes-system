@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}開關測試{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>開關測試頁面</h2>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <h4>測試開關 1 (True)</h4>
+            <label class="toggle-switch">
+                <input type="checkbox" name="test1" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+        
+        <div class="col-md-6">
+            <h4>測試開關 2 (False)</h4>
+            <label class="toggle-switch">
+                <input type="checkbox" name="test2">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <h4>動態開關 1 (auto_approval: {{ auto_approval }})</h4>
+            <label class="toggle-switch">
+                <input type="checkbox" name="auto_approval" {% if auto_approval %}checked{% endif %}>
+                <span class="slider"></span>
+            </label>
+        </div>
+        
+        <div class="col-md-6">
+            <h4>動態開關 2 (notification_enabled: {{ notification_enabled }})</h4>
+            <label class="toggle-switch">
+                <input type="checkbox" name="notification_enabled" {% if notification_enabled %}checked{% endif %}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <h4>變數值</h4>
+            <ul>
+                <li>auto_approval: {{ auto_approval }} (類型: {{ auto_approval|yesno:"True,False" }})</li>
+                <li>notification_enabled: {{ notification_enabled }} (類型: {{ notification_enabled|yesno:"True,False" }})</li>
+                <li>audit_log_enabled: {{ audit_log_enabled }} (類型: {{ audit_log_enabled|yesno:"True,False" }})</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #2196F3;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+</style>
+{% endblock %} 

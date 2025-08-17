@@ -1,0 +1,430 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}評分報表詳情{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.css" rel="stylesheet">
+<style>
+    .score-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .score-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        text-align: center;
+        margin: 10px 0;
+    }
+    
+    .score-label {
+        text-align: center;
+        font-size: 1.1rem;
+        opacity: 0.9;
+    }
+    
+    .grade-badge {
+        display: inline-block;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+    
+    .grade-excellent { background-color: #28a745; color: white; }
+    .grade-good { background-color: #17a2b8; color: white; }
+    .grade-pass { background-color: #ffc107; color: black; }
+    .grade-fail { background-color: #dc3545; color: white; }
+    
+    .improvement-card {
+        border-left: 4px solid #dc3545;
+        background-color: #f8f9fa;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+    }
+    
+    .improvement-urgent { border-left-color: #dc3545; }
+    .improvement-important { border-left-color: #fd7e14; }
+    .improvement-normal { border-left-color: #ffc107; }
+    .improvement-suggestion { border-left-color: #20c997; }
+    
+    .dimension-score {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-left: 4px solid #007bff;
+    }
+    
+    .dimension-score h6 {
+        margin-bottom: 10px;
+        color: #495057;
+    }
+    
+    .progress {
+        height: 25px;
+        border-radius: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">評分報表詳情</h1>
+                <div>
+                    <a href="{% url 'reporting:export_scoring_report' report.id %}" class="btn btn-success">
+                        <i class="fas fa-download"></i> 匯出Excel
+                    </a>
+                    <a href="{% url 'reporting:scoring_report_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回清單
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表基本資訊 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">報表基本資訊</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>報表名稱：</strong>{{ report.report_name }}</p>
+                            <p><strong>公司名稱：</strong>{{ report.company_name }}</p>
+                            <p><strong>報表期間：</strong>{{ report.start_date|date:"Y-m-d" }} 至 {{ report.end_date|date:"Y-m-d" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>報表日期：</strong>{{ report.report_date|date:"Y-m-d" }}</p>
+                            <p><strong>報表週期：</strong>{{ report.get_report_period_display }}</p>
+                            <p><strong>建立時間：</strong>{{ report.created_at|date:"Y-m-d H:i" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 總分概覽 -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="score-card">
+                <div class="score-label">總分</div>
+                <div class="score-value">{{ report.total_score|floatformat:1 }}</div>
+                <div class="text-center">
+                    <span class="grade-badge grade-{{ report.overall_grade|lower }}">
+                        {{ report.overall_grade }}
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="score-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="score-label">最高可能分數</div>
+                <div class="score-value">{{ report.max_possible_score|floatformat:1 }}</div>
+                <div class="text-center">
+                    <span class="grade-badge grade-excellent">滿分</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="score-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="score-label">得分百分比</div>
+                <div class="score-value">{{ report.score_percentage|floatformat:1 }}%</div>
+                <div class="text-center">
+                    <span class="grade-badge grade-{{ report.overall_grade|lower }}">
+                        {{ report.overall_grade }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 評分維度分析 -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">評分維度分析</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="radarChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">等級統計</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span>優秀項目</span>
+                        <span class="badge bg-success">{{ grade_stats.excellent }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span>良好項目</span>
+                        <span class="badge bg-info">{{ grade_stats.good }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span>及格項目</span>
+                        <span class="badge bg-warning">{{ grade_stats.pass }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>不及格項目</span>
+                        <span class="badge bg-danger">{{ grade_stats.fail }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 各維度詳細評分 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">各維度詳細評分</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="dimension-score">
+                                <h6>生產效率 (權重: 25%)</h6>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>{{ report.production_score|floatformat:1 }}分</span>
+                                    <span class="grade-badge grade-{% if report.production_score >= 90 %}excellent{% elif report.production_score >= 80 %}good{% elif report.production_score >= 70 %}pass{% else %}fail{% endif %}">
+                                        {% if report.production_score >= 90 %}優秀{% elif report.production_score >= 80 %}良好{% elif report.production_score >= 70 %}及格{% else %}不及格{% endif %}
+                                    </span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar bg-primary" style="width: {{ report.production_score }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dimension-score">
+                                <h6>品質管理 (權重: 20%)</h6>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>{{ report.quality_score|floatformat:1 }}分</span>
+                                    <span class="grade-badge grade-{% if report.quality_score >= 90 %}excellent{% elif report.quality_score >= 80 %}good{% elif report.quality_score >= 70 %}pass{% else %}fail{% endif %}">
+                                        {% if report.quality_score >= 90 %}優秀{% elif report.quality_score >= 80 %}良好{% elif report.quality_score >= 70 %}及格{% else %}不及格{% endif %}
+                                    </span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar bg-success" style="width: {{ report.quality_score }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dimension-score">
+                                <h6>交期管理 (權重: 15%)</h6>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>{{ report.delivery_score|floatformat:1 }}分</span>
+                                    <span class="grade-badge grade-{% if report.delivery_score >= 90 %}excellent{% elif report.delivery_score >= 80 %}good{% elif report.delivery_score >= 70 %}pass{% else %}fail{% endif %}">
+                                        {% if report.delivery_score >= 90 %}優秀{% elif report.delivery_score >= 80 %}良好{% elif report.delivery_score >= 70 %}及格{% else %}不及格{% endif %}
+                                    </span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar bg-warning" style="width: {{ report.delivery_score }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dimension-score">
+                                <h6>設備管理 (權重: 15%)</h6>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>{{ report.equipment_score|floatformat:1 }}分</span>
+                                    <span class="grade-badge grade-{% if report.equipment_score >= 90 %}excellent{% elif report.equipment_score >= 80 %}good{% elif report.equipment_score >= 70 %}pass{% else %}fail{% endif %}">
+                                        {% if report.equipment_score >= 90 %}優秀{% elif report.equipment_score >= 80 %}良好{% elif report.equipment_score >= 70 %}及格{% else %}不及格{% endif %}
+                                    </span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar bg-info" style="width: {{ report.equipment_score }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dimension-score">
+                                <h6>成本控制 (權重: 10%)</h6>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>{{ report.cost_score|floatformat:1 }}分</span>
+                                    <span class="grade-badge grade-{% if report.cost_score >= 90 %}excellent{% elif report.cost_score >= 80 %}good{% elif report.cost_score >= 70 %}pass{% else %}fail{% endif %}">
+                                        {% if report.cost_score >= 90 %}優秀{% elif report.cost_score >= 80 %}良好{% elif report.cost_score >= 70 %}及格{% else %}不及格{% endif %}
+                                    </span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar bg-secondary" style="width: {{ report.cost_score }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dimension-score">
+                                <h6>安全管理 (權重: 10%)</h6>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>{{ report.safety_score|floatformat:1 }}分</span>
+                                    <span class="grade-badge grade-{% if report.safety_score >= 90 %}excellent{% elif report.safety_score >= 80 %}good{% elif report.safety_score >= 70 %}pass{% else %}fail{% endif %}">
+                                        {% if report.safety_score >= 90 %}優秀{% elif report.safety_score >= 80 %}良好{% elif report.safety_score >= 70 %}及格{% else %}不及格{% endif %}
+                                    </span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar bg-danger" style="width: {{ report.safety_score }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dimension-score">
+                                <h6>人員管理 (權重: 5%)</h6>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>{{ report.personnel_score|floatformat:1 }}分</span>
+                                    <span class="grade-badge grade-{% if report.personnel_score >= 90 %}excellent{% elif report.personnel_score >= 80 %}good{% elif report.personnel_score >= 70 %}pass{% else %}fail{% endif %}">
+                                        {% if report.personnel_score >= 90 %}優秀{% elif report.personnel_score >= 80 %}良好{% elif report.personnel_score >= 70 %}及格{% else %}不及格{% endif %}
+                                    </span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar bg-dark" style="width: {{ report.personnel_score }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 改善建議 -->
+    {% if improvements %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">改善建議</h5>
+                </div>
+                <div class="card-body">
+                    {% for improvement in improvements %}
+                    <div class="improvement-card improvement-{{ improvement.improvement_type }}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">{{ improvement.problem_description }}</h6>
+                                <p class="mb-2">{{ improvement.improvement_suggestion }}</p>
+                                {% if improvement.action_plan %}
+                                <div class="mb-2">
+                                    <strong>行動計劃：</strong>
+                                    <pre class="mb-0" style="white-space: pre-wrap; font-size: 0.9rem;">{{ improvement.action_plan }}</pre>
+                                </div>
+                                {% endif %}
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <small class="text-muted">
+                                            <strong>目前分數：</strong>{{ improvement.current_score }}分
+                                        </small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <small class="text-muted">
+                                            <strong>目標分數：</strong>{{ improvement.target_score }}分
+                                        </small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <small class="text-muted">
+                                            <strong>責任人：</strong>{{ improvement.responsible_person|default:"未指定" }}
+                                        </small>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <small class="text-muted">
+                                            <strong>完成期限：</strong>{{ improvement.deadline|date:"Y-m-d"|default:"未設定" }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <span class="badge bg-{% if improvement.improvement_type == 'urgent' %}danger{% elif improvement.improvement_type == 'important' %}warning{% elif improvement.improvement_type == 'normal' %}info{% else %}success{% endif %}">
+                                    {{ improvement.get_improvement_type_display }}
+                                </span>
+                                <br>
+                                <span class="badge bg-secondary mt-1">
+                                    {{ improvement.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 備註 -->
+    {% if report.remarks %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">備註</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ report.remarks }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 雷達圖
+    const radarCtx = document.getElementById('radarChart').getContext('2d');
+    new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+            labels: {{ chart_data.labels|safe }},
+            datasets: [{
+                label: '評分',
+                data: {{ chart_data.scores|safe }},
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(54, 162, 235, 1)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        stepSize: 20
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

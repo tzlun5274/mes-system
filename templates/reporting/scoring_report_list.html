@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}評分報表清單{% endblock %}
+
+{% block extra_css %}
+<style>
+    .grade-badge {
+        display: inline-block;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+    
+    .grade-excellent { background-color: #28a745; color: white; }
+    .grade-good { background-color: #17a2b8; color: white; }
+    .grade-pass { background-color: #ffc107; color: black; }
+    .grade-fail { background-color: #dc3545; color: white; }
+    
+    .score-highlight {
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+    
+    .score-excellent { color: #28a745; }
+    .score-good { color: #17a2b8; }
+    .score-pass { color: #ffc107; }
+    .score-fail { color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">評分報表清單</h1>
+                <div>
+                    <a href="{% url 'reporting:scoring_dashboard' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-chart-line"></i> 評分儀表板
+                    </a>
+                    <a href="{% url 'reporting:generate_scoring_report' %}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> 生成新評分報表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">評分報表</h5>
+                </div>
+                <div class="card-body">
+                    {% if reports %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>報表名稱</th>
+                                    <th>報表期間</th>
+                                    <th>報表日期</th>
+                                    <th>總分</th>
+                                    <th>總體等級</th>
+                                    <th>生產效率</th>
+                                    <th>品質管理</th>
+                                    <th>交期管理</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for report in reports %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ report.report_name }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ report.company_name }}</small>
+                                    </td>
+                                    <td>
+                                        {{ report.start_date|date:"Y-m-d" }} 至 {{ report.end_date|date:"Y-m-d" }}
+                                        <br>
+                                        <small class="text-muted">{{ report.get_report_period_display }}</small>
+                                    </td>
+                                    <td>{{ report.report_date|date:"Y-m-d" }}</td>
+                                    <td>
+                                        <span class="score-highlight score-{{ report.overall_grade|lower }}">
+                                            {{ report.total_score|floatformat:1 }}分
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="grade-badge grade-{{ report.overall_grade|lower }}">
+                                            {{ report.overall_grade }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-2">{{ report.production_score|floatformat:1 }}</span>
+                                            <span class="grade-badge grade-{% if report.production_score >= 90 %}excellent{% elif report.production_score >= 80 %}good{% elif report.production_score >= 70 %}pass{% else %}fail{% endif %}">
+                                                {% if report.production_score >= 90 %}優秀{% elif report.production_score >= 80 %}良好{% elif report.production_score >= 70 %}及格{% else %}不及格{% endif %}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-2">{{ report.quality_score|floatformat:1 }}</span>
+                                            <span class="grade-badge grade-{% if report.quality_score >= 90 %}excellent{% elif report.quality_score >= 80 %}good{% elif report.quality_score >= 70 %}pass{% else %}fail{% endif %}">
+                                                {% if report.quality_score >= 90 %}優秀{% elif report.quality_score >= 80 %}良好{% elif report.quality_score >= 70 %}及格{% else %}不及格{% endif %}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-2">{{ report.delivery_score|floatformat:1 }}</span>
+                                            <span class="grade-badge grade-{% if report.delivery_score >= 90 %}excellent{% elif report.delivery_score >= 80 %}good{% elif report.delivery_score >= 70 %}pass{% else %}fail{% endif %}">
+                                                {% if report.delivery_score >= 90 %}優秀{% elif report.delivery_score >= 80 %}良好{% elif report.delivery_score >= 70 %}及格{% else %}不及格{% endif %}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'reporting:scoring_report_detail' report.id %}" 
+                                               class="btn btn-sm btn-outline-primary" title="查看詳情">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'reporting:export_scoring_report' report.id %}" 
+                                               class="btn btn-sm btn-outline-success" title="匯出Excel">
+                                                <i class="fas fa-download"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分頁 -->
+                    {% if page_obj.has_other_pages %}
+                    <nav aria-label="評分報表分頁">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一頁</a>
+                            </li>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}">下一頁</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                        <h4 class="text-muted">尚未有評分報表</h4>
+                        <p class="text-muted">點擊下方按鈕生成您的第一份評分報表</p>
+                        <a href="{% url 'reporting:generate_scoring_report' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> 生成評分報表
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

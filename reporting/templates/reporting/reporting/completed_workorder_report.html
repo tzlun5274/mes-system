@@ -1,0 +1,302 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}已完工工單報表 - 報表管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-check-circle"></i> 已完工工單報表
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <!-- 統計摘要 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-chart-pie text-primary"></i> 統計摘要
+                            </h5>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ summary.total_workorders|default:0 }}</h4>
+                                    <p class="mb-0">完工工單數</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ summary.total_completed_quantity|default:0 }}</h4>
+                                    <p class="mb-0">完成數量</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ summary.avg_completion_rate|default:0|floatformat:1 }}%</h4>
+                                    <p class="mb-0">平均完工率</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ summary.avg_defect_rate|default:0|floatformat:1 }}%</h4>
+                                    <p class="mb-0">平均不良率</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ summary.total_all_hours|default:0|floatformat:1 }}</h4>
+                                    <p class="mb-0">總工作時數</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card bg-secondary text-white">
+                                <div class="card-body text-center">
+                                    <h4>{{ summary.avg_hourly_output|default:0|floatformat:1 }}</h4>
+                                    <p class="mb-0">平均時產出</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 圖表視覺化 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-chart-area text-primary"></i> 圖表視覺化
+                            </h5>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-chart-line"></i> 完工工單趨勢</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="completedWorkorderTrendChart" width="400" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-chart-pie"></i> 公司完工分布</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="completedWorkorderDistributionChart" width="400" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 快速操作 -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h5 class="mb-3">
+                                <i class="fas fa-bolt text-warning"></i> 快速操作
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <div class="card border-primary">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-list fa-2x text-primary mb-2"></i>
+                                            <h6>報表列表</h6>
+                                            <p class="small text-muted">查看所有已完工工單報表</p>
+                                            <a href="{% url 'reporting:completed_workorder_report_list' %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> 查看列表
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="card border-success">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-file-excel fa-2x text-success mb-2"></i>
+                                            <h6>匯出報表</h6>
+                                            <p class="small text-muted">匯出已完工工單報表</p>
+                                            <a href="{% url 'reporting:completed_workorder_report_list' %}" class="btn btn-sm btn-outline-success">
+                                                <i class="fas fa-download"></i> 開始匯出
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="card border-info">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-sync-alt fa-2x text-info mb-2"></i>
+                                            <h6>同步資料</h6>
+                                            <p class="small text-muted">同步已完工工單資料</p>
+                                            <button class="btn btn-sm btn-outline-info" onclick="syncCompletedWorkorderData()">
+                                                <i class="fas fa-sync"></i> 立即同步
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(document).ready(function() {
+    // 載入圖表資料
+    loadCompletedWorkorderChartData();
+});
+
+function loadCompletedWorkorderChartData() {
+    // 完工工單趨勢圖
+    $.ajax({
+        url: '{% url "reporting:chart_data" %}',
+        method: 'GET',
+        data: { chart_type: 'completed_workorder_trend' },
+        success: function(data) {
+            createCompletedWorkorderTrendChart(data);
+        },
+        error: function() {
+            console.log('載入完工工單趨勢圖失敗');
+        }
+    });
+
+    // 公司完工分布圖
+    $.ajax({
+        url: '{% url "reporting:chart_data" %}',
+        method: 'GET',
+        data: { chart_type: 'completed_workorder_distribution' },
+        success: function(data) {
+            createCompletedWorkorderDistributionChart(data);
+        },
+        error: function() {
+            console.log('載入公司完工分布圖失敗');
+        }
+    });
+}
+
+function createCompletedWorkorderTrendChart(data) {
+    const ctx = document.getElementById('completedWorkorderTrendChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: '完工工單數',
+                data: data.workorder_counts,
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }, {
+                label: '完成數量',
+                data: data.completed_quantities,
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '數量'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '日期'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function createCompletedWorkorderDistributionChart(data) {
+    const ctx = document.getElementById('completedWorkorderDistributionChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.workorder_counts,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 205, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(153, 102, 255, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function syncCompletedWorkorderData() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // 顯示載入狀態
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 同步中...';
+    button.disabled = true;
+    
+    $.ajax({
+        url: '{% url "reporting:sync_completed_workorder_data" %}',
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            // 顯示成功訊息
+            button.innerHTML = '<i class="fas fa-check"></i> 同步完成';
+            button.className = 'btn btn-sm btn-success';
+            
+            // 重新載入頁面
+            setTimeout(function() {
+                location.reload();
+            }, 2000);
+        },
+        error: function() {
+            // 顯示錯誤訊息
+            button.innerHTML = '<i class="fas fa-times"></i> 同步失敗';
+            button.className = 'btn btn-sm btn-danger';
+            
+            // 3秒後恢復原狀
+            setTimeout(function() {
+                button.innerHTML = originalText;
+                button.className = 'btn btn-sm btn-outline-info';
+                button.disabled = false;
+            }, 3000);
+        }
+    });
+}
+</script>
+{% endblock %} 

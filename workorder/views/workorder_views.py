@@ -28,13 +28,16 @@ from django.utils import timezone
 from django.core.management import call_command
 import logging
 
-from ..models import WorkOrder, WorkOrderProductionDetail
+from ..models import WorkOrder, WorkOrderProductionDetail, CompletedWorkOrder
 # 移除 ProductionMonitoringData 引用，改用派工單監控資料
 from ..workorder_erp.models import CompanyOrder, SystemConfig, PrdMKOrdMain
 from ..forms import WorkOrderForm
 from erp_integration.models import CompanyConfig
 from ..workorder_dispatch.models import WorkOrderDispatch
+from ..workorder_dispatch.services import WorkOrderDispatchService
 from ..fill_work.models import FillWork
+from ..onsite_reporting.models import OnsiteReport
+from ..services.completion_service import FillWorkCompletionService
 
 # 設定 logger
 workorder_logger = logging.getLogger('workorder')
@@ -88,7 +91,6 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         # 如果工單狀態是 completed，重定向到已完工工單詳情頁面
         if workorder.status == 'completed':
             # 檢查是否已經有對應的已完工工單記錄
-            from ..models import CompletedWorkOrder
             completed_workorder = CompletedWorkOrder.objects.filter(
                 order_number=workorder.order_number,
                 company_code=workorder.company_code,
@@ -97,11 +99,9 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
             
             if completed_workorder:
                 # 重定向到已完工工單詳情頁面
-                from django.shortcuts import redirect
                 return redirect('workorder:completed_workorder_detail', pk=completed_workorder.id)
             else:
                 # 如果沒有已完工工單記錄，可能是資料不一致，顯示錯誤訊息
-                from django.contrib import messages
                 messages.error(request, f'工單 {workorder.order_number} 狀態為已完工，但找不到對應的已完工工單記錄。請聯繫系統管理員。')
                 return redirect('workorder:index')
         
@@ -136,7 +136,6 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         context['company_name'] = company_name
 
         # 取得派工單監控資料
-        from workorder.workorder_dispatch.models import WorkOrderDispatch
         
         # 查找對應的派工單
         dispatch = WorkOrderDispatch.objects.filter(
@@ -147,7 +146,6 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         
         if dispatch:
             # 更新派工單的監控資料
-            from workorder.workorder_dispatch.services import WorkOrderDispatchService
             WorkOrderDispatchService.update_monitoring_data(dispatch)
             
             # 從派工單取得工序統計
@@ -191,17 +189,6 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
             context["pending_processes_count"] = 0
             context["total_processes_count"] = 0
             context["monitoring_data"] = None
-            context["production_total_stats"] = {
-                "total_good_quantity": 0,
-                "total_defect_quantity": 0,
-                "total_quantity": 0,
-                "total_report_count": 0,
-                "total_work_hours": 0.0,
-                "total_overtime_hours": 0.0,
-                "total_all_hours": 0.0,
-                "unique_operators": [],
-                "unique_equipment": [],
-            }
             context["packaging_stats"] = {
                 "packaging_good_quantity": 0,
                 "packaging_defect_quantity": 0,
@@ -213,7 +200,6 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
 
         # 添加完工判斷資訊
         try:
-            from ..services.completion_service import FillWorkCompletionService
             completion_summary = FillWorkCompletionService.get_completion_summary(workorder.id)
             context["completion_summary"] = completion_summary
         except Exception as e:
@@ -221,8 +207,6 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
             context["completion_summary"] = {'error': '獲取完工摘要失敗'}
 
         # 取得所有報工記錄（填報記錄 + 現場報工）
-        from ..fill_work.models import FillWork
-        from ..onsite_reporting.models import OnsiteReport
         
         # 取得已核准的填報記錄
         approved_fillwork = FillWork.objects.filter(
@@ -278,11 +262,53 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         context['all_production_reports'] = all_production_reports
         
         # 計算報工記錄統計
+        total_work_hours = sum(r['work_hours'] for r in all_production_reports)
+        total_overtime_hours = sum(r['overtime_hours'] for r in all_production_reports)
+        
         production_total_stats = {
-            'total_work_hours': sum(r['work_hours'] for r in all_production_reports),
-            'total_overtime_hours': sum(r['overtime_hours'] for r in all_production_reports),
+            'total_good_quantity': sum(r['work_quantity'] for r in all_production_reports),
+            'total_defect_quantity': sum(r['defect_quantity'] for r in all_production_reports),
+            'total_report_count': len(all_production_reports),
+            'total_work_hours': total_work_hours,
+            'total_overtime_hours': total_overtime_hours,
+            'total_all_hours': total_work_hours + total_overtime_hours,
+            'unique_operators': list(set(r['operator'] for r in all_production_reports if r['operator'] and r['operator'] != '-')),
+            'unique_equipment': list(set(r['equipment'] for r in all_production_reports if r['equipment'] and r['equipment'] != '-')),
         }
         context['production_total_stats'] = production_total_stats
+        
+        # 按工序統計
+        production_stats_by_process = {}
+        for report in all_production_reports:
+            process_name = report['process_name']
+            if process_name not in production_stats_by_process:
+                production_stats_by_process[process_name] = {
+                    'process_name': process_name,
+                    'total_good_quantity': 0,
+                    'total_defect_quantity': 0,
+                    'report_count': 0,
+                    'total_work_hours': 0.0,
+                    'operators': set(),
+                    'equipment': set()
+                }
+            
+            stats = production_stats_by_process[process_name]
+            stats['total_good_quantity'] += report['work_quantity']
+            stats['total_defect_quantity'] += report['defect_quantity']
+            stats['report_count'] += 1
+            stats['total_work_hours'] += report['work_hours']
+            
+            if report['operator'] and report['operator'] != '-':
+                stats['operators'].add(report['operator'])
+            if report['equipment'] and report['equipment'] != '-':
+                stats['equipment'].add(report['equipment'])
+        
+        # 將 set 轉換為 list 以便在模板中使用
+        for process_name, stats in production_stats_by_process.items():
+            stats['operators'] = list(stats['operators'])
+            stats['equipment'] = list(stats['equipment'])
+        
+        context['production_stats_by_process'] = production_stats_by_process
 
         return context
 
@@ -872,8 +898,6 @@ class CreateMissingWorkOrdersView(LoginRequiredMixin, View):
     
     def get(self, request):
         """顯示工單創建頁面"""
-        from ..fill_work.models import FillWork
-        from ..models import WorkOrder
         
         # 統計資訊
         total_fill_works = FillWork.objects.count()
