@@ -7,38 +7,38 @@
 import logging
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from ..models import WorkOrderProductionDetail
 from ..fill_work.models import FillWork
 from ..services.workorder_status_service import WorkOrderStatusService
 
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender=WorkOrderProductionDetail)
-def update_workorder_status_on_process_save(sender, instance, created, **kwargs):
-    """
-    當工序記錄保存時更新工單狀態
-    
-    Args:
-        sender: 發送者模型
-        instance: 保存的實例
-        created: 是否為新建記錄
-        **kwargs: 其他參數
-    """
-    try:
-        workorder = instance.workorder_production.workorder
-        logger.info(f"工序記錄觸發工單狀態更新：工單 {workorder.order_number}")
-        
-        # 更新工單狀態
-        updated = WorkOrderStatusService.update_workorder_status(workorder.id)
-        
-        if updated:
-            logger.info(f"工單 {workorder.order_number} 狀態更新成功")
-        else:
-            logger.warning(f"工單 {workorder.order_number} 狀態更新失敗")
-            
-    except Exception as e:
-        logger.error(f"工序記錄觸發工單狀態更新失敗：{str(e)}")
+# 移除 WorkOrderProductionDetail 信號處理器，因為該模型已移除外鍵關係
+# @receiver(post_save, sender=WorkOrderProductionDetail)
+# def update_workorder_status_on_process_save(sender, instance, created, **kwargs):
+#     """
+#     當工序記錄保存時更新工單狀態
+#     
+#     Args:
+#         sender: 發送者模型
+#         instance: 保存的實例
+#         created: 是否為新建記錄
+#         **kwargs: 其他參數
+#     """
+#     try:
+#         workorder = instance.workorder_production.workorder
+#         logger.info(f"工序記錄觸發工單狀態更新：工單 {workorder.order_number}")
+#         
+#         # 更新工單狀態
+#         updated = WorkOrderStatusService.update_workorder_status(workorder.id)
+#         
+#         if updated:
+#             logger.info(f"工單 {workorder.order_number} 狀態更新成功")
+#         else:
+#             logger.warning(f"工單 {workorder.order_number} 狀態更新失敗")
+#             
+#     except Exception as e:
+#         logger.error(f"工序記錄觸發工單狀態更新失敗：{str(e)}")
 
 
 @receiver(post_save, sender=FillWork)

@@ -7,7 +7,7 @@
 import logging
 from django.db import transaction
 from django.utils import timezone
-from ..models import WorkOrder, WorkOrderProductionDetail
+from ..models import WorkOrder
 from ..fill_work.models import FillWork
 from erp_integration.models import CompanyConfig
 
@@ -81,14 +81,14 @@ class WorkOrderStatusService:
             bool: 是否有生產活動
         """
         try:
-            # 1. 檢查工序記錄
-            has_process_records = WorkOrderProductionDetail.objects.filter(
-                workorder_production__workorder=workorder
-            ).exists()
-            
-            if has_process_records:
-                logger.debug(f"工單 {workorder.order_number} 有工序記錄")
-                return True
+            # 1. 檢查工序記錄（已移除，因為 WorkOrderProductionDetail 模型已移除外鍵關係）
+            # has_process_records = WorkOrderProductionDetail.objects.filter(
+            #     workorder_production__workorder=workorder
+            # ).exists()
+            # 
+            # if has_process_records:
+            #     logger.debug(f"工單 {workorder.order_number} 有工序記錄")
+            #     return True
             
             # 2. 檢查現場報工記錄
             try:

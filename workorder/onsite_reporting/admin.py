@@ -16,7 +16,7 @@ class OnsiteReportAdmin(admin.ModelAdmin):
     """現場報工記錄管理介面"""
     
     list_display = [
-        'id', 'operator', 'order_number', 'product_code', 'company_code',
+        'id', 'operator', 'workorder', 'product_id', 'company_code',
         'report_type', 'status', 'work_quantity', 'planned_quantity',
         'progress_display', 'work_date', 'created_at'
     ]
@@ -27,7 +27,7 @@ class OnsiteReportAdmin(admin.ModelAdmin):
     ]
     
     search_fields = [
-        'operator', 'order_number', 'product_code', 'company_code', 'process'
+        'operator', 'workorder', 'product_id', 'company_code', 'process'
     ]
     
     readonly_fields = [
@@ -39,7 +39,7 @@ class OnsiteReportAdmin(admin.ModelAdmin):
             'fields': ('report_type', 'operator', 'company_code')
         }),
         ('工單資訊', {
-            'fields': ('order_number', 'product_code', 'planned_quantity')
+            'fields': ('workorder', 'product_id', 'planned_quantity')
         }),
         ('製程資訊', {
             'fields': ('process', 'operation', 'equipment')
@@ -98,7 +98,7 @@ class OnsiteReportSessionAdmin(admin.ModelAdmin):
     """現場報工工作時段管理介面"""
     
     list_display = [
-        'id', 'operator', 'order_number', 'product_code', 'company_code',
+        'id', 'operator', 'workorder', 'product_id', 'company_code',
         'session_count', 'total_work_minutes', 'total_quantity_produced',
         'is_active', 'created_at'
     ]
@@ -108,7 +108,7 @@ class OnsiteReportSessionAdmin(admin.ModelAdmin):
     ]
     
     search_fields = [
-        'operator', 'order_number', 'product_code', 'company_code'
+        'operator', 'workorder', 'product_id', 'company_code'
     ]
     
     readonly_fields = [

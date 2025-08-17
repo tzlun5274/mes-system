@@ -25,8 +25,8 @@ def onsite_report_post_save(sender, instance, created, **kwargs):
         from workorder.models import WorkOrder
         try:
             workorder = WorkOrder.objects.filter(
-                order_number=instance.order_number,
-                product_code=instance.product_code
+                order_number=instance.workorder,
+                product_code=instance.product_id
             ).first()
             
             # 如果工單有公司代號，進一步檢查公司代號是否匹配
@@ -50,12 +50,12 @@ def onsite_report_post_save(sender, instance, created, **kwargs):
         
         # 只處理已完成的報工記錄
         if instance.status == 'completed':
-            logger.info(f"現場報工記錄完成，更新工序：{instance.order_number} - {instance.process}")
+            logger.info(f"現場報工記錄完成，更新工序：{instance.workorder} - {instance.process}")
             
             # 查找對應的工單
             from workorder.models import WorkOrder
             try:
-                workorder = WorkOrder.objects.get(order_number=instance.order_number)
+                workorder = WorkOrder.objects.get(order_number=instance.workorder)
                 
                 # 更新工序完成數量
                 from workorder.models import WorkOrderProcess
@@ -70,7 +70,7 @@ def onsite_report_post_save(sender, instance, created, **kwargs):
                     
                     # 現場報工數量
                     onsite_quantity = OnsiteReport.objects.filter(
-                        order_number=instance.order_number,
+                        workorder=instance.workorder,
                         process=instance.process,
                         status='completed'
                     ).aggregate(
@@ -79,7 +79,7 @@ def onsite_report_post_save(sender, instance, created, **kwargs):
                     
                     # 填報記錄數量
                     fill_work_quantity = FillWork.objects.filter(
-                        workorder=instance.order_number,
+                        workorder=instance.workorder,
                         process__name=instance.process,
                         approval_status='approved'
                     ).aggregate(
@@ -111,10 +111,10 @@ def onsite_report_post_save(sender, instance, created, **kwargs):
                     ProcessUpdateService._update_workorder_completion(workorder)
                     
                 else:
-                    logger.warning(f"找不到對應的工序：{instance.order_number} - {instance.process}")
+                    logger.warning(f"找不到對應的工序：{instance.workorder} - {instance.process}")
                     
             except WorkOrder.DoesNotExist:
-                logger.warning(f"找不到對應的工單：{instance.order_number}")
+                logger.warning(f"找不到對應的工單：{instance.workorder}")
                 
     except Exception as e:
         logger.error(f"現場報工信號處理錯誤：{str(e)}")
@@ -128,12 +128,12 @@ def onsite_report_completion_check(sender, instance, created, **kwargs):
     try:
         # 只處理已完成的報工記錄
         if instance.status == 'completed':
-            logger.info(f"檢查工單完工狀態：{instance.order_number}")
+            logger.info(f"檢查工單完工狀態：{instance.workorder}")
             
             # 查找對應的工單
             from workorder.models import WorkOrder
             try:
-                workorder = WorkOrder.objects.get(order_number=instance.order_number)
+                workorder = WorkOrder.objects.get(order_number=instance.workorder)
                 
                 # 檢查是否所有工序都完成
                 from workorder.services.process_completion_service import ProcessCompletionService
@@ -145,7 +145,7 @@ def onsite_report_completion_check(sender, instance, created, **kwargs):
                     auto_check_workorder_completion.delay()
                     
             except WorkOrder.DoesNotExist:
-                logger.warning(f"找不到對應的工單：{instance.order_number}")
+                logger.warning(f"找不到對應的工單：{instance.workorder}")
                 
     except Exception as e:
         logger.error(f"現場報工完工檢查錯誤：{str(e)}") 

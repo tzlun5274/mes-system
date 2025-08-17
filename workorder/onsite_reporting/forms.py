@@ -62,14 +62,14 @@ class OnsiteReportForm(ModelForm):
     class Meta:
         model = OnsiteReport
         fields = [
-            'report_type', 'work_date', 'product_code', 'order_number', 'company_code', 'operator',
+            'report_type', 'work_date', 'product_id', 'workorder', 'company_code', 'operator',
             'process', 'equipment', 'planned_quantity', 'work_quantity', 'defect_quantity', 'status',
             'remarks', 'abnormal_notes'
         ]
         widgets = {
             'report_type': forms.Select(attrs={'class': 'form-select'}),
             'work_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'order_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'workorder': forms.TextInput(attrs={'class': 'form-control'}),
             'process': forms.TextInput(attrs={'class': 'form-control'}),
             'planned_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'readonly': True}),
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),

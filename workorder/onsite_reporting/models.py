@@ -37,10 +37,11 @@ class OnsiteReport(models.Model):
     report_type = models.CharField(max_length=20, choices=REPORT_TYPE_CHOICES, verbose_name="報工類型")
     operator = models.CharField(max_length=100, verbose_name="作業員")
     company_code = models.CharField(max_length=10, verbose_name="公司代號", null=True, blank=True)
+    company_name = models.CharField(max_length=100, verbose_name="公司名稱", help_text="公司名稱")
     
-    # 工單相關欄位 - 修正欄位名稱以與工單模型一致
-    order_number = models.CharField(max_length=100, verbose_name="工單號碼")  # 修正：workorder -> order_number
-    product_code = models.CharField(max_length=100, verbose_name="產品編號")  # 修正：product_id -> product_code
+    # 工單相關欄位 - 統一與填報模型命名一致
+    workorder = models.CharField(max_length=100, verbose_name="工單號碼")  # 統一：order_number -> workorder
+    product_id = models.CharField(max_length=100, verbose_name="產品編號")  # 統一：product_code -> product_id
     planned_quantity = models.IntegerField(default=0, verbose_name="工單預設生產數量")
     
     # 製程相關欄位
@@ -75,12 +76,12 @@ class OnsiteReport(models.Model):
         verbose_name_plural = "現場報工記錄"
         db_table = 'workorder_onsite_report'
         ordering = ['-created_at']
-        unique_together = (("company_code", "order_number", "product_code", "operation", "operator", "work_date", "start_datetime"),)  # 唯一性約束：company_code + order_number + product_code + operation + operator + work_date + start_datetime
+        unique_together = (("company_name", "workorder", "product_id", "operation", "operator", "work_date", "start_datetime"),)  # 唯一性約束：company_name + workorder + product_id + operation + operator + work_date + start_datetime
         indexes = [
-            models.Index(fields=['company_code']),
+            models.Index(fields=['company_name']),
             models.Index(fields=['operator']),
-            models.Index(fields=['order_number']),
-            models.Index(fields=['product_code']),
+            models.Index(fields=['workorder']),
+            models.Index(fields=['product_id']),
             models.Index(fields=['status']),
             models.Index(fields=['report_type']),
             models.Index(fields=['work_date']),
@@ -88,7 +89,7 @@ class OnsiteReport(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.operator} - {self.order_number} - {self.get_status_display()}"
+        return f"{self.operator} - {self.workorder} - {self.get_status_display()}"
     
     def get_duration_minutes(self):
         """取得此筆記錄的工作時間（分鐘）"""
@@ -199,8 +200,8 @@ class OnsiteReportSession(models.Model):
     
     # 基本資訊欄位
     operator = models.CharField(max_length=100, verbose_name="作業員", help_text="作業員姓名")
-    order_number = models.CharField(max_length=100, verbose_name="工單號碼", help_text="工單號碼")  # 修正：workorder -> order_number
-    product_code = models.CharField(max_length=100, verbose_name="產品編號", help_text="產品編號")  # 修正：product_id -> product_code
+    workorder = models.CharField(max_length=100, verbose_name="工單號碼", help_text="工單號碼")  # 統一：order_number -> workorder
+    product_id = models.CharField(max_length=100, verbose_name="產品編號", help_text="產品編號")  # 統一：product_code -> product_id
     company_code = models.CharField(max_length=10, verbose_name="公司代號", null=True, blank=True, help_text="公司代號")
     
     # 製程相關欄位
@@ -232,13 +233,13 @@ class OnsiteReportSession(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['operator']),
-            models.Index(fields=['order_number']),
-            models.Index(fields=['product_code']),
+            models.Index(fields=['workorder']),
+            models.Index(fields=['product_id']),
             models.Index(fields=['is_active']),
         ]
     
     def __str__(self):
-        return f"{self.operator} - {self.order_number} - {self.session_count}時段"
+        return f"{self.operator} - {self.workorder} - {self.session_count}時段"
     
     def get_progress_percentage(self):
         """取得進度百分比"""
@@ -250,8 +251,8 @@ class OnsiteReportSession(models.Model):
         """更新統計資料"""
         reports = OnsiteReport.objects.filter(
             operator=self.operator,
-            order_number=self.order_number,
-            product_code=self.product_code,
+            workorder=self.workorder,
+            product_id=self.product_id,
             status='completed'
         )
         

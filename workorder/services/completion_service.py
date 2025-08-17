@@ -45,6 +45,11 @@ class FillWorkCompletionService:
                     logger.info(f"工單 {workorder.order_number} 已經是完工狀態")
                     return True
                 
+                # 3. 檢查工單狀態是否為 pending 或 in_progress
+                if workorder.status not in ['pending', 'in_progress']:
+                    logger.warning(f"工單 {workorder.order_number} 狀態為 {workorder.status}，不進行完工判斷")
+                    return False
+                
                 # 3. 查找對應的派工單並獲取監控資料
                 dispatch = WorkOrderDispatch.objects.filter(
                     order_number=workorder.order_number,

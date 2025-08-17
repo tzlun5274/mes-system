@@ -954,7 +954,7 @@ class BackupOperatorSupplementReportForm(ProductionReportBaseForm):
         self.fields["product_id"].widget.attrs.update(
             {
                 "onchange": "updateWorkorderOptions(this.value);",
-                "data-url": "/workorder/api/get-workorders-by-product/",
+                "data-url": "/workorder/static/api/get-workorders-by-product/",
             }
         )
 

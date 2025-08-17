@@ -76,8 +76,8 @@ class OnsiteReportListView(LoginRequiredMixin, ListView):
         if search:
             queryset = queryset.filter(
                 Q(operator__icontains=search) |
-                            Q(order_number__icontains=search) |
-            Q(product_code__icontains=search) |
+                            Q(workorder__icontains=search) |
+            Q(product_id__icontains=search) |
             Q(company_code__icontains=search)
             )
         
@@ -152,8 +152,8 @@ def operator_onsite_report_create(request):
             # 從 POST 資料取得欄位值
             report_type = 'operator'
             operator = request.POST.get('operator')
-            order_number = request.POST.get('order_number')
-            product_code = request.POST.get('product_code')
+            order_number = request.POST.get('workorder')
+            product_code = request.POST.get('product_id')
             company_code = request.POST.get('company_code')
             process = request.POST.get('process')
             equipment = request.POST.get('equipment', '')
@@ -181,8 +181,8 @@ def operator_onsite_report_create(request):
             # 計算開始數量
             previous_reports = OnsiteReport.objects.filter(
                 operator=operator,
-                order_number=order_number,
-                product_code=product_code,
+                workorder=order_number,
+                product_id=product_code,
                 status='completed'
             ).order_by('-end_datetime')
             
@@ -851,7 +851,7 @@ def operator_rd_onsite_report_create(request):
                     equipment=equipment,
                     process=process,
                     product_code='PFP-CCT',  # 固定產品編號
-                    order_number='RD樣品',   # 固定工單號碼
+                    workorder='RD樣品',   # 固定工單號碼
                     company_code=company_code,
                     work_quantity=int(work_quantity) if work_quantity else 0,
                     defect_quantity=int(defect_quantity) if defect_quantity else 0,

@@ -100,8 +100,8 @@ urlpatterns = [
     path("auto-management/create/", AutoManagementConfigCreateView.as_view(), name="auto_management_config_create"),
     path("auto-management/edit/<int:pk>/", AutoManagementConfigUpdateView.as_view(), name="auto_management_config_update"),
     path("auto-management/delete/<int:pk>/", AutoManagementConfigDeleteView.as_view(), name="auto_management_config_delete"),
-    path("api/auto-management/execute/", execute_auto_function, name="execute_auto_function"),
-    path("api/auto-management/toggle/", toggle_auto_function, name="toggle_auto_function"),
+    path("static/api/auto-management/execute/", execute_auto_function, name="execute_auto_function"),
+    path("static/api/auto-management/toggle/", toggle_auto_function, name="toggle_auto_function"),
     
     # 自動分配功能已移除
     
@@ -128,20 +128,20 @@ urlpatterns = [
     path("static/api/equipment-list/", workorder_views.get_equipment_list_unified, name="equipment_list"),
     
     # 原有API路由（保留作為備用）
-    path("api/company_order_info/", get_company_order_info, name="get_company_order_info"),
-    path("api/get_workorders_by_product/", workorder_views.get_workorders_by_product, name="get_workorders_by_product"),
-    path("api/get_product_by_workorder/", workorder_views.get_product_by_workorder, name="get_product_by_workorder"),
-    path("api/create_workorder_processes/<int:workorder_id>/", workorder_views.create_workorder_processes, name="create_workorder_processes"),
-    path("api/get_operators_and_equipments/", workorder_views.get_operators_and_equipments, name="get_operators_and_equipments"),
-    path("api/get_operators_only/", workorder_views.get_operators_only, name="get_operators_only"),
-    path("api/get_equipments_only/", workorder_views.get_equipments_only, name="get_equipments_only"),
-    path("api/add_process/<int:workorder_id>/", workorder_views.add_process, name="add_process"),
-    path("api/move_process/", workorder_views.move_process, name="move_process"),
+    path("static/api/company_order_info/", get_company_order_info, name="get_company_order_info"),
+    path("static/api/get_workorders_by_product/", workorder_views.get_workorders_by_product, name="get_workorders_by_product"),
+    path("static/api/get_product_by_workorder/", workorder_views.get_product_by_workorder, name="get_product_by_workorder"),
+    path("static/api/create_workorder_processes/<int:workorder_id>/", workorder_views.create_workorder_processes, name="create_workorder_processes"),
+    path("static/api/get_operators_and_equipments/", workorder_views.get_operators_and_equipments, name="get_operators_and_equipments"),
+    path("static/api/get_operators_only/", workorder_views.get_operators_only, name="get_operators_only"),
+    path("static/api/get_equipments_only/", workorder_views.get_equipments_only, name="get_equipments_only"),
+    path("static/api/add_process/<int:workorder_id>/", workorder_views.add_process, name="add_process"),
+    path("static/api/move_process/", workorder_views.move_process, name="move_process"),
     
     # 工序 API 路由
-    path("api/process/<int:process_id>/", api_views.get_process_detail, name="get_process_detail"),
-    path("api/process/<int:process_id>/edit/", api_views.edit_process, name="edit_process"),
-    path("api/process/<int:process_id>/delete/", api_views.delete_process, name="delete_process"),
+    path("static/api/process/<int:process_id>/", api_views.get_process_detail, name="get_process_detail"),
+    path("static/api/process/<int:process_id>/edit/", api_views.edit_process, name="edit_process"),
+    path("static/api/process/<int:process_id>/delete/", api_views.delete_process, name="delete_process"),
     
     # 舊路徑導向新路徑（填報作業主索引）
     path("report/", RedirectView.as_view(url="/workorder/fill_work/", permanent=True)),
