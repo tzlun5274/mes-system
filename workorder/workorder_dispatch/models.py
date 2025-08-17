@@ -7,6 +7,7 @@ from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+from django.db.models import Sum
 
 
 class WorkOrderDispatch(models.Model):
@@ -24,6 +25,7 @@ class WorkOrderDispatch(models.Model):
 
     # 基本資訊
     company_code = models.CharField(max_length=20, verbose_name="公司代號", null=True, blank=True)
+    company_name = models.CharField(max_length=100, verbose_name="公司名稱", null=True, blank=True)
     order_number = models.CharField(max_length=100, verbose_name="工單號碼", db_index=True)
     product_code = models.CharField(max_length=100, verbose_name="產品編號", db_index=True)
     product_name = models.CharField(max_length=200, verbose_name="產品名稱", null=True, blank=True)
@@ -39,6 +41,56 @@ class WorkOrderDispatch(models.Model):
     assigned_operator = models.CharField(max_length=100, verbose_name="分配作業員", null=True, blank=True)
     assigned_equipment = models.CharField(max_length=100, verbose_name="分配設備", null=True, blank=True)
     process_name = models.CharField(max_length=100, verbose_name="工序名稱", null=True, blank=True)
+    
+    # 生產監控資料（合併自ProductionMonitoringData）
+    # 基本統計資料
+    total_work_hours = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="總工作時數")
+    total_overtime_hours = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="總加班時數")
+    total_all_hours = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="總時數")
+    
+    # 數量統計資料
+    total_good_quantity = models.IntegerField(default=0, verbose_name="總良品數量")
+    total_defect_quantity = models.IntegerField(default=0, verbose_name="總不良品數量")
+    total_quantity = models.IntegerField(default=0, verbose_name="總數量")
+    
+    # 出貨包裝專項統計
+    packaging_good_quantity = models.IntegerField(default=0, verbose_name="出貨包裝良品數量")
+    packaging_defect_quantity = models.IntegerField(default=0, verbose_name="出貨包裝不良品數量")
+    packaging_total_quantity = models.IntegerField(default=0, verbose_name="出貨包裝總數量")
+    
+    # 填報記錄統計
+    fillwork_report_count = models.IntegerField(default=0, verbose_name="填報記錄數量")
+    fillwork_approved_count = models.IntegerField(default=0, verbose_name="已核准填報數量")
+    fillwork_pending_count = models.IntegerField(default=0, verbose_name="待審核填報數量")
+    
+    # 現場報工統計
+    onsite_report_count = models.IntegerField(default=0, verbose_name="現場報工記錄數量")
+    onsite_completed_count = models.IntegerField(default=0, verbose_name="已完成現場報工數量")
+    
+    # 工序進度統計
+    total_processes = models.IntegerField(default=0, verbose_name="總工序數")
+    completed_processes = models.IntegerField(default=0, verbose_name="已完成工序數")
+    in_progress_processes = models.IntegerField(default=0, verbose_name="進行中工序數")
+    pending_processes = models.IntegerField(default=0, verbose_name="待開始工序數")
+    
+    # 人員和設備統計
+    unique_operators = models.JSONField(default=list, verbose_name="參與作業員清單")
+    unique_equipment = models.JSONField(default=list, verbose_name="使用設備清單")
+    operator_count = models.IntegerField(default=0, verbose_name="參與作業員數量")
+    equipment_count = models.IntegerField(default=0, verbose_name="使用設備數量")
+    
+    # 完成率計算
+    completion_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0, verbose_name="完成率(%)")
+    packaging_completion_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0, verbose_name="出貨包裝完成率(%)")
+    
+    # 完工判斷
+    can_complete = models.BooleanField(default=False, verbose_name="可完工")
+    completion_threshold_met = models.BooleanField(default=False, verbose_name="達到完工閾值")
+    
+    # 最後更新資訊
+    last_fillwork_update = models.DateTimeField(null=True, blank=True, verbose_name="最後填報更新時間")
+    last_onsite_update = models.DateTimeField(null=True, blank=True, verbose_name="最後現場報工更新時間")
+    last_process_update = models.DateTimeField(null=True, blank=True, verbose_name="最後工序更新時間")
     
     # 備註
     notes = models.TextField(verbose_name="備註", blank=True)
@@ -74,6 +126,204 @@ class WorkOrderDispatch(models.Model):
         """儲存前處理"""
         self.clean()
         super().save(*args, **kwargs)
+    
+    def update_all_statistics(self):
+        """更新所有統計資料"""
+        try:
+            # 1. 更新填報記錄統計
+            self._update_fillwork_statistics()
+            
+            # 2. 更新現場報工統計
+            self._update_onsite_statistics()
+            
+            # 3. 更新工序進度統計
+            self._update_process_statistics()
+            
+            # 4. 更新人員和設備統計
+            self._update_operator_equipment_statistics()
+            
+            # 5. 更新完成率計算
+            self._update_completion_rates()
+            
+            # 6. 更新完工判斷
+            self._update_completion_status()
+            
+            self.save()
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger('workorder')
+            logger.error(f"更新派工單 {self.order_number} 統計資料失敗: {str(e)}")
+    
+    def _update_fillwork_statistics(self):
+        """更新填報記錄統計"""
+        from workorder.fill_work.models import FillWork
+        
+        # 基本查詢條件
+        fillwork_reports = FillWork.objects.filter(
+            workorder=self.order_number,
+            product_id=self.product_code
+        )
+        
+        # 按公司分離
+        if self.company_code:
+            fillwork_reports = fillwork_reports.filter(
+                company_name=self._get_company_name()
+            )
+        
+        # 統計數量
+        self.fillwork_report_count = fillwork_reports.count()
+        self.fillwork_approved_count = fillwork_reports.filter(approval_status='approved').count()
+        self.fillwork_pending_count = fillwork_reports.filter(approval_status='pending').count()
+        
+        # 統計時數
+        approved_reports = fillwork_reports.filter(approval_status='approved')
+        self.total_work_hours = approved_reports.aggregate(
+            total=Sum('work_hours_calculated')
+        )['total'] or 0
+        
+        self.total_overtime_hours = approved_reports.aggregate(
+            total=Sum('overtime_hours_calculated')
+        )['total'] or 0
+        
+        self.total_all_hours = self.total_work_hours + self.total_overtime_hours
+        
+        # 統計數量
+        self.total_good_quantity = approved_reports.aggregate(
+            total=Sum('work_quantity')
+        )['total'] or 0
+        
+        self.total_defect_quantity = approved_reports.aggregate(
+            total=Sum('defect_quantity')
+        )['total'] or 0
+        
+        self.total_quantity = self.total_good_quantity + self.total_defect_quantity
+        
+        # 出貨包裝專項統計（填報記錄）
+        packaging_reports = approved_reports.filter(operation='出貨包裝')
+        packaging_good_quantity = packaging_reports.aggregate(
+            total=Sum('work_quantity')
+        )['total'] or 0
+        
+        packaging_defect_quantity = packaging_reports.aggregate(
+            total=Sum('defect_quantity')
+        )['total'] or 0
+        
+        # 加上現場報工出貨包裝數量
+        onsite_packaging_quantity = self._get_onsite_packaging_quantity()
+        
+        # 總出貨包裝數量 = 填報記錄 + 現場報工
+        self.packaging_good_quantity = packaging_good_quantity + onsite_packaging_quantity['good']
+        self.packaging_defect_quantity = packaging_defect_quantity + onsite_packaging_quantity['defect']
+        self.packaging_total_quantity = self.packaging_good_quantity + self.packaging_defect_quantity
+        
+        # 更新最後填報時間
+        if approved_reports.exists():
+            self.last_fillwork_update = approved_reports.latest('updated_at').updated_at
+    
+    def _update_onsite_statistics(self):
+        """更新現場報工統計"""
+        try:
+            from workorder.onsite_reporting.models import OnsiteReport
+            
+            onsite_reports = OnsiteReport.objects.filter(
+                order_number=self.order_number,
+                product_code=self.product_code
+            )
+            
+            # 按公司分離
+            if self.company_code:
+                onsite_reports = onsite_reports.filter(
+                    company_code=self.company_code
+                )
+            
+            self.onsite_report_count = onsite_reports.count()
+            self.onsite_completed_count = onsite_reports.filter(status='completed').count()
+            
+            # 更新最後現場報工時間
+            if onsite_reports.exists():
+                self.last_onsite_update = onsite_reports.latest('updated_at').updated_at
+                
+        except ImportError:
+            # 如果現場報工模組不存在，跳過更新
+            pass
+    
+    def _update_process_statistics(self):
+        """更新工序進度統計"""
+        # 這裡可以根據實際需求實現工序統計邏輯
+        pass
+    
+    def _update_operator_equipment_statistics(self):
+        """更新人員和設備統計"""
+        # 這裡可以根據實際需求實現人員和設備統計邏輯
+        pass
+    
+    def _update_completion_rates(self):
+        """更新完成率計算"""
+        if self.planned_quantity and self.planned_quantity > 0:
+            self.completion_rate = (self.total_quantity / self.planned_quantity) * 100
+        else:
+            self.completion_rate = 0
+        
+        if self.planned_quantity and self.planned_quantity > 0:
+            self.packaging_completion_rate = (self.packaging_total_quantity / self.planned_quantity) * 100
+        else:
+            self.packaging_completion_rate = 0
+    
+    def _update_completion_status(self):
+        """更新完工判斷"""
+        # 根據完工判斷資料轉移設計規範
+        # 出貨包裝累計達到預計生產數量就觸發完工機制
+        if (self.packaging_total_quantity >= self.planned_quantity and 
+            self.planned_quantity > 0):
+            self.completion_threshold_met = True
+            self.can_complete = True
+        else:
+            self.completion_threshold_met = False
+            self.can_complete = False
+    
+    def _get_company_name(self):
+        """取得公司名稱"""
+        from erp_integration.models import CompanyConfig
+        company_config = CompanyConfig.objects.filter(company_code=self.company_code).first()
+        return company_config.company_name if company_config else None
+
+    def _get_onsite_packaging_quantity(self):
+        """獲取現場報工出貨包裝數量"""
+        try:
+            from workorder.onsite_reporting.models import OnsiteReport
+            
+            onsite_packaging_reports = OnsiteReport.objects.filter(
+                order_number=self.order_number,
+                product_code=self.product_code,
+                process='出貨包裝',
+                status='completed'
+            )
+            
+            # 按公司分離
+            if self.company_code:
+                onsite_packaging_reports = onsite_packaging_reports.filter(
+                    company_code=self.company_code
+                )
+            
+            # 統計良品和不良品數量
+            good_quantity = onsite_packaging_reports.aggregate(
+                total=Sum('work_quantity')
+            )['total'] or 0
+            
+            defect_quantity = onsite_packaging_reports.aggregate(
+                total=Sum('defect_quantity')
+            )['total'] or 0
+            
+            return {
+                'good': good_quantity,
+                'defect': defect_quantity,
+                'total': good_quantity + defect_quantity
+            }
+            
+        except ImportError:
+            # 如果現場報工模組不存在，返回0
+            return {'good': 0, 'defect': 0, 'total': 0}
 
 
 class WorkOrderDispatchProcess(models.Model):

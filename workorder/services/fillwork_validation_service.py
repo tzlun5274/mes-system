@@ -97,10 +97,9 @@ class FillWorkValidationService:
                         continue
                     
                     # 檢查工單是否存在
-                    # 根據多公司架構，需要同時檢查公司代號、工單號碼和產品編號
+                    # 首先根據工單號碼查找工單（不考慮產品編號）
                     workorder = WorkOrder.objects.filter(
-                        order_number=fillwork.workorder,
-                        product_code=fillwork.product_id
+                        order_number=fillwork.workorder
                     ).first()
                     
                     # 如果找到工單，進一步檢查公司代號是否匹配
@@ -193,24 +192,23 @@ class FillWorkValidationService:
         """
         mismatches = {}
         
-        # 檢查產品編號不匹配（公司代號+工單號碼匹配）
-        if (workorder.company_code == company_config.company_code and
-            workorder.product_code != fillwork.product_id):
+        # 檢查產品編號不匹配（工單號碼存在但產品編號不匹配）
+        if workorder.product_code != fillwork.product_id:
             mismatches['product_mismatch'] = True
-        
-        # 檢查工單號碼不匹配（公司代號+產品編號匹配）
-        if workorder.company_code == company_config.company_code:
-            # 查找相同公司代號和產品編號的工單
-            from workorder.models import WorkOrder
-            correct_workorder = WorkOrder.objects.filter(
-                company_code=company_config.company_code,
-                product_code=fillwork.product_id
-            ).first()
-            
-            if correct_workorder and correct_workorder.order_number != fillwork.workorder:
-                mismatches['workorder_mismatch'] = {
-                    'correct_workorder': correct_workorder.order_number
-                }
+        else:
+            # 只有在產品編號匹配的情況下，才檢查工單號碼不匹配
+            if workorder.company_code == company_config.company_code:
+                # 查找相同公司代號和產品編號的工單
+                from workorder.models import WorkOrder
+                correct_workorder = WorkOrder.objects.filter(
+                    company_code=company_config.company_code,
+                    product_code=fillwork.product_id
+                ).first()
+                
+                if correct_workorder and correct_workorder.order_number != fillwork.workorder:
+                    mismatches['workorder_mismatch'] = {
+                        'correct_workorder': correct_workorder.order_number
+                    }
         
         # 檢查公司代號不匹配（工單號碼+產品編號匹配）
         if (workorder.order_number == fillwork.workorder and
@@ -265,10 +263,9 @@ class FillWorkValidationService:
         missing_workorders = []
         
         for fillwork in fillwork_records:
-            # 檢查工單號碼是否存在（使用多公司架構唯一識別）
+            # 檢查工單號碼是否存在（只檢查工單號碼，不考慮產品編號）
             workorder = WorkOrder.objects.filter(
-                order_number=fillwork.workorder,
-                product_code=fillwork.product_id
+                order_number=fillwork.workorder
             ).first()
             
             # 只有工單號碼完全不存在才算是缺失工單

@@ -29,7 +29,7 @@ from django.core.management import call_command
 import logging
 
 from ..models import WorkOrder, WorkOrderProductionDetail
-from ..production_monitoring.models import ProductionMonitoringData
+# 移除 ProductionMonitoringData 引用，改用派工單監控資料
 from ..workorder_erp.models import CompanyOrder, SystemConfig, PrdMKOrdMain
 from ..forms import WorkOrderForm
 from erp_integration.models import CompanyConfig
@@ -82,84 +82,108 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
     context_object_name = "workorder"
 
     def get_context_data(self, **kwargs):
-        """添加上下文資料，使用 ProductionMonitoringData 作為資料來源"""
+        """添加上下文資料，使用派工單監控資料作為資料來源"""
         context = super().get_context_data(**kwargs)
         workorder = self.get_object()
-
-        # 取得或建立監控資料
-        monitoring_data = ProductionMonitoringData.get_or_create_for_workorder(workorder)
-        monitoring_data.update_all_statistics()
         
-        # 取得公司名稱（若 company_code 為空，嘗試推導）
-        company_name = workorder.company_code or '-'
-        code = workorder.company_code
-        if not code:
-            # 1) 嘗試從 CompanyOrder 推導
+        # 使用原始工單資料，不進行強制修正
+        # 保持工單的原始公司代號和產品編號
+
+        # 首先取得公司名稱（在監控資料處理之前）
+        company_name = None
+        if workorder.company_code:
             try:
-                co = CompanyOrder.objects.filter(mkordno=workorder.order_number).first()
-                if co and co.company_code:
-                    code = co.company_code
-            except Exception:
-                pass
-            # 2) 若仍無，保留 None
-        if code:
-            try:
-                config = CompanyConfig.objects.filter(company_code=code).first()
-                if config:
-                    company_name = config.company_name
-            except Exception:
-                pass
-        # 3) 最後後備：從填報記錄直接取公司名稱（以實際填報為準）
-        if company_name in (None, '-', ''):
-            try:
-                fw = (
-                    FillWork.objects
-                    .filter(workorder=workorder.order_number)
-                    .exclude(company_name__isnull=True)
-                    .exclude(company_name__exact='')
-                    .order_by('-created_at')
-                    .first()
-                )
-                if fw:
-                    company_name = fw.company_name
-            except Exception:
-                pass
+                company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
+                if company_config:
+                    company_name = company_config.company_name
+                    workorder_logger.info(f"成功取得公司名稱: {company_name} (代號: {workorder.company_code})")
+                else:
+                    workorder_logger.warning(f"找不到公司代號 {workorder.company_code} 的配置")
+            except Exception as e:
+                workorder_logger.error(f"查詢公司配置時發生錯誤: {str(e)}")
+        
+        # 如果無法從 CompanyConfig 取得，使用公司代號作為後備
+        if not company_name:
+            company_name = workorder.company_code or '未知公司'
+            workorder_logger.warning(f"使用後備公司名稱: {company_name}")
+        
         context['company_name'] = company_name
 
-        # 從監控資料取得工序統計
-        context["completed_processes_count"] = monitoring_data.completed_processes
-        context["in_progress_processes_count"] = monitoring_data.in_progress_processes
-        context["pending_processes_count"] = monitoring_data.pending_processes
-        context["total_processes_count"] = monitoring_data.total_processes
+        # 取得派工單監控資料
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        
+        # 查找對應的派工單
+        dispatch = WorkOrderDispatch.objects.filter(
+            order_number=workorder.order_number,
+            product_code=workorder.product_code,
+            company_code=workorder.company_code
+        ).first()
+        
+        if dispatch:
+            # 更新派工單的監控資料
+            from workorder.workorder_dispatch.services import WorkOrderDispatchService
+            WorkOrderDispatchService.update_monitoring_data(dispatch)
+            
+            # 從派工單取得工序統計
+            context["completed_processes_count"] = dispatch.completed_processes
+            context["in_progress_processes_count"] = dispatch.in_progress_processes
+            context["pending_processes_count"] = dispatch.pending_processes
+            context["total_processes_count"] = dispatch.total_processes
 
-        # 從監控資料取得統計資訊
-        context["monitoring_data"] = monitoring_data
-        
-        # 總計資料（從監控資料取得）
-        total_stats = {
-            "total_good_quantity": monitoring_data.total_good_quantity,
-            "total_defect_quantity": monitoring_data.total_defect_quantity,
-            "total_quantity": monitoring_data.total_quantity,
-            "total_report_count": monitoring_data.fillwork_report_count + monitoring_data.onsite_report_count,
-            "total_work_hours": float(monitoring_data.total_work_hours),
-            "total_overtime_hours": float(monitoring_data.total_overtime_hours),
-            "total_all_hours": float(monitoring_data.total_all_hours),
-            "unique_operators": monitoring_data.unique_operators,
-            "unique_equipment": monitoring_data.unique_equipment,
-        }
-        
-        # 出貨包裝專項統計
-        packaging_stats = {
-            "packaging_good_quantity": monitoring_data.packaging_good_quantity,
-            "packaging_defect_quantity": monitoring_data.packaging_defect_quantity,
-            "packaging_total_quantity": monitoring_data.packaging_total_quantity,
-            "packaging_completion_rate": float(monitoring_data.packaging_completion_rate),
-        }
-        
-        context["production_total_stats"] = total_stats
-        context["packaging_stats"] = packaging_stats
-        context["can_complete"] = monitoring_data.can_complete
-        context["completion_rate"] = float(monitoring_data.completion_rate)
+            # 從派工單取得統計資訊
+            context["monitoring_data"] = dispatch
+            
+            # 總計資料（從派工單取得）
+            total_stats = {
+                "total_good_quantity": dispatch.total_good_quantity,
+                "total_defect_quantity": dispatch.total_defect_quantity,
+                "total_quantity": dispatch.total_quantity,
+                "total_report_count": dispatch.fillwork_report_count + dispatch.onsite_report_count,
+                "total_work_hours": float(dispatch.total_work_hours),
+                "total_overtime_hours": float(dispatch.total_overtime_hours),
+                "total_all_hours": float(dispatch.total_all_hours),
+                "unique_operators": dispatch.unique_operators,
+                "unique_equipment": dispatch.unique_equipment,
+            }
+            
+            # 出貨包裝專項統計
+            packaging_stats = {
+                "packaging_good_quantity": dispatch.packaging_good_quantity,
+                "packaging_defect_quantity": dispatch.packaging_defect_quantity,
+                "packaging_total_quantity": dispatch.packaging_total_quantity,
+                "packaging_completion_rate": float(dispatch.packaging_completion_rate),
+            }
+            
+            context["production_total_stats"] = total_stats
+            context["packaging_stats"] = packaging_stats
+            context["can_complete"] = dispatch.can_complete
+            context["completion_rate"] = float(dispatch.completion_rate)
+        else:
+            # 如果沒有派工單，使用預設值
+            context["completed_processes_count"] = 0
+            context["in_progress_processes_count"] = 0
+            context["pending_processes_count"] = 0
+            context["total_processes_count"] = 0
+            context["monitoring_data"] = None
+            context["production_total_stats"] = {
+                "total_good_quantity": 0,
+                "total_defect_quantity": 0,
+                "total_quantity": 0,
+                "total_report_count": 0,
+                "total_work_hours": 0.0,
+                "total_overtime_hours": 0.0,
+                "total_all_hours": 0.0,
+                "unique_operators": [],
+                "unique_equipment": [],
+            }
+            context["packaging_stats"] = {
+                "packaging_good_quantity": 0,
+                "packaging_defect_quantity": 0,
+                "packaging_total_quantity": 0,
+                "packaging_completion_rate": 0.0,
+            }
+            context["can_complete"] = False
+            context["completion_rate"] = 0.0
 
         # 添加完工判斷資訊
         try:
@@ -171,72 +195,68 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
             context["completion_summary"] = {'error': '獲取完工摘要失敗'}
 
         # 取得所有報工記錄（填報記錄 + 現場報工）
-        try:
-            from ..fill_work.models import FillWork
-            from ..onsite_reporting.models import OnsiteReport
-            
-            # 取得已核准的填報記錄
-            approved_fillwork = FillWork.objects.filter(
-                workorder=workorder.order_number,
-                product_id=workorder.product_code,
-                approval_status='approved'
-            ).order_by('work_date', 'start_time')
-            
-            # 取得現場報工記錄
-            onsite_reports = OnsiteReport.objects.filter(
-                order_number=workorder.order_number,
-                product_code=workorder.product_code
-            ).order_by('work_date', 'start_datetime')
-            
-            # 合併報工記錄
-            all_production_reports = []
-            
-            # 處理填報記錄
-            for fillwork in approved_fillwork:
-                all_production_reports.append({
-                    'report_date': fillwork.work_date,
-                    'process_name': fillwork.operation or fillwork.process.name if fillwork.process else '未知工序',
-                    'operator': fillwork.operator,
-                    'equipment': fillwork.equipment or '-',
-                    'work_quantity': fillwork.work_quantity,
-                    'defect_quantity': fillwork.defect_quantity,
-                    'work_hours': float(fillwork.work_hours_calculated or 0),
-                    'overtime_hours': float(fillwork.overtime_hours_calculated or 0),
-                    'report_source': '填報記錄',
-                    'report_type': 'fillwork'
-                })
-            
-            # 處理現場報工記錄
-            for onsite in onsite_reports:
-                all_production_reports.append({
-                    'report_date': onsite.work_date,
-                    'process_name': onsite.operation or onsite.process,
-                    'operator': onsite.operator,
-                    'equipment': onsite.equipment or '-',
-                    'work_quantity': onsite.work_quantity,
-                    'defect_quantity': onsite.defect_quantity,
-                    'work_hours': float(onsite.work_minutes / 60 if onsite.work_minutes else 0),
-                    'overtime_hours': 0,  # 現場報工暫時不計算加班時數
-                    'report_source': '現場報工',
-                    'report_type': 'onsite'
-                })
-            
-            # 按日期和時間排序
-            all_production_reports.sort(key=lambda x: (x['report_date'], x.get('start_time', '00:00')))
-            
-            context['all_production_reports'] = all_production_reports
-            
-            # 計算報工記錄統計
-            production_total_stats = {
-                'total_work_hours': sum(r['work_hours'] for r in all_production_reports),
-                'total_overtime_hours': sum(r['overtime_hours'] for r in all_production_reports),
-            }
-            context['production_total_stats'] = production_total_stats
-            
-        except Exception as e:
-            workorder_logger.error(f"獲取工單 {workorder.order_number} 報工記錄失敗: {str(e)}")
-            context['all_production_reports'] = []
-            context['production_total_stats'] = {'total_work_hours': 0, 'total_overtime_hours': 0}
+        from ..fill_work.models import FillWork
+        from ..onsite_reporting.models import OnsiteReport
+        
+        # 取得已核准的填報記錄
+        approved_fillwork = FillWork.objects.filter(
+            workorder=workorder.order_number,
+            product_id=workorder.product_code,
+            company_name=company_name,
+            approval_status='approved'
+        ).order_by('work_date', 'start_time')
+        
+        # 取得現場報工記錄
+        onsite_reports = OnsiteReport.objects.filter(
+            order_number=workorder.order_number,
+            product_code=workorder.product_code,
+            company_code=workorder.company_code
+        ).order_by('work_date', 'start_datetime')
+        
+        # 合併報工記錄
+        all_production_reports = []
+        
+        # 處理填報記錄
+        for fillwork in approved_fillwork:
+            all_production_reports.append({
+                'report_date': fillwork.work_date,
+                'process_name': fillwork.operation or fillwork.process.name if fillwork.process else '未知工序',
+                'operator': fillwork.operator,
+                'equipment': fillwork.equipment or '-',
+                'work_quantity': fillwork.work_quantity,
+                'defect_quantity': fillwork.defect_quantity,
+                'work_hours': float(fillwork.work_hours_calculated or 0),
+                'overtime_hours': float(fillwork.overtime_hours_calculated or 0),
+                'report_source': '填報記錄',
+                'report_type': 'fillwork'
+            })
+        
+        # 處理現場報工記錄
+        for onsite in onsite_reports:
+            all_production_reports.append({
+                'report_date': onsite.work_date,
+                'process_name': onsite.operation or onsite.process,
+                'operator': onsite.operator,
+                'equipment': onsite.equipment or '-',
+                'work_quantity': onsite.work_quantity,
+                'defect_quantity': onsite.defect_quantity,
+                'work_hours': float(onsite.work_minutes / 60 if onsite.work_minutes else 0),
+                'overtime_hours': 0,  # 現場報工暫時不計算加班時數
+                'report_source': '現場報工',
+                'report_type': 'onsite'
+            })
+        
+        # 按日期和時間排序
+        all_production_reports.sort(key=lambda x: (x['report_date'], x.get('start_time', '00:00')))
+        
+        context['all_production_reports'] = all_production_reports
+        
+        # 計算報工記錄統計
+        production_total_stats = {
+            'total_work_hours': sum(r['work_hours'] for r in all_production_reports),
+            'total_overtime_hours': sum(r['overtime_hours'] for r in all_production_reports),
+        }
+        context['production_total_stats'] = production_total_stats
 
         return context
 
@@ -547,6 +567,16 @@ class MesOrderListView(LoginRequiredMixin, ListView):
             qs = qs.exclude(order_number__in=WorkOrderDispatch.objects.values_list("order_number", flat=True))
         elif status == "dispatched":
             qs = qs.filter(order_number__in=WorkOrderDispatch.objects.values_list("order_number", flat=True))
+        
+        # 添加公司名稱
+        qs = qs.extra(
+            select={'company_name': '''
+                SELECT company_name 
+                FROM erp_integration_companyconfig 
+                WHERE erp_integration_companyconfig.company_code = workorder_workorder.company_code
+            '''}
+        )
+        
         return qs
 
     def get_context_data(self, **kwargs):

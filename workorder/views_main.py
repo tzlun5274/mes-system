@@ -1532,7 +1532,7 @@ def edit_supplement_mobile(request):
 def pending_approval_list(request):
     """待審核報工列表 - 已移至主管功能模組"""
     from django.shortcuts import redirect
-    return redirect('workorder:supervisor:pending_approval_list')
+    return redirect('workorder:fill_work:supervisor_pending_list')
 
 def approved_reports_list(request):
     """已核准報工列表 - 已移至 reporting 模組"""
@@ -3674,103 +3674,23 @@ def submit_smt_report(request):
 
 # ============================================================================
 # 主管審核功能視圖函數
+# 注意：舊的報工系統已棄用，相關功能已移至新的填報系統
 # ============================================================================
-
-@login_required
-def supervisor_approve_reports(request):
-    """主管審核報工記錄
-    注意：此功能已棄用，相關模型已移至新的報工系統
-    """
-    context = {
-        'page_obj': [],
-        'search': '',
-        'total_count': 0,
-        'message': '此功能已棄用，請使用新的報工系統進行審核'
-    }
-    return render(request, 'supervisor/pending_approval_list.html', context)
-
-@login_required
-def approve_report(request, report_id):
-    """審核單筆報工記錄
-    注意：此功能已棄用，相關模型已移至新的報工系統
-    """
-    from django.contrib import messages
-    messages.warning(request, '此功能已棄用，請使用新的報工系統進行審核')
-    return redirect('workorder:supervisor_approve_reports')
-
-@login_required
-def reject_report(request, report_id):
-    """駁回單筆報工記錄
-    注意：此功能已棄用，相關模型已移至新的報工系統
-    """
-    from django.contrib import messages
-    messages.warning(request, '此功能已棄用，請使用新的報工系統進行審核')
-    return redirect('workorder:supervisor_approve_reports')
 
 # ============================================================================
 # API功能視圖函數
+# 注意：舊的報工系統已棄用，相關功能已移至新的填報系統
 # ============================================================================
-
-@require_GET
-@login_required
-def api_get_operator_reports(request):
-    """API：取得作業員報工記錄
-    注意：此功能已棄用，相關模型已移至新的報工系統
-    """
-    return JsonResponse({
-        'status': 'error',
-        'message': '此功能已棄用，請使用新的報工系統',
-        'data': [],
-        'total_count': 0
-    })
-
-@require_GET
-@login_required
-def api_get_smt_reports(request):
-    """API：取得SMT報工記錄
-    注意：此功能已棄用，相關模型已移至新的報工系統
-    """
-    return JsonResponse({
-        'status': 'error',
-        'message': '此功能已棄用，請使用新的報工系統',
-        'data': [],
-        'total_count': 0
-    })
 
 # ============================================================================
 # 報表匯出功能視圖函數
+# 注意：舊的報工系統已棄用，相關功能已移至新的填報系統
 # ============================================================================
-
-@login_required
-def export_operator_reports(request):
-    """匯出作業員報工記錄
-    注意：此功能已棄用，相關模型已移至新的報工系統
-    """
-    from django.contrib import messages
-    messages.warning(request, '此功能已棄用，請使用新的報工系統進行匯出')
-    return redirect('workorder:index')
 
 # ============================================================================
 # 審核功能視圖函數
+# 注意：舊的報工系統已棄用，相關功能已移至新的填報系統
 # ============================================================================
-
-@login_required
-def operator_supplement_report_approve(request, report_id):
-    """審核作業員補登報工
-    注意：此功能已棄用，相關模型已移至新的報工系統
-    """
-    from django.contrib import messages
-    messages.warning(request, '此功能已棄用，請使用新的報工系統進行審核')
-    return redirect('workorder:index')
-
-@login_required
-def operator_supplement_report_reject(request, report_id):
-    """駁回作業員補登報工
-    注意：此功能已棄用，相關模型已移至新的報工系統
-    """
-    from django.contrib import messages
-    messages.warning(request, '此功能已棄用，請使用新的報工系統進行審核')
-    return redirect('workorder:index')
 
 @login_required
 def smt_supplement_report_approve(request, report_id):

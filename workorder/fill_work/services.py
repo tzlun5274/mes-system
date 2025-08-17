@@ -222,6 +222,12 @@ class FillWorkApprovalService:
         """
         try:
             with transaction.atomic():
+                # 核准前驗證派工單（RD樣品除外）
+                if not fill_work_record._is_rd_sample():
+                    validation_result = FillWorkApprovalService._validate_workorder_dispatch(fill_work_record)
+                    if not validation_result['success']:
+                        return validation_result
+                
                 # 更新核准狀態
                 fill_work_record.approval_status = 'approved'
                 fill_work_record.approved_by = approved_by
@@ -286,6 +292,67 @@ class FillWorkApprovalService:
             return {
                 'success': False,
                 'message': f'填報記錄核准失敗: {str(e)}'
+            }
+    
+    @staticmethod
+    def _validate_workorder_dispatch(fill_work_record):
+        """
+        驗證派工單是否存在且資料一致
+        
+        Args:
+            fill_work_record: FillWork記錄
+            
+        Returns:
+            dict: 驗證結果
+        """
+        try:
+            from workorder.workorder_dispatch.models import WorkOrderDispatch
+            from erp_integration.models import CompanyConfig
+            
+            # 查找對應的派工單
+            dispatch = WorkOrderDispatch.objects.filter(
+                order_number=fill_work_record.workorder,
+                product_code=fill_work_record.product_id
+            ).first()
+            
+            if not dispatch:
+                return {
+                    'success': False,
+                    'message': f'找不到對應的派工單：工單號碼={fill_work_record.workorder}, 產品編號={fill_work_record.product_id}'
+                }
+            
+            # 驗證公司名稱是否一致
+            company_config = CompanyConfig.objects.filter(company_code=dispatch.company_code).first()
+            dispatch_company_name = company_config.company_name if company_config else None
+            
+            if dispatch_company_name != fill_work_record.company_name:
+                return {
+                    'success': False,
+                    'message': f'公司名稱不一致：填報記錄={fill_work_record.company_name}, 派工單={dispatch_company_name}'
+                }
+            
+            # 驗證產品編號是否一致
+            if dispatch.product_code != fill_work_record.product_id:
+                return {
+                    'success': False,
+                    'message': f'產品編號不一致：填報記錄={fill_work_record.product_id}, 派工單={dispatch.product_code}'
+                }
+            
+            return {
+                'success': True,
+                'message': '派工單驗證通過'
+            }
+                
+        except ImportError:
+            # 如果派工單模組不存在，跳過驗證
+            return {
+                'success': True,
+                'message': '派工單模組不存在，跳過驗證'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'派工單驗證失敗: {str(e)}'
             }
     
     @staticmethod

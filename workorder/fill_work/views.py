@@ -1130,10 +1130,9 @@ class FillWorkDetailView(LoginRequiredMixin, DetailView):
 
 
 class FillWorkDeleteView(LoginRequiredMixin, DeleteView):
-    """刪除填報記錄（僅允許待核准）
-    注意：直接在 GET 就執行刪除（前端已彈出確認），避免需要 confirm template。
-    """
+    """刪除填報記錄（僅允許待核准）"""
     model = FillWork
+    template_name = 'workorder/fill_work/fillwork_confirm_delete.html'
     success_url = reverse_lazy('workorder:fill_work:fill_work_list')
 
     def dispatch(self, request, *args, **kwargs):
@@ -1143,14 +1142,10 @@ class FillWorkDeleteView(LoginRequiredMixin, DeleteView):
             return redirect(self.success_url)
         return super().dispatch(request, *args, **kwargs)
 
-    def get(self, request, *args, **kwargs):
-        """直接執行刪除，不呈現確認頁面。"""
-        return self.post(request, *args, **kwargs)
-
-    def post(self, request, *args, **kwargs):
+    def delete(self, request, *args, **kwargs):
         obj = self.get_object()
         obj_id = obj.id
-        response = super().post(request, *args, **kwargs)
+        response = super().delete(request, *args, **kwargs)
         messages.success(request, f'已刪除填報記錄（ID: {obj_id}）')
         return response
 
@@ -1158,6 +1153,7 @@ class FillWorkDeleteView(LoginRequiredMixin, DeleteView):
 def approve_fill_work(request, pk: int):
     """核准填報記錄"""
     from django.shortcuts import redirect
+    from django.http import JsonResponse
     from .services import FillWorkApprovalService
     
     try:
@@ -1165,6 +1161,11 @@ def approve_fill_work(request, pk: int):
         
         # 若已核准，避免重複核准與重複同步
         if record.approval_status == 'approved':
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': '此筆填報記錄已核准，已略過重複操作'
+                })
             messages.info(request, '此筆填報記錄已核准，已略過重複操作')
             return redirect('workorder:fill_work:fill_work_list')
         
@@ -1183,12 +1184,25 @@ def approve_fill_work(request, pk: int):
             if approval_result.get('dispatch_created'):
                 success_message += f"，已自動建立RD樣品派工單"
             
+            # 如果是 AJAX 請求，返回 JSON 回應
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': success_message
+                })
+            
             messages.success(request, success_message)
             
             # 如果有RD樣品處理訊息，顯示詳細資訊
             if approval_result.get('rd_message'):
                 messages.info(request, f"RD樣品處理: {approval_result['rd_message']}")
         else:
+            # 如果是 AJAX 請求，返回 JSON 回應
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': approval_result['message']
+                })
             messages.error(request, approval_result['message'])
         
         # 嘗試同步到生產執行監控
@@ -1255,7 +1269,7 @@ def approve_fill_work(request, pk: int):
                     completion_time=None,
                     cumulative_quantity=0,
                     cumulative_hours=float(record.work_hours_calculated or 0),
-                    approval_status=record.approval_status,
+                    approval_status='approved',
                     approved_by=request.user.username,
                     approved_at=timezone.now(),
                     approval_remarks=record.approval_remarks or ''
@@ -1275,8 +1289,22 @@ def approve_fill_work(request, pk: int):
             # 同步錯誤不阻斷使用者操作
             pass
     except FillWork.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'message': '記錄不存在'
+            })
         messages.error(request, '記錄不存在')
-    return redirect('workorder:fill_work:fill_work_list')
+    
+    # 如果不是 AJAX 請求，返回重定向
+    if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return redirect('workorder:fill_work:fill_work_list')
+    
+    # 預設返回成功回應
+    return JsonResponse({
+        'success': True,
+        'message': '核准成功'
+    })
 
 
 def cancel_approve_fill_work(request, pk: int):
@@ -1341,14 +1369,41 @@ def cancel_approve_fill_work(request, pk: int):
 def reject_fill_work(request, pk: int):
     """駁回填報記錄"""
     from django.shortcuts import redirect
+    from django.http import JsonResponse
+    
     try:
         record = FillWork.objects.get(pk=pk)
         record.approval_status = 'rejected'
-        record.save(update_fields=['approval_status', 'updated_at'])
+        record.rejected_by = request.user.username
+        record.rejected_at = timezone.now()
+        record.rejection_reason = request.POST.get('reason', '')
+        record.save(update_fields=['approval_status', 'rejected_by', 'rejected_at', 'rejection_reason', 'updated_at'])
+        
+        # 如果是 AJAX 請求，返回 JSON 回應
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': '已駁回該筆填報記錄'
+            })
+        
         messages.info(request, '已駁回該筆填報記錄')
     except FillWork.DoesNotExist:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'message': '記錄不存在'
+            })
         messages.error(request, '記錄不存在')
-    return redirect('workorder:fill_work:fill_work_list')
+    
+    # 如果不是 AJAX 請求，返回重定向
+    if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return redirect('workorder:fill_work:fill_work_list')
+    
+    # 預設返回成功回應
+    return JsonResponse({
+        'success': True,
+        'message': '駁回成功'
+    })
 
 
 def delete_fill_work(request, pk: int):
@@ -2336,11 +2391,23 @@ def batch_approve_fill_work(request):
     批次核准填報記錄
     處理多筆填報記錄的批量核准操作
     """
+    from django.http import JsonResponse
+    
     if request.method != 'POST':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'message': '無效的請求方法'
+            })
         return redirect('workorder:fill_work:supervisor_pending_list')
     
     # 檢查權限
     if not (request.user.is_superuser or request.user.groups.filter(name__in=['系統管理員', '主管']).exists()):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'message': '您沒有權限執行批次核准操作'
+            })
         messages.error(request, '您沒有權限執行批次核准操作')
         return redirect('workorder:fill_work:supervisor_pending_list')
     
@@ -2349,6 +2416,11 @@ def batch_approve_fill_work(request):
         record_ids = request.POST.getlist('record_ids')
         
         if not record_ids:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': '請選擇要核准的記錄'
+                })
             messages.warning(request, '請選擇要核准的記錄')
             return redirect('workorder:fill_work:supervisor_pending_list')
         
@@ -2368,8 +2440,22 @@ def batch_approve_fill_work(request):
             if batch_result.get('rd_dispatches_created', 0) > 0:
                 success_message += f"，已自動建立 {batch_result['rd_dispatches_created']} 個RD樣品派工單"
             
+            # 如果是 AJAX 請求，返回 JSON 回應
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': success_message,
+                    'approved_count': batch_result.get('approved_count', 0)
+                })
+            
             messages.success(request, success_message)
         else:
+            # 如果是 AJAX 請求，返回 JSON 回應
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'message': batch_result['message']
+                })
             messages.error(request, batch_result['message'])
         
         # 批量同步到生產執行監控
@@ -2458,7 +2544,7 @@ def batch_approve_fill_work(request):
                                 completion_time=None,
                                 cumulative_quantity=0,
                                 cumulative_hours=float(fill_work.work_hours_calculated or 0),
-                                approval_status=fill_work.approval_status,
+                                approval_status='approved',
                                 approved_by=fill_work.approved_by,
                                 approved_at=fill_work.approved_at,
                                 approval_remarks=fill_work.approval_remarks or ''
@@ -2508,9 +2594,22 @@ def batch_approve_fill_work(request):
             logger.error(f"批量工單狀態更新失敗: {str(status_error)}")
         
     except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'message': f'批次核准失敗: {str(e)}'
+            })
         messages.error(request, f'批次核准失敗: {str(e)}')
     
-    return redirect('workorder:fill_work:supervisor_pending_list')
+    # 如果不是 AJAX 請求，返回重定向
+    if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return redirect('workorder:fill_work:supervisor_pending_list')
+    
+    # 預設返回成功回應
+    return JsonResponse({
+        'success': True,
+        'message': '批次核准完成'
+    })
 
 
 @login_required

@@ -44,17 +44,23 @@
             <p class="text-muted mb-0">三種獨立檢查類型，全面分析資料一致性</p>
         </div>
         <div>
-            <button class="btn btn-primary" onclick="refreshCheck()">
-                <i class="fas fa-sync-alt"></i>
-                重新檢查
+            <button class="btn btn-primary" onclick="checkAll()">
+                <i class="fas fa-search"></i>
+                完整檢查
             </button>
         </div>
     </div>
 
     <!-- 檢查時間 -->
-    <div class="alert alert-info">
+    <div class="alert alert-info" id="checkTimeAlert" style="display: none;">
         <i class="fas fa-clock"></i>
-        最後檢查時間：<span id="checkTime">{{ check_time|date:"Y-m-d H:i:s" }}</span>
+        最後檢查時間：<span id="checkTime"></span>
+    </div>
+    
+    <!-- 檢查按鈕 -->
+    <div class="alert alert-warning" id="checkPrompt">
+        <i class="fas fa-info-circle"></i>
+        請選擇要檢查的項目，或點擊「完整檢查」進行全面分析
     </div>
 
     <!-- 總體統計 -->
@@ -168,6 +174,9 @@
                         </div>
                     </div>
                     <div class="btn-group-vertical w-100">
+                        <button class="btn btn-sm btn-outline-danger mb-1" onclick="checkMissingWorkorders()">
+                            <i class="fas fa-search"></i> 檢查缺失工單
+                        </button>
                         <a href="{% url 'workorder:missing_workorders' %}" class="btn btn-sm btn-outline-danger">
                             <i class="fas fa-eye"></i> 查看詳細
                         </a>
@@ -199,6 +208,9 @@
                         </div>
                     </div>
                     <div class="btn-group-vertical w-100">
+                        <button class="btn btn-sm btn-outline-success mb-1" onclick="checkProductMismatch()">
+                            <i class="fas fa-search"></i> 檢查產品編號
+                        </button>
                         <a href="{% url 'workorder:product_mismatch' %}" class="btn btn-sm btn-outline-success mb-1">
                             <i class="fas fa-eye"></i> 查看詳細
                         </a>
@@ -233,6 +245,9 @@
                         </div>
                     </div>
                     <div class="btn-group-vertical w-100">
+                        <button class="btn btn-sm btn-outline-warning mb-1" onclick="checkWorkorderMismatch()">
+                            <i class="fas fa-search"></i> 檢查工單號碼
+                        </button>
                         <a href="{% url 'workorder:workorder_mismatch' %}" class="btn btn-sm btn-outline-warning mb-1">
                             <i class="fas fa-eye"></i> 查看詳細
                         </a>
@@ -267,6 +282,9 @@
                         </div>
                     </div>
                     <div class="btn-group-vertical w-100">
+                        <button class="btn btn-sm btn-outline-purple mb-1" onclick="checkCompanyMismatch()">
+                            <i class="fas fa-search"></i> 檢查公司代號
+                        </button>
                         <a href="{% url 'workorder:company_mismatch' %}" class="btn btn-sm btn-outline-purple mb-1">
                             <i class="fas fa-eye"></i> 查看詳細
                         </a>
@@ -330,6 +348,9 @@
                         </div>
                     </div>
                     <div class="btn-group-vertical w-100">
+                        <button class="btn btn-sm btn-outline-secondary mb-1" onclick="checkRDSamples()">
+                            <i class="fas fa-search"></i> 檢查RD樣品
+                        </button>
                         <a href="{% url 'workorder:rd_sample_statistics' %}" class="btn btn-sm btn-outline-secondary">
                             <i class="fas fa-chart-bar"></i> 查看統計
                         </a>
@@ -385,14 +406,15 @@
 
 {% block extra_js %}
 <script>
-function refreshCheck() {
+function checkAll() {
     // 顯示載入中
-    $('#checkTime').html('<i class="fas fa-spinner fa-spin"></i> 檢查中...');
+    showLoading('完整檢查中...');
     
     // 發送AJAX請求
     $.ajax({
         url: '{% url "workorder:fillwork_consistency_check_ajax" %}',
         method: 'GET',
+        data: { check_type: 'all' },
         success: function(response) {
             if (response.success) {
                 // 更新統計數據
@@ -405,11 +427,15 @@ function refreshCheck() {
                     response.results.workorder_mismatch + 
                     response.results.company_mismatch
                 );
-                $('#rdSamples').text(response.results.rd_samples_excluded);
+                $('#rdSamples').text(response.rd_stats.total_rd_samples);
                 $('#checkTime').text(new Date(response.check_time).toLocaleString('zh-TW'));
                 
+                // 顯示檢查時間
+                $('#checkTimeAlert').show();
+                $('#checkPrompt').hide();
+                
                 // 顯示成功訊息
-                showAlert('檢查完成！', 'success');
+                showAlert('完整檢查完成！', 'success');
             } else {
                 showAlert('檢查失敗：' + response.error, 'danger');
             }
@@ -418,6 +444,131 @@ function refreshCheck() {
             showAlert('檢查請求失敗', 'danger');
         }
     });
+}
+
+function checkMissingWorkorders() {
+    showLoading('檢查缺失工單中...');
+    
+    $.ajax({
+        url: '{% url "workorder:fillwork_consistency_check_ajax" %}',
+        method: 'GET',
+        data: { check_type: 'missing_workorders' },
+        success: function(response) {
+            if (response.success) {
+                // 更新缺失工單數量
+                $('.issue-type-card.missing .h5').text(response.count);
+                $('#checkTime').text(new Date(response.check_time).toLocaleString('zh-TW'));
+                $('#checkTimeAlert').show();
+                showAlert(`缺失工單檢查完成！發現 ${response.count} 筆記錄`, 'info');
+            } else {
+                showAlert('檢查失敗：' + response.error, 'danger');
+            }
+        },
+        error: function() {
+            showAlert('檢查請求失敗', 'danger');
+        }
+    });
+}
+
+function checkProductMismatch() {
+    showLoading('檢查產品編號不匹配中...');
+    
+    $.ajax({
+        url: '{% url "workorder:fillwork_consistency_check_ajax" %}',
+        method: 'GET',
+        data: { check_type: 'product_mismatch' },
+        success: function(response) {
+            if (response.success) {
+                // 更新產品編號不匹配數量
+                $('.issue-type-card.product .h5').text(response.count);
+                $('#checkTime').text(new Date(response.check_time).toLocaleString('zh-TW'));
+                $('#checkTimeAlert').show();
+                showAlert(`產品編號不匹配檢查完成！發現 ${response.count} 筆記錄`, 'info');
+            } else {
+                showAlert('檢查失敗：' + response.error, 'danger');
+            }
+        },
+        error: function() {
+            showAlert('檢查請求失敗', 'danger');
+        }
+    });
+}
+
+function checkWorkorderMismatch() {
+    showLoading('檢查工單號碼不匹配中...');
+    
+    $.ajax({
+        url: '{% url "workorder:fillwork_consistency_check_ajax" %}',
+        method: 'GET',
+        data: { check_type: 'workorder_mismatch' },
+        success: function(response) {
+            if (response.success) {
+                // 更新工單號碼不匹配數量
+                $('.issue-type-card.workorder .h5').text(response.count);
+                $('#checkTime').text(new Date(response.check_time).toLocaleString('zh-TW'));
+                $('#checkTimeAlert').show();
+                showAlert(`工單號碼不匹配檢查完成！發現 ${response.count} 筆記錄`, 'info');
+            } else {
+                showAlert('檢查失敗：' + response.error, 'danger');
+            }
+        },
+        error: function() {
+            showAlert('檢查請求失敗', 'danger');
+        }
+    });
+}
+
+function checkCompanyMismatch() {
+    showLoading('檢查公司代號不匹配中...');
+    
+    $.ajax({
+        url: '{% url "workorder:fillwork_consistency_check_ajax" %}',
+        method: 'GET',
+        data: { check_type: 'company_mismatch' },
+        success: function(response) {
+            if (response.success) {
+                // 更新公司代號不匹配數量
+                $('.issue-type-card.company .h5').text(response.count);
+                $('#checkTime').text(new Date(response.check_time).toLocaleString('zh-TW'));
+                $('#checkTimeAlert').show();
+                showAlert(`公司代號不匹配檢查完成！發現 ${response.count} 筆記錄`, 'info');
+            } else {
+                showAlert('檢查失敗：' + response.error, 'danger');
+            }
+        },
+        error: function() {
+            showAlert('檢查請求失敗', 'danger');
+        }
+    });
+}
+
+function checkRDSamples() {
+    showLoading('檢查RD樣品統計中...');
+    
+    $.ajax({
+        url: '{% url "workorder:fillwork_consistency_check_ajax" %}',
+        method: 'GET',
+        data: { check_type: 'rd_samples' },
+        success: function(response) {
+            if (response.success) {
+                // 更新RD樣品數量
+                $('.issue-type-card:last-child .h5').text(response.rd_stats.total_rd_samples);
+                $('#checkTime').text(new Date(response.check_time).toLocaleString('zh-TW'));
+                $('#checkTimeAlert').show();
+                showAlert(`RD樣品統計檢查完成！發現 ${response.rd_stats.total_rd_samples} 筆記錄`, 'info');
+            } else {
+                showAlert('檢查失敗：' + response.error, 'danger');
+            }
+        },
+        error: function() {
+            showAlert('檢查請求失敗', 'danger');
+        }
+    });
+}
+
+function showLoading(message) {
+    $('#checkTime').html('<i class="fas fa-spinner fa-spin"></i> ' + message);
+    $('#checkTimeAlert').show();
 }
 
 function showAlert(message, type) {

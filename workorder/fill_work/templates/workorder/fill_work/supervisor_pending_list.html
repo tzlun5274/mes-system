@@ -368,13 +368,19 @@ document.getElementById('btnBatchApprove')?.addEventListener('click', async func
 			method: 'POST',
 			body: formData,
 			headers: {
-				'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value || '{{ csrf_token }}'
+				'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value || '{{ csrf_token }}',
+				'X-Requested-With': 'XMLHttpRequest'
 			}
 		});
 		
 		if (response.ok) {
-			// 重新載入頁面以顯示更新後的狀態
-			window.location.reload();
+			const data = await response.json();
+			if (data.success) {
+				alert(`批次核准完成！\n成功核准 ${data.approved_count || 0} 筆記錄`);
+				window.location.reload();
+			} else {
+				throw new Error(data.message || '核准失敗');
+			}
 		} else {
 			throw new Error('網路請求失敗');
 		}

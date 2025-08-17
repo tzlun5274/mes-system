@@ -34,6 +34,58 @@ def auto_check_workorder_completion():
     }
 
 
+@shared_task
+def simple_auto_completion_check():
+    """
+    簡化完工判斷定時任務
+    定期檢查所有生產中工單的完工狀態
+    """
+    try:
+        workorder_logger.info("開始執行簡化完工判斷檢查")
+        
+        # 獲取所有生產中的工單
+        production_workorders = WorkOrder.objects.filter(
+            status='in_progress'
+        ).select_related('production_record')
+        
+        completed_count = 0
+        total_count = production_workorders.count()
+        
+        workorder_logger.info(f"找到 {total_count} 個生產中工單，開始檢查完工狀態")
+        
+        for workorder in production_workorders:
+            try:
+                # 使用完工服務檢查並完成工單
+                from .services.completion_service import FillWorkCompletionService
+                success = FillWorkCompletionService.check_and_complete_workorder(workorder.id)
+                
+                if success:
+                    completed_count += 1
+                    workorder_logger.info(f"工單 {workorder.order_number} 已成功完工並轉移")
+                else:
+                    workorder_logger.debug(f"工單 {workorder.order_number} 尚未達到完工條件")
+                    
+            except Exception as e:
+                workorder_logger.error(f"檢查工單 {workorder.order_number} 完工狀態失敗: {str(e)}")
+        
+        workorder_logger.info(f"簡化完工判斷檢查完成：共檢查 {total_count} 個工單，成功完工 {completed_count} 個")
+        
+        return {
+            "status": "success",
+            "message": f"簡化完工判斷檢查完成：共檢查 {total_count} 個工單，成功完工 {completed_count} 個",
+            "total_checked": total_count,
+            "completed_count": completed_count,
+            "timestamp": timezone.now().isoformat(),
+        }
+        
+    except Exception as e:
+        workorder_logger.error(f"簡化完工判斷檢查失敗：{str(e)}")
+        return {
+            "status": "error",
+            "message": f"簡化完工判斷檢查失敗：{str(e)}",
+            "timestamp": timezone.now().isoformat(),
+        }
+
 
 @shared_task
 def auto_allocation_task():

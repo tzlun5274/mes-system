@@ -126,6 +126,11 @@ class FillWork(models.Model):
                     f"工序={self.operation}, 作業員={self.operator}, "
                     f"工作日期={self.work_date}, 開始時間={self.start_time}"
                 )
+            
+            # 移除派工單驗證，直接使用匯入的工單號碼
+            # 驗證派工單（RD樣品除外）
+            # if not self._is_rd_sample():
+            #     self._validate_workorder_dispatch()
         
         # 計算工作時數和加班時數（允許在匯入時以臨時旗標跳過）
         if not getattr(self, '_skip_auto_hours_calculation', False):
@@ -194,4 +199,46 @@ class FillWork(models.Model):
         except (ValueError, AttributeError):
             # 如果時間格式錯誤，設為0
             self.work_hours_calculated = Decimal('0.00')
-            self.overtime_hours_calculated = Decimal('0.00') 
+            self.overtime_hours_calculated = Decimal('0.00')
+    
+    def _is_rd_sample(self):
+        """判斷是否為RD樣品"""
+        return (self.workorder == 'RD樣品' and 
+                self.product_id and 
+                self.product_id.startswith('PFP-CCT'))
+    
+    def _validate_workorder_dispatch(self):
+        """驗證派工單是否存在且資料一致"""
+        try:
+            from workorder.workorder_dispatch.models import WorkOrderDispatch
+            
+            # 查找對應的派工單
+            dispatch = WorkOrderDispatch.objects.filter(
+                order_number=self.workorder,
+                product_code=self.product_id
+            ).first()
+            
+            if not dispatch:
+                raise ValueError(
+                    f"找不到對應的派工單：工單號碼={self.workorder}, 產品編號={self.product_id}"
+                )
+            
+            # 驗證公司代號是否一致（需要從公司代號轉換為公司名稱進行比較）
+            from erp_integration.models import CompanyConfig
+            company_config = CompanyConfig.objects.filter(company_code=dispatch.company_code).first()
+            dispatch_company_name = company_config.company_name if company_config else None
+            
+            if dispatch_company_name != self.company_name:
+                raise ValueError(
+                    f"公司名稱不一致：填報記錄={self.company_name}, 派工單={dispatch_company_name}"
+                )
+            
+            # 驗證產品編號是否一致
+            if dispatch.product_code != self.product_id:
+                raise ValueError(
+                    f"產品編號不一致：填報記錄={self.product_id}, 派工單={dispatch.product_code}"
+                )
+                
+        except ImportError:
+            # 如果派工單模組不存在，跳過驗證
+            pass 

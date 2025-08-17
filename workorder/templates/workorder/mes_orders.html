@@ -114,7 +114,7 @@
         {% for o in orders %}
         <tr>
           <td><input type="checkbox" class="row-chk" value="{{ o.order_number }}" {% if o.order_number in dispatched_map %}disabled{% endif %} /></td>
-          <td>{{ o.company_code|default:'-' }}</td>
+          <td>{{ o.company_name|default:o.company_code|default:'-' }}</td>
           <td>{{ o.order_number }}</td>
           <td>{{ o.product_code }}</td>
           <td>{{ o.quantity }}</td>

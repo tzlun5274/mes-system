@@ -120,11 +120,23 @@ class DispatchListView(LoginRequiredMixin, ListView):
                     
                     dispatch.erp_start_date = format_date(company_order.est_take_mat_date)
                     dispatch.erp_end_date = format_date(company_order.est_stock_out_date)
-                    dispatch.company_name = company_order.company_code
+                    # 取得公司名稱
+                    try:
+                        from erp_integration.models import CompanyConfig
+                        company_config = CompanyConfig.objects.filter(company_code=dispatch.company_code).first()
+                        dispatch.company_name = company_config.company_name if company_config else dispatch.company_code
+                    except Exception:
+                        dispatch.company_name = dispatch.company_code
                 else:
                     dispatch.erp_start_date = None
                     dispatch.erp_end_date = None
-                    dispatch.company_name = dispatch.company_code or '-'
+                    # 取得公司名稱
+                    try:
+                        from erp_integration.models import CompanyConfig
+                        company_config = CompanyConfig.objects.filter(company_code=dispatch.company_code).first()
+                        dispatch.company_name = company_config.company_name if company_config else (dispatch.company_code or '-')
+                    except Exception:
+                        dispatch.company_name = dispatch.company_code or '-'
             except Exception as e:
                 # 記錄錯誤並設定預設值
                 import logging
@@ -132,7 +144,13 @@ class DispatchListView(LoginRequiredMixin, ListView):
                 logger.warning(f"取得 ERP 製令單資訊失敗: {dispatch.order_number} (公司: {dispatch.company_code}), 錯誤: {str(e)}")
                 dispatch.erp_start_date = None
                 dispatch.erp_end_date = None
-                dispatch.company_name = dispatch.company_code or '-'
+                # 取得公司名稱
+                try:
+                    from erp_integration.models import CompanyConfig
+                    company_config = CompanyConfig.objects.filter(company_code=dispatch.company_code).first()
+                    dispatch.company_name = company_config.company_name if company_config else (dispatch.company_code or '-')
+                except Exception:
+                    dispatch.company_name = dispatch.company_code or '-'
         context['start_date'] = self.request.GET.get('start_date', '')
         context['end_date'] = self.request.GET.get('end_date', '')
         context['company_code'] = self.request.GET.get('company_code', '')
@@ -252,6 +270,19 @@ class DispatchDetailView(LoginRequiredMixin, DetailView):
             logger = logging.getLogger('workorder')
             logger.warning(f"取得工單資訊失敗: {dispatch.order_number} (公司: {dispatch.company_code}), 錯誤: {str(e)}")
             context['work_order'] = None
+        
+        # 確保派工單有正確的公司名稱
+        if not dispatch.company_name and dispatch.company_code:
+            try:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(company_code=dispatch.company_code).first()
+                if company_config:
+                    dispatch.company_name = company_config.company_name
+                    dispatch.save(update_fields=['company_name'])
+            except Exception as e:
+                import logging
+                logger = logging.getLogger('workorder')
+                logger.warning(f"更新派工單公司名稱失敗: {dispatch.order_number}, 錯誤: {str(e)}")
         
         # 取得 ERP 製令單資訊（預定開工日和預定出貨日）
         try:

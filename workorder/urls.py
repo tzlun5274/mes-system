@@ -75,6 +75,7 @@ urlpatterns = [
     path("workorder-mismatch/", WorkorderMismatchView.as_view(), name="workorder_mismatch"),
     path("company-mismatch/", CompanyMismatchView.as_view(), name="company_mismatch"),
     path("rd-sample-statistics/", RDSampleStatisticsView.as_view(), name="rd_sample_statistics"),
+    path("create-missing-workorders/", CreateMissingWorkOrdersView.as_view(), name="create_missing_workorders"),
     
     # 填報紀錄修正
     path("fillwork-correction/", FillWorkCorrectionView.as_view(), name="fillwork_correction"),

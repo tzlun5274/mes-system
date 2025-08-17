@@ -296,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
         card.addEventListener('click', function() {
             const cardType = this.querySelector('.stats-label').textContent;
             if (cardType.includes('待審核')) {
-                window.location.href = "{% url 'workorder:supervisor:pending_approval_list' %}";
+                window.location.href = "{% url 'workorder:fill_work:supervisor_pending_list' %}";
             } else if (cardType.includes('異常')) {
                 window.location.href = "{% url 'workorder:supervisor:abnormal_management' %}";
             }

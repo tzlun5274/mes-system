@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}刪除填報記錄{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-trash text-danger"></i>
+                刪除填報記錄
+            </h1>
+            <p class="text-muted mb-0">確認刪除這筆填報記錄</p>
+        </div>
+        <div>
+            <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i>
+                返回列表
+            </a>
+        </div>
+    </div>
+
+    <!-- 確認刪除卡片 -->
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        確認刪除
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>注意：</strong>此操作將永久刪除這筆填報記錄，無法復原。
+                    </div>
+
+                    <!-- 記錄詳細資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="text-primary">基本資訊</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>記錄ID：</strong></td>
+                                    <td>{{ object.id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>作業員：</strong></td>
+                                    <td>{{ object.operator }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>工單號碼：</strong></td>
+                                    <td>{{ object.workorder }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>產品編號：</strong></td>
+                                    <td>{{ object.product_id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>公司名稱：</strong></td>
+                                    <td>{{ object.company_name }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-primary">工作資訊</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>工作日期：</strong></td>
+                                    <td>{{ object.work_date|date:"Y-m-d" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>工序：</strong></td>
+                                    <td>{{ object.process.name|default:object.operation|default:"未指定" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>工作數量：</strong></td>
+                                    <td>{{ object.work_quantity }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>工作時數：</strong></td>
+                                    <td>{{ object.work_hours }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>核准狀態：</strong></td>
+                                    <td>
+                                        {% if object.approval_status == 'pending' %}
+                                            <span class="badge badge-warning">待核准</span>
+                                        {% elif object.approval_status == 'approved' %}
+                                            <span class="badge badge-success">已核准</span>
+                                        {% elif object.approval_status == 'rejected' %}
+                                            <span class="badge badge-danger">已拒絕</span>
+                                        {% else %}
+                                            <span class="badge badge-secondary">{{ object.approval_status }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 刪除確認表單 -->
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="fas fa-trash"></i>
+                                確認刪除
+                            </button>
+                            <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-secondary btn-lg ml-2">
+                                <i class="fas fa-times"></i>
+                                取消
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 防止意外提交
+    $('form').on('submit', function(e) {
+        if (!confirm('確定要刪除這筆填報記錄嗎？此操作無法復原。')) {
+            e.preventDefault();
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %} 

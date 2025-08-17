@@ -19,6 +19,13 @@ class WorkorderConfig(AppConfig):
             # 註冊工單狀態信號
             from .signals.workorder_status_signals import register_workorder_status_signals
             register_workorder_status_signals()
+            
+            # 載入填報作業信號處理器（自動觸發完工判斷）
+            import workorder.fill_work.signals
+            
+            # 載入現場報工信號處理器
+            import workorder.onsite_reporting.signals
+            
         except Exception as e:
             # 避免在遷移時出現錯誤
             pass

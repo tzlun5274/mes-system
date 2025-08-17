@@ -1046,7 +1046,7 @@
             </div>
         </div>
     </div>
-    {% elif workorder.production_record and workorder.production_record.production_details.exists %}
+    {% elif all_production_reports %}
     <div class="process-section">
         <h4>
             <i class="fas fa-clipboard-check text-primary me-2"></i>
@@ -1065,11 +1065,11 @@
                         <th>合格品</th>
                         <th>不良品</th>
                         <th>報工來源</th>
-                        <th>時間</th>
+                        <th>工作時數</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for detail in workorder.production_record.production_details.all|slice:":10" %}
+                    {% for detail in all_production_reports %}
                     <tr>
                         <td class="text-center">
                             <span class="badge bg-primary">{{ forloop.counter }}</span>
@@ -1089,9 +1089,9 @@
                             {% endif %}
                         </td>
                         <td>
-                            <span class="badge bg-info">{{ detail.get_report_source_display }}</span>
+                            <span class="badge bg-info">{{ detail.report_source }}</span>
                         </td>
-                        <td>{{ detail.report_time|date:"H:i" }}</td>
+                        <td>{{ detail.work_hours|floatformat:2 }}h</td>
                     </tr>
                     {% endfor %}
                 </tbody>
