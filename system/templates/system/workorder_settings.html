@@ -274,6 +274,15 @@
                             </div>
                         </div>
                     </div>
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <button type="button" class="btn btn-primary" onclick="executeAutoAllocation()">
+                                <i class="fas fa-play mr-2"></i>手動執行自動分配
+                            </button>
+                            <div id="auto-allocation-result" class="mt-2"></div>
+                        </div>
+                    </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -422,5 +431,119 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// 手動執行自動分配
+function executeAutoAllocation() {
+    const resultDiv = document.getElementById('auto-allocation-result');
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // 顯示載入中
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>執行中...';
+    button.disabled = true;
+    resultDiv.innerHTML = '';
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:execute_auto_allocation" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+        }
+    })
+    .catch(error => {
+        console.error('執行自動分配失敗:', error);
+        resultDiv.innerHTML = '<div class="alert alert-danger">執行失敗，請稍後再試</div>';
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+// 手動執行完工檢查
+function executeCompletionCheck() {
+    const resultDiv = document.getElementById('completion-check-result');
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // 顯示載入中
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>執行中...';
+    button.disabled = true;
+    resultDiv.innerHTML = '';
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:execute_completion_check" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+        }
+    })
+    .catch(error => {
+        console.error('執行完工檢查失敗:', error);
+        resultDiv.innerHTML = '<div class="alert alert-danger">執行失敗，請稍後再試</div>';
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+// 手動執行資料轉移
+function executeDataTransfer() {
+    const resultDiv = document.getElementById('data-transfer-result');
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // 顯示載入中
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>執行中...';
+    button.disabled = true;
+    resultDiv.innerHTML = '';
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:execute_data_transfer" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+        }
+    })
+    .catch(error => {
+        console.error('執行資料轉移失敗:', error);
+        resultDiv.innerHTML = '<div class="alert alert-danger">執行失敗，請稍後再試</div>';
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
 </script>
 {% endblock %} 

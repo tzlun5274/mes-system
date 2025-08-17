@@ -66,6 +66,11 @@ urlpatterns = [
 
     # 工單管理設定（已整合完工判斷功能）
     path("workorder_settings/", views.workorder_settings, name="workorder_settings"),
+    
+    # 手動執行 API 端點
+    path("execute_auto_allocation/", views.execute_auto_allocation, name="execute_auto_allocation"),
+    path("execute_completion_check/", views.execute_completion_check, name="execute_completion_check"),
+    path("execute_data_transfer/", views.execute_data_transfer, name="execute_data_transfer"),
 
     # 完工檢查配置（已整合到工單管理設定中）
     # path('completion-check/config/', views.completion_check_config, name='completion_check_config'),

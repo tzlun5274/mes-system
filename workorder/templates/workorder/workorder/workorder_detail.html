@@ -568,27 +568,6 @@
             </div>
             <div class="info-item">
                 <div class="info-label">
-                    <i class="fas fa-check-circle me-1"></i>完成數量
-                </div>
-                <div class="info-value">{{ workorder.completed_quantity|floatformat:0 }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">
-                    <i class="fas fa-box me-1"></i>出貨包裝累計
-                </div>
-                <div class="info-value">
-                    <span class="{% if can_complete %}text-success{% else %}text-warning{% endif %}">
-                        {{ packaging_quantity|floatformat:0 }} / {{ workorder.quantity|floatformat:0 }}
-                    </span>
-                    <br>
-                    <small class="text-muted">
-                        良品: {{ packaging_good_quantity|floatformat:0 }} | 
-                        不良品: {{ packaging_defect_quantity|floatformat:0 }}
-                    </small>
-                </div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">
                     <i class="fas fa-info-circle me-1"></i>工單狀態
                 </div>
                 <div class="info-value">
@@ -597,25 +576,19 @@
                     </span>
                 </div>
             </div>
-            <div class="info-item">
-                <div class="info-label">
-                    <i class="fas fa-calendar-alt me-1"></i>建立時間
-                </div>
-                <div class="info-value">{{ workorder.created_at|date:"Y-m-d H:i" }}</div>
-            </div>
         </div>
     </div>
 
     <!-- 統計資訊 -->
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-number">{{ workorder.progress|floatformat:1 }}%</div>
+            <div class="stat-number">{{ completion_rate|floatformat:1 }}%</div>
             <div class="stat-label">
                 <i class="fas fa-chart-line me-1"></i>完成進度
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-number">{{ workorder.processes.count }}</div>
+            <div class="stat-number">{{ total_processes_count }}</div>
             <div class="stat-label">
                 <i class="fas fa-tasks me-1"></i>工序數量
             </div>

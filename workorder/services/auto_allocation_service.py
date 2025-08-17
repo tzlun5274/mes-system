@@ -46,8 +46,13 @@ class AutoAllocationService:
             )
             
             # 篩選已完工工單的填報紀錄
-            completed_order_numbers = list(completed_workorders.values_list('order_number', flat=True))
-            pending_reports = zero_quantity_reports.filter(workorder__in=completed_order_numbers)
+            pending_reports = []
+            for completed_workorder in completed_workorders:
+                workorder_reports = zero_quantity_reports.filter(
+                    workorder=completed_workorder.order_number,
+                    product_id=completed_workorder.product_code
+                )
+                pending_reports.extend(list(workorder_reports))
             
             if company_code:
                 # 根據多公司架構，需要同時檢查公司代號、工單號碼和產品編號
@@ -59,7 +64,7 @@ class AutoAllocationService:
             # 按工序統計
             processes_summary = {}
             for report in pending_reports:
-                process_name = report.process
+                process_name = report.operation
                 if process_name not in processes_summary:
                     processes_summary[process_name] = {
                         'report_count': 0,
@@ -68,7 +73,7 @@ class AutoAllocationService:
                     }
                 
                 processes_summary[process_name]['report_count'] += 1
-                processes_summary[process_name]['total_hours'] += report.work_hours_calculated or 0
+                processes_summary[process_name]['total_hours'] += float(report.work_hours_calculated or 0)
             
             # 按工單統計
             workorders_summary = {}
@@ -83,10 +88,10 @@ class AutoAllocationService:
                     }
                 
                 workorders_summary[workorder_number]['report_count'] += 1
-                workorders_summary[workorder_number]['total_hours'] += report.work_hours_calculated or 0
+                workorders_summary[workorder_number]['total_hours'] += float(report.work_hours_calculated or 0)
             
             return {
-                'total_pending_reports': pending_reports.count(),
+                'total_pending_reports': len(pending_reports),
                 'total_workorders': len(workorders_summary),
                 'processes': processes_summary,
                 'workorders': workorders_summary
@@ -179,6 +184,7 @@ class AutoAllocationService:
                 # 獲取該工單數量為0的填報紀錄
                 zero_reports = FillWork.objects.filter(
                     workorder=workorder_number,
+                    product_id=completed_workorder.product_code,
                     work_quantity=0,
                     approval_status='approved'
                 )
@@ -201,14 +207,14 @@ class AutoAllocationService:
                 excluded_processes = []
                 
                 for report in zero_reports:
-                    process_name = report.process
+                    process_name = report.operation
                     
                     # 檢查是否為出貨包裝工序
                     if self._is_packaging_process(process_name):
                         excluded_processes.append({
                             'process_name': process_name,
                             'reason': '出貨包裝工序不參與分配',
-                            'report_count': zero_reports.filter(process=process_name).count()
+                            'report_count': zero_reports.filter(operation=process_name).count()
                         })
                         continue
                     
@@ -219,7 +225,7 @@ class AutoAllocationService:
                         }
                     
                     processes_data[process_name]['reports'].append(report)
-                    processes_data[process_name]['total_hours'] += report.work_hours_calculated or 0
+                    processes_data[process_name]['total_hours'] += float(report.work_hours_calculated or 0)
                 
                 # 計算分配數量
                 total_planned_quantity = completed_workorder.planned_quantity
@@ -325,7 +331,7 @@ class AutoAllocationService:
             excluded_processes = []
             
             for report in all_reports:
-                process_name = report.process
+                process_name = report.operation
                 
                 if self._is_packaging_process(process_name):
                     if process_name not in excluded_processes:
@@ -364,7 +370,7 @@ class AutoAllocationService:
         判斷是否為出貨包裝工序
         
         Args:
-            process_name: 工序名稱
+            process_name: 工序名稱（可能是 ProcessName 物件或字串）
             
         Returns:
             bool: 是否為出貨包裝工序
@@ -372,5 +378,11 @@ class AutoAllocationService:
         if not process_name:
             return False
         
-        process_name_lower = process_name.lower()
+        # 如果是 ProcessName 物件，獲取其 name 屬性
+        if hasattr(process_name, 'name'):
+            process_name_str = process_name.name
+        else:
+            process_name_str = str(process_name)
+        
+        process_name_lower = process_name_str.lower()
         return any(keyword in process_name_lower for keyword in self.packaging_process_keywords) 

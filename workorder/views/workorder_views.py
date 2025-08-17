@@ -81,6 +81,32 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
     template_name = "workorder/workorder/workorder_detail.html"
     context_object_name = "workorder"
 
+    def get(self, request, *args, **kwargs):
+        """檢查工單狀態，如果是已完工工單則重定向到已完工工單詳情頁面"""
+        workorder = self.get_object()
+        
+        # 如果工單狀態是 completed，重定向到已完工工單詳情頁面
+        if workorder.status == 'completed':
+            # 檢查是否已經有對應的已完工工單記錄
+            from ..models import CompletedWorkOrder
+            completed_workorder = CompletedWorkOrder.objects.filter(
+                order_number=workorder.order_number,
+                company_code=workorder.company_code,
+                product_code=workorder.product_code
+            ).first()
+            
+            if completed_workorder:
+                # 重定向到已完工工單詳情頁面
+                from django.shortcuts import redirect
+                return redirect('workorder:completed_workorder_detail', pk=completed_workorder.id)
+            else:
+                # 如果沒有已完工工單記錄，可能是資料不一致，顯示錯誤訊息
+                from django.contrib import messages
+                messages.error(request, f'工單 {workorder.order_number} 狀態為已完工，但找不到對應的已完工工單記錄。請聯繫系統管理員。')
+                return redirect('workorder:index')
+        
+        return super().get(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         """添加上下文資料，使用派工單監控資料作為資料來源"""
         context = super().get_context_data(**kwargs)

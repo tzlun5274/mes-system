@@ -279,13 +279,6 @@
             </div>
         </div>
         <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-            <div class="stats-card completed fade-in-up">
-                <div class="stats-number">{{ total_completed|default:0 }}</div>
-                <div class="stats-label">已完成工單</div>
-                <div class="stats-subtitle">生產完成</div>
-            </div>
-        </div>
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
             <div class="stats-card reports fade-in-up">
                 <div class="stats-number">{{ total_approved_reports_with_workorder|default:0 }}</div>
                 <div class="stats-label">已核准填報</div>
@@ -394,7 +387,6 @@
                                 <ul class="mb-0 small">
                                     <li><strong>執行中工單：</strong>有已核准填報記錄的工單數量</li>
                                     <li><strong>待生產工單：</strong>狀態為待生產的工單數量</li>
-                                    <li><strong>已完成工單：</strong>狀態為已完成的工單數量</li>
                                     <li><strong>工單列表：</strong>顯示公司、工單號、產品、數量、日期，詳細資料請點擊「詳情」</li>
                                 </ul>
                             </div>

@@ -203,6 +203,36 @@ class FillWorkCompletionService:
                 packaging_completion_rate = float(dispatch.packaging_completion_rate)
                 can_complete = dispatch.can_complete
                 
+                # 檢查出貨包裝工序是否存在
+                from process.models import ProductProcessRoute, ProcessName
+                try:
+                    # 先查找出貨包裝工序名稱
+                    packaging_process = ProcessName.objects.filter(name="出貨包裝").first()
+                    if packaging_process:
+                        packaging_process_exists = ProductProcessRoute.objects.filter(
+                            product_id=workorder.product_code,
+                            process_name=packaging_process
+                        ).exists()
+                    else:
+                        packaging_process_exists = False
+                except Exception as e:
+                    logger.warning(f"檢查出貨包裝工序時發生錯誤: {str(e)}")
+                    packaging_process_exists = False
+                
+                # 計算工序統計
+                total_processes = dispatch.total_processes
+                completed_processes = dispatch.completed_processes
+                
+                # 判斷完工原因
+                if can_complete:
+                    reason = "已達到完工條件"
+                elif packaging_quantity >= workorder.quantity:
+                    reason = "出貨包裝數量已達標，但其他條件未滿足"
+                elif total_quantity == 0:
+                    reason = "尚未有任何報工記錄"
+                else:
+                    reason = f"出貨包裝數量不足（{packaging_quantity}/{workorder.quantity}）"
+                
                 return {
                     'workorder_id': workorder_id,
                     'workorder_number': workorder.order_number,
@@ -222,6 +252,16 @@ class FillWorkCompletionService:
                     },
                     'config': {
                         'packaging_quantity_threshold': 100  # 100% 為完工閾值
+                    },
+                    # 新增：符合模板期望的結構
+                    'completion_status': {
+                        'can_complete': can_complete,
+                        'reason': reason,
+                        'details': {
+                            'total_processes': total_processes,
+                            'completed_processes': completed_processes,
+                            'packaging_process_exists': packaging_process_exists
+                        }
                     }
                 }
             else:
@@ -245,6 +285,16 @@ class FillWorkCompletionService:
                     },
                     'config': {
                         'packaging_quantity_threshold': 100
+                    },
+                    # 新增：符合模板期望的結構
+                    'completion_status': {
+                        'can_complete': False,
+                        'reason': '找不到對應的派工單記錄',
+                        'details': {
+                            'total_processes': 0,
+                            'completed_processes': 0,
+                            'packaging_process_exists': False
+                        }
                     }
                 }
             
@@ -258,6 +308,47 @@ class FillWorkCompletionService:
                 'error': f'獲取完工摘要失敗: {str(e)}'
             }
     
+    @classmethod
+    def _cleanup_production_data(cls, workorder):
+        """
+        清理生產中相關資料
+        
+        Args:
+            workorder: WorkOrder 實例
+        """
+        try:
+            # 清理工序記錄
+            from ..models import WorkOrderProcess
+            WorkOrderProcess.objects.filter(workorder=workorder).delete()
+            
+            # 清理工單分配記錄
+            from ..models import WorkOrderAssignment
+            WorkOrderAssignment.objects.filter(workorder=workorder).delete()
+            
+            # 清理生產記錄
+            from ..models import WorkOrderProduction
+            WorkOrderProduction.objects.filter(workorder=workorder).delete()
+            
+            # 清理生產明細記錄
+            from ..models import WorkOrderProductionDetail
+            WorkOrderProductionDetail.objects.filter(
+                workorder_production__workorder=workorder
+            ).delete()
+            
+            # 清理派工單記錄
+            from ..workorder_dispatch.models import WorkOrderDispatch
+            WorkOrderDispatch.objects.filter(
+                order_number=workorder.order_number,
+                product_code=workorder.product_code,
+                company_code=workorder.company_code
+            ).delete()
+            
+            logger.info(f"工單 {workorder.order_number} 生產中資料清理完成")
+            
+        except Exception as e:
+            logger.error(f"清理工單 {workorder.order_number} 生產中資料失敗: {str(e)}")
+            raise
+
     @classmethod
     def transfer_workorder_to_completed(cls, workorder_id):
         """
@@ -336,6 +427,12 @@ class FillWorkCompletionService:
                 
                 # 轉移詳細現場報工記錄
                 cls._transfer_onsite_records(workorder, completed_workorder)
+                
+                # 清理相關的生產中資料
+                cls._cleanup_production_data(workorder)
+                
+                # 刪除原始工單記錄（重要：避免資料重複和狀態不一致）
+                workorder.delete()
                 
                 logger.info(f"工單 {workorder.order_number} 成功轉移到已完工模組，實際完成數量: {actual_completed_quantity}")
                 return completed_workorder

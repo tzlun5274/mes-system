@@ -791,6 +791,7 @@ class CompletedProductionReport(models.Model):
     # 自動分配標記
     allocated_at = models.DateTimeField(null=True, blank=True, verbose_name="分配時間")
     allocation_method = models.CharField(max_length=50, null=True, blank=True, verbose_name="分配方式")
+    is_system_allocated = models.BooleanField(default=False, verbose_name="系統分配標記", help_text="標記此數量是否為系統自動分配")
     
     class Meta:
         verbose_name = "已完工生產報工記錄"
@@ -812,6 +813,19 @@ class AutoAllocationSettings(models.Model):
         default=False,
         verbose_name="啟用自動執行",
         help_text="是否啟用自動分配功能"
+    )
+    
+    # 已完工工單數量分配設定
+    completed_workorder_allocation_enabled = models.BooleanField(
+        default=False,
+        verbose_name="啟用已完工工單數量分配",
+        help_text="是否啟用已完工工單工序紀錄數量自動分配"
+    )
+    
+    completed_workorder_allocation_interval = models.IntegerField(
+        default=60,
+        verbose_name="已完工工單分配執行頻率（分鐘）",
+        help_text="已完工工單數量分配的執行間隔時間"
     )
     
     interval_minutes = models.IntegerField(

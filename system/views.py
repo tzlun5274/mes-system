@@ -1862,6 +1862,113 @@ def workorder_settings(request):
     return render(request, 'system/workorder_settings.html', context)
 
 
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_auto_allocation(request):
+    """
+    手動執行自動分配 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from workorder.services.completed_workorder_allocation_service import CompletedWorkOrderAllocationService
+        
+        service = CompletedWorkOrderAllocationService()
+        result = service.allocate_all_pending_workorders()
+        
+        if result['success']:
+            if result['total_processed'] == 0:
+                message = result['message']
+            else:
+                message = f"自動分配完成！處理 {result['total_processed']} 個工單，成功 {result['total_success']} 個，失敗 {result['total_failed']} 個"
+                
+                if result['failed_workorders']:
+                    failed_list = ', '.join([w['workorder_number'] for w in result['failed_workorders']])
+                    message += f"（失敗的工單: {failed_list}）"
+            
+            return JsonResponse({
+                'success': True,
+                'message': message
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': result['message']
+            })
+            
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"手動執行自動分配失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'執行失敗: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_completion_check(request):
+    """
+    手動執行完工檢查 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from workorder.services.completion_service import FillWorkCompletionService
+        
+        result = FillWorkCompletionService.check_all_workorders_completion()
+        
+        if 'error' not in result:
+            return JsonResponse({
+                'success': True,
+                'message': f"完工檢查完成！{result.get('message', '檢查完成')}"
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': result['error']
+            })
+            
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"手動執行完工檢查失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'執行失敗: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_data_transfer(request):
+    """
+    手動執行資料轉移 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        # 這裡可以實作資料轉移邏輯
+        # 暫時返回成功訊息
+        return JsonResponse({
+            'success': True,
+            'message': '資料轉移功能尚未實作'
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"手動執行資料轉移失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'執行失敗: {str(e)}'
+        })
+
+
 # 完工判斷功能已整合到現有的 SimpleCompletionService 中
 # 手動執行功能可以通過現有的管理命令實現
 

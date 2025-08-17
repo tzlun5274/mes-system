@@ -250,8 +250,54 @@ class WorkOrderDispatch(models.Model):
     
     def _update_process_statistics(self):
         """更新工序進度統計"""
-        # 這裡可以根據實際需求實現工序統計邏輯
-        pass
+        try:
+            # 從產品工序路線獲取總工序數
+            from process.models import ProductProcessRoute
+            total_processes = ProductProcessRoute.objects.filter(
+                product_id=self.product_code
+            ).count()
+            
+            # 從填報記錄獲取已完成的工序
+            from workorder.fill_work.models import FillWork
+            from erp_integration.models import CompanyConfig
+            
+            # 獲取公司名稱
+            company_name = None
+            if self.company_code:
+                company_config = CompanyConfig.objects.filter(company_code=self.company_code).first()
+                if company_config:
+                    company_name = company_config.company_name
+            
+            # 統計已完成的工序（有報工記錄的工序）
+            if company_name:
+                completed_processes = FillWork.objects.filter(
+                    workorder=self.order_number,
+                    product_id=self.product_code,
+                    company_name=company_name,
+                    approval_status='approved'
+                ).values('operation').distinct().count()
+            else:
+                completed_processes = 0
+            
+            # 統計進行中的工序（有報工記錄但未完成的工序）
+            # 這裡簡化處理，假設有報工記錄的工序就是進行中
+            in_progress_processes = completed_processes
+            
+            # 待處理工序 = 總工序數 - 已完成工序
+            pending_processes = max(0, total_processes - completed_processes)
+            
+            # 更新派工單的工序統計
+            self.total_processes = total_processes
+            self.completed_processes = completed_processes
+            self.in_progress_processes = in_progress_processes
+            self.pending_processes = pending_processes
+            
+        except Exception as e:
+            # 如果發生錯誤，設定預設值
+            self.total_processes = 0
+            self.completed_processes = 0
+            self.in_progress_processes = 0
+            self.pending_processes = 0
     
     def _update_operator_equipment_statistics(self):
         """更新人員和設備統計"""

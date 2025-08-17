@@ -5213,7 +5213,6 @@ def active_workorders(request):
     # 獲取統計數據
     total_active = len(workorders_with_approved_reports)  # 有已核准填報記錄的工單數量
     total_pending = WorkOrder.objects.filter(status='pending').count()
-    total_completed = WorkOrder.objects.filter(status='completed').count()
     
     # 已核准填報記錄統計（只計算主管審核後的記錄）
     total_approved_reports = FillWork.objects.filter(approval_status='approved').count()
@@ -5275,7 +5274,6 @@ def active_workorders(request):
     context = {
         'total_active': total_active,
         'total_pending': total_pending,
-        'total_completed': total_completed,
         'total_approved_reports': total_approved_reports,
         'total_approved_reports_with_workorder': total_approved_reports_with_workorder,
         'total_good_quantity': total_good_quantity,
