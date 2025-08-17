@@ -304,7 +304,7 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     const uploadArea = document.getElementById('uploadArea');
     const fileInput = document.getElementById('fileInput');
     const fileInfo = document.getElementById('fileInfo');
@@ -384,38 +384,31 @@ $(document).ready(function() {
             progressText.textContent = `上傳中... ${Math.round(progress)}%`;
         }, 200);
         
-        $.ajax({
-            url: '{% url "workorder:workorder_import_file" %}',
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                clearInterval(progressInterval);
-                progressBar.style.width = '100%';
-                progressText.textContent = '完成！';
-                
-                setTimeout(function() {
-                    showResult(response);
-                }, 500);
-            },
-            error: function(xhr, status, error) {
-                clearInterval(progressInterval);
-                progressContainer.style.display = 'none';
-                
-                let errorMessage = '上傳失敗';
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    errorMessage = response.message || errorMessage;
-                } catch (e) {
-                    errorMessage = error || errorMessage;
-                }
-                
+        fetch('{% url "workorder:workorder_import_file" %}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            progressText.textContent = '完成！';
+            
+            setTimeout(function() {
+                showResult(response);
+            }, 500);
+        })
+        .catch(error => {
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            progressText.textContent = '錯誤！';
+            
+            setTimeout(function() {
                 showResult({
                     success: false,
-                    message: errorMessage
+                    message: '上傳失敗：' + error.message
                 });
-            }
+            }, 500);
         });
     }
     
