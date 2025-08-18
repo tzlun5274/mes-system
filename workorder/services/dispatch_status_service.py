@@ -43,7 +43,7 @@ class DispatchStatusService:
                 return False
             
             # 檢查工序分配情況
-            processes = WorkOrderProcess.objects.filter(workorder=workorder)
+            processes = WorkOrderProcess.objects.filter(workorder_id=workorder.id)
             
             if not processes.exists():
                 logger.info(f"工單 {workorder.order_number} 沒有工序記錄")
@@ -98,7 +98,7 @@ class DispatchStatusService:
                 
                 if workorder:
                     # 檢查工序分配情況
-                    processes = WorkOrderProcess.objects.filter(workorder=workorder)
+                    processes = WorkOrderProcess.objects.filter(workorder_id=workorder.id)
                     
                     if processes.exists():
                         # 檢查是否有工序已分配（作業員或設備任一有分配即可）
@@ -158,7 +158,7 @@ class DispatchStatusService:
                     logger.info(f"派工單 {dispatch.order_number} 狀態同步為生產中")
             elif workorder.status == 'pending':
                 # 檢查是否有工序分配
-                processes = WorkOrderProcess.objects.filter(workorder=workorder)
+                processes = WorkOrderProcess.objects.filter(workorder_id=workorder.id)
                 has_allocation = processes.filter(
                     assigned_operator__isnull=False
                 ).exclude(assigned_operator='').exists()

@@ -293,7 +293,30 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化統一的填報控制器（處理產品編號、工單號碼、公司名稱的雙向關聯選擇）
     new FillWorkController();
     
-
+    // SMT模板專用：設備選擇自動填入作業員功能
+    const equipmentSelect = document.getElementById('equipment');
+    if (equipmentSelect) {
+        console.log('綁定SMT模板設備選擇事件');
+        equipmentSelect.addEventListener('change', function() {
+            const equipmentName = this.value;
+            const operatorDisplay = document.getElementById('operator_display');
+            const operatorHidden = document.getElementById('operator');
+            
+            console.log('SMT模板：設備選擇變更為:', equipmentName);
+            
+            if (equipmentName) {
+                // 自動填入作業員欄位為設備名稱
+                if (operatorDisplay) {
+                    operatorDisplay.value = equipmentName;
+                    console.log('SMT模板：已設定作業員顯示欄位為:', equipmentName);
+                }
+                if (operatorHidden) {
+                    operatorHidden.value = equipmentName;
+                    console.log('SMT模板：已設定作業員隱藏欄位為:', equipmentName);
+                }
+            }
+        });
+    }
     
     // 表單提交前驗證
     const formElement = document.getElementById('fillWorkForm');

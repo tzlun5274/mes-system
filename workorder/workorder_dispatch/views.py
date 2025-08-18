@@ -100,9 +100,29 @@ class DispatchListView(LoginRequiredMixin, ListView):
         context['search'] = self.request.GET.get('search', '')
         context['status'] = self.request.GET.get('status', '')
         
-        # 為每個派工單添加 ERP 製令單日期資訊
+        # 為每個派工單添加 ERP 製令單日期資訊和公司名稱
         dispatches = context['dispatches']
         for dispatch in dispatches:
+            # 首先處理公司名稱
+            if not dispatch.company_name and dispatch.company_code:
+                try:
+                    from erp_integration.models import CompanyConfig
+                    company_config = CompanyConfig.objects.filter(company_code=dispatch.company_code).first()
+                    if company_config:
+                        dispatch.company_name = company_config.company_name
+                        # 更新資料庫中的公司名稱
+                        dispatch.save(update_fields=['company_name'])
+                    else:
+                        dispatch.company_name = dispatch.company_code
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger('workorder')
+                    logger.warning(f"取得公司名稱失敗: {dispatch.order_number} (公司代號: {dispatch.company_code}), 錯誤: {str(e)}")
+                    dispatch.company_name = dispatch.company_code
+            elif not dispatch.company_name:
+                dispatch.company_name = dispatch.company_code or '-'
+            
+            # 然後處理 ERP 製令單資訊
             try:
                 from workorder.workorder_erp.models import CompanyOrder
                 # 使用公司代號和工單號碼來精確匹配
@@ -120,23 +140,9 @@ class DispatchListView(LoginRequiredMixin, ListView):
                     
                     dispatch.erp_start_date = format_date(company_order.est_take_mat_date)
                     dispatch.erp_end_date = format_date(company_order.est_stock_out_date)
-                    # 取得公司名稱
-                    try:
-                        from erp_integration.models import CompanyConfig
-                        company_config = CompanyConfig.objects.filter(company_code=dispatch.company_code).first()
-                        dispatch.company_name = company_config.company_name if company_config else dispatch.company_code
-                    except Exception:
-                        dispatch.company_name = dispatch.company_code
                 else:
                     dispatch.erp_start_date = None
                     dispatch.erp_end_date = None
-                    # 取得公司名稱
-                    try:
-                        from erp_integration.models import CompanyConfig
-                        company_config = CompanyConfig.objects.filter(company_code=dispatch.company_code).first()
-                        dispatch.company_name = company_config.company_name if company_config else (dispatch.company_code or '-')
-                    except Exception:
-                        dispatch.company_name = dispatch.company_code or '-'
             except Exception as e:
                 # 記錄錯誤並設定預設值
                 import logging
@@ -144,13 +150,6 @@ class DispatchListView(LoginRequiredMixin, ListView):
                 logger.warning(f"取得 ERP 製令單資訊失敗: {dispatch.order_number} (公司: {dispatch.company_code}), 錯誤: {str(e)}")
                 dispatch.erp_start_date = None
                 dispatch.erp_end_date = None
-                # 取得公司名稱
-                try:
-                    from erp_integration.models import CompanyConfig
-                    company_config = CompanyConfig.objects.filter(company_code=dispatch.company_code).first()
-                    dispatch.company_name = company_config.company_name if company_config else (dispatch.company_code or '-')
-                except Exception:
-                    dispatch.company_name = dispatch.company_code or '-'
         context['start_date'] = self.request.GET.get('start_date', '')
         context['end_date'] = self.request.GET.get('end_date', '')
         context['company_code'] = self.request.GET.get('company_code', '')
@@ -172,19 +171,19 @@ class DispatchCreateView(LoginRequiredMixin, CreateView):
         """表單驗證成功時的處理"""
         with transaction.atomic():
             form.instance.created_by = self.request.user.username
-            form.instance.status = 'pending'
+            form.instance.status = 'in_production'  # 直接設定為生產中
             response = super().form_valid(form)
             
             # 記錄歷史
             DispatchHistory.objects.create(
                 workorder_dispatch=form.instance,
                 action='建立',
-                new_status='pending',
+                new_status='in_production',
                 operator=self.request.user.username,
-                notes='建立派工單'
+                notes='建立派工單（生產中狀態）'
             )
             
-            messages.success(self.request, '派工單建立成功！')
+            messages.success(self.request, '派工單建立成功，已設定為生產中狀態！')
             return response
 
     def get_context_data(self, **kwargs):
@@ -272,17 +271,28 @@ class DispatchDetailView(LoginRequiredMixin, DetailView):
             context['work_order'] = None
         
         # 確保派工單有正確的公司名稱
-        if not dispatch.company_name and dispatch.company_code:
+        company_name = dispatch.company_name
+        if not company_name and dispatch.company_code:
             try:
                 from erp_integration.models import CompanyConfig
                 company_config = CompanyConfig.objects.filter(company_code=dispatch.company_code).first()
                 if company_config:
-                    dispatch.company_name = company_config.company_name
+                    company_name = company_config.company_name
+                    # 更新派工單的公司名稱欄位
+                    dispatch.company_name = company_name
                     dispatch.save(update_fields=['company_name'])
+                else:
+                    company_name = dispatch.company_code
             except Exception as e:
                 import logging
                 logger = logging.getLogger('workorder')
                 logger.warning(f"更新派工單公司名稱失敗: {dispatch.order_number}, 錯誤: {str(e)}")
+                company_name = dispatch.company_code
+        elif not company_name:
+            company_name = dispatch.company_code or '-'
+        
+        # 將公司名稱添加到上下文中
+        context['company_name'] = company_name
         
         # 取得 ERP 製令單資訊（預定開工日和預定出貨日）
         try:
@@ -425,15 +435,15 @@ def bulk_dispatch_view(request):
                             skipped_count += 1
                             continue
                         
-                        # 建立派工單
+                        # 建立派工單，直接設定為生產中狀態
                         dispatch = WorkOrderDispatch.objects.create(
                             company_code=work_order.company_code,
                             order_number=work_order.order_number,
                             product_code=work_order.product_code,
                             product_name=getattr(work_order, 'product_name', ''),
                             planned_quantity=work_order.quantity,
-                            status='pending',
-                            dispatch_date=dispatch_date,
+                            status='in_production',  # 直接設定為生產中
+                            dispatch_date=dispatch_date or timezone.now().date(),
                             assigned_operator=assigned_operator,
                             assigned_equipment=assigned_equipment,
                             process_name=process_name,
@@ -445,9 +455,9 @@ def bulk_dispatch_view(request):
                         DispatchHistory.objects.create(
                             workorder_dispatch=dispatch,
                             action='批量建立',
-                            new_status='pending',
+                            new_status='in_production',
                             operator=request.user.username,
-                            notes=f'批量建立派工單，作業員: {assigned_operator or "未指定"}'
+                            notes=f'批量建立派工單（生產中狀態），作業員: {assigned_operator or "未指定"}'
                         )
                         
                         created_count += 1

@@ -31,7 +31,7 @@
                             <li>產品編號預設填入：PFP-CCT</li>
                             <li>工單號碼固定為：RD樣品</li>
                             <li>工序和設備已過濾只顯示SMT相關項目</li>
-                            <li>選擇設備時作業員欄位會自動填入設備名稱</li>
+                            <li>作業員、工序、設備支援下拉式選擇</li>
                             <li>無休息時間，加班時間：16:30後</li>
                         </ul>
                     </div>
@@ -74,9 +74,9 @@
 
                             <!-- 作業員 -->
                             <div class="col-md-4 mb-3">
-                                <label for="operator_display" class="form-label">作業員 <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="operator_display" value="" readonly>
-                                <input type="hidden" id="operator" name="operator" value="">
+                                <label for="operator" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="operator" name="operator" value="" readonly>
+                                <div class="form-text">選擇設備後會自動填入設備名稱</div>
                             </div>
 
                             <!-- 工序 -->
@@ -271,14 +271,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (equipmentElement) {
         equipmentElement.addEventListener('change', function() {
             const equipmentName = this.value;
-            const operatorDisplayElement = document.getElementById('operator_display');
             const operatorElement = document.getElementById('operator');
             
             if (equipmentName) {
-                if (operatorDisplayElement) operatorDisplayElement.value = equipmentName;
                 if (operatorElement) operatorElement.value = equipmentName;
             } else {
-                if (operatorDisplayElement) operatorDisplayElement.value = '';
                 if (operatorElement) operatorElement.value = '';
             }
         });

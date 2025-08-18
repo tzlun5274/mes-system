@@ -1,26 +1,156 @@
 """
-現場報工子模組 - 視圖定義
-負責現場報工的網頁視圖和表單處理
+現場報工子模組 - 視圖
+負責現場報工的所有視圖邏輯
 """
 
 from django.shortcuts import render, redirect, get_object_or_404
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView, TemplateView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Q, Count, Sum, Max
-from django.urls import reverse_lazy
-from django.core.paginator import Paginator
+from django.db.models import Q, Sum, Count
 from django.utils import timezone
-from django.views.decorators.http import require_POST
-from django.utils.decorators import method_decorator
-from django.contrib.auth.decorators import login_required
-from datetime import datetime, date, timedelta
+from django.urls import reverse_lazy
+from django.views.decorators.http import require_GET, require_POST
+from django.forms import ModelForm
+from django import forms
+from datetime import datetime, timedelta
+from decimal import Decimal
 import json
 
-from .models import OnsiteReport, OnsiteReportHistory, OnsiteReportConfig
-# 移除表單依賴，直接在模板中設計欄位
+from .models import OnsiteReport, OnsiteReportHistory, OnsiteReportConfig, OnsiteReportSession
+from process.models import ProcessName, Operator
+from equip.models import Equipment
+from workorder.models import WorkOrder
+from erp_integration.models import CompanyConfig
 
+
+# ==================== 現場報工表單類別 ====================
+
+class OperatorOnsiteReportForm(forms.Form):
+    """作業員現場報工表單"""
+    
+    # 產品編號 - 下拉式選單
+    product_id = forms.ChoiceField(
+        choices=[],
+        label="產品編號",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇產品編號'}),
+        required=True,
+        help_text="請選擇產品編號",
+    )
+
+    # 工單號碼 - 下拉式選單
+    workorder = forms.ChoiceField(
+        choices=[],
+        label="工單號碼",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇工單號碼'}),
+        required=True,
+        help_text="請選擇工單號碼",
+    )
+
+    # 公司名稱欄位 - 下拉式選單
+    company_name = forms.ChoiceField(
+        choices=[],
+        label="公司名稱",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇公司名稱'}),
+        required=True,
+        help_text="請選擇公司名稱",
+    )
+
+    # 作業員欄位 - 下拉式選單
+    operator = forms.ChoiceField(
+        choices=[],
+        label="作業員",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇作業員'}),
+        required=True,
+        help_text="請選擇作業員",
+    )
+
+    # 工序欄位 - 下拉式選單
+    process = forms.ChoiceField(
+        choices=[],
+        label="工序",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇工序'}),
+        required=True,
+        help_text="請選擇工序",
+    )
+
+    # 使用的設備欄位 - 下拉式選單
+    equipment = forms.ChoiceField(
+        choices=[],
+        label="使用的設備",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇設備'}),
+        required=False,
+        help_text="請選擇設備",
+    )
+
+    # 工作狀態 - 下拉選單
+    status = forms.ChoiceField(
+        choices=OnsiteReport.STATUS_CHOICES,
+        label="報工狀態",
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=True,
+        help_text="請選擇此次報工的狀態",
+    )
+
+    # 備註欄位
+    remarks = forms.CharField(
+        label="備註",
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        required=False,
+        help_text="可記錄此次報工的相關備註",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 動態載入選項
+        self.load_dynamic_choices()
+
+    def load_dynamic_choices(self):
+        """動態載入表單選項"""
+        try:
+            # 載入公司選項
+            companies = CompanyConfig.objects.all().order_by('company_name')
+            self.fields['company_name'].choices = [('', '請選擇公司名稱')] + [
+                (company.company_name, company.company_name) for company in companies
+            ]
+
+            # 載入產品選項（從工單中取得）
+            workorders = WorkOrder.objects.values_list('product_code', flat=True).distinct().order_by('product_code')
+            self.fields['product_id'].choices = [('', '請選擇產品編號')] + [
+                (product_code, product_code) for product_code in workorders if product_code
+            ]
+
+            # 載入作業員選項
+            operators = Operator.objects.all().order_by('name')
+            self.fields['operator'].choices = [('', '請選擇作業員')] + [
+                (operator.name, operator.name) for operator in operators
+            ]
+
+            # 載入工序選項（從工單工序中取得）
+            from workorder.models import WorkOrderProcess
+            processes = WorkOrderProcess.objects.values_list('process_name', flat=True).distinct().order_by('process_name')
+            self.fields['process'].choices = [('', '請選擇工序')] + [
+                (process_name, process_name) for process_name in processes if process_name
+            ]
+
+            # 載入設備選項
+            equipments = Equipment.objects.all().order_by('name')
+            self.fields['equipment'].choices = [('', '請選擇設備')] + [
+                (equipment.name, equipment.name) for equipment in equipments
+            ]
+
+        except Exception as e:
+            # 如果載入失敗，設定空選項
+            self.fields['company_name'].choices = [('', '載入失敗')]
+            self.fields['product_id'].choices = [('', '載入失敗')]
+            self.fields['operator'].choices = [('', '載入失敗')]
+            self.fields['process'].choices = [('', '載入失敗')]
+            self.fields['equipment'].choices = [('', '載入失敗')]
+
+
+# ==================== 現場報工視圖 ====================
 
 class OnsiteReportIndexView(LoginRequiredMixin, TemplateView):
     """現場報工首頁視圖"""
@@ -76,15 +206,23 @@ class OnsiteReportListView(LoginRequiredMixin, ListView):
         if search:
             queryset = queryset.filter(
                 Q(operator__icontains=search) |
-                            Q(workorder__icontains=search) |
-            Q(product_id__icontains=search) |
-            Q(company_name__icontains=search)
+                Q(workorder__icontains=search) |
+                Q(product_id__icontains=search) |
+                Q(company_name__icontains=search)
             )
         
         # 報工類型篩選
         report_type = self.request.GET.get("report_type", "")
         if report_type:
-            queryset = queryset.filter(report_type=report_type)
+            if report_type == 'smt':
+                # SMT類型包含 smt 和 smt_rd
+                queryset = queryset.filter(report_type__in=['smt', 'smt_rd'])
+            elif report_type == 'operator':
+                # 作業員類型包含 operator 和 operator_rd
+                queryset = queryset.filter(report_type__in=['operator', 'operator_rd'])
+            else:
+                # 其他類型直接篩選
+                queryset = queryset.filter(report_type=report_type)
         
         # 狀態篩選
         status = self.request.GET.get("status", "")
@@ -110,36 +248,12 @@ class OnsiteReportListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # 搜尋表單（暫時移除，待後續實作）
-        
         # 統計資料
         queryset = self.get_queryset()
         context['total_count'] = queryset.count()
         context['active_count'] = queryset.filter(status__in=['started', 'resumed']).count()
         context['completed_count'] = queryset.filter(status='completed').count()
         context['stopped_count'] = queryset.filter(status='stopped').count()
-        
-        return context
-
-
-class OnsiteReportDetailView(LoginRequiredMixin, DetailView):
-    """現場報工詳情視圖"""
-    
-    model = OnsiteReport
-    template_name = "workorder/onsite_reporting/onsite_report_detail.html"
-    context_object_name = "onsite_report"
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        # 取得歷史記錄
-        context['history'] = OnsiteReportHistory.objects.filter(
-            onsite_report=self.object
-        ).order_by('-changed_at')
-        
-        # 計算進度
-        context['progress_percentage'] = self.object.get_progress_percentage()
-        context['duration_minutes'] = self.object.get_duration_minutes()
         
         return context
 
@@ -152,120 +266,23 @@ def operator_onsite_report_create(request):
             # 從 POST 資料取得欄位值
             report_type = 'operator'
             operator = request.POST.get('operator')
-            order_number = request.POST.get('workorder')
-            product_code = request.POST.get('product_id')
-            company_code = request.POST.get('company_code')
-            process = request.POST.get('process')
-            equipment = request.POST.get('equipment', '')
-            status = request.POST.get('status', 'started')  # 新增狀態欄位
-            planned_quantity = int(request.POST.get('planned_quantity', 0))
-            remarks = request.POST.get('remarks', '')
-            
-            # 驗證必填欄位
-            if not all([operator, order_number, product_code, company_code, process]):
-                messages.error(request, '請填寫所有必填欄位')
-                return redirect('workorder:onsite_reporting:operator_onsite_report_create')
-            
-            # 設定公司代號（如果沒有提供）
-            if not company_code:
-                try:
-                    from erp_integration.models import CompanyConfig
-                    company_config = CompanyConfig.objects.filter(
-                        company_code=company_code
-                    ).first()
-                    if company_config:
-                        company_code = company_config.company_code
-                except Exception:
-                    pass
-            
-            # 計算開始數量
-            previous_reports = OnsiteReport.objects.filter(
-                operator=operator,
-                workorder=order_number,
-                product_id=product_code,
-                status='completed'
-            ).order_by('-end_datetime')
-            
-            start_quantity = 0
-            if previous_reports.exists():
-                last_report = previous_reports.first()
-                start_quantity = last_report.work_quantity
-            
-            # 自動檢查並加入工序到工單
-            auto_process_result = OnsiteReportAutoProcessService.check_and_add_process(
-                workorder_number=workorder,
-                process_name=process,
-                operator=operator,
-                equipment=equipment
-            )
-            
-            # 建立報工記錄
-            onsite_report = OnsiteReport.objects.create(
-                report_type=report_type,
-                operator=operator,
-                workorder=workorder,
-                product_id=product_id,
-                company_name=company_name,
-                company_code=company_code,
-                process=process,
-                equipment=equipment,
-                status=status,  # 新增狀態欄位
-                planned_quantity=planned_quantity,
-                work_quantity=0,  # 初始工作數量為0
-                remarks=remarks,
-                created_by=request.user.username,
-                work_date=timezone.now().date(),
-                start_datetime=timezone.now()
-            )
-            
-            # 根據自動加入工序的結果顯示訊息
-            if auto_process_result['success']:
-                if auto_process_result.get('already_exists', False):
-                    messages.success(request, '作業員現場報工記錄已建立')
-                else:
-                    messages.success(request, f'作業員現場報工記錄已建立，並已自動將工序 {process} 加入到工單 {order_number}')
-            else:
-                messages.warning(request, f'作業員現場報工記錄已建立，但自動加入工序失敗：{auto_process_result["message"]}')
-            return redirect('workorder:onsite_reporting:onsite_report_list')
-            
-        except Exception as e:
-            messages.error(request, f'建立失敗: {str(e)}')
-            return redirect('workorder:onsite_reporting:operator_onsite_report_create')
-    
-    # GET 請求：顯示新增頁面
-    context = {
-        'report_type': 'operator',
-        'report_type_display': '作業員報工'
-    }
-    return render(request, 'workorder/onsite_reporting/operator_onsite_report_form.html', context)
-
-
-@login_required
-def smt_onsite_report_create(request):
-    """SMT設備現場報工新增視圖"""
-    if request.method == 'POST':
-        try:
-            # 從 POST 資料取得欄位值
-            report_type = 'smt'
-            operator = request.POST.get('operator')
             workorder = request.POST.get('workorder')
             product_id = request.POST.get('product_id')
             company_name = request.POST.get('company_name')
             process = request.POST.get('process')
             equipment = request.POST.get('equipment', '')
-            status = request.POST.get('status', 'started')  # 新增狀態欄位
+            status = 'started'  # 新增報工固定為開工狀態
             planned_quantity = int(request.POST.get('planned_quantity', 0))
             remarks = request.POST.get('remarks', '')
             
             # 驗證必填欄位
-            if not all([operator, workorder, product_id, company_name, process, equipment]):
-                messages.error(request, '請填寫所有必填欄位（SMT設備報工需要選擇設備）')
-                return redirect('workorder:onsite_reporting:smt_onsite_report_create')
+            if not all([operator, workorder, product_id, company_name, process]):
+                messages.error(request, '請填寫所有必填欄位')
+                return redirect('workorder:onsite_reporting:operator_onsite_report_create')
             
             # 設定公司代號
             company_code = None
             try:
-                from erp_integration.models import CompanyConfig
                 company_config = CompanyConfig.objects.filter(
                     company_name=company_name
                 ).first()
@@ -274,27 +291,6 @@ def smt_onsite_report_create(request):
             except Exception:
                 pass
             
-            # 計算開始數量
-            previous_reports = OnsiteReport.objects.filter(
-                operator=operator,
-                workorder=workorder,
-                product_id=product_id,
-                status='completed'
-            ).order_by('-end_datetime')
-            
-            start_quantity = 0
-            if previous_reports.exists():
-                last_report = previous_reports.first()
-                start_quantity = last_report.work_quantity
-            
-            # 自動檢查並加入工序到工單
-            auto_process_result = OnsiteReportAutoProcessService.check_and_add_process(
-                workorder_number=workorder,
-                process_name=process,
-                operator=operator,
-                equipment=equipment
-            )
-            
             # 建立報工記錄
             onsite_report = OnsiteReport.objects.create(
                 report_type=report_type,
@@ -305,74 +301,156 @@ def smt_onsite_report_create(request):
                 company_code=company_code,
                 process=process,
                 equipment=equipment,
-                status=status,  # 新增狀態欄位
+                status=status,
                 planned_quantity=planned_quantity,
-                work_quantity=0,  # 初始工作數量為0
+                work_quantity=0,
                 remarks=remarks,
                 created_by=request.user.username,
                 work_date=timezone.now().date(),
                 start_datetime=timezone.now()
             )
             
-            # 根據自動加入工序的結果顯示訊息
-            if auto_process_result['success']:
-                if auto_process_result.get('already_exists', False):
-                    messages.success(request, 'SMT設備現場報工記錄已建立')
-                else:
-                    messages.success(request, f'SMT設備現場報工記錄已建立，並已自動將工序 {process} 加入到工單 {workorder}')
-            else:
-                messages.warning(request, f'SMT設備現場報工記錄已建立，但自動加入工序失敗：{auto_process_result["message"]}')
+            messages.success(request, '作業員現場報工記錄已建立')
             return redirect('workorder:onsite_reporting:onsite_report_list')
             
         except Exception as e:
             messages.error(request, f'建立失敗: {str(e)}')
-            return redirect('workorder:onsite_reporting:smt_onsite_report_create')
+            return redirect('workorder:onsite_reporting:operator_onsite_report_create')
     
     # GET 請求：顯示新增頁面
-    context = {
-        'report_type': 'smt',
-        'report_type_display': 'SMT設備報工'
-    }
-    return render(request, 'workorder/onsite_reporting/smt_onsite_report_form.html', context)
-
-
-@login_required
-def onsite_report_update(request, pk):
-    """現場報工編輯視圖"""
-    onsite_report = get_object_or_404(OnsiteReport, pk=pk)
+    form = OperatorOnsiteReportForm()
     
-    if request.method == 'POST':
+    context = {
+        'report_type': 'operator',
+        'report_type_display': '作業員報工',
+        'form': form
+    }
+    return render(request, 'workorder/onsite_reporting/operator_onsite_report_form.html', context)
+
+
+# 其他視圖函數將在下一部分添加...
+
+
+class OnsiteReportDetailView(LoginRequiredMixin, DetailView):
+    """現場報工詳情視圖"""
+    
+    model = OnsiteReport
+    template_name = "workorder/onsite_reporting/onsite_report_detail.html"
+    context_object_name = "onsite_report"
+    
+    def post(self, request, *args, **kwargs):
+        """處理狀態變更POST請求"""
+        self.object = self.get_object()
+        action = request.POST.get('action')
+        
+        if action == 'change_status':
+            return self.handle_status_change(request)
+        
+        return self.get(request, *args, **kwargs)
+    
+    def handle_status_change(self, request):
+        """處理狀態變更"""
         try:
-            # 從 POST 資料取得欄位值
+            new_status = request.POST.get('new_status')
             work_quantity = int(request.POST.get('work_quantity', 0))
             defect_quantity = int(request.POST.get('defect_quantity', 0))
-            remarks = request.POST.get('remarks', '')
+            change_notes = request.POST.get('change_notes', '')
             
-            # 更新記錄
-            onsite_report.work_quantity = work_quantity
-            onsite_report.defect_quantity = defect_quantity
-            onsite_report.remarks = remarks
+            # 驗證新狀態
+            if not new_status:
+                messages.error(request, '請選擇新狀態')
+                return self.get(request)
             
-            # 如果有結束時間，計算工作分鐘數（但不儲存到 work_minutes 欄位）
-            if onsite_report.end_datetime:
-                duration = onsite_report.end_datetime - onsite_report.start_datetime
-                # onsite_report.work_minutes = int(duration.total_seconds() / 60)  # 暫時註解掉
+            # 驗證狀態轉換的合理性
+            current_status = self.object.status
+            valid_transitions = {
+                'started': ['paused', 'completed', 'stopped'],
+                'paused': ['resumed', 'completed', 'stopped'],
+                'resumed': ['paused', 'completed', 'stopped'],
+            }
             
-            onsite_report.save()
+            if current_status not in valid_transitions or new_status not in valid_transitions[current_status]:
+                messages.error(request, f'無法從 {self.object.get_status_display()} 變更為 {dict(OnsiteReport.STATUS_CHOICES).get(new_status, new_status)}')
+                return self.get(request)
             
-            messages.success(request, '現場報工記錄已更新')
-            return redirect('workorder:onsite_reporting:onsite_report_list')
+            # 驗證數量
+            if new_status in ['completed', 'stopped'] and work_quantity == 0:
+                messages.error(request, '完工或停工時必須填寫工作數量')
+                return self.get(request)
+            
+            if defect_quantity > work_quantity:
+                messages.error(request, '不良品數量不能超過工作數量')
+                return self.get(request)
+            
+            # 記錄原始資料
+            old_status = self.object.status
+            old_work_quantity = self.object.work_quantity
+            old_defect_quantity = self.object.defect_quantity
+            
+            # 更新報工記錄
+            self.object.status = new_status
+            self.object.work_quantity = work_quantity
+            self.object.defect_quantity = defect_quantity
+            
+            # 如果變更為完工或停工，設定結束時間
+            if new_status in ['completed', 'stopped']:
+                self.object.end_datetime = timezone.now()
+            
+            self.object.save()
+            
+            # 記錄歷史
+            try:
+                # 根據狀態變更類型決定 change_type
+                if new_status == 'started':
+                    change_type = 'start'
+                elif new_status == 'paused':
+                    change_type = 'pause'
+                elif new_status == 'resumed':
+                    change_type = 'resume'
+                elif new_status == 'completed':
+                    change_type = 'complete'
+                elif new_status == 'stopped':
+                    change_type = 'abnormal'
+                else:
+                    change_type = 'update'
+                
+                OnsiteReportHistory.objects.create(
+                    onsite_report=self.object,
+                    change_type=change_type,
+                    old_status=old_status,
+                    new_status=new_status,
+                    old_quantity=old_work_quantity,
+                    new_quantity=work_quantity,
+                    change_notes=change_notes,
+                    changed_by=request.user.username
+                )
+            except Exception as e:
+                # 如果歷史記錄失敗，不影響主要功能
+                print(f"記錄歷史失敗: {e}")
+            
+            messages.success(request, f'狀態已成功變更為 {self.object.get_status_display()}')
+            return redirect('workorder:onsite_reporting:onsite_report_detail', pk=self.object.pk)
             
         except Exception as e:
-            messages.error(request, f'更新失敗: {str(e)}')
+            messages.error(request, f'狀態變更失敗: {str(e)}')
+            return self.get(request)
     
-    # GET 請求：顯示編輯頁面
-    context = {
-        'onsite_report': onsite_report,
-        'report_type': onsite_report.report_type,
-        'report_type_display': '編輯現場報工'
-    }
-    return render(request, 'workorder/onsite_reporting/onsite_report_edit.html', context)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # 取得歷史記錄
+        try:
+            context['history'] = OnsiteReportHistory.objects.filter(
+                onsite_report=self.object
+            ).order_by('-changed_at')
+        except:
+            context['history'] = []
+        
+        # 計算進度
+        context['progress_percentage'] = self.object.get_progress_percentage()
+        context['duration_minutes'] = self.object.get_duration_minutes()
+        
+        return context
 
 
 class OnsiteReportDeleteView(LoginRequiredMixin, DeleteView):
@@ -411,6 +489,7 @@ class OnsiteReportMonitoringView(LoginRequiredMixin, TemplateView):
         ).order_by('-updated_at')
         
         # 今日完成報工
+        from datetime import date
         today = date.today()
         context['today_completed'] = OnsiteReport.objects.filter(
             work_date=today,
@@ -439,6 +518,139 @@ class OnsiteReportConfigView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         return context
+
+
+class OnsiteReportConfigDeleteView(LoginRequiredMixin, DeleteView):
+    """現場報工配置刪除視圖"""
+    
+    model = OnsiteReportConfig
+    template_name = "workorder/onsite_reporting/onsite_report_config_confirm_delete.html"
+    success_url = reverse_lazy('workorder:onsite_reporting:onsite_report_config')
+    
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, '現場報工配置已刪除')
+        return super().delete(request, *args, **kwargs)
+
+
+@login_required
+def operator_work_selection(request):
+    """作業員報工作業選擇頁面"""
+    return render(request, 'workorder/onsite_reporting/operator_work_selection.html', {
+        'title': '作業員現場報工作業選擇',
+        'subtitle': '請選擇要進行的作業員報工類型'
+    })
+
+
+@login_required
+def smt_work_selection(request):
+    """SMT報工作業選擇頁面"""
+    return render(request, 'workorder/onsite_reporting/smt_work_selection.html', {
+        'title': 'SMT現場報工作業選擇',
+        'subtitle': '請選擇要進行的SMT報工類型'
+    })
+
+
+@login_required
+def smt_onsite_report_create(request):
+    """SMT設備現場報工新增視圖 - 只有開工功能"""
+    if request.method == 'POST':
+        try:
+            # 從 POST 資料取得欄位值
+            report_type = 'smt'
+            operator = request.POST.get('operator')
+            workorder = request.POST.get('workorder')
+            product_id = request.POST.get('product_id')
+            company_name = request.POST.get('company_name')
+            process = request.POST.get('process')
+            equipment = request.POST.get('equipment', '')
+            planned_quantity = int(request.POST.get('planned_quantity', 0))
+            remarks = request.POST.get('remarks', '')
+            
+            # 驗證必填欄位
+            if not all([operator, workorder, product_id, company_name, process, equipment]):
+                messages.error(request, '請填寫所有必填欄位（SMT設備報工需要選擇設備）')
+                return redirect('workorder:onsite_reporting:smt_onsite_report_create')
+            
+            # 設定公司代號
+            company_code = None
+            try:
+                company_config = CompanyConfig.objects.filter(
+                    company_name=company_name
+                ).first()
+                if company_config:
+                    company_code = company_config.company_code
+            except Exception:
+                pass
+            
+            # SMT現場報工只有開工功能，狀態固定為 started
+            status = 'started'
+            
+            # 建立報工記錄
+            onsite_report = OnsiteReport.objects.create(
+                report_type=report_type,
+                operator=operator,
+                workorder=workorder,
+                product_id=product_id,
+                company_name=company_name,
+                company_code=company_code,
+                process=process,
+                equipment=equipment,
+                status=status,  # 固定為開工狀態
+                planned_quantity=planned_quantity,
+                work_quantity=0,  # 初始工作數量為0
+                remarks=remarks,
+                created_by=request.user.username,
+                work_date=timezone.now().date(),
+                start_datetime=timezone.now()
+            )
+            
+            messages.success(request, 'SMT設備現場報工記錄已建立（開工狀態）')
+            return redirect('workorder:onsite_reporting:onsite_report_list')
+            
+        except Exception as e:
+            messages.error(request, f'建立失敗: {str(e)}')
+            return redirect('workorder:onsite_reporting:smt_onsite_report_create')
+    
+    # GET 請求：顯示新增頁面
+    context = {
+        'report_type': 'smt',
+        'report_type_display': 'SMT設備報工（只有開工功能）'
+    }
+    return render(request, 'workorder/onsite_reporting/smt_onsite_report_form.html', context)
+
+
+@login_required
+def onsite_report_update(request, pk):
+    """現場報工編輯視圖"""
+    onsite_report = get_object_or_404(OnsiteReport, pk=pk)
+    
+    if request.method == 'POST':
+        try:
+            # 從 POST 資料取得欄位值
+            work_quantity = int(request.POST.get('work_quantity', 0))
+            defect_quantity = int(request.POST.get('defect_quantity', 0))
+            remarks = request.POST.get('remarks', '')
+            
+            # 更新記錄
+            onsite_report.work_quantity = work_quantity
+            onsite_report.defect_quantity = defect_quantity
+            onsite_report.remarks = remarks
+            
+            onsite_report.save()
+            
+            messages.success(request, '現場報工記錄已更新')
+            return redirect('workorder:onsite_reporting:onsite_report_list')
+            
+        except Exception as e:
+            messages.error(request, f'更新失敗: {str(e)}')
+    
+    # GET 請求：顯示編輯頁面
+    context = {
+        'onsite_report': onsite_report,
+        'report_type': onsite_report.report_type,
+        'report_type_display': '編輯現場報工'
+    }
+    return render(request, 'workorder/onsite_reporting/onsite_report_edit.html', context)
 
 
 @login_required
@@ -523,372 +735,375 @@ def onsite_report_config_update(request, pk):
     return render(request, 'workorder/onsite_reporting/onsite_report_config_form.html', context)
 
 
-class OnsiteReportConfigDeleteView(LoginRequiredMixin, DeleteView):
-    """現場報工配置刪除視圖"""
-    
-    model = OnsiteReportConfig
-    template_name = "workorder/onsite_reporting/onsite_report_config_confirm_delete.html"
-    success_url = reverse_lazy('workorder:onsite_reporting:onsite_report_config')
-    
-    def delete(self, request, *args, **kwargs):
-        messages.success(request, '現場報工配置已刪除')
-        return super().delete(request, *args, **kwargs)
-
-
-# API 視圖
-@require_POST
 @login_required
-def update_onsite_report_status(request, pk):
-    """更新現場報工狀態 API"""
-    try:
-        onsite_report = get_object_or_404(OnsiteReport, pk=pk)
-        data = json.loads(request.body)
-
-        old_status = onsite_report.status
-        old_quantity = onsite_report.work_quantity
-
-        # 更新狀態
-        if 'status' in data:
-            onsite_report.status = data['status']
-
-        # 更新數量
-        if 'work_quantity' in data:
-            onsite_report.work_quantity = data['work_quantity']
-
-        # 更新不良品數量
-        if 'defect_quantity' in data:
-            onsite_report.defect_quantity = data['defect_quantity']
-
-        # 如果完成，設定結束時間
-        if onsite_report.status == 'completed' and not onsite_report.end_datetime:
-            onsite_report.end_datetime = timezone.now()
-
-        onsite_report.save()
-
-        # 記錄歷史
-        if old_status != onsite_report.status or old_quantity != onsite_report.work_quantity:
-            change_type = 'update'
-            if onsite_report.status == 'completed':
-                change_type = 'complete'
-            elif onsite_report.status == 'abnormal':
-                change_type = 'abnormal'
-
-            OnsiteReportHistory.objects.create(
-                onsite_report=onsite_report,
-                change_type=change_type,
-                old_status=old_status,
-                new_status=onsite_report.status,
-                old_quantity=old_quantity,
-                new_quantity=onsite_report.work_quantity,
-                change_notes=f"API更新 - {request.user.username}",
-                changed_by=request.user.username
-            )
-
-        return JsonResponse({
-            'success': True,
-            'message': '狀態更新成功',
-            'data': {
-                'id': onsite_report.id,
-                'status': onsite_report.status,
-                'work_quantity': onsite_report.work_quantity,
-                'defect_quantity': onsite_report.defect_quantity,
-                'progress_percentage': onsite_report.get_progress_percentage(),
-                'updated_at': onsite_report.updated_at.isoformat()
-            }
-        })
-
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'更新失敗: {str(e)}'
-        }, status=400)
-
-
-@require_POST
-@login_required
-def complete_onsite_report(request, pk):
-    """完成現場報工 API"""
-    try:
-        onsite_report = get_object_or_404(OnsiteReport, pk=pk)
+def check_equipment_status(request):
+    """檢查設備狀態API"""
+    if request.method == 'GET':
+        equipment_name = request.GET.get('equipment')
         
-        # 從請求中取得工作數量和不良品數量
-        work_quantity = int(request.POST.get('work_quantity', 0))
-        defect_quantity = int(request.POST.get('defect_quantity', 0))
-
-        old_status = onsite_report.status
-        onsite_report.complete_work(work_quantity, defect_quantity)
-
-        # 記錄歷史
-        OnsiteReportHistory.objects.create(
-            onsite_report=onsite_report,
-            change_type='complete',
-            old_status=old_status,
-            new_status='completed',
-            old_quantity=0,
-            new_quantity=onsite_report.work_quantity,
-            change_notes=f"完成報工 - {request.user.username}",
-            changed_by=request.user.username
-        )
-
-        return JsonResponse({
-            'success': True,
-            'message': '報工已完成',
-            'data': {
-                'id': onsite_report.id,
-                'status': onsite_report.status,
-                'work_minutes': onsite_report.get_duration_minutes(),
-                'work_quantity': onsite_report.work_quantity,
-                'defect_quantity': onsite_report.defect_quantity
-            }
-        })
-
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'完成失敗: {str(e)}'
-        }, status=400)
-
-
-@require_POST
-@login_required
-def resume_onsite_report(request, pk):
-    """恢復現場報工 API"""
-    try:
-        onsite_report = get_object_or_404(OnsiteReport, pk=pk)
-
-        old_status = onsite_report.status
-        onsite_report.resume_work()
-
-        # 記錄歷史
-        OnsiteReportHistory.objects.create(
-            onsite_report=onsite_report,
-            change_type='resume',
-            old_status=old_status,
-            new_status='resumed',
-            old_quantity=onsite_report.work_quantity,
-            new_quantity=onsite_report.work_quantity,
-            change_notes=f"恢復報工 - {request.user.username}",
-            changed_by=request.user.username
-        )
-
-        return JsonResponse({
-            'success': True,
-            'message': '報工已恢復',
-            'data': {
-                'id': onsite_report.id,
-                'status': onsite_report.status,
-                'total_work_minutes': onsite_report.get_duration_minutes(),
-                'work_minutes': onsite_report.work_minutes,
-                'updated_at': onsite_report.updated_at.isoformat()
-            }
-        })
-
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'恢復失敗: {str(e)}'
-        }, status=400)
-
-
-@require_POST
-@login_required
-def pause_onsite_report(request, pk):
-    """暫停現場報工 API"""
-    try:
-        onsite_report = get_object_or_404(OnsiteReport, pk=pk)
-        pause_reason = request.POST.get('pause_reason', '')
-
-        old_status = onsite_report.status
-        onsite_report.pause_work()
-
-        # 記錄歷史
-        OnsiteReportHistory.objects.create(
-            onsite_report=onsite_report,
-            change_type='pause',
-            old_status=old_status,
-            new_status='paused',
-            old_quantity=onsite_report.work_quantity,
-            new_quantity=onsite_report.work_quantity,
-            change_notes=f"暫停報工 - {request.user.username}",
-            changed_by=request.user.username
-        )
-
-        return JsonResponse({
-            'success': True,
-            'message': '報工已暫停'
-        })
-
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'暫停失敗: {str(e)}'
-        }, status=400)
-
-
-
-
-
-# 動態載入API
-@login_required
-def product_list_api(request):
-    """產品編號列表 API - 使用 WorkOrderDispatch 模型以保持與填報功能一致"""
-    try:
-        from workorder.workorder_dispatch.models import WorkOrderDispatch
-        
-        company_name = request.GET.get('company_name', '')
-        
-        if company_name:
-            # 根據公司代號篩選產品編號
-            products = WorkOrderDispatch.objects.filter(
-                company_name=company_name
-            ).values('product_id').distinct().order_by('product_id')
-        else:
-            # 取得所有產品編號
-            products = WorkOrderDispatch.objects.values('product_id').distinct().order_by('product_id')
-        
-        # 格式化資料
-        product_list = []
-        for product in products:
-            product_list.append({
-                'product_id': product['product_id']
+        if not equipment_name:
+            return JsonResponse({
+                'success': False,
+                'message': '請提供設備名稱'
             })
         
-        return JsonResponse({
-            'success': True,
-            'products': product_list
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'載入失敗: {str(e)}'
-        }, status=400)
-
-
-# 現場報工的獨立API函數已移除，統一使用 /workorder/api/ 路徑的統一API
-
-
-# ==================== RD樣品工單建立功能 ====================
-
-@login_required
-def operator_work_selection(request):
-    """作業員報工作業選擇頁面"""
-    return render(request, 'workorder/onsite_reporting/operator_work_selection.html', {
-        'title': '作業員現場報工作業選擇',
-        'subtitle': '請選擇要進行的作業員報工類型'
-    })
-
-
-@login_required
-def smt_work_selection(request):
-    """SMT報工作業選擇頁面"""
-    return render(request, 'workorder/onsite_reporting/smt_work_selection.html', {
-        'title': 'SMT現場報工作業選擇',
-        'subtitle': '請選擇要進行的SMT報工類型'
-    })
-
-
-@login_required
-@login_required
-def operator_rd_onsite_report_create(request):
-    """
-    作業員RD樣品現場報工建立視圖
-    用於在現場報工模組中建立作業員RD樣品現場報工記錄
-    第一筆記錄時自動建立工單
-    """
-    from .models import OnsiteReport
-    from workorder.models import WorkOrder
-    from django.contrib import messages
-    from django.shortcuts import render, redirect
-    from django.db.models import Q
-    from django.db import transaction
-    from django.utils import timezone
+        try:
+            active_reports = OnsiteReport.objects.filter(
+                equipment=equipment_name,
+                status__in=['started', 'resumed'],
+                end_datetime__isnull=True
+            )
+            
+            if active_reports.exists():
+                conflicting_report = active_reports.first()
+                return JsonResponse({
+                    'success': True,
+                    'available': False,
+                    'message': f'設備 {equipment_name} 正在被工單 {conflicting_report.workorder} 使用中',
+                    'conflicting_workorder': conflicting_report.workorder,
+                    'conflicting_operator': conflicting_report.operator,
+                    'start_time': conflicting_report.start_datetime.strftime('%Y-%m-%d %H:%M:%S')
+                })
+            else:
+                return JsonResponse({
+                    'success': True,
+                    'available': True,
+                    'message': f'設備 {equipment_name} 可用'
+                })
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'檢查設備狀態失敗: {str(e)}'
+            })
     
+    return JsonResponse({
+        'success': False,
+        'message': '不支援的請求方法'
+    })
+
+
+@login_required
+def quick_status_change(request, pk):
+    """快速狀態變更API"""
     if request.method == 'POST':
         try:
-            with transaction.atomic():
-                # 取得表單資料
-                operator = request.POST.get('operator', '')
-                equipment = request.POST.get('equipment', '')
-                process = request.POST.get('process', '')
-                work_quantity = request.POST.get('work_quantity', 0)
-                defect_quantity = request.POST.get('defect_quantity', 0)
-                status = request.POST.get('status', 'started')
-                remarks = request.POST.get('remarks', '')
-                abnormal_notes = request.POST.get('abnormal_notes', '')
-                company_code = request.POST.get('company_code', '')
-                product_code = request.POST.get('product_id', 'PFP-CCT')  # 從表單取得產品編號
-                order_number = request.POST.get('workorder', 'RD樣品')   # 從表單取得工單號碼
+            onsite_report = OnsiteReport.objects.get(pk=pk)
+            action = request.POST.get('action')
+            
+            if action == 'pause':
+                # 暫停報工
+                if onsite_report.status in ['started', 'resumed']:
+                    old_status = onsite_report.status
+                    onsite_report.status = 'paused'
+                    onsite_report.end_datetime = timezone.now()
+                    onsite_report.save()
+                    
+                    # 記錄歷史
+                    try:
+                        OnsiteReportHistory.objects.create(
+                            onsite_report=onsite_report,
+                            change_type='quick_pause',
+                            old_status=old_status,
+                            new_status='paused',
+                            old_quantity=onsite_report.work_quantity,
+                            new_quantity=onsite_report.work_quantity,
+                            change_notes='快速暫停操作',
+                            changed_by=request.user.username
+                        )
+                    except:
+                        pass
+                    
+                    return JsonResponse({
+                        'success': True,
+                        'message': '報工已暫停'
+                    })
+                else:
+                    return JsonResponse({
+                        'success': False,
+                        'message': '當前狀態無法暫停'
+                    })
+            
+            elif action == 'resume':
+                # 恢復報工
+                if onsite_report.status == 'paused':
+                    old_status = onsite_report.status
+                    onsite_report.status = 'resumed'
+                    onsite_report.end_datetime = None  # 清除結束時間
+                    onsite_report.save()
+                    
+                    # 記錄歷史
+                    try:
+                        OnsiteReportHistory.objects.create(
+                            onsite_report=onsite_report,
+                            change_type='quick_resume',
+                            old_status=old_status,
+                            new_status='resumed',
+                            old_quantity=onsite_report.work_quantity,
+                            new_quantity=onsite_report.work_quantity,
+                            change_notes='快速恢復操作',
+                            changed_by=request.user.username
+                        )
+                    except:
+                        pass
+                    
+                    return JsonResponse({
+                        'success': True,
+                        'message': '報工已恢復'
+                    })
+                else:
+                    return JsonResponse({
+                        'success': False,
+                        'message': '當前狀態無法恢復'
+                    })
+            
+            elif action == 'complete':
+                # 完工報工
+                work_quantity = int(request.POST.get('work_quantity', 0))
+                defect_quantity = int(request.POST.get('defect_quantity', 0))
                 
-                # 驗證必填欄位
-                if not all([operator, process, status]):
-                    messages.error(request, '請填寫所有必填欄位')
-                    return redirect('workorder:onsite_reporting:operator_rd_onsite_report_create')
+                if work_quantity == 0:
+                    return JsonResponse({
+                        'success': False,
+                        'message': '完工時必須填寫工作數量'
+                    })
                 
-                # 檢查是否已有RD樣品工單，如果沒有則自動建立
-                rd_workorder = WorkOrder.objects.filter(
-                    product_id='PFP-CCT',
-                    workorder='RD樣品',
-                    company_name='RD樣品'
-                ).first()
+                if defect_quantity > work_quantity:
+                    return JsonResponse({
+                        'success': False,
+                        'message': '不良品數量不能超過工作數量'
+                    })
                 
-                if not rd_workorder:
-                    # 自動建立RD樣品工單
-                    rd_workorder = WorkOrder.objects.create(
-                        product_id='PFP-CCT',
-                        workorder='RD樣品',
-                        company_name='RD樣品',
-                        planned_quantity=0,  # RD樣品無預設數量
-                        order_source='mes',
-                        status='pending',
-                        created_by=request.user
-                    )
-                    messages.info(request, '已自動建立RD樣品工單')
+                if onsite_report.status in ['started', 'resumed', 'paused']:
+                    old_status = onsite_report.status
+                    onsite_report.status = 'completed'
+                    onsite_report.end_datetime = timezone.now()
+                    onsite_report.work_quantity = work_quantity
+                    onsite_report.defect_quantity = defect_quantity
+                    onsite_report.save()
+                    
+                    # 記錄歷史
+                    try:
+                        OnsiteReportHistory.objects.create(
+                            onsite_report=onsite_report,
+                            change_type='quick_complete',
+                            old_status=old_status,
+                            new_status='completed',
+                            old_quantity=0,
+                            new_quantity=work_quantity,
+                            change_notes=f'快速完工操作 - 工作數量: {work_quantity}, 不良品: {defect_quantity}',
+                            changed_by=request.user.username
+                        )
+                    except:
+                        pass
+                    
+                    return JsonResponse({
+                        'success': True,
+                        'message': '報工已完成'
+                    })
+                else:
+                    return JsonResponse({
+                        'success': False,
+                        'message': '當前狀態無法完工'
+                    })
+            
+            elif action == 'stop':
+                # 停工報工
+                reason = request.POST.get('reason', '')
                 
-                # 建立作業員RD樣品現場報工記錄
-                onsite_report = OnsiteReport.objects.create(
-                    report_type='operator_rd',
-                    operator=operator,
-                    equipment=equipment,
-                    process=process,
-                    product_id='PFP-CCT',  # 固定產品編號
-                    workorder='RD樣品',   # 固定工單號碼
-                    company_name=company_name,
-                    work_quantity=int(work_quantity) if work_quantity else 0,
-                    defect_quantity=int(defect_quantity) if defect_quantity else 0,
-                    status=status,
-                    remarks=remarks,
-                    abnormal_notes=abnormal_notes,
-                    created_by=request.user.username,
-                    work_date=timezone.now().date(),
-                    start_datetime=timezone.now()
+                if onsite_report.status in ['started', 'resumed', 'paused']:
+                    old_status = onsite_report.status
+                    onsite_report.status = 'stopped'
+                    onsite_report.end_datetime = timezone.now()
+                    onsite_report.abnormal_notes = reason
+                    onsite_report.save()
+                    
+                    # 記錄歷史
+                    try:
+                        OnsiteReportHistory.objects.create(
+                            onsite_report=onsite_report,
+                            change_type='quick_stop',
+                            old_status=old_status,
+                            new_status='stopped',
+                            old_quantity=onsite_report.work_quantity,
+                            new_quantity=onsite_report.work_quantity,
+                            change_notes=f'快速停工操作 - 原因: {reason}',
+                            changed_by=request.user.username
+                        )
+                    except:
+                        pass
+                    
+                    return JsonResponse({
+                        'success': True,
+                        'message': '報工已停工'
+                    })
+                else:
+                    return JsonResponse({
+                        'success': False,
+                        'message': '當前狀態無法停工'
+                    })
+            
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': '無效的操作'
+                })
+                
+        except OnsiteReport.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': '找不到報工記錄'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'操作失敗: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': '不支援的請求方法'
+    })
+
+
+# RD樣品相關視圖
+@login_required
+def operator_rd_onsite_report_create(request):
+    """作業員RD樣品現場報工建立視圖"""
+    if request.method == 'POST':
+        try:
+            # 取得表單資料
+            product_code = request.POST.get('product_code', '')
+            company_code = request.POST.get('company_code', '')
+            operator = request.POST.get('operator', '')
+            equipment = request.POST.get('equipment', '')
+            process = request.POST.get('process', '')
+            remarks = request.POST.get('remarks', '')
+            
+            # 驗證必填欄位
+            if not all([product_code, company_code, operator, process]):
+                messages.error(request, '請填寫所有必填欄位')
+                return redirect('workorder:onsite_reporting:operator_rd_onsite_report_create')
+            
+            # 取得公司代號
+            company_config = CompanyConfig.objects.filter(company_name=company_code).first()
+            if not company_config:
+                messages.error(request, '找不到對應的公司設定')
+                return redirect('workorder:onsite_reporting:operator_rd_onsite_report_create')
+            
+            company_code_value = company_config.company_code
+            
+            # 檢查並建立工單
+            from workorder.models import WorkOrder
+            from workorder.workorder_dispatch.models import WorkOrderDispatch
+            
+            # 查找現有工單
+            existing_workorder = WorkOrder.objects.filter(
+                company_code=company_code_value,
+                order_number='RD樣品',
+                product_code=product_code
+            ).first()
+            
+            workorder = None
+            workorder_created = False
+            
+            if existing_workorder:
+                workorder = existing_workorder
+                messages.info(request, f'找到現有RD樣品工單: {workorder.order_number}')
+            else:
+                # 建立新工單
+                workorder = WorkOrder.objects.create(
+                    company_code=company_code_value,
+                    order_number='RD樣品',
+                    product_code=product_code,
+                    quantity=0,  # RD樣品數量為0
+                    status='in_progress',
+                    order_source='MES手動建立'
                 )
-                
-                messages.success(request, '作業員RD樣品現場報工記錄建立成功！')
-                return redirect('workorder:onsite_reporting:onsite_report_index')
-                
+                workorder_created = True
+                messages.info(request, f'建立新RD樣品工單: {workorder.order_number}')
+            
+            # 檢查並建立派工單（比對公司代號+工單號碼+產品編號+工序）
+            existing_dispatch = WorkOrderDispatch.objects.filter(
+                company_code=company_code_value,
+                order_number='RD樣品',
+                product_code=product_code,
+                process_name=process
+            ).first()
+            
+            dispatch_created = False
+            
+            if existing_dispatch:
+                messages.info(request, f'找到現有RD樣品派工單: {existing_dispatch.order_number}')
+            else:
+                # 建立新派工單
+                new_dispatch = WorkOrderDispatch.objects.create(
+                    company_code=company_code_value,
+                    order_number='RD樣品',
+                    product_code=product_code,
+                    product_name=f"RD樣品-{product_code}",
+                    planned_quantity=0,  # RD樣品預設數量為0
+                    status='in_production',  # 直接設為生產中
+                    dispatch_date=timezone.now().date(),
+                    assigned_operator=operator,
+                    assigned_equipment=equipment or '',
+                    process_name=process,
+                    notes=f"RD樣品現場報工自動建立 - 建立時間: {timezone.now()} - 注意：RD樣品無預定工序流程",
+                    created_by=request.user.username
+                )
+                dispatch_created = True
+                messages.info(request, f'建立新RD樣品派工單: {new_dispatch.order_number}')
+            
+            # 作業員RD樣品現場報工只有開工功能，狀態固定為 started
+            status = 'started'
+            
+            # 建立作業員RD樣品現場報工記錄
+            onsite_report = OnsiteReport.objects.create(
+                report_type='operator_rd',
+                operator=operator,
+                equipment=equipment,
+                process=process,
+                product_id=product_code,  # 使用表單輸入的產品編號
+                workorder='RD樣品',   # 固定工單號碼
+                company_name=company_code, # 使用表單選擇的公司名稱
+                work_quantity=0,  # 固定為0，因為只有開工功能
+                defect_quantity=0,  # 固定為0，因為只有開工功能
+                status=status,  # 固定為開工狀態
+                remarks=remarks,
+                created_by=request.user.username,
+                work_date=timezone.now().date(),
+                start_datetime=timezone.now()
+            )
+            
+            # 顯示建立結果
+            success_message = '作業員RD樣品現場報工記錄建立成功！（開工狀態）'
+            if workorder_created:
+                success_message += f' - 已建立新工單: {workorder.order_number}'
+            if dispatch_created:
+                success_message += f' - 已建立新派工單'
+            
+            messages.success(request, success_message)
+            return redirect('workorder:onsite_reporting:onsite_report_index')
+            
         except Exception as e:
             messages.error(request, f'作業員RD樣品現場報工記錄建立失敗：{str(e)}')
     
     # 取得作業員列表（過濾非SMT）
-    from process.models import Operator
     operators = Operator.objects.filter(
         ~Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
     # 取得工序列表（過濾非SMT）
-    from process.models import ProcessName
     processes = ProcessName.objects.filter(
         ~Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
     # 取得設備列表（過濾非SMT）
-    from equip.models import Equipment
     equipments = Equipment.objects.filter(
         ~Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
     # 取得公司名稱列表
-    from erp_integration.models import CompanyConfig
     companies = CompanyConfig.objects.values_list('company_name', 'company_name').distinct()
     
     context = {
@@ -896,7 +1111,7 @@ def operator_rd_onsite_report_create(request):
         'processes': processes,
         'equipments': equipments,
         'companies': companies,
-        'title': '建立作業員RD樣品現場報工記錄',
+        'title': '建立作業員RD樣品現場報工記錄（只有開工功能）',
         'subtitle': '現場報工 - 作業員RD樣品報工管理'
     }
     
@@ -905,96 +1120,141 @@ def operator_rd_onsite_report_create(request):
 
 @login_required
 def smt_rd_onsite_report_create(request):
-    """
-    SMT_RD樣品現場報工建立視圖
-    用於在現場報工模組中建立SMT_RD樣品現場報工記錄
-    第一筆記錄時自動建立工單
-    """
-    from .models import OnsiteReport
-    from workorder.models import WorkOrder
-    from django.contrib import messages
-    from django.http import JsonResponse
-    from django.db.models import Q
-    from django.db import transaction
-    
+    """SMT_RD樣品現場報工建立視圖"""
     if request.method == 'POST':
         try:
-            with transaction.atomic():
-                # 取得表單資料
-                operator = request.POST.get('operator', '')
-                equipment = request.POST.get('equipment', '')
-                process = request.POST.get('process', '')
-                work_quantity = request.POST.get('work_quantity', 0)
-                defect_quantity = request.POST.get('defect_quantity', 0)
-                status = request.POST.get('status', 'start')
-                notes = request.POST.get('notes', '')
-                abnormal_record = request.POST.get('abnormal_record', '')
-                
-                # 檢查是否已有RD樣品工單，如果沒有則自動建立
-                rd_workorder = WorkOrder.objects.filter(
-                    product_id='PFP-CCT',
-                    workorder='RD樣品',
-                    company_name='RD樣品'
-                ).first()
-                
-                if not rd_workorder:
-                    # 自動建立RD樣品工單
-                    rd_workorder = WorkOrder.objects.create(
-                        product_id='PFP-CCT',
-                        workorder='RD樣品',
-                        company_name='RD樣品',
-                        planned_quantity=100,  # 預設數量
-                        order_source='mes',
-                        status='pending',
-                        created_by=request.user
-                    )
-                    messages.info(request, '已自動建立RD樣品工單')
-                
-                # 建立SMT_RD樣品現場報工記錄
-                onsite_report = OnsiteReport.objects.create(
-                    report_type='smt_rd',
-                    operator=operator,
-                    equipment=equipment,
-                    process=process,
-                    product_id='PFP-CCT',  # 固定產品編號
-                    workorder='RD樣品',    # 固定工單號碼
-                    company_name='RD樣品', # 固定公司名稱
-                    work_quantity=int(work_quantity) if work_quantity else 0,
-                    defect_quantity=int(defect_quantity) if defect_quantity else 0,
-                    status=status,
-                    remarks=notes,
-                    abnormal_notes=abnormal_record,
-                    created_by=request.user.username,
-                    work_date=timezone.now().date(),
-                    start_datetime=timezone.now()
+            # 取得表單資料
+            operator = request.POST.get('operator', '')
+            equipment = request.POST.get('equipment', '')
+            process = request.POST.get('process', '')
+            remarks = request.POST.get('remarks', '')
+            company_code = request.POST.get('company_code', '')
+            product_code = request.POST.get('product_code', '')
+            
+            # 驗證必填欄位
+            if not all([operator, process, equipment, company_code, product_code]):
+                messages.error(request, '請填寫所有必填欄位')
+                return redirect('workorder:onsite_reporting:smt_rd_onsite_report_create')
+            
+            # 檢查並建立工單
+            from workorder.models import WorkOrder
+            from workorder.workorder_dispatch.models import WorkOrderDispatch
+            
+            # 取得公司代號
+            company_config = CompanyConfig.objects.filter(company_name=company_code).first()
+            if not company_config:
+                messages.error(request, '找不到對應的公司設定')
+                return redirect('workorder:onsite_reporting:smt_rd_onsite_report_create')
+            
+            company_code_value = company_config.company_code
+            
+            # 查找現有工單（只根據公司代號和工單號碼，因為唯一性約束是 (company_code, order_number)）
+            existing_workorder = WorkOrder.objects.filter(
+                company_code=company_code_value,
+                order_number='RD樣品'
+            ).first()
+            
+            workorder = None
+            workorder_created = False
+            
+            if existing_workorder:
+                workorder = existing_workorder
+                messages.info(request, f'找到現有RD樣品工單: {workorder.order_number}')
+            else:
+                # 建立新工單
+                workorder = WorkOrder.objects.create(
+                    company_code=company_code_value,  # 使用選擇的公司代號
+                    order_number='RD樣品',
+                    product_code=product_code,  # 使用表單輸入的產品編號
+                    quantity=0,  # RD樣品數量為0
+                    status='in_progress',
+                    order_source='MES手動建立'
                 )
-                
-                messages.success(request, f'SMT_RD樣品現場報工記錄建立成功！')
-                return redirect('workorder:onsite_reporting:smt_work_selection')
-                
+                workorder_created = True
+                messages.info(request, f'建立新RD樣品工單: {workorder.order_number}')
+            
+            # 檢查並建立派工單（比對公司代號+工單號碼+產品編號+工序）
+            existing_dispatch = WorkOrderDispatch.objects.filter(
+                company_code=company_code_value,
+                order_number='RD樣品',
+                product_code=product_code,
+                process_name=process
+            ).first()
+            
+            dispatch_created = False
+            
+            if existing_dispatch:
+                messages.info(request, f'找到現有RD樣品派工單: {existing_dispatch.order_number}')
+            else:
+                # 建立新派工單
+                new_dispatch = WorkOrderDispatch.objects.create(
+                    company_code=company_code_value,  # 使用選擇的公司代號
+                    order_number='RD樣品',
+                    product_code=product_code,  # 使用表單輸入的產品編號
+                    product_name=f'RD樣品-{product_code}',
+                    planned_quantity=0,  # RD樣品預設數量為0
+                    status='in_production',  # 直接設為生產中
+                    dispatch_date=timezone.now().date(),
+                    assigned_operator=operator,
+                    assigned_equipment=equipment,
+                    process_name=process,
+                    notes=f"SMT_RD樣品現場報工自動建立 - 建立時間: {timezone.now()} - 注意：RD樣品無預定工序流程",
+                    created_by=request.user.username
+                )
+                dispatch_created = True
+                messages.info(request, f'建立新RD樣品派工單: {new_dispatch.order_number}')
+            
+            # SMT_RD樣品現場報工只有開工功能，狀態固定為 started
+            status = 'started'
+            
+            # 建立SMT_RD樣品現場報工記錄
+            onsite_report = OnsiteReport.objects.create(
+                report_type='smt_rd',
+                operator=operator,
+                equipment=equipment,
+                process=process,
+                product_id=product_code,  # 使用表單輸入的產品編號
+                workorder='RD樣品',    # 固定工單號碼
+                company_name=company_code, # 使用表單選擇的公司名稱
+                company_code=company_code_value, # 使用公司代號
+                work_quantity=0,  # 固定為0，因為只有開工功能
+                defect_quantity=0,  # 固定為0，因為只有開工功能
+                status=status,  # 固定為開工狀態
+                remarks=remarks,
+                created_by=request.user.username,
+                work_date=timezone.now().date(),
+                start_datetime=timezone.now()
+            )
+            
+            # 顯示建立結果
+            success_message = 'SMT_RD樣品現場報工記錄建立成功！（開工狀態）'
+            if workorder_created:
+                success_message += f' - 已建立新工單: {workorder.order_number}'
+            if dispatch_created:
+                success_message += f' - 已建立新派工單'
+            
+            messages.success(request, success_message)
+            return redirect('workorder:onsite_reporting:smt_work_selection')
+            
         except Exception as e:
             messages.error(request, f'SMT_RD樣品現場報工記錄建立失敗：{str(e)}')
     
     # 取得作業員列表（只顯示SMT相關）
-    from process.models import Operator
     operators = Operator.objects.filter(
         Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
     # 取得工序列表（只顯示SMT相關）
-    from process.models import ProcessName
     processes = ProcessName.objects.filter(
         Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
     # 取得設備列表（只顯示SMT相關）
-    from equip.models import Equipment
     equipments = Equipment.objects.filter(
         Q(name__icontains='SMT')
     ).values_list('name', flat=True).distinct()
     
     # 取得公司名稱列表
-    from erp_integration.models import CompanyConfig
     companies = CompanyConfig.objects.values_list('company_name', 'company_name').distinct()
     
     context = {
@@ -1002,7 +1262,7 @@ def smt_rd_onsite_report_create(request):
         'processes': processes,
         'equipments': equipments,
         'companies': companies,
-        'title': '建立SMT_RD樣品現場報工記錄',
+        'title': '建立SMT_RD樣品現場報工記錄（只有開工功能）',
         'subtitle': '現場報工 - SMT_RD樣品報工管理'
     }
     
@@ -1011,11 +1271,7 @@ def smt_rd_onsite_report_create(request):
 
 @login_required
 def rd_sample_workorder_list(request):
-    """
-    RD樣品現場報工記錄列表視圖
-    顯示所有RD樣品現場報工記錄
-    """
-    from .models import OnsiteReport
+    """RD樣品現場報工記錄列表視圖"""
     from django.core.paginator import Paginator
     
     # 取得所有RD樣品現場報工記錄
@@ -1039,13 +1295,7 @@ def rd_sample_workorder_list(request):
 
 @login_required
 def rd_sample_workorder_detail(request, pk):
-    """
-    RD樣品現場報工記錄詳情視圖
-    顯示RD樣品現場報工記錄的詳細資訊
-    """
-    from .models import OnsiteReport
-    from django.shortcuts import get_object_or_404
-    
+    """RD樣品現場報工記錄詳情視圖"""
     report = get_object_or_404(OnsiteReport, pk=pk, report_type__in=['operator_rd', 'smt_rd'])
     
     context = {
@@ -1059,14 +1309,7 @@ def rd_sample_workorder_detail(request, pk):
 
 @login_required
 def rd_sample_workorder_delete(request, pk):
-    """
-    RD樣品現場報工記錄刪除視圖
-    刪除RD樣品現場報工記錄
-    """
-    from .models import OnsiteReport
-    from django.shortcuts import get_object_or_404
-    from django.contrib import messages
-    
+    """RD樣品現場報工記錄刪除視圖"""
     report = get_object_or_404(OnsiteReport, pk=pk, report_type__in=['operator_rd', 'smt_rd'])
     
     if request.method == 'POST':
@@ -1084,14 +1327,12 @@ def rd_sample_workorder_delete(request, pk):
         'subtitle': '現場報工 - RD樣品報工管理'
     }
     
-    return render(request, 'workorder/onsite_reporting/rd_sample_workorder_delete.html', context) 
+    return render(request, 'workorder/onsite_reporting/rd_sample_workorder_delete.html', context)
+
 
 @login_required
 def rd_sample_workorder_create(request):
-    """
-    RD 樣品工單建立頁面
-    提供 RD 樣品工單的建立介面
-    """
+    """RD 樣品工單建立頁面"""
     if request.method == 'POST':
         # 處理表單提交
         try:
@@ -1106,363 +1347,4 @@ def rd_sample_workorder_create(request):
         'subtitle': '現場報工 - RD樣品工單管理'
     }
     
-    return render(request, 'workorder/onsite_reporting/rd_sample_workorder_create.html', context)
-
-# ==================== 自動加入工序功能 ====================
-
-@login_required
-def auto_add_process_to_workorder(request):
-    """
-    自動加入工序到工單的 API
-    當現場報工時發現工單中沒有的工序，自動將該工序加入到工單中
-    """
-    from workorder.models import WorkOrder, WorkOrderProcess
-    from django.http import JsonResponse
-    import json
-    
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            workorder_number = data.get('workorder_number')
-            process_name = data.get('process_name')
-            operator = data.get('operator')
-            equipment = data.get('equipment', '')
-            
-            if not all([workorder_number, process_name]):
-                return JsonResponse({
-                    'success': False,
-                    'message': '工單號碼和工序名稱不能為空'
-                }, status=400)
-            
-            # 查找工單
-            try:
-                # 使用多公司架構唯一識別查詢工單
-                workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
-                if not workorder:
-                    return JsonResponse({
-                        'success': False,
-                        'message': f'找不到工單：{workorder_number}'
-                    }, status=404)
-            except Exception as e:
-                return JsonResponse({
-                    'success': False,
-                    'message': f'查詢工單失敗：{str(e)}'
-                }, status=500)
-            
-            # 檢查工序是否已存在
-            existing_process = WorkOrderProcess.objects.filter(
-                workorder=workorder,
-                process_name=process_name
-            ).first()
-            
-            if existing_process:
-                return JsonResponse({
-                    'success': True,
-                    'message': f'工序 {process_name} 已存在於工單中',
-                    'process_id': existing_process.id,
-                    'already_exists': True
-                })
-            
-            # 取得最大步驟順序
-            max_step = WorkOrderProcess.objects.filter(
-                workorder=workorder
-            ).aggregate(Max('step_order'))['step_order__max'] or 0
-            
-            # 建立新工序
-            new_process = WorkOrderProcess.objects.create(
-                workorder=workorder,
-                process_name=process_name,
-                step_order=max_step + 1,
-                planned_quantity=workorder.quantity,
-                assigned_operator=operator,
-                assigned_equipment=equipment,
-                status='pending'
-            )
-            
-            return JsonResponse({
-                'success': True,
-                'message': f'已成功將工序 {process_name} 加入到工單 {workorder_number}',
-                'process_id': new_process.id,
-                'step_order': new_process.step_order,
-                'already_exists': False
-            })
-            
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'success': False,
-                'message': 'JSON 格式錯誤'
-            }, status=400)
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'message': f'加入工序失敗：{str(e)}'
-            }, status=500)
-    
-    return JsonResponse({
-        'success': False,
-        'message': '只支援 POST 請求'
-    }, status=405)
-
-
-@login_required
-def get_workorder_processes(request):
-    """
-    取得工單工序列表的 API
-    用於檢查工單中已有的工序
-    """
-    from workorder.models import WorkOrder, WorkOrderProcess
-    from django.http import JsonResponse
-    
-    workorder_number = request.GET.get('workorder_number')
-    
-    if not workorder_number:
-        return JsonResponse({
-            'success': False,
-            'message': '工單號碼不能為空'
-        }, status=400)
-    
-    try:
-        # 使用多公司架構唯一識別查詢工單
-        workorder = WorkOrder.objects.filter(order_number=workorder_number).first()
-        if not workorder:
-            return JsonResponse({
-                'success': False,
-                'message': f'找不到工單：{workorder_number}'
-            }, status=404)
-        
-        processes = WorkOrderProcess.objects.filter(
-            workorder=workorder
-        ).order_by('step_order')
-        
-        process_list = []
-        for process in processes:
-            process_list.append({
-                'id': process.id,
-                'process_name': process.process_name,
-                'step_order': process.step_order,
-                'status': process.status,
-                'assigned_operator': process.assigned_operator or '',
-                'assigned_equipment': process.assigned_equipment or '',
-                'planned_quantity': process.planned_quantity,
-                'completed_quantity': process.completed_quantity
-            })
-        
-        return JsonResponse({
-            'success': True,
-            'workorder_number': workorder_number,
-            'processes': process_list
-        })
-        
-    except WorkOrder.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'message': f'找不到工單：{workorder_number}'
-        }, status=404)
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'取得工序列表失敗：{str(e)}'
-        }, status=500)
-
-
-class OnsiteReportAutoProcessService:
-    """
-    現場報工自動工序服務
-    用於處理現場報工時的自動工序加入邏輯
-    """
-    
-    @staticmethod
-    def check_and_add_process(workorder_number, process_name, operator, equipment=''):
-        """
-        檢查並自動加入工序到工單
-        
-        Args:
-            workorder_number: 工單號碼
-            process_name: 工序名稱
-            operator: 作業員
-            equipment: 設備（可選）
-            
-        Returns:
-            dict: 包含結果的字典
-        """
-        from workorder.models import WorkOrder, WorkOrderProcess
-        
-        try:
-            # 查找工單
-            workorder = WorkOrder.objects.get(order_number=workorder_number)
-            
-            # 檢查工序是否已存在
-            existing_process = WorkOrderProcess.objects.filter(
-                workorder=workorder,
-                process_name=process_name
-            ).first()
-            
-            if existing_process:
-                return {
-                    'success': True,
-                    'message': f'工序 {process_name} 已存在於工單中',
-                    'process_id': existing_process.id,
-                    'already_exists': True,
-                    'process': existing_process
-                }
-            
-            # 取得最大步驟順序
-            max_step = WorkOrderProcess.objects.filter(
-                workorder=workorder
-            ).aggregate(Max('step_order'))['step_order__max'] or 0
-            
-            # 建立新工序
-            new_process = WorkOrderProcess.objects.create(
-                workorder=workorder,
-                process_name=process_name,
-                step_order=max_step + 1,
-                planned_quantity=workorder.quantity,
-                assigned_operator=operator,
-                assigned_equipment=equipment,
-                status='pending'
-            )
-            
-            return {
-                'success': True,
-                'message': f'已成功將工序 {process_name} 加入到工單 {workorder_number}',
-                'process_id': new_process.id,
-                'step_order': new_process.step_order,
-                'already_exists': False,
-                'process': new_process
-            }
-            
-        except WorkOrder.DoesNotExist:
-            return {
-                'success': False,
-                'message': f'找不到工單：{workorder_number}'
-            }
-        except Exception as e:
-            return {
-                'success': False,
-                'message': f'加入工序失敗：{str(e)}'
-            }
-    
-    @staticmethod
-    def get_workorder_processes(workorder_number):
-        """
-        取得工單的所有工序
-        
-        Args:
-            workorder_number: 工單號碼
-            
-        Returns:
-            dict: 包含結果的字典
-        """
-        from workorder.models import WorkOrder, WorkOrderProcess
-        
-        try:
-            workorder = WorkOrder.objects.get(order_number=workorder_number)
-            processes = WorkOrderProcess.objects.filter(
-                workorder=workorder
-            ).order_by('step_order')
-            
-            process_list = []
-            for process in processes:
-                process_list.append({
-                    'id': process.id,
-                    'process_name': process.process_name,
-                    'step_order': process.step_order,
-                    'status': process.status,
-                    'assigned_operator': process.assigned_operator or '',
-                    'assigned_equipment': process.assigned_equipment or '',
-                    'planned_quantity': process.planned_quantity,
-                    'completed_quantity': process.completed_quantity
-                })
-            
-            return {
-                'success': True,
-                'workorder_number': workorder_number,
-                'processes': process_list
-            }
-            
-        except WorkOrder.DoesNotExist:
-            return {
-                'success': False,
-                'message': f'找不到工單：{workorder_number}'
-            }
-        except Exception as e:
-            return {
-                'success': False,
-                'message': f'取得工序列表失敗：{str(e)}'
-            } 
-
-@login_required
-def process_list_api(request):
-    """工序列表 API"""
-    try:
-        from process.models import ProcessName
-        
-        # 取得所有工序
-        processes = ProcessName.objects.values('name').distinct().order_by('name')
-        
-        return JsonResponse({
-            'success': True,
-            'processes': list(processes)
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'載入失敗: {str(e)}'
-        }, status=400)
-
-
-@login_required
-def workorder_debug_api(request):
-    """工單調試 API - 檢查工單資料狀態（使用 WorkOrderDispatch 模型）"""
-    try:
-        from workorder.workorder_dispatch.models import WorkOrderDispatch
-        
-        # 取得基本統計
-        total_workorders = WorkOrderDispatch.objects.count()
-        
-        # 取得前10筆工單作為範例
-        sample_workorders = WorkOrderDispatch.objects.all()[:10].values(
-            'id', 'workorder', 'product_id', 'company_code', 'planned_quantity', 'status'
-        )
-        
-        # 取得公司代號統計
-        company_stats = WorkOrderDispatch.objects.values('company_code').annotate(
-            count=Count('id')
-        ).order_by('company_code')
-        
-        # 取得產品編號統計
-        product_stats = WorkOrderDispatch.objects.values('product_id').annotate(
-            count=Count('id')
-        ).order_by('product_id')[:10]
-        
-        return JsonResponse({
-            'success': True,
-            'debug_info': {
-                'total_workorders': total_workorders,
-                'sample_workorders': list(sample_workorders),
-                'company_stats': list(company_stats),
-                'product_stats': list(product_stats)
-            }
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'調試失敗: {str(e)}',
-            'error_details': str(e)
-        }, status=400) 
-
-@login_required
-def simple_test_api(request):
-    """簡單測試 API - 檢查基本功能"""
-    try:
-        return JsonResponse({
-            'success': True,
-            'message': 'API 連線正常',
-            'user': request.user.username,
-            'timestamp': timezone.now().isoformat()
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'測試失敗: {str(e)}'
-        }, status=400) 
+    return render(request, 'workorder/onsite_reporting/rd_sample_workorder_create.html', context) 

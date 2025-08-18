@@ -39,7 +39,7 @@ class WorkOrderProcessListView(LoginRequiredMixin, ListView):
         """取得查詢集，根據工單ID篩選"""
         workorder_id = self.kwargs.get('workorder_id')
         self.workorder = get_object_or_404(WorkOrder, pk=workorder_id)
-        return WorkOrderProcess.objects.filter(workorder=self.workorder).order_by('step_order')
+        return WorkOrderProcess.objects.filter(workorder_id=self.workorder.id).order_by('step_order')
 
     def get_context_data(self, **kwargs):
         """添加上下文資料"""
@@ -88,7 +88,7 @@ class WorkOrderProcessCreateView(LoginRequiredMixin, CreateView):
         
         # 自動設定工序順序
         if not form.instance.step_order:
-            last_process = WorkOrderProcess.objects.filter(workorder=workorder).order_by('-step_order').first()
+            last_process = WorkOrderProcess.objects.filter(workorder_id=workorder.id).order_by('-step_order').first()
             form.instance.step_order = (last_process.step_order + 1) if last_process else 1
         
         messages.success(self.request, '工序建立成功！')
@@ -197,7 +197,7 @@ class ProcessStatisticsView(LoginRequiredMixin, ListView):
         """取得查詢集"""
         workorder_id = self.kwargs.get('workorder_id')
         self.workorder = get_object_or_404(WorkOrder, pk=workorder_id)
-        return WorkOrderProcess.objects.filter(workorder=self.workorder).order_by('step_order')
+        return WorkOrderProcess.objects.filter(workorder_id=self.workorder.id).order_by('step_order')
 
     def get_context_data(self, **kwargs):
         """添加上下文資料"""

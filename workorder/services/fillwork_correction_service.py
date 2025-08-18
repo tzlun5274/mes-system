@@ -45,53 +45,55 @@ class FillWorkCorrectionService:
         
         for fillwork in fillwork_records:
             try:
-                # 取得公司配置
-                company_config = CompanyConfig.objects.filter(
-                    company_name__icontains=fillwork.company_name
-                ).first()
-                
-                if not company_config:
-                    continue
-                
                 # 類型1: 公司代號+工單號碼一樣，修復產品編號
+                # 先根據工單號碼查找工單
                 workorder_by_number = WorkOrder.objects.filter(
                     order_number=fillwork.workorder
                 ).first()
                 
-                if (workorder_by_number and 
-                    workorder_by_number.company_code == company_config.company_code and
-                    workorder_by_number.product_code != fillwork.product_id):
+                if workorder_by_number:
+                    # 取得公司配置
+                    company_config = CompanyConfig.objects.filter(
+                        company_code=workorder_by_number.company_code
+                    ).first()
                     
-                    analysis['type1_product']['count'] += 1
-                    analysis['type1_product']['items'].append({
-                        'fillwork_id': fillwork.id,
-                        'workorder': fillwork.workorder,
-                        'operator': fillwork.operator,
-                        'work_date': fillwork.work_date,
-                        'company_code': company_config.company_code,
-                        'old_product': fillwork.product_id,
-                        'new_product': workorder_by_number.product_code
-                    })
+                    if company_config and workorder_by_number.product_code != fillwork.product_id:
+                        analysis['type1_product']['count'] += 1
+                        analysis['type1_product']['items'].append({
+                            'fillwork_id': fillwork.id,
+                            'workorder': fillwork.workorder,
+                            'operator': fillwork.operator,
+                            'work_date': fillwork.work_date,
+                            'company_code': workorder_by_number.company_code,
+                            'old_product': fillwork.product_id,
+                            'new_product': workorder_by_number.product_code
+                        })
                 
                 # 類型2: 公司代號+產品編號一樣，修復工單號碼
-                workorder_by_product = WorkOrder.objects.filter(
-                    company_code=company_config.company_code,
-                    product_code=fillwork.product_id
+                # 先根據公司名稱查找公司配置
+                company_config = CompanyConfig.objects.filter(
+                    company_name__icontains=fillwork.company_name
                 ).first()
                 
-                if (workorder_by_product and 
-                    workorder_by_product.order_number != fillwork.workorder):
+                if company_config:
+                    workorder_by_product = WorkOrder.objects.filter(
+                        company_code=company_config.company_code,
+                        product_code=fillwork.product_id
+                    ).first()
                     
-                    analysis['type2_workorder']['count'] += 1
-                    analysis['type2_workorder']['items'].append({
-                        'fillwork_id': fillwork.id,
-                        'operator': fillwork.operator,
-                        'work_date': fillwork.work_date,
-                        'company_code': company_config.company_code,
-                        'product_code': fillwork.product_id,
-                        'old_workorder': fillwork.workorder,
-                        'new_workorder': workorder_by_product.order_number
-                    })
+                    if (workorder_by_product and 
+                        workorder_by_product.order_number != fillwork.workorder):
+                        
+                        analysis['type2_workorder']['count'] += 1
+                        analysis['type2_workorder']['items'].append({
+                            'fillwork_id': fillwork.id,
+                            'operator': fillwork.operator,
+                            'work_date': fillwork.work_date,
+                            'company_code': company_config.company_code,
+                            'product_code': fillwork.product_id,
+                            'old_workorder': fillwork.workorder,
+                            'new_workorder': workorder_by_product.order_number
+                        })
                 
                 # 類型3: 工單號碼+產品編號一樣，修復公司代號
                 workorder_by_both = WorkOrder.objects.filter(
@@ -99,19 +101,25 @@ class FillWorkCorrectionService:
                     product_code=fillwork.product_id
                 ).first()
                 
-                if (workorder_by_both and 
-                    workorder_by_both.company_code != company_config.company_code):
+                if workorder_by_both:
+                    # 取得公司配置
+                    company_config = CompanyConfig.objects.filter(
+                        company_name__icontains=fillwork.company_name
+                    ).first()
                     
-                    analysis['type3_company']['count'] += 1
-                    analysis['type3_company']['items'].append({
-                        'fillwork_id': fillwork.id,
-                        'workorder': fillwork.workorder,
-                        'operator': fillwork.operator,
-                        'work_date': fillwork.work_date,
-                        'product_code': fillwork.product_id,
-                        'old_company_code': company_config.company_code,
-                        'new_company_code': workorder_by_both.company_code
-                    })
+                    if (company_config and 
+                        workorder_by_both.company_code != company_config.company_code):
+                        
+                        analysis['type3_company']['count'] += 1
+                        analysis['type3_company']['items'].append({
+                            'fillwork_id': fillwork.id,
+                            'workorder': fillwork.workorder,
+                            'operator': fillwork.operator,
+                            'work_date': fillwork.work_date,
+                            'product_code': fillwork.product_id,
+                            'old_company_code': company_config.company_code,
+                            'new_company_code': workorder_by_both.company_code
+                        })
                     
             except Exception as e:
                 logger.error(f"分析填報紀錄 {fillwork.id} 時發生錯誤: {e}")
@@ -149,16 +157,7 @@ class FillWorkCorrectionService:
                     results['total_checked'] += 1
                     
                     try:
-                        # 取得公司配置
-                        company_config = CompanyConfig.objects.filter(
-                            company_name__icontains=fillwork.company_name
-                        ).first()
-                        
-                        if not company_config:
-                            results['total_skipped'] += 1
-                            continue
-                        
-                        # 查找工單
+                        # 先根據工單號碼查找工單
                         workorder = WorkOrder.objects.filter(
                             order_number=fillwork.workorder
                         ).first()
@@ -167,19 +166,17 @@ class FillWorkCorrectionService:
                             results['total_skipped'] += 1
                             continue
                         
-                        # 檢查公司代號是否匹配且產品編號不匹配
-                        if (workorder.company_code == company_config.company_code and
-                            workorder.product_code != fillwork.product_id):
-                            
+                        # 檢查產品編號是否不匹配
+                        if workorder.product_code != fillwork.product_id:
                             correction_info = {
                                 'fillwork_id': fillwork.id,
                                 'workorder': fillwork.workorder,
                                 'operator': fillwork.operator,
                                 'work_date': fillwork.work_date,
-                                'company_code': company_config.company_code,
+                                'company_code': workorder.company_code,
                                 'old_product': fillwork.product_id,
                                 'new_product': workorder.product_code,
-                                'reason': '公司代號和工單號碼匹配，修正產品編號'
+                                'reason': '根據工單號碼找到對應工單，修正產品編號'
                             }
                             
                             if not dry_run:

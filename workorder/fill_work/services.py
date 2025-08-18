@@ -128,7 +128,7 @@ class RDSampleWorkOrderService:
                     product_code=workorder.product_code,
                     product_name=f"RD樣品-{workorder.product_code}",
                     planned_quantity=workorder.quantity,
-                    status='dispatched',  # 直接設為已派工
+                    status='in_production',  # 直接設為生產中
                     dispatch_date=fill_work_record.work_date,
                     assigned_operator=fill_work_record.operator,
                     assigned_equipment=fill_work_record.equipment,

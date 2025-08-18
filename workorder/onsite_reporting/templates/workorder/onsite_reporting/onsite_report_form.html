@@ -185,7 +185,7 @@
 
     // 載入公司選項
     function loadCompanies() {
-        fetch('/workorder/onsite_reporting/api/company-list/')
+        fetch('/workorder/static/api/company-list/')
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -204,7 +204,7 @@
 
     // 載入作業員選項
     function loadOperators() {
-        fetch('/workorder/onsite_reporting/api/operator-list/')
+        fetch('/workorder/static/api/operator-list/')
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -223,7 +223,7 @@
 
     // 載入設備選項
     function loadEquipments() {
-        fetch('/workorder/onsite_reporting/api/equipment-list/')
+        fetch('/workorder/static/api/equipment-list/')
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -242,7 +242,7 @@
 
     // 載入產品選項
     function loadProducts() {
-        fetch('/workorder/onsite_reporting/api/product-list/')
+        fetch('/workorder/static/api/product-list/')
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -267,7 +267,7 @@
             return;
         }
 
-        fetch(`/workorder/onsite_reporting/api/workorder-by-product/?product_id=${productId}`)
+        fetch(`/workorder/static/api/workorder-by-product/?product_id=${productId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -277,23 +277,59 @@
                         const option = document.createElement('option');
                         option.value = workorder.workorder;
                         option.textContent = workorder.workorder;
-                        option.dataset.company = workorder.company_name;
-                        option.dataset.quantity = workorder.planned_quantity;
+                        option.setAttribute('data-company-name', workorder.company_name);
+                        option.setAttribute('data-planned-quantity', workorder.planned_quantity);
                         workorderSelect.appendChild(option);
                     });
                 }
             })
-            .catch(error => console.error('載入工單號碼失敗:', error));
+            .catch(error => console.error('載入工單選項失敗:', error));
     });
 
-    // 工單號碼變更時更新相關資訊
+    // 工單號碼變更時自動填入公司名稱和預設生產數量
     document.getElementById('workorder').addEventListener('change', function() {
         const selectedOption = this.options[this.selectedIndex];
-        if (selectedOption && selectedOption.dataset.company) {
-            document.getElementById('company_name').value = selectedOption.dataset.company;
-            document.getElementById('planned_quantity').value = selectedOption.dataset.quantity || 0;
-            updateQuantityInfo();
+        if (selectedOption && selectedOption.value) {
+            const companyName = selectedOption.getAttribute('data-company-name');
+            const plannedQuantity = selectedOption.getAttribute('data-planned-quantity');
+            
+            // 填入公司名稱
+            const companySelect = document.getElementById('company_name');
+            if (companySelect) {
+                companySelect.value = companyName || '';
+            }
+            
+            // 填入預設生產數量
+            const plannedQuantityInput = document.getElementById('planned_quantity');
+            if (plannedQuantityInput) {
+                plannedQuantityInput.value = plannedQuantity || 0;
+            }
         }
+    });
+
+    // 公司名稱變更時載入對應的產品編號
+    document.getElementById('company_name').addEventListener('change', function() {
+        const companyName = this.value;
+        if (!companyName) {
+            document.getElementById('product_id').innerHTML = '<option value="">請選擇產品編號</option>';
+            return;
+        }
+
+        fetch(`/workorder/static/api/products-by-company/?company_name=${encodeURIComponent(companyName)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const productSelect = document.getElementById('product_id');
+                    productSelect.innerHTML = '<option value="">請選擇產品編號</option>';
+                    data.products.forEach(product => {
+                        const option = document.createElement('option');
+                        option.value = product.product_id;
+                        option.textContent = product.product_id;
+                        productSelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => console.error('載入產品選項失敗:', error));
     });
 
     // 更新數量資訊

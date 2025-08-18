@@ -93,6 +93,16 @@ class WorkOrderDispatchForm(forms.ModelForm):
             })
         }
 
+    def __init__(self, *args, **kwargs):
+        """初始化表單，設定預設值"""
+        super().__init__(*args, **kwargs)
+        # 設定狀態預設值為生產中
+        if not self.instance.pk:  # 只有新增時才設定預設值
+            self.fields['status'].initial = 'in_production'
+            # 設定派工日期預設值為今天
+            from django.utils import timezone
+            self.fields['dispatch_date'].initial = timezone.now().date()
+
     def clean(self):
         """表單驗證"""
         cleaned_data = super().clean()

@@ -14,6 +14,7 @@ class OnsiteReport(models.Model):
     """
     現場報工記錄模型
     每筆記錄代表一次完整的工作時段（開始到結束）
+    與派工單和填報管理保持一致的資料結構
     """
     
     # 報工類型選擇
@@ -33,51 +34,53 @@ class OnsiteReport(models.Model):
         ('stopped', '停工'),
     ]
     
-    # 基本資訊欄位
-    report_type = models.CharField(max_length=20, choices=REPORT_TYPE_CHOICES, verbose_name="報工類型")
-    operator = models.CharField(max_length=100, verbose_name="作業員")
-    company_code = models.CharField(max_length=10, verbose_name="公司代號", null=True, blank=True)
-    company_name = models.CharField(max_length=100, verbose_name="公司名稱", help_text="公司名稱", default='')
+    # 基本資訊欄位 - 與填報管理保持一致
+    operator = models.CharField(max_length=100, verbose_name="作業員", help_text="作業員姓名")
+    company_code = models.CharField(max_length=10, verbose_name="公司代號", null=True, blank=True, help_text="公司代號")
+    company_name = models.CharField(max_length=100, verbose_name="公司名稱", help_text="公司名稱")
     
-    # 工單相關欄位 - 統一與填報模型命名一致
-    workorder = models.CharField(max_length=100, verbose_name="工單號碼")  # 統一：order_number -> workorder
-    product_id = models.CharField(max_length=100, verbose_name="產品編號")  # 統一：product_code -> product_id
-    planned_quantity = models.IntegerField(default=0, verbose_name="工單預設生產數量")
+    # 工單相關欄位 - 與派工單保持一致
+    workorder = models.CharField(max_length=100, verbose_name="工單號碼", help_text="工單號碼")
+    product_id = models.CharField(max_length=100, verbose_name="產品編號", help_text="產品編號")
+    planned_quantity = models.IntegerField(default=0, verbose_name="工單預設生產數量", help_text="工單預設生產數量")
     
-    # 製程相關欄位
-    process = models.CharField(max_length=100, verbose_name="工序")
-    operation = models.CharField(max_length=100, blank=True, verbose_name="工序名稱")
-    equipment = models.CharField(max_length=100, blank=True, default='', verbose_name="使用的設備")
+    # 製程相關欄位 - 與填報管理保持一致
+    process = models.CharField(max_length=100, verbose_name="工序", help_text="工序")
+    operation = models.CharField(max_length=100, blank=True, verbose_name="工序名稱", help_text="工序名稱")
+    equipment = models.CharField(max_length=100, blank=True, default='', verbose_name="使用的設備", help_text="使用的設備")
     
-    # 時間相關欄位
-    work_date = models.DateField(default=timezone.now, verbose_name="報工日期")
-    start_datetime = models.DateTimeField(verbose_name="開始日期時間")
-    end_datetime = models.DateTimeField(null=True, blank=True, verbose_name="結束日期時間")
-    work_minutes = models.IntegerField(default=0, verbose_name="工作分鐘數")
+    # 時間相關欄位 - 保持與資料庫一致
+    work_date = models.DateField(verbose_name="工作日期", help_text="工作日期")
+    start_datetime = models.DateTimeField(verbose_name="開始日期時間", help_text="開始日期時間")
+    end_datetime = models.DateTimeField(null=True, blank=True, verbose_name="結束日期時間", help_text="結束日期時間")
+    work_minutes = models.IntegerField(default=0, verbose_name="工作分鐘數", help_text="工作分鐘數")
     
-    # 數量相關欄位
-    work_quantity = models.IntegerField(default=0, verbose_name="工作數量")
-    defect_quantity = models.IntegerField(default=0, verbose_name="不良品數量")
+    # 數量相關欄位 - 與填報管理保持一致
+    work_quantity = models.IntegerField(default=0, validators=[MinValueValidator(0)], verbose_name="工作數量", help_text="工作數量")
+    defect_quantity = models.IntegerField(default=0, validators=[MinValueValidator(0)], verbose_name="不良品數量", help_text="不良品數量")
     
     # 狀態欄位
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='started', verbose_name="報工狀態")
+    report_type = models.CharField(max_length=20, choices=REPORT_TYPE_CHOICES, verbose_name="報工類型")
     
-    # 備註欄位
-    remarks = models.TextField(blank=True, verbose_name="備註")
-    abnormal_notes = models.TextField(blank=True, verbose_name="異常記錄")
+    # 備註欄位 - 與填報管理保持一致
+    remarks = models.TextField(blank=True, verbose_name="備註", help_text="備註")
+    abnormal_notes = models.TextField(blank=True, verbose_name="異常記錄", help_text="異常記錄")
     
-    # 系統欄位
-    created_by = models.CharField(max_length=100, verbose_name="建立人員")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    # 系統欄位 - 與填報管理保持一致
+    created_by = models.CharField(max_length=100, verbose_name="建立人員", help_text="建立人員")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間", help_text="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間", help_text="更新時間")
     
     class Meta:
         verbose_name = "現場報工記錄"
         verbose_name_plural = "現場報工記錄"
         db_table = 'workorder_onsite_report'
         ordering = ['-created_at']
-        unique_together = (("company_name", "workorder", "product_id", "operation", "operator", "work_date", "start_datetime"),)  # 唯一性約束：company_name + workorder + product_id + operation + operator + work_date + start_datetime
+        # 唯一性約束：與資料庫保持一致
+        unique_together = (("company_name", "workorder", "product_id", "operation", "operator", "work_date", "start_datetime"),)
         indexes = [
+            models.Index(fields=['company_code']),
             models.Index(fields=['company_name']),
             models.Index(fields=['operator']),
             models.Index(fields=['workorder']),
@@ -99,6 +102,51 @@ class OnsiteReport(models.Model):
         end_datetime = self.end_datetime or timezone.now()
         duration = end_datetime - self.start_datetime
         return int(duration.total_seconds() / 60)
+    
+    def is_equipment_locked(self):
+        """檢查設備是否被鎖定（正在使用中）"""
+        if not self.equipment:
+            return False
+        
+        # 檢查是否有其他正在使用此設備的報工記錄
+        active_reports = OnsiteReport.objects.filter(
+            equipment=self.equipment,
+            status__in=['started', 'resumed'],
+            end_datetime__isnull=True
+        ).exclude(id=self.id)
+        
+        return active_reports.exists()
+    
+    def lock_equipment(self):
+        """鎖定設備"""
+        if not self.equipment:
+            return True
+        
+        # 檢查設備是否已被其他報工記錄鎖定
+        if self.is_equipment_locked():
+            return False
+        
+        return True
+    
+    def unlock_equipment(self):
+        """解鎖設備"""
+        if not self.equipment:
+            return True
+        
+        # 設備會在狀態變更為暫停、完工、停工時自動解鎖
+        return True
+    
+    def get_equipment_status(self):
+        """取得設備狀態"""
+        if not self.equipment:
+            return "未指定設備"
+        
+        if self.status in ['started', 'resumed']:
+            return "使用中"
+        elif self.status in ['paused', 'completed', 'stopped']:
+            return "可用"
+        else:
+            return "未知"
     
     def complete_work(self, work_quantity=0, defect_quantity=0):
         """完成此筆工作記錄"""
@@ -147,6 +195,7 @@ class OnsiteReport(models.Model):
         if self.status == 'paused':
             self.status = 'resumed'
             self.start_datetime = timezone.now()
+            self.end_datetime = None
             self.save()
             
             # 記錄歷史
@@ -190,6 +239,43 @@ class OnsiteReport(models.Model):
     def is_completed(self):
         """檢查是否已完成"""
         return self.status == 'completed'
+    
+    def add_process_to_workorder(self):
+        """自動加入工序到工單裡（如果工單裡沒有的工序）"""
+        try:
+            from workorder.models import WorkOrder, WorkOrderProcess
+            
+            # 檢查工單是否存在
+            workorder_obj = WorkOrder.objects.filter(
+                company_name=self.company_name,
+                order_number=self.workorder,
+                product_code=self.product_id
+            ).first()
+            
+            if not workorder_obj:
+                return False
+            
+            # 檢查工序是否已存在於工單中
+            existing_process = WorkOrderProcess.objects.filter(
+                workorder=workorder_obj,
+                process_name=self.process
+            ).exists()
+            
+            if not existing_process:
+                # 新增工序到工單
+                WorkOrderProcess.objects.create(
+                    workorder=workorder_obj,
+                    process_name=self.process,
+                    operation_name=self.operation or self.process,
+                    sequence_number=999,  # 預設序號
+                    created_by=self.created_by
+                )
+                return True
+            
+            return False
+        except Exception as e:
+            print(f"自動加入工序失敗: {e}")
+            return False
 
 
 class OnsiteReportSession(models.Model):
@@ -200,8 +286,8 @@ class OnsiteReportSession(models.Model):
     
     # 基本資訊欄位
     operator = models.CharField(max_length=100, verbose_name="作業員", help_text="作業員姓名")
-    workorder = models.CharField(max_length=100, verbose_name="工單號碼", help_text="工單號碼")  # 統一：order_number -> workorder
-    product_id = models.CharField(max_length=100, verbose_name="產品編號", help_text="產品編號")  # 統一：product_code -> product_id
+    workorder = models.CharField(max_length=100, verbose_name="工單號碼", help_text="工單號碼")
+    product_id = models.CharField(max_length=100, verbose_name="產品編號", help_text="產品編號")
     company_code = models.CharField(max_length=10, verbose_name="公司代號", null=True, blank=True, help_text="公司代號")
     
     # 製程相關欄位
@@ -256,7 +342,7 @@ class OnsiteReportSession(models.Model):
             status='completed'
         )
         
-        self.total_work_minutes = sum(report.work_minutes for report in reports)
+        self.total_work_minutes = sum(report.get_duration_minutes() for report in reports)
         self.total_quantity_produced = sum(report.work_quantity for report in reports)
         self.total_defect_quantity = sum(report.defect_quantity for report in reports)
         self.session_count = reports.count()

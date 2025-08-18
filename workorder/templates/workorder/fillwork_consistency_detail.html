@@ -1,0 +1,346 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .table thead th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+    }
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+    .badge {
+        font-size: 0.8em;
+        padding: 0.4em 0.6em;
+    }
+    .btn {
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .card {
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-radius: 8px;
+    }
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        font-weight: 600;
+    }
+    .text-correct {
+        color: #28a745;
+        font-weight: bold;
+    }
+    .text-wrong {
+        color: #dc3545;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-list text-primary"></i>
+                {{ title }}
+            </h1>
+            <p class="text-muted mb-0">
+                {% if detail_type == 'missing_fill_work' %}
+                    顯示有工單但沒有填報紀錄的資料
+                {% elif detail_type == 'missing_dispatch' %}
+                    顯示有填報紀錄但沒有派工單的資料
+                {% elif detail_type == 'wrong_product_code' %}
+                    顯示產品編號錯誤的填報紀錄
+                {% elif detail_type == 'wrong_company' %}
+                    顯示公司代號/名稱錯誤的填報紀錄
+                {% elif detail_type == 'wrong_workorder' %}
+                    顯示工單號碼錯誤的填報紀錄
+                {% else %}
+                    詳細記錄列表
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'workorder:consistency_check_home' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i>
+                返回檢查頁面
+            </a>
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-muted">總記錄數</h5>
+                    <h3 class="text-primary">{{ records|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-muted">顯示限制</h5>
+                    <h3 class="text-info">{{ limit }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-muted">記錄類型</h5>
+                    <h3 class="text-success">
+                        {% if detail_type == 'missing_fill_work' %}
+                            缺失填報紀錄
+                        {% elif detail_type == 'missing_dispatch' %}
+                            缺失派工單
+                        {% elif detail_type == 'wrong_product_code' %}
+                            產品編號錯誤
+                        {% elif detail_type == 'wrong_company' %}
+                            公司代號錯誤
+                        {% elif detail_type == 'wrong_workorder' %}
+                            工單號碼錯誤
+                        {% else %}
+                            未知
+                        {% endif %}
+                    </h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-muted">更新時間</h5>
+                    <h6 class="text-muted">{{ check_time|default:"未知" }}</h6>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 錯誤訊息 -->
+    {% if error_message %}
+    <div class="alert alert-danger" role="alert">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>錯誤：</strong>{{ error_message }}
+    </div>
+    {% endif %}
+
+    <!-- 記錄列表 -->
+    {% if records %}
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-table"></i>
+                詳細記錄列表
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            {% if detail_type == 'missing_fill_work' %}
+                                <th>工單ID</th>
+                                <th>公司代號</th>
+                                <th>工單號碼</th>
+                                <th>產品編號</th>
+                                <th>狀態</th>
+                                <th>數量</th>
+                                <th>建立時間</th>
+                            {% elif detail_type == 'missing_dispatch' %}
+                                <th>填報ID</th>
+                                <th>公司代號</th>
+                                <th>公司名稱</th>
+                                <th>工單號碼</th>
+                                <th>產品編號</th>
+                                <th>作業員</th>
+                                <th>工作日期</th>
+                                <th>建立時間</th>
+                            {% elif detail_type == 'wrong_product_code' %}
+                                <th>填報ID</th>
+                                <th>公司代號</th>
+                                <th>工單號碼</th>
+                                <th>正確產品編號</th>
+                                <th>錯誤產品編號</th>
+                                <th>作業員</th>
+                                <th>工作日期</th>
+                                <th>建立時間</th>
+                            {% elif detail_type == 'wrong_company' %}
+                                <th>填報ID</th>
+                                <th>正確公司代號</th>
+                                <th>正確公司名稱</th>
+                                <th>錯誤公司代號</th>
+                                <th>錯誤公司名稱</th>
+                                <th>工單號碼</th>
+                                <th>產品編號</th>
+                                <th>作業員</th>
+                                <th>工作日期</th>
+                                <th>建立時間</th>
+                            {% elif detail_type == 'wrong_workorder' %}
+                                <th>填報ID</th>
+                                <th>公司代號</th>
+                                <th>正確工單號碼</th>
+                                <th>錯誤工單號碼</th>
+                                <th>產品編號</th>
+                                <th>作業員</th>
+                                <th>工作日期</th>
+                                <th>建立時間</th>
+                            {% else %}
+                                <th>ID</th>
+                                <th>公司名稱</th>
+                                <th>工單號碼</th>
+                                <th>產品編號</th>
+                                <th>作業員</th>
+                                <th>工作日期</th>
+                                <th>建立時間</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr>
+                            {% if detail_type == 'missing_fill_work' %}
+                                <td><span class="badge badge-secondary">{{ record.workorder_id|default:"-" }}</span></td>
+                                <td><strong>{{ record.company_code|default:"-" }}</strong></td>
+                                <td><code>{{ record.workorder|default:"-" }}</code></td>
+                                <td><span class="text-muted">{{ record.product_code|default:"-" }}</span></td>
+                                <td><span class="badge badge-{% if record.status == 'completed' %}success{% elif record.status == 'in_progress' %}warning{% else %}secondary{% endif %}">{{ record.status|default:"-" }}</span></td>
+                                <td><span class="text-info">{{ record.quantity|default:"-" }}</span></td>
+                                <td><small class="text-muted">{{ record.created_at|date:"Y-m-d H:i" }}</small></td>
+                            {% elif detail_type == 'missing_dispatch' %}
+                                <td><span class="badge badge-secondary">{{ record.fill_work_id|default:"-" }}</span></td>
+                                <td><strong>{{ record.company_code|default:"-" }}</strong></td>
+                                <td><strong>{{ record.company_name|default:"-" }}</strong></td>
+                                <td><code>{{ record.workorder|default:"-" }}</code></td>
+                                <td><span class="text-muted">{{ record.product_code|default:"-" }}</span></td>
+                                <td><span class="badge badge-info">{{ record.operator|default:"-" }}</span></td>
+                                <td><span class="text-success">{{ record.work_date|date:"Y-m-d" }}</span></td>
+                                <td><small class="text-muted">{{ record.created_at|date:"Y-m-d H:i" }}</small></td>
+                            {% elif detail_type == 'wrong_product_code' %}
+                                <td><span class="badge badge-secondary">{{ record.fill_work_id|default:"-" }}</span></td>
+                                <td><strong>{{ record.company_code|default:"-" }}</strong></td>
+                                <td><code>{{ record.workorder|default:"-" }}</code></td>
+                                <td><span class="text-correct">{{ record.correct_product_code|default:"-" }}</span></td>
+                                <td><span class="text-wrong">{{ record.wrong_product_code|default:"-" }}</span></td>
+                                <td><span class="badge badge-info">{{ record.operator|default:"-" }}</span></td>
+                                <td><span class="text-success">{{ record.work_date|date:"Y-m-d" }}</span></td>
+                                <td><small class="text-muted">{{ record.created_at|date:"Y-m-d H:i" }}</small></td>
+                            {% elif detail_type == 'wrong_company' %}
+                                <td><span class="badge badge-secondary">{{ record.fill_work_id|default:"-" }}</span></td>
+                                <td><span class="text-correct">{{ record.correct_company_code|default:"-" }}</span></td>
+                                <td><span class="text-correct">{{ record.correct_company_name|default:"-" }}</span></td>
+                                <td><span class="text-wrong">{{ record.wrong_company_code|default:"-" }}</span></td>
+                                <td><span class="text-wrong">{{ record.wrong_company_name|default:"-" }}</span></td>
+                                <td><code>{{ record.workorder|default:"-" }}</code></td>
+                                <td><span class="text-muted">{{ record.product_code|default:"-" }}</span></td>
+                                <td><span class="badge badge-info">{{ record.operator|default:"-" }}</span></td>
+                                <td><span class="text-success">{{ record.work_date|date:"Y-m-d" }}</span></td>
+                                <td><small class="text-muted">{{ record.created_at|date:"Y-m-d H:i" }}</small></td>
+                            {% elif detail_type == 'wrong_workorder' %}
+                                <td><span class="badge badge-secondary">{{ record.fill_work_id|default:"-" }}</span></td>
+                                <td><strong>{{ record.company_code|default:"-" }}</strong></td>
+                                <td><span class="text-correct">{{ record.correct_workorder|default:"-" }}</span></td>
+                                <td><span class="text-wrong">{{ record.wrong_workorder|default:"-" }}</span></td>
+                                <td><span class="text-muted">{{ record.product_code|default:"-" }}</span></td>
+                                <td><span class="badge badge-info">{{ record.operator|default:"-" }}</span></td>
+                                <td><span class="text-success">{{ record.work_date|date:"Y-m-d" }}</span></td>
+                                <td><small class="text-muted">{{ record.created_at|date:"Y-m-d H:i" }}</small></td>
+                            {% else %}
+                                <td><span class="badge badge-secondary">{{ record.id|default:"-" }}</span></td>
+                                <td><strong>{{ record.company_name|default:"-" }}</strong></td>
+                                <td><code>{{ record.workorder|default:"-" }}</code></td>
+                                <td><span class="text-muted">{{ record.product_id|default:"-" }}</span></td>
+                                <td><span class="badge badge-info">{{ record.operator|default:"-" }}</span></td>
+                                <td><span class="text-success">{{ record.work_date|date:"Y-m-d" }}</span></td>
+                                <td><small class="text-muted">{{ record.created_at|date:"Y-m-d H:i" }}</small></td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分頁資訊 -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <strong>顯示資訊：</strong>
+                共顯示 {{ records|length }} 筆記錄
+                {% if records|length >= limit %}
+                    （已達顯示上限 {{ limit }} 筆）
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- 無記錄時顯示 -->
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">暫無記錄</h4>
+            <p class="text-muted">
+                {% if detail_type == 'missing_fill_work' %}
+                    目前沒有發現缺失填報紀錄的問題
+                {% elif detail_type == 'missing_dispatch' %}
+                    目前沒有發現缺失派工單的問題
+                {% elif detail_type == 'wrong_product_code' %}
+                    目前沒有發現產品編號錯誤的問題
+                {% elif detail_type == 'wrong_company' %}
+                    目前沒有發現公司代號/名稱錯誤的問題
+                {% elif detail_type == 'wrong_workorder' %}
+                    目前沒有發現工單號碼錯誤的問題
+                {% else %}
+                    目前沒有相關記錄
+                {% endif %}
+            </p>
+            <a href="{% url 'workorder:consistency_check_home' %}" class="btn btn-primary">
+                <i class="fas fa-search"></i>
+                重新檢查
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 操作按鈕 -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="{% url 'workorder:consistency_check_home' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i>
+                返回檢查頁面
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('詳細記錄頁面已載入');
+    console.log('記錄類型:', '{{ detail_type }}');
+    console.log('記錄數量:', {{ records|length }});
+});
+</script>
+{% endblock %} 

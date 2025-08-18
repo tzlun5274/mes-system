@@ -125,21 +125,35 @@ class WorkOrderClearAjaxView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
                 dispatch_count = WorkOrderDispatch.objects.count()
                 dispatch_process_count = WorkOrderDispatchProcess.objects.count()
                 
-                # 刪除資料
-                FillWork.objects.all().delete()
-                CompanyOrder.objects.all().delete()
-                WorkOrder.objects.all().delete()
-                PrdMKOrdMain.objects.all().delete()
-                PrdMkOrdMats.objects.all().delete()
+                # 新增：統計工單工序相關資料
+                from workorder.models import WorkOrderProcess, WorkOrderProcessLog, WorkOrderProcessCapacity
+                workorder_process_count = WorkOrderProcess.objects.count()
+                workorder_process_log_count = WorkOrderProcessLog.objects.count()
+                workorder_process_capacity_count = WorkOrderProcessCapacity.objects.count()
                 
-                # 新增：刪除已完工工單相關資料
+                # 按照外鍵依賴關係的正確順序刪除資料
+                # 1. 先刪除依賴工單的資料
+                FillWork.objects.all().delete()
                 CompletedProductionReport.objects.all().delete()
                 CompletedWorkOrderProcess.objects.all().delete()
-                CompletedWorkOrder.objects.all().delete()
+                WorkOrderProcessLog.objects.all().delete()
+                WorkOrderProcessCapacity.objects.all().delete()
+                WorkOrderProcess.objects.all().delete()
                 
-                # 新增：刪除派工單相關資料
+                # 2. 刪除派工單相關資料
                 WorkOrderDispatchProcess.objects.all().delete()
                 WorkOrderDispatch.objects.all().delete()
+                
+                # 3. 刪除已完工工單
+                CompletedWorkOrder.objects.all().delete()
+                
+                # 4. 刪除工單本身
+                WorkOrder.objects.all().delete()
+                
+                # 5. 刪除ERP相關資料
+                CompanyOrder.objects.all().delete()
+                PrdMKOrdMain.objects.all().delete()
+                PrdMkOrdMats.objects.all().delete()
             
             return {
                 'success': True,
@@ -155,7 +169,10 @@ class WorkOrderClearAjaxView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
                     'completed_report': completed_report_count,
                     'dispatch': dispatch_count,
                     'dispatch_process': dispatch_process_count,
-                    'total': fillwork_count + company_order_count + workorder_count + mkord_main_count + mkord_mats_count + completed_workorder_count + completed_process_count + completed_report_count + dispatch_count + dispatch_process_count
+                    'workorder_process': workorder_process_count,
+                    'workorder_process_log': workorder_process_log_count,
+                    'workorder_process_capacity': workorder_process_capacity_count,
+                    'total': fillwork_count + company_order_count + workorder_count + mkord_main_count + mkord_mats_count + completed_workorder_count + completed_process_count + completed_report_count + dispatch_count + dispatch_process_count + workorder_process_count + workorder_process_log_count + workorder_process_capacity_count
                 },
                 'backup_path': backup_path,
                 'clear_time': timezone.now().isoformat()

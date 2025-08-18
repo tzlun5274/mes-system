@@ -32,32 +32,40 @@
                                 <h5 class="border-bottom pb-2">基本資訊</h5>
                             </div>
                             
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">報工類型</label>
                                 <p class="form-control-plaintext">{{ onsite_report.get_report_type_display }}</p>
                             </div>
                             
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">作業員</label>
-                                <p class="form-control-plaintext">{{ onsite_report.operator }}</p>
+                                <p class="form-control-plaintext">
+                                    {% if onsite_report.report_type == 'smt' or onsite_report.report_type == 'smt_rd' %}
+                                        [SMT] {{ onsite_report.operator }}
+                                    {% elif onsite_report.report_type == 'operator' or onsite_report.report_type == 'operator_rd' %}
+                                        [作業員] {{ onsite_report.operator }}
+                                    {% else %}
+                                        {{ onsite_report.operator }}
+                                    {% endif %}
+                                </p>
                             </div>
                             
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">工單號碼</label>
                                 <p class="form-control-plaintext">{{ onsite_report.workorder }}</p>
                             </div>
                             
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">產品編號</label>
                                 <p class="form-control-plaintext">{{ onsite_report.product_id }}</p>
                             </div>
                             
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">工序</label>
                                 <p class="form-control-plaintext">{{ onsite_report.process }}</p>
                             </div>
                             
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">使用的設備</label>
                                 <p class="form-control-plaintext">{{ onsite_report.equipment|default:"未指定" }}</p>
                             </div>
@@ -100,17 +108,12 @@
                                 <h5 class="border-bottom pb-2">時間資訊</h5>
                             </div>
                             
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">報工日期</label>
-                                <p class="form-control-plaintext">{{ onsite_report.work_date|date:"Y-m-d" }}</p>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">開始時間</label>
                                 <p class="form-control-plaintext">{{ onsite_report.start_datetime|date:"Y-m-d H:i:s" }}</p>
                             </div>
                             
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">結束時間</label>
                                 <p class="form-control-plaintext">
                                     {% if onsite_report.end_datetime %}
@@ -121,7 +124,7 @@
                                 </p>
                             </div>
                             
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">工作時間</label>
                                 <p class="form-control-plaintext">{{ onsite_report.get_duration_minutes }} 分鐘</p>
                             </div>

@@ -1,9 +1,10 @@
 /**
  * 派工單管理模組 JavaScript
  * 提供派工單相關的互動功能
+ * 使用原生 JavaScript，嚴禁使用 jQuery
  */
 
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 初始化派工單模組
     initDispatchModule();
 });
@@ -36,25 +37,32 @@ function initDispatchModule() {
  * 初始化表單驗證
  */
 function initFormValidation() {
+    const dispatchForm = document.getElementById('dispatchForm');
+    if (!dispatchForm) return;
+    
     // 為表單欄位添加驗證
-    $('#dispatchForm').on('submit', function(e) {
-        var isValid = true;
+    dispatchForm.addEventListener('submit', function(e) {
+        let isValid = true;
         
         // 檢查必填欄位
-        $(this).find('[required]').each(function() {
-            if (!$(this).val()) {
-                $(this).addClass('is-invalid');
+        const requiredFields = this.querySelectorAll('[required]');
+        requiredFields.forEach(function(field) {
+            if (!field.value.trim()) {
+                field.classList.add('is-invalid');
                 isValid = false;
             } else {
-                $(this).removeClass('is-invalid');
+                field.classList.remove('is-invalid');
             }
         });
         
         // 檢查數量欄位
-        var plannedQuantity = $('#id_planned_quantity').val();
-        if (plannedQuantity && (isNaN(plannedQuantity) || plannedQuantity <= 0)) {
-            $('#id_planned_quantity').addClass('is-invalid');
-            isValid = false;
+        const plannedQuantityField = document.getElementById('id_planned_quantity');
+        if (plannedQuantityField) {
+            const plannedQuantity = plannedQuantityField.value;
+            if (plannedQuantity && (isNaN(plannedQuantity) || plannedQuantity <= 0)) {
+                plannedQuantityField.classList.add('is-invalid');
+                isValid = false;
+            }
         }
         
         if (!isValid) {
@@ -64,14 +72,17 @@ function initFormValidation() {
     });
     
     // 即時驗證
-    $('#id_planned_quantity').on('input', function() {
-        var value = $(this).val();
-        if (value && (isNaN(value) || value <= 0)) {
-            $(this).addClass('is-invalid');
-        } else {
-            $(this).removeClass('is-invalid');
-        }
-    });
+    const plannedQuantityField = document.getElementById('id_planned_quantity');
+    if (plannedQuantityField) {
+        plannedQuantityField.addEventListener('input', function() {
+            const value = this.value;
+            if (value && (isNaN(value) || value <= 0)) {
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-invalid');
+            }
+        });
+    }
 }
 
 /**
@@ -79,32 +90,45 @@ function initFormValidation() {
  */
 function initSearchFunction() {
     // 搜尋框自動完成
-    $('input[name="search"]').on('input', function() {
-        var searchTerm = $(this).val();
-        if (searchTerm.length >= 2) {
-            // 這裡可以添加 AJAX 搜尋建議功能
-            console.log('搜尋:', searchTerm);
-        }
-    });
+    const searchInput = document.querySelector('input[name="search"]');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value;
+            if (searchTerm.length >= 2) {
+                // 這裡可以添加 AJAX 搜尋建議功能
+                console.log('搜尋:', searchTerm);
+            }
+        });
+    }
     
     // 搜尋表單提交
-    $('.dispatch-search-form form').on('submit', function(e) {
-        var searchTerm = $(this).find('input[name="search"]').val();
-        if (!searchTerm.trim()) {
-            e.preventDefault();
-            showAlert('請輸入搜尋關鍵字', 'warning');
-        }
-    });
+    const searchForm = document.querySelector('.dispatch-search-form form');
+    if (searchForm) {
+        searchForm.addEventListener('submit', function(e) {
+            const searchInput = this.querySelector('input[name="search"]');
+            const searchTerm = searchInput ? searchInput.value : '';
+            if (!searchTerm.trim()) {
+                e.preventDefault();
+                showAlert('請輸入搜尋關鍵字', 'warning');
+            }
+        });
+    }
 }
 
 /**
  * 初始化狀態篩選
  */
 function initStatusFilter() {
-    $('select[name="status"]').on('change', function() {
-        // 自動提交表單以應用篩選
-        $(this).closest('form').submit();
-    });
+    const statusSelect = document.querySelector('select[name="status"]');
+    if (statusSelect) {
+        statusSelect.addEventListener('change', function() {
+            // 自動提交表單以應用篩選
+            const form = this.closest('form');
+            if (form) {
+                form.submit();
+            }
+        });
+    }
 }
 
 /**
@@ -112,14 +136,20 @@ function initStatusFilter() {
  */
 function initDatePickers() {
     // 為日期欄位添加日期選擇器
-    $('input[type="date"]').each(function() {
-        $(this).on('change', function() {
-            var startDate = $('input[name="start_date"]').val();
-            var endDate = $('input[name="end_date"]').val();
+    const dateInputs = document.querySelectorAll('input[type="date"]');
+    dateInputs.forEach(function(input) {
+        input.addEventListener('change', function() {
+            const startDateInput = document.querySelector('input[name="start_date"]');
+            const endDateInput = document.querySelector('input[name="end_date"]');
             
-            if (startDate && endDate && startDate > endDate) {
-                showAlert('開始日期不能晚於結束日期', 'warning');
-                $(this).val('');
+            if (startDateInput && endDateInput) {
+                const startDate = startDateInput.value;
+                const endDate = endDateInput.value;
+                
+                if (startDate && endDate && startDate > endDate) {
+                    showAlert('開始日期不能晚於結束日期', 'warning');
+                    this.value = '';
+                }
             }
         });
     });
@@ -130,12 +160,18 @@ function initDatePickers() {
  */
 function initTooltips() {
     // 初始化 Bootstrap 工具提示
-    $('[data-bs-toggle="tooltip"]').tooltip();
+    const tooltipElements = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tooltipElements.forEach(function(element) {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+            new bootstrap.Tooltip(element);
+        }
+    });
     
     // 為操作按鈕添加工具提示
-    $('.btn[title]').each(function() {
-        if (!$(this).attr('data-bs-toggle')) {
-            $(this).attr('data-bs-toggle', 'tooltip');
+    const buttonsWithTitle = document.querySelectorAll('.btn[title]');
+    buttonsWithTitle.forEach(function(button) {
+        if (!button.hasAttribute('data-bs-toggle')) {
+            button.setAttribute('data-bs-toggle', 'tooltip');
         }
     });
 }
@@ -144,7 +180,7 @@ function initTooltips() {
  * 顯示警告訊息
  */
 function showAlert(message, type) {
-    var alertHtml = `
+    const alertHtml = `
         <div class="alert alert-${type} alert-dismissible fade show" role="alert">
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -152,14 +188,29 @@ function showAlert(message, type) {
     `;
     
     // 移除現有的警告
-    $('.alert').remove();
+    const existingAlerts = document.querySelectorAll('.alert');
+    existingAlerts.forEach(function(alert) {
+        alert.remove();
+    });
     
     // 添加新的警告
-    $('.container-fluid').prepend(alertHtml);
+    const container = document.querySelector('.container-fluid');
+    if (container) {
+        container.insertAdjacentHTML('afterbegin', alertHtml);
+    }
     
     // 自動隱藏警告
     setTimeout(function() {
-        $('.alert').fadeOut();
+        const newAlert = document.querySelector('.alert');
+        if (newAlert) {
+            newAlert.style.opacity = '0';
+            newAlert.style.transition = 'opacity 0.5s';
+            setTimeout(function() {
+                if (newAlert.parentNode) {
+                    newAlert.parentNode.removeChild(newAlert);
+                }
+            }, 500);
+        }
     }, 5000);
 }
 
@@ -176,23 +227,32 @@ function confirmDelete(message) {
 function loadWorkOrderInfo(workOrderId) {
     if (!workOrderId) return;
     
-    $.ajax({
-        url: '/workorder/dispatch/api/work-order-info/',
+    fetch('/workorder/dispatch/api/work-order-info/', {
         method: 'GET',
-        data: { work_order_no: workOrderId },
-        success: function(data) {
-            // 更新表單欄位
-            if (data.product_code) {
-                $('#id_product_code').val(data.product_code);
-            }
-            if (data.quantity) {
-                $('#id_planned_quantity').val(data.quantity);
-            }
+        headers: {
+            'Content-Type': 'application/json',
         },
-        error: function(xhr, status, error) {
-            console.error('載入工單資訊失敗:', error);
-            showAlert('載入工單資訊失敗', 'danger');
+        body: JSON.stringify({ work_order_no: workOrderId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // 更新表單欄位
+        if (data.product_code) {
+            const productCodeField = document.getElementById('id_product_code');
+            if (productCodeField) {
+                productCodeField.value = data.product_code;
+            }
         }
+        if (data.quantity) {
+            const quantityField = document.getElementById('id_planned_quantity');
+            if (quantityField) {
+                quantityField.value = data.quantity;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('載入工單資訊失敗:', error);
+        showAlert('載入工單資訊失敗', 'danger');
     });
 }
 
@@ -210,33 +270,37 @@ function bulkDispatch(workOrderNos, operatorId, process) {
         return;
     }
     
-    $.ajax({
-        url: '/workorder/dispatch/api/bulk-dispatch/',
+    // 獲取 CSRF Token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    const token = csrfToken ? csrfToken.value : '';
+    
+    fetch('/workorder/dispatch/api/bulk-dispatch/', {
         method: 'POST',
-        data: JSON.stringify({
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': token
+        },
+        body: JSON.stringify({
             work_order_nos: workOrderNos,
             operator_id: operatorId,
             process: process
-        }),
-        contentType: 'application/json',
-        headers: {
-            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
-        },
-        success: function(data) {
-            if (data.success) {
-                showAlert(data.message, 'success');
-                // 重新載入頁面
-                setTimeout(function() {
-                    location.reload();
-                }, 1500);
-            } else {
-                showAlert(data.error || '批量派工失敗', 'danger');
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('批量派工失敗:', error);
-            showAlert('批量派工失敗', 'danger');
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(data.message, 'success');
+            // 重新載入頁面
+            setTimeout(function() {
+                location.reload();
+            }, 1500);
+        } else {
+            showAlert(data.error || '批量派工失敗', 'danger');
         }
+    })
+    .catch(error => {
+        console.error('批量派工失敗:', error);
+        showAlert('批量派工失敗', 'danger');
     });
 }
 
@@ -244,28 +308,35 @@ function bulkDispatch(workOrderNos, operatorId, process) {
  * 更新派工單狀態
  */
 function updateDispatchStatus(dispatchId, newStatus) {
-    $.ajax({
-        url: `/workorder/dispatch/${dispatchId}/update-status/`,
+    // 獲取 CSRF Token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    const token = csrfToken ? csrfToken.value : '';
+    
+    const formData = new FormData();
+    formData.append('status', newStatus);
+    
+    fetch(`/workorder/dispatch/${dispatchId}/update-status/`, {
         method: 'POST',
-        data: { status: newStatus },
         headers: {
-            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            'X-CSRFToken': token
         },
-        success: function(data) {
-            if (data.success) {
-                showAlert('狀態更新成功', 'success');
-                // 重新載入頁面
-                setTimeout(function() {
-                    location.reload();
-                }, 1000);
-            } else {
-                showAlert(data.error || '狀態更新失敗', 'danger');
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('狀態更新失敗:', error);
-            showAlert('狀態更新失敗', 'danger');
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('狀態更新成功', 'success');
+            // 重新載入頁面
+            setTimeout(function() {
+                location.reload();
+            }, 1000);
+        } else {
+            showAlert(data.error || '狀態更新失敗', 'danger');
         }
+    })
+    .catch(error => {
+        console.error('狀態更新失敗:', error);
+        showAlert('狀態更新失敗', 'danger');
     });
 }
 
@@ -273,8 +344,8 @@ function updateDispatchStatus(dispatchId, newStatus) {
  * 匯出派工單資料
  */
 function exportDispatchData(format) {
-    var searchParams = new URLSearchParams(window.location.search);
-    var url = `/workorder/dispatch/export/?format=${format}`;
+    const searchParams = new URLSearchParams(window.location.search);
+    let url = `/workorder/dispatch/export/?format=${format}`;
     
     // 添加搜尋參數
     if (searchParams.has('search')) {

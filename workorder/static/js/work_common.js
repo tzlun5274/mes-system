@@ -27,6 +27,16 @@ class FillWorkController {
         this.processSelect = document.getElementById('process');
         this.equipmentSelect = document.getElementById('equipment');
         
+        // 除錯資訊
+        console.log('初始化元素結果:');
+        console.log('- productSelect:', this.productSelect ? '找到' : '未找到');
+        console.log('- workorderSelect:', this.workorderSelect ? '找到' : '未找到');
+        console.log('- companySelect:', this.companySelect ? '找到' : '未找到');
+        console.log('- operatorSelect:', this.operatorSelect ? '找到' : '未找到');
+        console.log('- operatorDisplay:', this.operatorDisplay ? '找到' : '未找到');
+        console.log('- processSelect:', this.processSelect ? '找到' : '未找到');
+        console.log('- equipmentSelect:', this.equipmentSelect ? '找到' : '未找到');
+        
         // 檢查必要元素是否存在
         if (!this.productSelect || !this.workorderSelect || !this.companySelect) {
             console.error('找不到必要的下拉選單元素');
@@ -54,12 +64,10 @@ class FillWorkController {
             this.handleWorkorderChange();
         });
 
-        // 設備選擇事件（SMT專用）
-        if (this.equipmentSelect) {
-            this.equipmentSelect.addEventListener('change', () => {
-                this.handleEquipmentChange();
-            });
-        }
+        // 設備選擇事件（已移至各模板中處理）
+        // 設備選擇自動填入作業員功能已移至各模板中處理
+        // SMT模板：在 smt_backfill_form.html 中處理
+        // 作業員模板：在 operator_backfill_form.html 中處理
     }
 
     // 載入初始資料
@@ -188,9 +196,9 @@ class FillWorkController {
         try {
             const data = await this.fetchAPI('/workorder/static/api/workorder-list/');
             if (data.success && data.workorders) {
-                // 從工單資料中提取公司名稱，過濾掉純數字的公司代號
+                // 從工單資料中提取公司名稱，過濾掉純數字的公司代號和null值
                 const companies = [...new Set(data.workorders.map(w => w.company_name))]
-                    .filter(company => !/^\d+$/.test(company) && company.trim() !== '');
+                    .filter(company => company && company.trim() !== '' && !/^\d+$/.test(company));
                 
                 this.populateSelect(this.companySelect, companies, {
                     placeholder: '請選擇公司名稱'
@@ -324,7 +332,8 @@ class FillWorkController {
             const data = await this.fetchAPI(url);
             if (data.success && data.equipments) {
                 this.populateSelect(this.equipmentSelect, data.equipments, {
-                    placeholder: '請選擇設備'
+                    placeholder: '請選擇設備',
+                    preserveValue: false  // 不保留之前的值，避免觸發change事件
                 });
             }
         } catch (error) {
@@ -426,36 +435,12 @@ class FillWorkController {
         }
     }
 
-    // 處理設備變更（SMT專用）
+    // 處理設備變更（已移至各模板中處理）
     handleEquipmentChange() {
-        if (!this.equipmentSelect) return;
-        
-        const equipmentName = this.equipmentSelect.value;
-        if (equipmentName) {
-            // 自動填入作業員欄位為設備名稱
-            if (this.operatorDisplay) {
-                // SMT表單：填入顯示欄位和隱藏欄位
-                this.operatorDisplay.value = equipmentName;
-                if (this.operatorSelect) {
-                    this.operatorSelect.value = equipmentName;
-                }
-                console.log('SMT表單：設備選擇時自動填入作業員:', equipmentName);
-            } else if (this.operatorSelect) {
-                // 作業員表單：填入下拉選單
-                this.operatorSelect.value = equipmentName;
-                console.log('作業員表單：設備選擇時自動填入作業員:', equipmentName);
-            }
-        } else {
-            // 如果沒有選擇設備，清空作業員欄位
-            if (this.operatorDisplay) {
-                this.operatorDisplay.value = '';
-                if (this.operatorSelect) {
-                    this.operatorSelect.value = '';
-                }
-            } else if (this.operatorSelect) {
-                this.operatorSelect.value = '';
-            }
-        }
+        console.log('handleEquipmentChange 被呼叫 - 此功能已移至各模板中處理');
+        // 設備選擇自動填入作業員功能已移至各模板中處理
+        // SMT模板：在 smt_backfill_form.html 中處理
+        // 作業員模板：在 operator_backfill_form.html 中處理
     }
 
     // 獲取CSRF Token

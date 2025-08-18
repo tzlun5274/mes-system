@@ -5,6 +5,25 @@
 
 {% block content %}
 <div class="container-fluid">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:index' %}">
+                    <i class="fas fa-home"></i> 首頁
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:onsite_reporting:onsite_report_index' %}">
+                    <i class="fas fa-clipboard-list"></i> 現場報工
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-tv"></i> 報工監控
+            </li>
+        </ol>
+    </nav>
+
     <div class="row">
         <div class="col-12">
             <div class="card">
@@ -12,6 +31,7 @@
                     <h4 class="card-title">現場報工監控</h4>
                 </div>
                 <div class="card-body">
+                    {% csrf_token %}
                     <!-- 訊息顯示區域 -->
                     {% if messages %}
                         {% for message in messages %}
@@ -118,7 +138,15 @@
                                                 <tbody>
                                                     {% for report in active_reports %}
                                                     <tr>
-                                                        <td>{{ report.operator }}</td>
+                                                        <td>
+                                                            {% if report.report_type == 'smt' or report.report_type == 'smt_rd' %}
+                                                                [SMT] {{ report.operator }}
+                                                            {% elif report.report_type == 'operator' or report.report_type == 'operator_rd' %}
+                                                                [作業員] {{ report.operator }}
+                                                            {% else %}
+                                                                {{ report.operator }}
+                                                            {% endif %}
+                                                        </td>
                                                         <td>{{ report.workorder }}</td>
                                                         <td>{{ report.product_id }}</td>
                                                         <td>{{ report.process }}</td>
@@ -131,13 +159,16 @@
                                                         </td>
                                                         <td>
                                                             <div class="btn-group" role="group">
-                                                                <button type="button" class="btn btn-sm btn-warning" onclick="pauseReport({{ report.id }})">
+                                                                <a href="{% url 'workorder:onsite_reporting:onsite_report_detail' report.id %}" class="btn btn-sm btn-primary">
+                                                                    <i class="fas fa-eye"></i> 詳情
+                                                                </a>
+                                                                <button type="button" class="btn btn-sm btn-warning" onclick="quickPause({{ report.id }})">
                                                                     <i class="fas fa-pause"></i> 暫停
                                                                 </button>
-                                                                <button type="button" class="btn btn-sm btn-success" onclick="completeReport({{ report.id }})">
+                                                                <button type="button" class="btn btn-sm btn-success" onclick="quickComplete({{ report.id }})">
                                                                     <i class="fas fa-check"></i> 完工
                                                                 </button>
-                                                                <button type="button" class="btn btn-sm btn-danger" onclick="stopReport({{ report.id }})">
+                                                                <button type="button" class="btn btn-sm btn-danger" onclick="quickStop({{ report.id }})">
                                                                     <i class="fas fa-stop"></i> 停工
                                                                 </button>
                                                             </div>
@@ -185,7 +216,15 @@
                                                 <tbody>
                                                     {% for report in paused_reports %}
                                                     <tr>
-                                                        <td>{{ report.operator }}</td>
+                                                        <td>
+                                                            {% if report.report_type == 'smt' or report.report_type == 'smt_rd' %}
+                                                                [SMT] {{ report.operator }}
+                                                            {% elif report.report_type == 'operator' or report.report_type == 'operator_rd' %}
+                                                                [作業員] {{ report.operator }}
+                                                            {% else %}
+                                                                {{ report.operator }}
+                                                            {% endif %}
+                                                        </td>
                                                         <td>{{ report.workorder }}</td>
                                                         <td>{{ report.product_id }}</td>
                                                         <td>{{ report.process }}</td>
@@ -193,10 +232,13 @@
                                                         <td>{{ report.work_minutes }} 分鐘</td>
                                                         <td>
                                                             <div class="btn-group" role="group">
-                                                                <button type="button" class="btn btn-sm btn-info" onclick="resumeReport({{ report.id }})">
+                                                                <a href="{% url 'workorder:onsite_reporting:onsite_report_detail' report.id %}" class="btn btn-sm btn-primary">
+                                                                    <i class="fas fa-eye"></i> 詳情
+                                                                </a>
+                                                                <button type="button" class="btn btn-sm btn-info" onclick="quickResume({{ report.id }})">
                                                                     <i class="fas fa-play"></i> 恢復
                                                                 </button>
-                                                                <button type="button" class="btn btn-sm btn-success" onclick="completeReport({{ report.id }})">
+                                                                <button type="button" class="btn btn-sm btn-success" onclick="quickComplete({{ report.id }})">
                                                                     <i class="fas fa-check"></i> 完工
                                                                 </button>
                                                             </div>
@@ -244,7 +286,15 @@
                                                 <tbody>
                                                     {% for report in stopped_reports %}
                                                     <tr>
-                                                        <td>{{ report.operator }}</td>
+                                                        <td>
+                                                            {% if report.report_type == 'smt' or report.report_type == 'smt_rd' %}
+                                                                [SMT] {{ report.operator }}
+                                                            {% elif report.report_type == 'operator' or report.report_type == 'operator_rd' %}
+                                                                [作業員] {{ report.operator }}
+                                                            {% else %}
+                                                                {{ report.operator }}
+                                                            {% endif %}
+                                                        </td>
                                                         <td>{{ report.workorder }}</td>
                                                         <td>{{ report.product_id }}</td>
                                                         <td>{{ report.process }}</td>
@@ -289,14 +339,16 @@
 
 {% block extra_js %}
 <script>
-    // 暫停報工
-    function pauseReport(reportId) {
+    // 快速暫停報工
+    function quickPause(reportId) {
         if (confirm('確定要暫停此報工嗎？')) {
-            fetch(`/workorder/onsite_reporting/api/pause/${reportId}/`, {
+            const formData = new FormData();
+            formData.append('action', 'pause');
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            fetch(`{% url 'workorder:onsite_reporting:quick_status_change' 0 %}`.replace('0', reportId), {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                }
+                body: formData
             })
             .then(response => response.json())
             .then(data => {
@@ -308,24 +360,27 @@
                 }
             })
             .catch(error => {
-                alert('操作失敗：' + error);
+                console.error('Error:', error);
+                alert('操作失敗：請檢查網路連線');
             });
         }
     }
 
-    // 完工報工
-    function completeReport(reportId) {
+    // 快速完工報工
+    function quickComplete(reportId) {
         const workQuantity = prompt('請輸入工作數量：');
-        if (workQuantity !== null) {
+        if (workQuantity !== null && workQuantity.trim() !== '') {
             const defectQuantity = prompt('請輸入不良品數量（可選）：') || 0;
             
-            fetch(`/workorder/onsite_reporting/api/complete/${reportId}/`, {
+            const formData = new FormData();
+            formData.append('action', 'complete');
+            formData.append('work_quantity', workQuantity);
+            formData.append('defect_quantity', defectQuantity);
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            fetch(`{% url 'workorder:onsite_reporting:quick_status_change' 0 %}`.replace('0', reportId), {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `work_quantity=${workQuantity}&defect_quantity=${defectQuantity}`
+                body: formData
             })
             .then(response => response.json())
             .then(data => {
@@ -337,22 +392,24 @@
                 }
             })
             .catch(error => {
-                alert('操作失敗：' + error);
+                console.error('Error:', error);
+                alert('操作失敗：請檢查網路連線');
             });
         }
     }
 
-    // 停工報工
-    function stopReport(reportId) {
+    // 快速停工報工
+    function quickStop(reportId) {
         const reason = prompt('請輸入停工原因：');
         if (reason !== null) {
-            fetch(`/workorder/onsite_reporting/api/pause/${reportId}/`, {
+            const formData = new FormData();
+            formData.append('action', 'stop');
+            formData.append('reason', reason);
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            fetch(`{% url 'workorder:onsite_reporting:quick_status_change' 0 %}`.replace('0', reportId), {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `pause_reason=${encodeURIComponent(reason)}`
+                body: formData
             })
             .then(response => response.json())
             .then(data => {
@@ -364,19 +421,22 @@
                 }
             })
             .catch(error => {
-                alert('操作失敗：' + error);
+                console.error('Error:', error);
+                alert('操作失敗：請檢查網路連線');
             });
         }
     }
 
-    // 恢復報工
-    function resumeReport(reportId) {
+    // 快速恢復報工
+    function quickResume(reportId) {
         if (confirm('確定要恢復此報工嗎？')) {
-            fetch(`/workorder/onsite_reporting/api/resume/${reportId}/`, {
+            const formData = new FormData();
+            formData.append('action', 'resume');
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            fetch(`{% url 'workorder:onsite_reporting:quick_status_change' 0 %}`.replace('0', reportId), {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                }
+                body: formData
             })
             .then(response => response.json())
             .then(data => {
@@ -388,7 +448,8 @@
                 }
             })
             .catch(error => {
-                alert('操作失敗：' + error);
+                console.error('Error:', error);
+                alert('操作失敗：請檢查網路連線');
             });
         }
     }

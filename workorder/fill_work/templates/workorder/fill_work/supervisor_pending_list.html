@@ -46,6 +46,7 @@
 {% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container-fluid py-3">
 	<div class="mb-2">
 		<nav aria-label="breadcrumb">
@@ -289,9 +290,48 @@ function getAllRowIds(){
 }
 
 // 全部記錄刪除（超級管理員）
-document.getElementById('btnDeleteAll')?.addEventListener('click', function(){
+document.getElementById('btnDeleteAll')?.addEventListener('click', async function(){
 	if(!confirm('警告：這將刪除「全部」填報記錄，且無法復原！\n\n是否確定要刪除？')) return;
-	                window.location.href = '{% url "workorder:fill_work:batch_delete_fill_work" %}';
+	
+	// 顯示載入中提示
+	const button = this;
+	const originalText = button.innerHTML;
+	button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
+	button.disabled = true;
+	
+	try {
+		// 取得所有記錄的ID
+		const allIds = getAllRowIds();
+		
+		// 建立表單資料
+		const formData = new FormData();
+		allIds.forEach(id => {
+			formData.append('record_ids', id);
+		});
+		
+		// 發送批次刪除請求
+		const response = await fetch('{% url "workorder:fill_work:batch_delete_fill_work" %}', {
+			method: 'POST',
+			body: formData,
+			headers: {
+				'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value || '{{ csrf_token }}'
+			}
+		});
+		
+		if (response.ok) {
+			// 重新載入頁面以顯示更新後的狀態
+			window.location.reload();
+		} else {
+			throw new Error('網路請求失敗');
+		}
+	} catch (error) {
+		console.error('全部記錄刪除失敗：', error);
+		alert('全部記錄刪除失敗，請稍後再試');
+	} finally {
+		// 恢復按鈕狀態
+		button.innerHTML = originalText;
+		button.disabled = false;
+	}
 });
 
 // 批次刪除（超級管理員）

@@ -710,6 +710,9 @@
                 工序明細
             </h4>
             <div class="action-buttons">
+                <a href="{% url 'workorder:quick_create_processes_from_route' workorder.id %}" class="btn btn-warning action-btn me-2">
+                    <i class="fas fa-magic me-1"></i>快速建立工序
+                </a>
                 <a href="{% url 'workorder:create_workorder_processes' workorder.id %}" class="btn btn-success action-btn">
                     <i class="fas fa-plus me-1"></i>新增工序
                 </a>
@@ -788,10 +791,15 @@
         <div class="empty-state">
             <i class="fas fa-tasks"></i>
             <h5>尚未建立工序</h5>
-            <p>請點擊「新增工序」按鈕來建立工單的工序明細</p>
-            <a href="{% url 'workorder:create_workorder_processes' workorder.id %}" class="btn btn-primary">
-                <i class="fas fa-plus me-1"></i>新增工序
-            </a>
+            <p>請點擊「快速建立工序」按鈕來從產品工藝路線自動建立工序明細</p>
+            <div class="mt-3">
+                <a href="{% url 'workorder:quick_create_processes_from_route' workorder.id %}" class="btn btn-warning me-2">
+                    <i class="fas fa-magic me-1"></i>快速建立工序
+                </a>
+                <a href="{% url 'workorder:create_workorder_processes' workorder.id %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>手動新增工序
+                </a>
+            </div>
         </div>
         {% endif %}
     </div>

@@ -140,7 +140,7 @@ class Command(BaseCommand):
     
     def process_onsite_report_data(self, company_code, start_date, end_date, force=False):
         """處理現場報工資料"""
-        from onsite_reporting.models import OnsiteReport
+        from workorder.onsite_reporting.models import OnsiteReport
         
         onsite_reports = OnsiteReport.objects.filter(
             company_code=company_code,

@@ -39,6 +39,34 @@
     .btn-action {
         margin: 0 0.1rem;
     }
+    
+    /* 確保操作欄位始終可見 */
+    .table-responsive {
+        position: relative;
+    }
+    
+    .table th:last-child,
+    .table td:last-child {
+        position: sticky;
+        right: 0;
+        background: white;
+        z-index: 10;
+        box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    }
+    
+    .table th:last-child {
+        background: #f8f9fa;
+    }
+    
+    /* 確保按鈕組不會被擠壓 */
+    .btn-group {
+        white-space: nowrap;
+        flex-wrap: nowrap;
+    }
+    
+    .btn-group .btn {
+        flex-shrink: 0;
+    }
 </style>
 {% endblock %}
 
@@ -146,23 +174,23 @@
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover table-bordered mb-0" style="white-space: nowrap;">
+                        <table class="table table-hover table-bordered mb-0" style="white-space: nowrap; min-width: 1200px;">
                             <thead class="table-light">
                                 <tr>
-                                    <th>作業員</th>
-                                    <th>工單號碼</th>
-                                    <th>產品編號</th>
-                                    <th>工序</th>
-                                    <th>設備</th>
-                                    <th>工作日期</th>
-                                    <th>開始時間</th>
-                                    <th>結束時間</th>
-                                    <th>工作時數</th>
-                                    <th>加班時數</th>
-                                    <th>填報數量</th>
-                                    <th>不良品數量</th>
-                                    <th>狀態</th>
-                                    <th>操作</th>
+                                    <th style="min-width: 80px;">作業員</th>
+                                    <th style="min-width: 120px;">工單號碼</th>
+                                    <th style="min-width: 150px;">產品編號</th>
+                                    <th style="min-width: 80px;">工序</th>
+                                    <th style="min-width: 100px;">設備</th>
+                                    <th style="min-width: 100px;">工作日期</th>
+                                    <th style="min-width: 80px;">開始時間</th>
+                                    <th style="min-width: 80px;">結束時間</th>
+                                    <th style="min-width: 80px;">工作時數</th>
+                                    <th style="min-width: 80px;">加班時數</th>
+                                    <th style="min-width: 80px;">填報數量</th>
+                                    <th style="min-width: 80px;">不良品數量</th>
+                                    <th style="min-width: 80px;">狀態</th>
+                                    <th style="min-width: 100px; position: sticky; right: 0; background: white; z-index: 10;">操作</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -189,18 +217,31 @@
                                             <span class="badge bg-danger status-badge">已駁回</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td style="position: sticky; right: 0; background: white; z-index: 10;">
                                         <div class="btn-group" role="group">
                                             <a href="{% url 'workorder:fill_work:fill_work_detail' fill_work.id %}"
-                                               class="btn btn-sm btn-outline-primary btn-action">
+                                               class="btn btn-sm btn-outline-primary btn-action"
+                                               title="查看詳情">
                                                 <i class="fas fa-eye"></i>
                                             </a>
+                                            {% if fill_work.approval_status == 'pending' %}
+                                            <a href="{% url 'workorder:fill_work:approve_fill_work' fill_work.id %}"
+                                               class="btn btn-sm btn-outline-success btn-action"
+                                               title="核准">
+                                                <i class="fas fa-check"></i>
+                                            </a>
+                                            <a href="{% url 'workorder:fill_work:reject_fill_work' fill_work.id %}"
+                                               class="btn btn-sm btn-outline-danger btn-action"
+                                               title="駁回">
+                                                <i class="fas fa-times"></i>
+                                            </a>
+                                            {% endif %}
                                         </div>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="10" class="text-center py-4">
+                                    <td colspan="14" class="text-center py-4">
                                         <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
                                         <p class="text-muted">暫無填報記錄</p>
                                     </td>

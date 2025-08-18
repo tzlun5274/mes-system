@@ -10,11 +10,7 @@ from .views.workorder_views import (
     mes_order_dispatch, mes_order_delete, mes_orders_auto_dispatch,
     mes_orders_set_auto_dispatch_interval, CreateMissingWorkOrdersView
 )
-from .views.fillwork_validation_views import (
-    FillWorkConsistencyCheckView, FillWorkConsistencyAjaxView,
-    MissingWorkOrdersView, ProductMismatchView, WorkorderMismatchView,
-    CompanyMismatchView, RDSampleStatisticsView
-)
+
 from .views.fillwork_correction_views import (
     FillWorkCorrectionView, FillWorkCorrectionAjaxView,
     FillWorkCorrectionAnalysisView, FillWorkCorrectionPreviewView,
@@ -38,8 +34,13 @@ from .views.auto_management_views import (
     AutoManagementConfigUpdateView, AutoManagementConfigDeleteView,
     execute_auto_function, toggle_auto_function
 )
+
 from .views.completion_automation_views import (
     CompletionAutomationManagementView
+)
+from .views.consistency_check_views import (
+    ConsistencyCheckHomeView, ConsistencyCheckAjaxView, ConsistencyCheckDetailView,
+    ConsistencyCheckExportView, ConsistencyCheckFixView
 )
 
 
@@ -66,16 +67,7 @@ urlpatterns = [
     path("selective-revert-orders/", workorder_views.selective_revert_orders, name="selective_revert_orders"),
     path("delete-pending-workorders/", workorder_views.delete_pending_workorders, name="delete_pending_workorders"),
 
-    
-    # 填報紀錄相符性檢查
-    path("fillwork-consistency-check/", FillWorkConsistencyCheckView.as_view(), name="fillwork_consistency_check"),
-    path("fillwork-consistency-check/ajax/", FillWorkConsistencyAjaxView.as_view(), name="fillwork_consistency_check_ajax"),
-    path("missing-workorders/", MissingWorkOrdersView.as_view(), name="missing_workorders"),
-    path("product-mismatch/", ProductMismatchView.as_view(), name="product_mismatch"),
-    path("workorder-mismatch/", WorkorderMismatchView.as_view(), name="workorder_mismatch"),
-    path("company-mismatch/", CompanyMismatchView.as_view(), name="company_mismatch"),
-    path("rd-sample-statistics/", RDSampleStatisticsView.as_view(), name="rd_sample_statistics"),
-    path("create-missing-workorders/", CreateMissingWorkOrdersView.as_view(), name="create_missing_workorders"),
+
     
     # 填報紀錄修正
     path("fillwork-correction/", FillWorkCorrectionView.as_view(), name="fillwork_correction"),
@@ -94,6 +86,13 @@ urlpatterns = [
     
     # 完工自動化管理
     path("completion-automation/", CompletionAutomationManagementView.as_view(), name="completion_automation_management"),
+    
+    # 相符性檢查功能
+    path("consistency-check/", ConsistencyCheckHomeView.as_view(), name="consistency_check_home"),
+    path("consistency-check/ajax/", ConsistencyCheckAjaxView.as_view(), name="consistency_check_ajax"),
+    path("consistency-check/detail/", ConsistencyCheckDetailView.as_view(), name="consistency_check_detail"),
+    path("consistency-check/export/", ConsistencyCheckExportView.as_view(), name="consistency_check_export"),
+    path("consistency-check/fix/", ConsistencyCheckFixView.as_view(), name="consistency_check_fix"),
     
     # 自動管理功能設定
     path("auto-management/", AutoManagementConfigListView.as_view(), name="auto_management_config_list"),
@@ -132,6 +131,7 @@ urlpatterns = [
     path("static/api/get_workorders_by_product/", workorder_views.get_workorders_by_product, name="get_workorders_by_product"),
     path("static/api/get_product_by_workorder/", workorder_views.get_product_by_workorder, name="get_product_by_workorder"),
     path("static/api/create_workorder_processes/<int:workorder_id>/", workorder_views.create_workorder_processes, name="create_workorder_processes"),
+    path("quick-create-processes/<int:workorder_id>/", workorder_views.quick_create_processes_from_route, name="quick_create_processes_from_route"),
     path("static/api/get_operators_and_equipments/", workorder_views.get_operators_and_equipments, name="get_operators_and_equipments"),
     path("static/api/get_operators_only/", workorder_views.get_operators_only, name="get_operators_only"),
     path("static/api/get_equipments_only/", workorder_views.get_equipments_only, name="get_equipments_only"),

@@ -27,12 +27,11 @@
                     
                     <!-- 功能說明 -->
                     <div class="alert alert-warning">
-                        <h5><i class="fas fa-info-circle"></i> RD樣品現場報工功能說明</h5>
+                        <h5><i class="fas fa-info-circle"></i> 作業員RD樣品現場報工功能說明</h5>
                         <ul class="mb-0">
                             <li><strong>RD樣品專用</strong>：專門用於研發樣品的現場報工記錄</li>
-                            <li><strong>即時報工模式</strong>：以當下報工狀態為時間戳，開工為開始時間，暫停為時間結束</li>
-                            <li><strong>狀態流程</strong>：開工 → 暫停 → 重啟開工 → 完工，每筆記錄代表一次完整工作時段</li>
-                            <li><strong>數量填寫</strong>：只有暫停、完工、停工時才能填寫工作數量和不良品數量</li>
+                            <li><strong>只有開工功能</strong>：記錄作業員開始RD樣品作業的時間點</li>
+                            <li><strong>開工記錄</strong>：記錄作業員開始RD樣品作業的時間點</li>
                             <li><strong>產品編號固定為：PFP-CCT</strong></li>
                             <li><strong>工單號碼固定為：RD樣品</strong></li>
                             <li>作業員、工序、設備支援下拉式選擇</li>
@@ -122,32 +121,12 @@
                                 </h5>
                             </div>
                             
-                            <!-- 報工狀態 -->
-                            <div class="col-12 mb-3">
-                                <label class="form-label">報工狀態 <span class="text-danger">*</span></label>
-                                <div class="d-flex flex-wrap gap-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="status" id="status_started" value="started" required>
-                                        <label class="form-check-label" for="status_started">開工</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="status" id="status_paused" value="paused">
-                                        <label class="form-check-label" for="status_paused">暫停</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="status" id="status_resumed" value="resumed">
-                                        <label class="form-check-label" for="status_resumed">重啟開工</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="status" id="status_completed" value="completed">
-                                        <label class="form-check-label" for="status_completed">完工</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="status" id="status_stopped" value="stopped">
-                                        <label class="form-check-label" for="status_stopped">停工</label>
-                                    </div>
-                                </div>
-                                <div class="form-text">請選擇此次報工的狀態</div>
+                            <!-- 報工狀態和預設生產數量（同一行） -->
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">報工狀態</label>
+                                <input type="text" class="form-control" value="開工" readonly>
+                                <input type="hidden" name="status" value="started">
+                                <div class="form-text">作業員RD樣品現場報工只有開工功能</div>
                             </div>
 
                             <!-- 預設生產數量 -->
@@ -158,8 +137,8 @@
                             </div>
                         </div>
 
-                        <!-- 數量資訊 -->
-                        <div class="row mb-4">
+                        <!-- 數量資訊（作業員RD樣品現場報工不需要填寫數量） -->
+                        <div class="row mb-4" style="display: none;">
                             <div class="col-12">
                                 <h5 class="border-bottom pb-2">
                                     <i class="fas fa-calculator"></i> 數量資訊
@@ -169,15 +148,13 @@
                             <!-- 工作數量 -->
                             <div class="col-md-6 mb-3">
                                 <label for="work_quantity" class="form-label">工作數量</label>
-                                <input type="number" class="form-control" id="work_quantity" name="work_quantity" min="0" value="0">
-                                <div class="form-text">請輸入該時段內實際完成的RD樣品數量</div>
+                                <input type="number" class="form-control" id="work_quantity" name="work_quantity" min="0" value="0" readonly>
                             </div>
 
                             <!-- 不良品數量 -->
                             <div class="col-md-6 mb-3">
                                 <label for="defect_quantity" class="form-label">不良品數量</label>
-                                <input type="number" class="form-control" id="defect_quantity" name="defect_quantity" min="0" value="0">
-                                <div class="form-text">請輸入本次RD樣品作業中產生的不良品數量</div>
+                                <input type="number" class="form-control" id="defect_quantity" name="defect_quantity" min="0" value="0" readonly>
                             </div>
                         </div>
 
@@ -208,7 +185,7 @@
                         <div class="row">
                             <div class="col-12 text-center">
                                 <button type="submit" class="btn btn-warning btn-lg">
-                                    <i class="fas fa-save"></i> 儲存RD樣品報工記錄
+                                    <i class="fas fa-play"></i> 開工
                                 </button>
                                 <a href="{% url 'workorder:onsite_reporting:onsite_report_index' %}" class="btn btn-secondary btn-lg ms-2">
                                     <i class="fas fa-arrow-left"></i> 返回列表
@@ -250,13 +227,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 初始化事件監聽器
         initializeEventListeners() {
-            // 報工狀態變更事件
-            this.statusRadios.forEach(radio => {
-                radio.addEventListener('change', () => {
-                    this.updateQuantityFields();
-                });
-            });
-
+            // 作業員RD樣品現場報工只有開工功能，不需要狀態變更事件
+            
             // 表單提交驗證
             const formElement = document.getElementById('rdOnsiteReportForm');
             if (formElement) {
@@ -266,67 +238,68 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // 更新數量欄位狀態
+        // 更新數量欄位狀態（作業員RD樣品現場報工只有開工功能，數量欄位固定為0）
         updateQuantityFields() {
-            const selectedStatus = document.querySelector('input[name="status"]:checked');
-            
-            if (selectedStatus) {
-                const status = selectedStatus.value;
-                console.log('報工狀態變更為:', status);
-                
-                // 開工和重啟開工時，數量欄位唯讀且設為0
-                if (status === 'started' || status === 'resumed') {
-                    if (this.workQuantityInput) {
-                        this.workQuantityInput.setAttribute('readonly', 'readonly');
-                        this.workQuantityInput.value = '0';
-                        this.workQuantityInput.classList.add('bg-light');
-                    }
-                    if (this.defectQuantityInput) {
-                        this.defectQuantityInput.setAttribute('readonly', 'readonly');
-                        this.defectQuantityInput.value = '0';
-                        this.defectQuantityInput.classList.add('bg-light');
-                    }
-                    console.log('數量欄位設為唯讀，數值重置為0');
-                } else {
-                    // 暫停、完工、停工時，數量欄位可編輯
-                    if (this.workQuantityInput) {
-                        this.workQuantityInput.removeAttribute('readonly');
-                        this.workQuantityInput.classList.remove('bg-light');
-                    }
-                    if (this.defectQuantityInput) {
-                        this.defectQuantityInput.removeAttribute('readonly');
-                        this.defectQuantityInput.classList.remove('bg-light');
-                    }
-                    console.log('數量欄位設為可編輯');
-                }
-            } else {
-                // 沒有選擇狀態時，預設為可編輯
-                if (this.workQuantityInput) {
-                    this.workQuantityInput.removeAttribute('readonly');
-                    this.workQuantityInput.classList.remove('bg-light');
-                }
-                if (this.defectQuantityInput) {
-                    this.defectQuantityInput.removeAttribute('readonly');
-                    this.defectQuantityInput.classList.remove('bg-light');
-                }
-                console.log('數量欄位預設為可編輯');
+            // 作業員RD樣品現場報工只有開工功能，數量欄位固定為0且唯讀
+            if (this.workQuantityInput) {
+                this.workQuantityInput.setAttribute('readonly', 'readonly');
+                this.workQuantityInput.value = '0';
+                this.workQuantityInput.classList.add('bg-light');
             }
+            if (this.defectQuantityInput) {
+                this.defectQuantityInput.setAttribute('readonly', 'readonly');
+                this.defectQuantityInput.value = '0';
+                this.defectQuantityInput.classList.add('bg-light');
+            }
+            console.log('作業員RD樣品現場報工：數量欄位固定為0且唯讀');
         }
 
         // 表單驗證
         validateForm(e) {
-            const requiredFields = ['company_code', 'operator', 'process', 'status'];
             let isValid = true;
 
-            requiredFields.forEach(fieldName => {
-                const field = document.getElementById(fieldName);
-                if (field && !field.value.trim()) {
-                    field.classList.add('is-invalid');
-                    isValid = false;
-                } else if (field) {
-                    field.classList.remove('is-invalid');
-                }
-            });
+            // 檢查公司名稱
+            const companyField = document.getElementById('company_code');
+            if (companyField && !companyField.value.trim()) {
+                companyField.classList.add('is-invalid');
+                isValid = false;
+            } else if (companyField) {
+                companyField.classList.remove('is-invalid');
+            }
+
+            // 檢查作業員
+            const operatorField = document.getElementById('operator');
+            if (operatorField && !operatorField.value.trim()) {
+                operatorField.classList.add('is-invalid');
+                isValid = false;
+            } else if (operatorField) {
+                operatorField.classList.remove('is-invalid');
+            }
+
+            // 檢查工序
+            const processField = document.getElementById('process');
+            if (processField && !processField.value.trim()) {
+                processField.classList.add('is-invalid');
+                isValid = false;
+            } else if (processField) {
+                processField.classList.remove('is-invalid');
+            }
+
+            // 檢查報工狀態 (radio button)
+            const statusRadios = document.querySelectorAll('input[name="status"]');
+            const selectedStatus = document.querySelector('input[name="status"]:checked');
+            if (!selectedStatus) {
+                // 為所有狀態 radio button 添加錯誤樣式
+                statusRadios.forEach(radio => {
+                    radio.closest('.form-check').classList.add('is-invalid');
+                });
+                isValid = false;
+            } else {
+                // 移除錯誤樣式
+                statusRadios.forEach(radio => {
+                    radio.closest('.form-check').classList.remove('is-invalid');
+                });
+            }
 
             if (!isValid) {
                 e.preventDefault();
@@ -375,20 +348,31 @@ function hideLoading() {
 function validateForm() {
     let errorMessages = [];
     
-    // 檢查必填欄位
-    const requiredFields = [
-        { id: 'company_code', name: '公司名稱' },
-        { id: 'operator', name: '作業員' },
-        { id: 'process', name: '工序' },
-        { id: 'status', name: '報工狀態' }
-    ];
+    // 檢查公司名稱
+    const companyElement = document.getElementById('company_code');
+    const companyValue = companyElement ? companyElement.value : '';
+    if (!companyValue || companyValue === '') {
+        errorMessages.push('• 公司名稱 為必填欄位');
+    }
     
-    for (let field of requiredFields) {
-        const element = document.getElementById(field.id);
-        const value = element ? element.value : '';
-        if (!value || value === '') {
-            errorMessages.push(`• ${field.name} 為必填欄位`);
-        }
+    // 檢查作業員
+    const operatorElement = document.getElementById('operator');
+    const operatorValue = operatorElement ? operatorElement.value : '';
+    if (!operatorValue || operatorValue === '') {
+        errorMessages.push('• 作業員 為必填欄位');
+    }
+    
+    // 檢查工序
+    const processElement = document.getElementById('process');
+    const processValue = processElement ? processElement.value : '';
+    if (!processValue || processValue === '') {
+        errorMessages.push('• 工序 為必填欄位');
+    }
+    
+    // 檢查報工狀態 (radio button)
+    const selectedStatus = document.querySelector('input[name="status"]:checked');
+    if (!selectedStatus) {
+        errorMessages.push('• 報工狀態 為必填欄位');
     }
     
     // 驗證工作數量

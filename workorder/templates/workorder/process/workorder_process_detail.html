@@ -4,6 +4,29 @@
 {% block content %}
 {% csrf_token %}
 <div class="container mt-4">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-light border rounded p-3">
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:index' %}" class="text-decoration-none">
+                    <i class="fas fa-home text-primary"></i> 首頁
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:list' %}" class="text-decoration-none">
+                    <i class="fas fa-list text-primary"></i> 工單管理
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:production_workorder_detail' workorder.id %}" class="text-decoration-none">
+                    <i class="fas fa-file-alt text-primary"></i> 工單詳情
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-tasks text-secondary"></i> 工序明細
+            </li>
+        </ol>
+    </nav>
     <!-- 工單基本資訊卡片 -->
     <div class="card mb-4">
         <div class="card-header bg-primary text-white">
@@ -43,11 +66,11 @@
         </div>
     </div>
 
-    <!-- 返回派工單列表按鈕 -->
+    <!-- 返回工單列表按鈕 -->
     <div class="row mb-3">
         <div class="col-auto">
-            <a href="{% url 'workorder_dispatch:dispatch_list' %}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> 返回派工單列表
+            <a href="{% url 'workorder:list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回工單列表
             </a>
         </div>
     </div>
@@ -116,7 +139,7 @@
                             {% if is_completed_workorder %}
                             <td>{{ process.defect_quantity|default:0 }}</td>
                             {% endif %}
-                            <td>{{ process.completion_rate }}</td>
+                            <td>{{ process.completion_rate|floatformat:1 }}%</td>
                             <td>{{ process.get_status_display }}</td>
                             <td>{{ process.assigned_equipment|default:'-' }}</td>
                             <td>{{ process.assigned_operator|default:'-' }}</td>

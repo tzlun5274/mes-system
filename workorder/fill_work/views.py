@@ -285,7 +285,11 @@ class OperatorRDBackfillForm(ModelForm):
             'work_date', 'start_time', 'end_time', 'remarks', 'abnormal_notes'
         ]
         widgets = {
-            'product_id': forms.TextInput(attrs={'class': 'form-control', 'readonly': 'readonly'}),
+            'product_id': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '請輸入產品編號',
+                'title': '請輸入RD樣品的產品編號'
+            }),
             'workorder': forms.TextInput(attrs={'class': 'form-control', 'readonly': 'readonly'}),
             'planned_quantity': forms.NumberInput(attrs={'class': 'form-control', 'readonly': 'readonly'}),
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
@@ -335,7 +339,7 @@ class OperatorRDBackfillForm(ModelForm):
                 options.append((s, s))
             self.fields['work_date'].choices = options
             self.fields['work_date'].initial = today.strftime('%Y-%m-%d')
-            self.fields['product_id'].initial = 'PFP-CCT'
+            self.fields['product_id'].initial = 'PFP-CCT'  # 預設值，但可以手動修改
             self.fields['workorder'].initial = 'RD樣品'
             self.fields['planned_quantity'].initial = 0
             # 不設定時間初始值，讓前端JavaScript處理
@@ -355,17 +359,14 @@ class OperatorRDBackfillForm(ModelForm):
         return choices
     
     def get_operator_choices(self):
-        """獲取作業員選項"""
         choices = [("", "請選擇作業員")]
-        
         try:
-            from process.models import Operator
-            operators = Operator.objects.all().order_by('name')
-            for operator in operators:
-                choices.append((operator.name, operator.name))
-        except ImportError:
+            # 排除SMT相關的作業員，因為SMT是設備/產線，不是人員
+            operators = Operator.objects.exclude(name__icontains='SMT').order_by('name')
+            for o in operators:
+                choices.append((o.name, o.name))
+        except Exception:
             pass
-        
         return choices
     
     def get_equipment_choices(self):
@@ -527,7 +528,8 @@ class SMTBackfillForm(ModelForm):
     def get_operator_choices(self):
         choices = [("", "請選擇作業員")]
         try:
-            operators = Operator.objects.all().order_by('name')
+            # 排除SMT相關的作業員，因為SMT是設備/產線，不是人員
+            operators = Operator.objects.exclude(name__icontains='SMT').order_by('name')
             for o in operators:
                 choices.append((o.name, o.name))
         except Exception:
@@ -543,7 +545,7 @@ class SMTBackfillForm(ModelForm):
         except Exception:
             pass
         return choices
-
+    
     def clean_start_time(self):
         """驗證開始時間格式"""
         start_time = self.cleaned_data.get('start_time')
@@ -588,7 +590,11 @@ class SMTRDBackfillForm(ModelForm):
         choices=[], label="公司名稱",
         widget=forms.Select(attrs={'class': 'form-select'}), required=True
     )
-    operator = forms.CharField(label="作業員", required=False)
+    operator = forms.CharField(
+        label="作業員",
+        widget=forms.TextInput(attrs={'class': 'form-control', 'readonly': 'readonly'}),
+        required=False
+    )
     equipment = forms.ChoiceField(
         choices=[], label="使用的設備",
         widget=forms.Select(attrs={'class': 'form-select'}), required=True
@@ -602,7 +608,11 @@ class SMTRDBackfillForm(ModelForm):
             'work_date', 'start_time', 'end_time', 'remarks', 'abnormal_notes'
         ]
         widgets = {
-            'product_id': forms.TextInput(attrs={'class': 'form-control'}),
+            'product_id': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '請輸入產品編號',
+                'title': '請輸入SMT RD樣品的產品編號'
+            }),
             'workorder': forms.TextInput(attrs={'class': 'form-control', 'readonly': 'readonly'}),
             'planned_quantity': forms.NumberInput(attrs={'class': 'form-control', 'readonly': 'readonly'}),
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
@@ -822,6 +832,79 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         try:
+            from workorder.models import WorkOrder
+            from workorder.workorder_dispatch.models import WorkOrderDispatch
+            from erp_integration.models import CompanyConfig
+            from django.utils import timezone
+            
+            # 取得表單資料
+            company_name = form.cleaned_data.get('company_name')
+            product_code = form.cleaned_data.get('product_id')
+            
+            # 取得公司代號
+            company_config = CompanyConfig.objects.filter(company_name=company_name).first()
+            if not company_config:
+                messages.error(self.request, '找不到對應的公司設定')
+                return self.form_invalid(form)
+            
+            company_code_value = company_config.company_code
+            
+            # 查找現有工單（只根據公司代號和工單號碼，因為唯一性約束是 (company_code, order_number)）
+            existing_workorder = WorkOrder.objects.filter(
+                company_code=company_code_value,
+                order_number='RD樣品'
+            ).first()
+            
+            workorder = None
+            workorder_created = False
+            
+            if existing_workorder:
+                workorder = existing_workorder
+                messages.info(self.request, f'找到現有RD樣品工單: {workorder.order_number}')
+            else:
+                # 建立新工單
+                workorder = WorkOrder.objects.create(
+                    company_code=company_code_value,
+                    order_number='RD樣品',
+                    product_code=product_code,
+                    quantity=0,
+                    status='in_progress',
+                    order_source='MES手動建立'
+                )
+                workorder_created = True
+                messages.info(self.request, f'建立新RD樣品工單: {workorder.order_number}')
+            
+            # 檢查並建立派工單（比對公司代號+工單號碼+產品編號+工序）
+            existing_dispatch = WorkOrderDispatch.objects.filter(
+                company_code=company_code_value,
+                order_number='RD樣品',
+                product_code=product_code,
+                process_name=process_name
+            ).first()
+            
+            dispatch_created = False
+            
+            if existing_dispatch:
+                messages.info(self.request, f'找到現有RD樣品派工單: {existing_dispatch.order_number}')
+            else:
+                # 建立新派工單
+                new_dispatch = WorkOrderDispatch.objects.create(
+                    company_code=company_code_value,
+                    order_number='RD樣品',
+                    product_code=product_code,
+                    product_name=f'RD樣品-{product_code}',
+                    planned_quantity=0,
+                    status='in_production',
+                    dispatch_date=timezone.now().date(),
+                    assigned_operator=form.cleaned_data.get('operator'),
+                    assigned_equipment=form.cleaned_data.get('equipment') or '',
+                    process_name=process_name,
+                    notes=f"作業員RD樣品補登填報自動建立 - 建立時間: {timezone.now()} - 注意：RD樣品無預定工序流程",
+                    created_by=self.request.user.username
+                )
+                dispatch_created = True
+                messages.info(self.request, f'建立新RD樣品派工單: {new_dispatch.order_number}')
+            
             # 設定休息時間（作業員RD填報：12:00-13:00）
             form.instance.has_break = True
             form.instance.break_start_time = time(12, 0)
@@ -833,8 +916,14 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
             # 儲存表單
             response = super().form_valid(form)
             
-            # 成功訊息
-            messages.success(self.request, '作業員RD樣品補登填報新增成功！')
+            # 顯示建立結果
+            success_message = '作業員RD樣品補登填報新增成功！'
+            if workorder_created:
+                success_message += f' - 已建立新工單: {workorder.order_number}'
+            if dispatch_created:
+                success_message += f' - 已建立新派工單'
+            
+            messages.success(self.request, success_message)
             
             return response
             
@@ -942,6 +1031,80 @@ class SMTRDBackfillCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         try:
+            from workorder.models import WorkOrder
+            from workorder.workorder_dispatch.models import WorkOrderDispatch
+            from erp_integration.models import CompanyConfig
+            from django.utils import timezone
+            
+            # 取得表單資料
+            company_name = form.cleaned_data.get('company_name')
+            product_code = form.cleaned_data.get('product_id')
+            
+            # 取得公司代號
+            company_config = CompanyConfig.objects.filter(company_name=company_name).first()
+            if not company_config:
+                messages.error(self.request, '找不到對應的公司設定')
+                return self.form_invalid(form)
+            
+            company_code_value = company_config.company_code
+            
+            # 查找現有工單（只根據公司代號和工單號碼，因為唯一性約束是 (company_code, order_number)）
+            existing_workorder = WorkOrder.objects.filter(
+                company_code=company_code_value,
+                order_number='RD樣品'
+            ).first()
+            
+            workorder = None
+            workorder_created = False
+            
+            if existing_workorder:
+                workorder = existing_workorder
+                messages.info(self.request, f'找到現有RD樣品工單: {workorder.order_number}')
+            else:
+                # 建立新工單
+                workorder = WorkOrder.objects.create(
+                    company_code=company_code_value,
+                    order_number='RD樣品',
+                    product_code=product_code,
+                    quantity=0,
+                    status='in_progress',
+                    order_source='MES手動建立'
+                )
+                workorder_created = True
+                messages.info(self.request, f'建立新RD樣品工單: {workorder.order_number}')
+            
+            # 檢查並建立派工單（比對公司代號+工單號碼+產品編號+工序）
+            process_name = form.cleaned_data.get('process').name if form.cleaned_data.get('process') else ''
+            existing_dispatch = WorkOrderDispatch.objects.filter(
+                company_code=company_code_value,
+                order_number='RD樣品',
+                product_code=product_code,
+                process_name=process_name
+            ).first()
+            
+            dispatch_created = False
+            
+            if existing_dispatch:
+                messages.info(self.request, f'找到現有RD樣品派工單: {existing_dispatch.order_number}')
+            else:
+                # 建立新派工單
+                new_dispatch = WorkOrderDispatch.objects.create(
+                    company_code=company_code_value,
+                    order_number='RD樣品',
+                    product_code=product_code,
+                    product_name=f'RD樣品-{product_code}',
+                    planned_quantity=0,
+                    status='in_production',
+                    dispatch_date=timezone.now().date(),
+                    assigned_operator=form.cleaned_data.get('operator') or '',
+                    assigned_equipment=form.cleaned_data.get('equipment') or '',
+                    process_name=process_name,
+                    notes=f"SMT_RD樣品補登填報自動建立 - 建立時間: {timezone.now()} - 注意：RD樣品無預定工序流程",
+                    created_by=self.request.user.username
+                )
+                dispatch_created = True
+                messages.info(self.request, f'建立新RD樣品派工單: {new_dispatch.order_number}')
+            
             # 設定無休息時間（SMT RD填報：12:00-12:00）
             form.instance.has_break = True
             form.instance.break_start_time = time(12, 0)
@@ -951,7 +1114,15 @@ class SMTRDBackfillCreateView(LoginRequiredMixin, CreateView):
             form.instance.created_by = self.request.user.username
             
             response = super().form_valid(form)
-            messages.success(self.request, 'SMT_RD樣品補登填報新增成功！')
+            
+            # 顯示建立結果
+            success_message = 'SMT_RD樣品補登填報新增成功！'
+            if workorder_created:
+                success_message += f' - 已建立新工單: {workorder.order_number}'
+            if dispatch_created:
+                success_message += f' - 已建立新派工單'
+            
+            messages.success(self.request, success_message)
             return response
         except Exception as e:
             messages.error(self.request, f'儲存失敗：{str(e)}')

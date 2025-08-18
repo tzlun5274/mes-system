@@ -244,7 +244,15 @@
                         <div class="recent-item">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <strong>{{ report.operator }}</strong> - {{ report.workorder }}
+                                    <strong>
+                                        {% if report.report_type == 'smt' or report.report_type == 'smt_rd' %}
+                                            [SMT] {{ report.operator }}
+                                        {% elif report.report_type == 'operator' or report.report_type == 'operator_rd' %}
+                                            [作業員] {{ report.operator }}
+                                        {% else %}
+                                            {{ report.operator }}
+                                        {% endif %}
+                                    </strong> - {{ report.workorder }}
                                     <br>
                                     <small class="text-muted">{{ report.product_id }} | {{ report.process }}</small>
                                 </div>
@@ -279,7 +287,15 @@
                         <div class="recent-item">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <strong>{{ report.operator }}</strong> - {{ report.workorder }}
+                                    <strong>
+                                        {% if report.report_type == 'smt' or report.report_type == 'smt_rd' %}
+                                            [SMT] {{ report.operator }}
+                                        {% elif report.report_type == 'operator' or report.report_type == 'operator_rd' %}
+                                            [作業員] {{ report.operator }}
+                                        {% else %}
+                                            {{ report.operator }}
+                                        {% endif %}
+                                    </strong> - {{ report.workorder }}
                                     <br>
                                     <small class="text-muted">{{ report.product_id }} | {{ report.process }}</small>
                                 </div>

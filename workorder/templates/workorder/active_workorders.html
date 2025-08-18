@@ -321,7 +321,7 @@
                 
                 <div class="card-body p-0">
                     {% if workorders_with_approved_reports %}
-                        {% for workorder in workorders_with_approved_reports|slice:":10" %}
+                        {% for workorder in workorders_with_approved_reports %}
                         <div class="workorder-item">
                             <div class="workorder-detail-item">
                                 <i class="fas fa-building"></i>
@@ -350,15 +350,9 @@
                         </div>
                         {% endfor %}
                         
-                        {% if workorders_with_approved_reports.count > 10 %}
-                        <div class="text-center p-3 border-top">
-                            <span class="text-muted">顯示前 10 筆記錄，共 {{ workorders_with_approved_reports.count }} 筆</span>
-                            <br>
-                            <a href="{% url 'workorder:list' %}" class="btn btn-outline-primary btn-sm mt-2">
-                                <i class="fas fa-list"></i> 查看全部工單
-                            </a>
-                        </div>
-                        {% endif %}
+                        <!-- 全局分頁組件 -->
+                        {% include 'includes/pagination.html' with page_obj=page_obj %}
+                        
                     {% else %}
                         <div class="text-center p-5">
                             <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
@@ -385,7 +379,7 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <ul class="mb-0 small">
-                                    <li><strong>執行中工單：</strong>有已核准填報記錄的工單數量</li>
+                                    <li><strong>執行中工單：</strong>有已核准填報記錄的工單 + 狀態為生產中的派工單</li>
                                     <li><strong>待生產工單：</strong>狀態為待生產的工單數量</li>
                                     <li><strong>工單列表：</strong>顯示公司、工單號、產品、數量、日期，詳細資料請點擊「詳情」</li>
                                 </ul>

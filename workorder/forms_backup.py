@@ -18,7 +18,6 @@ from equip.models import Equipment
 from datetime import datetime, date, timedelta
 from django.contrib.auth.models import User
 from workorder.workorder_dispatch.models import WorkOrderDispatch
-from erp_integration.models import CompanyConfig
 
 
 class TimeInputWidget(forms.Widget):
@@ -303,88 +302,90 @@ class ProductionReportBaseForm(forms.ModelForm):
 
 # 工單管理表單，支援新增與編輯
 class WorkOrderForm(forms.ModelForm):
-    """
-    工單表單類別
-    用於工單的新增和編輯
-    """
-    
+    # 公司代號欄位（手動輸入或下拉）
+    company_code = forms.CharField(
+        max_length=10,
+        label="公司代號",
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+        required=True,
+    )
+    # 工單編號（自動生成或手動輸入）
+    order_number = forms.CharField(
+        max_length=50,
+        label="工單編號",
+        widget=forms.TextInput(attrs={"class": "form-control", "readonly": "readonly"}),
+        required=True,
+        help_text="工單號碼將自動生成，格式：WO-{公司代號}-{年月}{序號}",
+    )
+    # 產品編號（下拉選單）
+    product_code = forms.ChoiceField(
+        choices=[],
+        label="產品編號",
+        widget=forms.Select(attrs={"class": "form-control"}),
+        required=True,
+    )
+    # 數量（手動輸入）
+    quantity = forms.IntegerField(
+        label="數量",
+        widget=forms.NumberInput(attrs={"class": "form-control"}),
+        required=True,
+        min_value=1,
+    )
+    # 狀態（下拉選單）
+    status = forms.ChoiceField(
+        label="狀態",
+        choices=[
+            ("pending", "待生產"),
+            ("in_progress", "生產中"),
+            ("completed", "已完工"),
+        ],
+        widget=forms.Select(attrs={"class": "form-control"}),
+        required=True,
+    )
+
     class Meta:
         model = WorkOrder
-        fields = [
-            'company_code',
-            'order_number', 
-            'product_code',
-            'quantity',
-            'status',
-            'order_source'
-        ]
-        widgets = {
-            'company_code': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': '請輸入公司代號'
-            }),
-            'order_number': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': '請輸入工單號碼'
-            }),
-            'product_code': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': '請輸入產品編號'
-            }),
-            'quantity': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '1',
-                'placeholder': '請輸入數量'
-            }),
-            'status': forms.Select(attrs={
-                'class': 'form-select'
-            }),
-            'order_source': forms.Select(attrs={
-                'class': 'form-select'
-            })
+        fields = ["company_code", "order_number", "product_code", "quantity", "status"]
+        labels = {
+            "company_code": "公司代號",
+            "order_number": "工單編號",
+            "product_code": "產品編號",
+            "quantity": "數量",
+            "status": "狀態",
         }
-    
+        widgets = {
+            "company_code": forms.TextInput(attrs={"class": "form-control"}),
+            "order_number": forms.TextInput(attrs={"class": "form-control"}),
+            "quantity": forms.NumberInput(attrs={"class": "form-control"}),
+            "status": forms.Select(attrs={"class": "form-control"}),
+        }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
-        # 設定欄位標籤
-        self.fields['company_code'].label = '公司代號'
-        self.fields['order_number'].label = '工單號碼'
-        self.fields['product_code'].label = '產品編號'
-        self.fields['quantity'].label = '數量'
-        self.fields['status'].label = '狀態'
-        self.fields['order_source'].label = '工單來源'
-        
-        # 設定說明文字
-        self.fields['company_code'].help_text = '請輸入公司代號'
-        self.fields['order_number'].help_text = '請輸入工單號碼'
-        self.fields['product_code'].help_text = '請輸入產品編號'
-        self.fields['quantity'].help_text = '請輸入數量'
-        self.fields['status'].help_text = '請選擇工單狀態'
-        self.fields['order_source'].help_text = '請選擇工單來源'
-    
-    def clean(self):
-        """表單驗證"""
-        cleaned_data = super().clean()
-        
-        # 驗證公司代號和工單號碼的組合必須唯一
-        company_code = cleaned_data.get('company_code')
-        order_number = cleaned_data.get('order_number')
-        
-        if company_code and order_number:
-            # 檢查是否已存在相同的組合
-            existing = WorkOrder.objects.filter(
-                company_code=company_code,
-                order_number=order_number
+        # 動態載入產品編號選項
+        self.fields["product_code"].choices = self.get_product_choices()
+
+    def get_product_choices(self):
+        """取得產品編號選項，從公司製令單中取得"""
+        choices = [("", "請選擇產品編號")]
+        try:
+            # 取得所有公司製令單的產品編號（包括已轉換和未轉換的）
+            from .models import CompanyOrder
+
+            company_orders = (
+                CompanyOrder.objects.all()
+                .values_list("product_id", "product_id")
+                .distinct()
+                .order_by("product_id")
             )
-            
-            if self.instance.pk:
-                existing = existing.exclude(pk=self.instance.pk)
-            
-            if existing.exists():
-                raise forms.ValidationError('此公司代號和工單號碼的組合已存在')
-        
-        return cleaned_data
+
+            for product_id, _ in company_orders:
+                choices.append((product_id, product_id))
+        except Exception as e:
+            # 如果發生錯誤，至少提供空選項
+            pass
+
+        return choices
 
 
 # ==================== SMT 補登報工表單 ====================
@@ -1623,7 +1624,7 @@ class BackupRDSampleSupplementReportForm(ProductionReportBaseForm):
             "end_time": "請輸入實際結束時間 (24小時制)，例如 18:30",
             "work_quantity": "請輸入該時段內實際完成的樣品數量",
             "defect_quantity": "請輸入本次製作中產生的不良品數量，若無則留空或填寫0",
-            "is_completed": "若此工單在此工序上已全部完成，請勾選",
+            "is_completed": "若此RD樣品製作已全部完成，請勾選",
             "completion_method": "請選擇完工判斷方式",
             "remarks": "請輸入備註說明（可選）",
             "approval_status": "請選擇審核狀態",
@@ -1639,41 +1640,11 @@ class BackupRDSampleSupplementReportForm(ProductionReportBaseForm):
 # ==================== 作業員現場報工表單 ====================
 
 
-class OperatorOnSiteReportForm(forms.Form):
+class OperatorOnSiteReportForm(forms.ModelForm):
     """
     作業員現場報工表單
     用於作業員現場報工記錄
     """
-
-    # 產品編號選擇
-    product_id = forms.ChoiceField(
-        choices=[],
-        label="產品編號",
-        widget=forms.Select(
-            attrs={
-                "class": "form-control",
-                "id": "product_id_select",
-                "placeholder": "請選擇產品編號",
-            }
-        ),
-        required=True,
-        help_text="請選擇產品編號",
-    )
-
-    # 公司名稱選擇
-    company_name = forms.ChoiceField(
-        choices=[],
-        label="公司名稱",
-        widget=forms.Select(
-            attrs={
-                "class": "form-control",
-                "id": "company_name_select",
-                "placeholder": "請選擇公司名稱",
-            }
-        ),
-        required=True,
-        help_text="請選擇公司名稱",
-    )
 
     # 作業員選擇
     operator = forms.ModelChoiceField(
@@ -1741,99 +1712,106 @@ class OperatorOnSiteReportForm(forms.Form):
         widget=forms.NumberInput(
             attrs={
                 "class": "form-control",
+                "min": "0",
                 "id": "quantity_input",
-                "placeholder": "請輸入數量",
+                "placeholder": "請輸入完成數量",
             }
         ),
         required=True,
-        help_text="請輸入數量",
+        help_text="請輸入完成數量",
     )
+
+    # 備註
+    notes = forms.CharField(
+        label="備註",
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": "3",
+                "id": "notes_input",
+                "placeholder": "請輸入備註",
+            }
+        ),
+        required=False,
+        help_text="請輸入備註",
+    )
+
+    class Meta:
+        # 注意：BackupOperatorSupplementReport 模型已棄用
+        model = None
+        fields = [
+            "operator",
+            "workorder",
+            "process",
+            "equipment",
+            "quantity",
+            "notes",
+        ]
+        labels = {
+            "operator": "作業員",
+            "workorder": "工單號碼",
+            "process": "工序",
+            "equipment": "使用的設備",
+            "quantity": "完成數量",
+            "notes": "備註",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # 載入產品編號選項（從 WorkOrderDispatch 中取得）
-        from workorder.workorder_dispatch.models import WorkOrderDispatch
-
-        products = (
-            WorkOrderDispatch.objects.exclude(status="completed")
-            .exclude(status="cancelled")  # 排除已取消的工單
-            .filter(status__in=["pending", "in_production"])  # 只顯示待處理和生產中的工單
-            .values_list("product_code", flat=True)
-            .distinct()
-            .order_by("product_code")
-        )
-
-        product_choices = [("", "請選擇產品編號")]
-        for product in products:
-            if product:  # 確保產品編號不為空
-                product_choices.append((product, product))
-        self.fields["product_id"].choices = product_choices
-
-        # 載入公司名稱選項（從 CompanyConfig 中取得）
-        from erp_integration.models import CompanyConfig
-
-        companies = CompanyConfig.objects.all().order_by("company_name")
-        company_choices = [("", "請選擇公司名稱")]
-        for company in companies:
-            company_choices.append((company.company_name, company.company_name))
-        self.fields["company_name"].choices = company_choices
-
-        # 載入作業員選項
+        # 設定作業員查詢集
         from process.models import Operator
 
-        operators = Operator.objects.all().order_by("name")
-        self.fields["operator"].queryset = operators
+        self.fields["operator"].queryset = Operator.objects.all().order_by("name")
 
-        # 載入工序選項
+        # 設定工單查詢集
+        self.fields["workorder"].queryset = WorkOrder.objects.filter(
+            status__in=["pending", "in_progress"]
+        ).order_by("-created_at")
+
+        # 設定工序查詢集
         from process.models import ProcessName
 
-        processes = ProcessName.objects.all().order_by("name")
-        self.fields["process"].queryset = processes
+        self.fields["process"].queryset = ProcessName.objects.exclude(
+            name__icontains="SMT"
+        ).order_by("name")
 
-        # 載入設備選項
+        # 設定設備查詢集 - 排除SMT相關設備
         from equip.models import Equipment
 
-        equipments = Equipment.objects.all().order_by("name")
-        self.fields["equipment"].queryset = equipments
-
-        # 載入工單選項（統一使用 WorkOrderDispatch 作為資料來源）
-        workorders = (
-            WorkOrderDispatch.objects.exclude(status="completed")
-            .exclude(status="cancelled")  # 排除已取消的工單
-            .filter(status__in=["pending", "in_production"])  # 只顯示待處理和生產中的工單
-            .order_by("-created_at")
-        )
-        self.fields["workorder"].queryset = workorders
+        self.fields["equipment"].queryset = Equipment.objects.exclude(
+            name__icontains="SMT"
+        ).order_by("name")
 
 
 class AutoManagementConfigForm(forms.ModelForm):
     """
-    自動管理功能設定表單類別
-    用於自動管理功能設定的新增和編輯
+    自動管理功能設定表單
     """
     
     class Meta:
         model = AutoManagementConfig
-        fields = [
-            'function_type',
-            'is_enabled',
-            'interval_minutes'
-        ]
+        fields = ['function_type', 'is_enabled', 'interval_minutes']
         widgets = {
-            'function_type': forms.Select(attrs={
-                'class': 'form-select',
-                'placeholder': '請選擇功能類型'
-            }),
-            'is_enabled': forms.CheckboxInput(attrs={
-                'class': 'form-check-input'
-            }),
-            'interval_minutes': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '1',
-                'max': '1440',  # 24小時 = 1440分鐘
-                'placeholder': '請輸入執行間隔（分鐘）'
-            })
+            'function_type': forms.Select(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': '請選擇功能類型'
+                }
+            ),
+            'is_enabled': forms.CheckboxInput(
+                attrs={
+                    'class': 'form-check-input',
+                }
+            ),
+            'interval_minutes': forms.NumberInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': '請輸入執行間隔（分鐘）',
+                    'min': '1',
+                    'max': '1440',  # 最多24小時
+                }
+            ),
         }
     
     def __init__(self, *args, **kwargs):
@@ -2696,7 +2674,12 @@ class OperatorOnSiteReportForm(forms.ModelForm):
         from workorder.workorder_dispatch.models import WorkOrderDispatch
 
         products = (
-            WorkOrderDispatch.objects.exclude(status="completed")
+            WorkOrderDispatch.objects.exclude(order_number__icontains="RD樣品")
+            .exclude(order_number__icontains="RD-樣品")
+            .exclude(order_number__icontains="RD樣本")
+            .exclude(product_code="PFP-CCT")  # 排除 RD 樣品的產品編號
+            .exclude(product_code__startswith="PFP-CCT")  # 排除所有 PFP-CCT 開頭的產品編號
+            .exclude(status="completed")
             .exclude(status="cancelled")  # 排除已取消的工單
             .filter(status__in=["pending", "in_production"])  # 只顯示待處理和生產中的工單
             .values_list("product_code", flat=True)
@@ -2739,7 +2722,12 @@ class OperatorOnSiteReportForm(forms.ModelForm):
 
         # 載入工單選項（統一使用 WorkOrderDispatch 作為資料來源）
         workorders = (
-            WorkOrderDispatch.objects.exclude(status="completed")
+            WorkOrderDispatch.objects.exclude(order_number__icontains="RD樣品")
+            .exclude(order_number__icontains="RD-樣品")
+            .exclude(order_number__icontains="RD樣本")
+            .exclude(product_code="PFP-CCT")  # 排除 RD 樣品的產品編號
+            .exclude(product_code__startswith="PFP-CCT")  # 排除所有 PFP-CCT 開頭的產品編號
+            .exclude(status="completed")
             .exclude(status="cancelled")  # 排除已取消的工單
             .filter(status__in=["pending", "in_production"])  # 只顯示待處理和生產中的工單
             .order_by("-created_at")

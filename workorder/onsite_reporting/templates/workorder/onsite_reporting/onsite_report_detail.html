@@ -3,8 +3,90 @@
 
 {% block title %}現場報工記錄詳情{% endblock %}
 
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const newStatusSelect = document.getElementById('new_status');
+    const workQuantityInput = document.getElementById('work_quantity');
+    const defectQuantityInput = document.getElementById('defect_quantity');
+    
+    if (newStatusSelect) {
+        newStatusSelect.addEventListener('change', function() {
+            const selectedStatus = this.value;
+            
+            if (selectedStatus === 'completed' || selectedStatus === 'stopped') {
+                // 完工或停工時，數量欄位可編輯
+                workQuantityInput.removeAttribute('readonly');
+                defectQuantityInput.removeAttribute('readonly');
+                workQuantityInput.classList.remove('bg-light');
+                defectQuantityInput.classList.remove('bg-light');
+                console.log('數量欄位設為可編輯');
+            } else {
+                // 其他狀態時，數量欄位唯讀
+                workQuantityInput.setAttribute('readonly', 'readonly');
+                defectQuantityInput.setAttribute('readonly', 'readonly');
+                workQuantityInput.classList.add('bg-light');
+                defectQuantityInput.classList.add('bg-light');
+                console.log('數量欄位設為唯讀');
+            }
+        });
+    }
+    
+    // 表單提交驗證
+    const statusChangeForm = document.getElementById('statusChangeForm');
+    if (statusChangeForm) {
+        statusChangeForm.addEventListener('submit', function(e) {
+            const selectedStatus = newStatusSelect.value;
+            const workQuantity = parseInt(workQuantityInput.value) || 0;
+            const defectQuantity = parseInt(defectQuantityInput.value) || 0;
+            
+            // 如果選擇完工或停工，必須填寫工作數量
+            if ((selectedStatus === 'completed' || selectedStatus === 'stopped') && workQuantity === 0) {
+                e.preventDefault();
+                alert('完工或停工時必須填寫工作數量');
+                return false;
+            }
+            
+            // 檢查不良品數量不能超過工作數量
+            if (defectQuantity > workQuantity) {
+                e.preventDefault();
+                alert('不良品數量不能超過工作數量');
+                return false;
+            }
+            
+            return true;
+        });
+    }
+});
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:index' %}">
+                    <i class="fas fa-home"></i> 首頁
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:onsite_reporting:onsite_report_index' %}">
+                    <i class="fas fa-clipboard-list"></i> 現場報工
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'workorder:onsite_reporting:onsite_report_list' %}">
+                    <i class="fas fa-list"></i> 報工記錄
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-eye"></i> 報工詳情
+            </li>
+        </ol>
+    </nav>
+
     <div class="row">
         <div class="col-12">
             <div class="card">
@@ -29,12 +111,12 @@
                             <h5 class="border-bottom pb-2">基本資訊</h5>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">報工類型</label>
                             <p class="form-control-plaintext">{{ onsite_report.get_report_type_display }}</p>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">報工狀態</label>
                             <p class="form-control-plaintext">
                                 <span class="badge bg-{% if onsite_report.status == 'started' %}primary{% elif onsite_report.status == 'paused' %}warning{% elif onsite_report.status == 'resumed' %}info{% elif onsite_report.status == 'completed' %}success{% else %}danger{% endif %}">
@@ -43,34 +125,50 @@
                             </p>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">作業員</label>
-                            <p class="form-control-plaintext">{{ onsite_report.operator }}</p>
+                            <p class="form-control-plaintext">
+                            {% if onsite_report.report_type == 'smt' or onsite_report.report_type == 'smt_rd' %}
+                                [SMT] {{ onsite_report.operator }}
+                            {% elif onsite_report.report_type == 'operator' or onsite_report.report_type == 'operator_rd' %}
+                                [作業員] {{ onsite_report.operator }}
+                            {% else %}
+                                {{ onsite_report.operator }}
+                            {% endif %}
+                        </p>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">公司名稱</label>
                             <p class="form-control-plaintext">{{ onsite_report.company_name }}</p>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">工單號碼</label>
                             <p class="form-control-plaintext">{{ onsite_report.workorder }}</p>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">產品編號</label>
                             <p class="form-control-plaintext">{{ onsite_report.product_id }}</p>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">工序</label>
                             <p class="form-control-plaintext">{{ onsite_report.process }}</p>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">使用的設備</label>
-                            <p class="form-control-plaintext">{{ onsite_report.equipment|default:"未指定" }}</p>
+                            <p class="form-control-plaintext">
+                                {{ onsite_report.equipment|default:"未指定" }}
+                                {% if onsite_report.equipment %}
+                                    <br>
+                                    <span class="badge bg-{% if onsite_report.status in 'started,resumed' %}danger{% else %}success{% endif %}">
+                                        {% if onsite_report.status in 'started,resumed' %}使用中{% else %}可用{% endif %}
+                                    </span>
+                                {% endif %}
+                            </p>
                         </div>
                     </div>
 
@@ -80,17 +178,12 @@
                             <h5 class="border-bottom pb-2">時間資訊</h5>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">報工日期</label>
-                            <p class="form-control-plaintext">{{ onsite_report.work_date|date:"Y-m-d" }}</p>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">開始時間</label>
                             <p class="form-control-plaintext">{{ onsite_report.start_datetime|date:"Y-m-d H:i:s" }}</p>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">結束時間</label>
                             <p class="form-control-plaintext">
                                 {% if onsite_report.end_datetime %}
@@ -101,7 +194,7 @@
                             </p>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">工作時間</label>
                             <p class="form-control-plaintext">{{ onsite_report.get_duration_minutes }} 分鐘</p>
                         </div>
@@ -146,12 +239,12 @@
                             <h5 class="border-bottom pb-2">備註資訊</h5>
                         </div>
                         
-                        <div class="col-12 mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">備註</label>
                             <p class="form-control-plaintext">{{ onsite_report.remarks|default:"無" }}</p>
                         </div>
                         
-                        <div class="col-12 mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">異常記錄</label>
                             <p class="form-control-plaintext">{{ onsite_report.abnormal_notes|default:"無" }}</p>
                         </div>
@@ -163,17 +256,17 @@
                             <h5 class="border-bottom pb-2">系統資訊</h5>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">建立人員</label>
                             <p class="form-control-plaintext">{{ onsite_report.created_by }}</p>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">建立時間</label>
                             <p class="form-control-plaintext">{{ onsite_report.created_at|date:"Y-m-d H:i:s" }}</p>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">更新時間</label>
                             <p class="form-control-plaintext">{{ onsite_report.updated_at|date:"Y-m-d H:i:s" }}</p>
                         </div>
@@ -203,8 +296,32 @@
                                         <tr>
                                             <td>{{ record.changed_at|date:"Y-m-d H:i:s" }}</td>
                                             <td>{{ record.get_change_type_display }}</td>
-                                            <td>{{ record.old_status|default:"-" }}</td>
-                                            <td>{{ record.new_status|default:"-" }}</td>
+                                            <td>
+                                                {% if record.old_status %}
+                                                    {% if record.old_status == 'started' %}開工
+                                                    {% elif record.old_status == 'paused' %}暫停
+                                                    {% elif record.old_status == 'resumed' %}重啟開工
+                                                    {% elif record.old_status == 'completed' %}完工
+                                                    {% elif record.old_status == 'stopped' %}停工
+                                                    {% else %}{{ record.old_status }}
+                                                    {% endif %}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if record.new_status %}
+                                                    {% if record.new_status == 'started' %}開工
+                                                    {% elif record.new_status == 'paused' %}暫停
+                                                    {% elif record.new_status == 'resumed' %}重啟開工
+                                                    {% elif record.new_status == 'completed' %}完工
+                                                    {% elif record.new_status == 'stopped' %}停工
+                                                    {% else %}{{ record.new_status }}
+                                                    {% endif %}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
                                             <td>{{ record.old_quantity }}</td>
                                             <td>{{ record.new_quantity }}</td>
                                             <td>{{ record.change_notes|default:"-" }}</td>
@@ -213,6 +330,76 @@
                                         {% endfor %}
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- 狀態變更表單 -->
+                    {% if onsite_report.status != 'completed' and onsite_report.status != 'stopped' %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-edit"></i> 狀態變更
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <form method="post" id="statusChangeForm">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="change_status">
+                                        
+                                        <div class="row">
+                                            <div class="col-md-4 mb-3">
+                                                <label class="form-label">變更狀態 <span class="text-danger">*</span></label>
+                                                <select class="form-select" name="new_status" id="new_status" required>
+                                                    <option value="">請選擇新狀態</option>
+                                                    {% if onsite_report.status == 'started' %}
+                                                        <option value="paused">暫停</option>
+                                                        <option value="completed">完工</option>
+                                                        <option value="stopped">停工</option>
+                                                    {% elif onsite_report.status == 'paused' %}
+                                                        <option value="resumed">重啟開工</option>
+                                                        <option value="completed">完工</option>
+                                                        <option value="stopped">停工</option>
+                                                    {% elif onsite_report.status == 'resumed' %}
+                                                        <option value="paused">暫停</option>
+                                                        <option value="completed">完工</option>
+                                                        <option value="stopped">停工</option>
+                                                    {% endif %}
+                                                </select>
+                                            </div>
+                                            
+                                            <div class="col-md-4 mb-3">
+                                                <label for="work_quantity" class="form-label">工作數量</label>
+                                                <input type="number" class="form-control" id="work_quantity" name="work_quantity" min="0" value="{{ onsite_report.work_quantity }}" readonly>
+                                                <div class="form-text">只有完工或停工時才能填寫</div>
+                                            </div>
+                                            
+                                            <div class="col-md-4 mb-3">
+                                                <label for="defect_quantity" class="form-label">不良品數量</label>
+                                                <input type="number" class="form-control" id="defect_quantity" name="defect_quantity" min="0" value="{{ onsite_report.defect_quantity }}" readonly>
+                                                <div class="form-text">只有完工或停工時才能填寫</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-12 mb-3">
+                                                <label for="change_notes" class="form-label">變更說明</label>
+                                                <textarea class="form-control" id="change_notes" name="change_notes" rows="2" placeholder="請說明此次狀態變更的原因"></textarea>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-12 text-center">
+                                                <button type="submit" class="btn btn-primary">
+                                                    <i class="fas fa-save"></i> 更新狀態
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -354,7 +354,7 @@ def dispatch_list(request):
             
         # 檢查分配資訊
         has_assignment = (
-            WorkOrderProcess.objects.filter(workorder=workorder)
+            WorkOrderProcess.objects.filter(workorder_id=workorder.id)
             .filter(
                 models.Q(assigned_operator__isnull=False, assigned_operator__gt="")
                 | models.Q(assigned_equipment__isnull=False, assigned_equipment__gt="")
@@ -371,7 +371,7 @@ def dispatch_list(request):
         ).exists()
         # 新增：檢查工序明細裡有沒有分配作業員或設備
         order.has_assignment = (
-            WorkOrderProcess.objects.filter(workorder=order)
+            WorkOrderProcess.objects.filter(workorder_id=order.id)
             .filter(
                 models.Q(assigned_operator__isnull=False, assigned_operator__gt="")
                 | models.Q(assigned_equipment__isnull=False, assigned_equipment__gt="")
@@ -538,7 +538,7 @@ def manual_convert_orders(request):
                         
                         # 建立工序明細
                         process = WorkOrderProcess.objects.create(
-                            workorder=workorder,
+                            workorder_id=workorder.id,
                             process_name=route.process_name.name,
                             step_order=route.step_order,
                             planned_quantity=workorder.quantity,
@@ -659,7 +659,7 @@ def manual_convert_orders(request):
                         standard_processes, 1
                     ):
                         WorkOrderProcess.objects.create(
-                            workorder=workorder,
+                            workorder_id=workorder.id,
                             process_name=process_info["name"],
                             step_order=step_order,
                             planned_quantity=workorder.quantity,
@@ -713,7 +713,7 @@ def workorder_process_detail(request, workorder_id):
         has_process_route = True  # 完工工單一定有實際工序
     else:
         # 未完工工單：顯示預先建立的工序明細
-        processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by("step_order")
+        processes = WorkOrderProcess.objects.filter(workorder_id=workorder.id).order_by("step_order")
         
         # 檢查產品是否有工藝路線設定
         from process.models import ProductProcessRoute
@@ -750,12 +750,13 @@ def workorder_process_detail(request, workorder_id):
 def generate_completed_workorder_processes(workorder):
     """
     為完工工單從實際填報資料生成工序明細
-    整合作業員填報和SMT填報資料
+    使用新的 CompletedProductionReport 模型
     """
     from collections import defaultdict
     from datetime import datetime, time
+    from workorder.models import CompletedProductionReport, CompletedWorkOrder
     
-            # 收集所有填報資料
+    # 收集所有填報資料
     process_data = defaultdict(lambda: {
         'process_name': '',
         'planned_quantity': workorder.quantity,
@@ -771,68 +772,44 @@ def generate_completed_workorder_processes(workorder):
         'step_order': 0
     })
     
-            # 1. 收集作業員填報資料
-    # operator_reports = OperatorSupplementReport.objects.filter(
-    #     workorder=workorder,
-    #     approval_status='approved'
-    # ).select_related('operator', 'process', 'equipment')
-    operator_reports = []
+    # 查找對應的已完工工單
+    completed_workorder = CompletedWorkOrder.objects.filter(
+        order_number=workorder.order_number,
+        company_code=workorder.company_code
+    ).first()
     
-    for report in operator_reports:
-        process_name = report.process.name if report.process else report.operation
+    if not completed_workorder:
+        # 如果沒有找到已完工工單，返回空列表
+        return []
+    
+    # 收集所有已完工的報工記錄
+    production_reports = CompletedProductionReport.objects.filter(
+        completed_workorder_id=completed_workorder.id,
+        approval_status='approved'
+    ).order_by('report_date', 'start_time')
+    
+    for report in production_reports:
+        process_name = report.process_name
         if process_name:
             process_data[process_name]['process_name'] = process_name
             process_data[process_name]['completed_quantity'] += report.work_quantity
             process_data[process_name]['defect_quantity'] += report.defect_quantity
             
             if report.operator:
-                process_data[process_name]['assigned_operators'].add(report.operator.name)
+                process_data[process_name]['assigned_operators'].add(report.operator)
             if report.equipment:
-                process_data[process_name]['assigned_equipments'].add(report.equipment.name)
+                process_data[process_name]['assigned_equipments'].add(report.equipment)
             
             # 計算時間
-            report_start_time = datetime.combine(report.work_date, report.start_time)
-            report_end_time = datetime.combine(report.work_date, report.end_time)
+            if report.start_time:
+                if not process_data[process_name]['actual_start_time'] or report.start_time < process_data[process_name]['actual_start_time']:
+                    process_data[process_name]['actual_start_time'] = report.start_time
+            if report.end_time:
+                if not process_data[process_name]['actual_end_time'] or report.end_time > process_data[process_name]['actual_end_time']:
+                    process_data[process_name]['actual_end_time'] = report.end_time
             
-            if not process_data[process_name]['actual_start_time'] or report_start_time < process_data[process_name]['actual_start_time']:
-                process_data[process_name]['actual_start_time'] = report_start_time
-            if not process_data[process_name]['actual_end_time'] or report_end_time > process_data[process_name]['actual_end_time']:
-                process_data[process_name]['actual_end_time'] = report_end_time
-            
-            process_data[process_name]['total_work_hours'] += float(report.work_hours_calculated or 0)
-            process_data[process_name]['total_overtime_hours'] += float(report.overtime_hours_calculated or 0)
-            
-            if report.abnormal_notes:
-                process_data[process_name]['abnormal_notes'].append(report.abnormal_notes)
-    
-            # 2. 收集SMT填報資料
-    # smt_reports = SMTSupplementReport.objects.filter(
-    #     workorder=workorder,
-    #     approval_status='approved'
-    # ).select_related('equipment')
-    smt_reports = []
-    
-    for report in smt_reports:
-        process_name = report.operation
-        if process_name:
-            process_data[process_name]['process_name'] = process_name
-            process_data[process_name]['completed_quantity'] += report.work_quantity
-            process_data[process_name]['defect_quantity'] += report.defect_quantity
-            
-            if report.equipment:
-                process_data[process_name]['assigned_equipments'].add(report.equipment.name)
-            
-            # 計算時間
-            report_start_time = datetime.combine(report.work_date, report.start_time)
-            report_end_time = datetime.combine(report.work_date, report.end_time)
-            
-            if not process_data[process_name]['actual_start_time'] or report_start_time < process_data[process_name]['actual_start_time']:
-                process_data[process_name]['actual_start_time'] = report_start_time
-            if not process_data[process_name]['actual_end_time'] or report_end_time > process_data[process_name]['actual_end_time']:
-                process_data[process_name]['actual_end_time'] = report_end_time
-            
-            process_data[process_name]['total_work_hours'] += float(report.work_hours_calculated or 0)
-            process_data[process_name]['total_overtime_hours'] += float(report.overtime_hours_calculated or 0)
+            process_data[process_name]['total_work_hours'] += float(report.work_hours or 0)
+            process_data[process_name]['total_overtime_hours'] += float(report.overtime_hours or 0)
             
             if report.abnormal_notes:
                 process_data[process_name]['abnormal_notes'].append(report.abnormal_notes)
@@ -935,7 +912,7 @@ def create_workorder_processes(request, workorder_id):
                 
                 # 建立工序明細
                 process = WorkOrderProcess.objects.create(
-                    workorder=workorder,
+                    workorder_id=workorder.id,
                     process_name=route.process_name.name,
                     step_order=route.step_order,
                     planned_quantity=workorder.quantity,
@@ -1055,7 +1032,7 @@ def create_workorder_processes(request, workorder_id):
 
             for step_order, process_info in enumerate(standard_processes, 1):
                 WorkOrderProcess.objects.create(
-                    workorder=workorder,
+                    workorder_id=workorder.id,
                     process_name=process_info["name"],
                     step_order=step_order,
                     planned_quantity=workorder.quantity,
@@ -1102,7 +1079,7 @@ def get_processes_only(request):
             return JsonResponse({"success": False, "message": "查無此工單編號"})
 
     # 查詢該工單的所有工序
-    processes = WorkOrderProcess.objects.filter(workorder=workorder).order_by(
+            processes = WorkOrderProcess.objects.filter(workorder_id=workorder.id).order_by(
         "step_order"
     )
     process_list = [
@@ -2243,7 +2220,7 @@ def add_process(request, workorder_id):
             return JsonResponse({"status": "error", "message": "數值欄位格式錯誤"})
         
         # 檢查工序順序是否重複
-        if WorkOrderProcess.objects.filter(workorder=workorder, step_order=step_order).exists():
+        if WorkOrderProcess.objects.filter(workorder_id=workorder.id, step_order=step_order).exists():
             return JsonResponse({"status": "error", "message": f"工序順序 {step_order} 已存在"})
         
         # 調整後續工序的順序（使用臨時值避免唯一性約束衝突）
@@ -2265,7 +2242,7 @@ def add_process(request, workorder_id):
         
         # 建立新工序
         new_process = WorkOrderProcess.objects.create(
-            workorder=workorder,
+            workorder_id=workorder.id,
             process_name=process_name,
             step_order=step_order,
             planned_quantity=planned_quantity,
@@ -5163,6 +5140,7 @@ def active_workorders(request):
     功能：基於已核准填報記錄監控生產執行狀況
     """
     from django.db.models import Q, Count, Sum
+    from django.core.paginator import Paginator
     from workorder.models import WorkOrder
     from workorder.fill_work.models import FillWork
     from erp_integration.models import CompanyConfig
@@ -5172,8 +5150,8 @@ def active_workorders(request):
     today = date.today()
     
     # 新的生產中工單判斷邏輯：
-    # 生產中工單 = 所有有已核准填報記錄的工單（只計算主管審核後的記錄）
-    # 這樣可以監控所有真正在生產的工單
+    # 生產中工單 = 有已核准填報記錄的工單 + 狀態為生產中的派工單
+    # 這樣可以監控所有真正在生產的工單和已派工的工單
     
     # 獲取所有有已核准填報記錄的工單（正確區分公司）
     # 先獲取已核准填報記錄的公司和工單號碼對應關係
@@ -5199,6 +5177,28 @@ def active_workorders(request):
             if workorder:
                 workorders_with_approved_reports.append(workorder)
     
+    # 獲取狀態為生產中的派工單對應的工單
+    try:
+        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        production_dispatches = WorkOrderDispatch.objects.filter(status='in_production')
+        
+        for dispatch in production_dispatches:
+            # 根據派工單資訊找到對應的工單
+            workorder = WorkOrder.objects.filter(
+                company_code=dispatch.company_code,
+                order_number=dispatch.order_number,
+                product_code=dispatch.product_code
+            ).first()
+            
+            if workorder and workorder not in workorders_with_approved_reports:
+                # 如果工單不在已核准填報記錄中，則加入執行中工單列表
+                workorders_with_approved_reports.append(workorder)
+    except Exception as e:
+        # 如果派工單模組不存在或發生錯誤，記錄錯誤但不影響功能
+        import logging
+        logger = logging.getLogger('workorder')
+        logger.warning(f"獲取生產中派工單失敗: {str(e)}")
+    
     # 去重並排序
     workorders_with_approved_reports = list(set(workorders_with_approved_reports))
     workorders_with_approved_reports.sort(key=lambda x: x.created_at, reverse=True)
@@ -5210,8 +5210,13 @@ def active_workorders(request):
     for workorder in workorders_with_approved_reports:
         workorder.company_name = company_configs.get(workorder.company_code, workorder.company_code or '-')
     
+    # 分頁處理
+    paginator = Paginator(workorders_with_approved_reports, 10)  # 每頁顯示10筆
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
     # 獲取統計數據
-    total_active = len(workorders_with_approved_reports)  # 有已核准填報記錄的工單數量
+    total_active = len(workorders_with_approved_reports)  # 執行中工單數量（有已核准填報記錄 + 生產中派工單）
     total_pending = WorkOrder.objects.filter(status='pending').count()
     
     # 已核准填報記錄統計（只計算主管審核後的記錄）
@@ -5278,7 +5283,8 @@ def active_workorders(request):
         'total_approved_reports_with_workorder': total_approved_reports_with_workorder,
         'total_good_quantity': total_good_quantity,
         'total_work_hours': total_work_hours + total_overtime_hours,
-        'workorders_with_approved_reports': workorders_with_approved_reports,
+        'workorders_with_approved_reports': page_obj,  # 使用分頁後的資料
+        'page_obj': page_obj,  # 加入分頁物件供模板使用
         'today': today,
     }
     
@@ -5434,3 +5440,72 @@ def auto_complete_workorder(request, pk):
             "success": False,
             "message": f"自動完工失敗: {str(e)}"
         }, status=500)
+
+def quick_create_processes_from_route(request, workorder_id):
+    """
+    快速從產品工藝路線建立工序明細
+    用於解決「有工藝路線但沒有工序明細」的問題
+    """
+    from process.models import ProductProcessRoute, ProductProcessStandardCapacity
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    
+    try:
+        workorder = WorkOrder.objects.get(id=workorder_id)
+    except WorkOrder.DoesNotExist:
+        messages.error(request, "工單不存在！")
+        return redirect("workorder:list")
+    
+    try:
+        # 檢查是否已有工序明細
+        existing_processes = WorkOrderProcess.objects.filter(workorder_id=workorder.id)
+        if existing_processes.exists():
+            messages.warning(request, "此工單已有工序明細，無法重複建立！")
+            return redirect("workorder:workorder_process_detail", workorder_id=workorder_id)
+        
+        # 從產品工藝路線取得工序資料
+        routes = ProductProcessRoute.objects.filter(
+            product_id=workorder.product_code
+        ).order_by("step_order")
+        
+        if not routes.exists():
+            messages.error(request, f"產品 {workorder.product_code} 沒有工藝路線設定！")
+            return redirect("workorder:workorder_process_detail", workorder_id=workorder_id)
+        
+        created_count = 0
+        
+        # 使用產品工藝路線建立工序明細
+        for route in routes:
+            # 查詢標準產能資料
+            capacity_data = ProductProcessStandardCapacity.objects.filter(
+                product_code=workorder.product_code,
+                process_name=route.process_name.name,
+                is_active=True
+            ).order_by('-version').first()
+            
+            # 使用標準產能或預設值
+            target_hourly_output = (
+                capacity_data.standard_capacity_per_hour 
+                if capacity_data else 1000
+            )
+            
+            # 建立工序明細
+            WorkOrderProcess.objects.create(
+                workorder_id=workorder.id,
+                process_name=route.process_name.name,
+                step_order=route.step_order,
+                planned_quantity=workorder.quantity,
+                target_hourly_output=target_hourly_output,
+                status="pending"
+            )
+            created_count += 1
+        
+        messages.success(
+            request, 
+            f"成功建立 {created_count} 個工序明細（從產品工藝路線：{workorder.product_code}）"
+        )
+        
+    except Exception as e:
+        messages.error(request, f"建立工序明細失敗：{str(e)}")
+    
+    return redirect("workorder:workorder_process_detail", workorder_id=workorder_id)

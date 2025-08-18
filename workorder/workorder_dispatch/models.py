@@ -30,7 +30,7 @@ class WorkOrderDispatch(models.Model):
     product_code = models.CharField(max_length=100, verbose_name="產品編號", db_index=True)
     product_name = models.CharField(max_length=200, verbose_name="產品名稱", null=True, blank=True)
     planned_quantity = models.PositiveIntegerField(verbose_name="計劃數量", null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending", verbose_name="派工狀態")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="in_production", verbose_name="派工狀態")
     
     # 派工相關資訊
     dispatch_date = models.DateField(verbose_name="派工日期", null=True, blank=True)

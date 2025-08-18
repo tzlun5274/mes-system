@@ -1202,3 +1202,83 @@ class AutoManagementConfig(models.Model):
 
 
 
+
+
+
+
+
+
+class ConsistencyCheckResult(models.Model):
+    """
+    相符性檢查結果模型
+    記錄各種相符性檢查的結果，排除RD樣品工單
+    """
+    CHECK_TYPE_CHOICES = [
+        ('missing_fill_work', '缺失填報紀錄'),
+        ('missing_dispatch', '缺失派工單'),
+        ('wrong_product_code', '產品編號錯誤'),
+        ('wrong_company', '公司代號/名稱錯誤'),
+        ('wrong_workorder', '工單號碼錯誤'),
+    ]
+    
+    check_type = models.CharField(max_length=50, choices=CHECK_TYPE_CHOICES, verbose_name="檢查類型")
+    company_code = models.CharField(max_length=10, verbose_name="公司代號", null=True, blank=True)
+    company_name = models.CharField(max_length=100, verbose_name="公司名稱", null=True, blank=True)
+    workorder = models.CharField(max_length=100, verbose_name="工單號碼", null=True, blank=True)
+    product_code = models.CharField(max_length=100, verbose_name="產品編號", null=True, blank=True)
+    
+    # 錯誤資訊欄位
+    wrong_company_code = models.CharField(max_length=10, verbose_name="錯誤公司代號", null=True, blank=True)
+    wrong_company_name = models.CharField(max_length=100, verbose_name="錯誤公司名稱", null=True, blank=True)
+    wrong_workorder = models.CharField(max_length=100, verbose_name="錯誤工單號碼", null=True, blank=True)
+    wrong_product_code = models.CharField(max_length=100, verbose_name="錯誤產品編號", null=True, blank=True)
+    
+    # 相關資訊
+    operator = models.CharField(max_length=100, verbose_name="作業員", null=True, blank=True)
+    work_date = models.DateField(verbose_name="工作日期", null=True, blank=True)
+    status = models.CharField(max_length=20, verbose_name="狀態", null=True, blank=True)
+    quantity = models.IntegerField(verbose_name="數量", null=True, blank=True)
+    
+    # 修復狀態
+    is_fixed = models.BooleanField(default=False, verbose_name="是否已修復")
+    fixed_at = models.DateTimeField(verbose_name="修復時間", null=True, blank=True)
+    fixed_by = models.CharField(max_length=100, verbose_name="修復人員", null=True, blank=True)
+    fix_method = models.CharField(max_length=50, verbose_name="修復方式", null=True, blank=True)
+    
+    # 系統欄位
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    
+    class Meta:
+        verbose_name = "相符性檢查結果"
+        verbose_name_plural = "相符性檢查結果"
+        db_table = "workorder_consistency_check_result"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['check_type']),
+            models.Index(fields=['company_code']),
+            models.Index(fields=['workorder']),
+            models.Index(fields=['product_code']),
+            models.Index(fields=['is_fixed']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_check_type_display()} - {self.workorder} - {self.product_code}"
+    
+    def mark_as_fixed(self, fixed_by, fix_method):
+        """標記為已修復"""
+        from django.utils import timezone
+        self.is_fixed = True
+        self.fixed_at = timezone.now()
+        self.fixed_by = fixed_by
+        self.fix_method = fix_method
+        self.save()
+
+
+
+
+
+
+
+

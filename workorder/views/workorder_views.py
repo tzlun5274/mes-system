@@ -696,24 +696,22 @@ def mes_orders_bulk_dispatch(request):
             skipped += 1
             continue
         
-        # 建立派工單
+        # 建立派工單，直接設定為生產中狀態
         dispatch = WorkOrderDispatch.objects.create(
             company_code=getattr(wo, "company_code", None),
             order_number=wo.order_number,
             product_code=wo.product_code,
             planned_quantity=wo.quantity,
-            status="pending",
+            status="in_production",  # 直接設定為生產中
+            dispatch_date=timezone.now().date(),  # 設定派工日期為今天
             created_by=str(request.user) if request.user.is_authenticated else "system",
         )
         created += 1
         
-        # 立即檢查工序分配並更新派工單狀態
-        try:
-            from workorder.services.dispatch_status_service import DispatchStatusService
-            DispatchStatusService.update_dispatch_status_by_process_allocation(wo.id)
-        except Exception as e:
-            # 記錄錯誤但不影響建立流程
-            pass
+        # 記錄派工單建立日誌
+        workorder_logger.info(
+            f"批量派工：工單 {wo.order_number} 轉派為生產中狀態。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
+        )
 
     return JsonResponse({"success": True, "created": created, "skipped": skipped})
 
@@ -737,25 +735,23 @@ def mes_order_dispatch(request):
     if WorkOrderDispatch.objects.filter(order_number=order_number).exists():
         return JsonResponse({"error": "此工單已有派工單"}, status=400)
     
-    # 建立派工單
+    # 建立派工單，直接設定為生產中狀態
     dispatch = WorkOrderDispatch.objects.create(
         company_code=getattr(wo, "company_code", None),
         order_number=wo.order_number,
         product_code=wo.product_code,
         planned_quantity=wo.quantity,
-        status="pending",
+        status="in_production",  # 直接設定為生產中
+        dispatch_date=timezone.now().date(),  # 設定派工日期為今天
         created_by=str(request.user) if request.user.is_authenticated else "system",
     )
     
-    # 立即檢查工序分配並更新派工單狀態
-    try:
-        from workorder.services.dispatch_status_service import DispatchStatusService
-        DispatchStatusService.update_dispatch_status_by_process_allocation(wo.id)
-    except Exception as e:
-        # 記錄錯誤但不影響建立流程
-        pass
+    # 記錄派工單建立日誌
+    workorder_logger.info(
+        f"單筆派工：工單 {wo.order_number} 轉派為生產中狀態。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
+    )
     
-    return JsonResponse({"success": True, "message": "派工單建立成功"})
+    return JsonResponse({"success": True, "message": "派工單建立成功，已設定為生產中狀態"})
 
 @login_required
 @require_POST
@@ -804,24 +800,22 @@ def mes_orders_auto_dispatch(request):
         
         created = 0
         for wo in truly_undispatched:
-            # 建立派工單
+            # 建立派工單，直接設定為生產中狀態
             dispatch = WorkOrderDispatch.objects.create(
                 company_code=getattr(wo, "company_code", None),
                 order_number=wo.order_number,
                 product_code=wo.product_code,
                 planned_quantity=wo.quantity,
-                status="pending",
+                status="in_production",  # 直接設定為生產中
+                dispatch_date=timezone.now().date(),  # 設定派工日期為今天
                 created_by=str(request.user) if request.user.is_authenticated else "system",
             )
             created += 1
             
-            # 立即檢查工序分配並更新派工單狀態
-            try:
-                from workorder.services.dispatch_status_service import DispatchStatusService
-                DispatchStatusService.update_dispatch_status_by_process_allocation(wo.id)
-            except Exception as e:
-                # 記錄錯誤但不影響建立流程
-                pass
+            # 記錄派工單建立日誌
+            workorder_logger.info(
+                f"自動批次派工：工單 {wo.order_number} 轉派為生產中狀態。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
+            )
         
         return JsonResponse({
             "success": True, 

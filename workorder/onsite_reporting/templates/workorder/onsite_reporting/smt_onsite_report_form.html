@@ -27,15 +27,15 @@
                     
                     <!-- 功能說明 -->
                     <div class="alert alert-info">
-                        <h5><i class="fas fa-info-circle"></i> 現場報工功能說明</h5>
+                        <h5><i class="fas fa-info-circle"></i> SMT現場報工功能說明</h5>
                         <ul class="mb-0">
-                            <li><strong>即時報工模式</strong>：以當下報工狀態為時間戳，開工為開始時間，暫停為時間結束</li>
-                            <li><strong>狀態流程</strong>：開工 → 暫停 → 重啟開工 → 完工，每筆記錄代表一次完整工作時段</li>
-                            <li><strong>數量填寫</strong>：只有暫停、完工、停工時才能填寫工作數量和不良品數量</li>
+                            <li><strong>SMT現場報工</strong>：只有開工功能，用於記錄SMT設備的開工狀態</li>
+                            <li><strong>開工記錄</strong>：記錄SMT設備開始工作的時間點</li>
                             <li><strong>工序自動加入</strong>：報工工單裡沒有的工序時能自動加入工序到工單裡</li>
                             <li>產品編號、工單號碼、公司名稱支援雙向關聯選擇</li>
                             <li>選擇產品編號會自動更新工單號碼選項</li>
                             <li>選擇工單號碼會自動填入公司名稱和預設生產數量</li>
+                            <li>選擇設備時會自動填入作業員欄位</li>
                         </ul>
                     </div>
 
@@ -111,31 +111,12 @@
                                 </h5>
                             </div>
                             
-                            <!-- 報工狀態 -->
+                            <!-- 報工狀態（固定為開工） -->
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">報工狀態 <span class="text-danger">*</span></label>
-                                <div class="d-flex flex-row gap-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="status" id="status_started" value="started" required>
-                                        <label class="form-check-label" for="status_started">開工</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="status" id="status_paused" value="paused">
-                                        <label class="form-check-label" for="status_paused">暫停</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="status" id="status_resumed" value="resumed">
-                                        <label class="form-check-label" for="status_resumed">重啟開工</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="status" id="status_completed" value="completed">
-                                        <label class="form-check-label" for="status_completed">完工</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="status" id="status_stopped" value="stopped">
-                                        <label class="form-check-label" for="status_stopped">停工</label>
-                                    </div>
-                                </div>
+                                <label class="form-label">報工狀態</label>
+                                <input type="text" class="form-control" value="開工" readonly>
+                                <input type="hidden" name="status" value="started">
+                                <div class="form-text">SMT現場報工只有開工功能</div>
                             </div>
 
                             <!-- 預設生產數量 -->
@@ -145,8 +126,8 @@
                             </div>
                         </div>
 
-                        <!-- 數量資訊 -->
-                        <div class="row mb-4">
+                        <!-- 數量資訊（SMT現場報工不需要填寫數量） -->
+                        <div class="row mb-4" style="display: none;">
                             <div class="col-12">
                                 <h5 class="border-bottom pb-2">
                                     <i class="fas fa-calculator"></i> 數量資訊
@@ -156,13 +137,13 @@
                             <!-- 工作數量 -->
                             <div class="col-md-6 mb-3">
                                 <label for="work_quantity" class="form-label">工作數量</label>
-                                <input type="number" class="form-control" id="work_quantity" name="work_quantity" min="0" value="0">
+                                <input type="number" class="form-control" id="work_quantity" name="work_quantity" min="0" value="0" readonly>
                             </div>
 
                             <!-- 不良品數量 -->
                             <div class="col-md-6 mb-3">
                                 <label for="defect_quantity" class="form-label">不良品數量</label>
-                                <input type="number" class="form-control" id="defect_quantity" name="defect_quantity" min="0" value="0">
+                                <input type="number" class="form-control" id="defect_quantity" name="defect_quantity" min="0" value="0" readonly>
                             </div>
                         </div>
 
@@ -191,7 +172,7 @@
                         <div class="row">
                             <div class="col-12 text-center">
                                 <button type="submit" class="btn btn-primary btn-lg">
-                                    <i class="fas fa-save"></i> 儲存報工記錄
+                                    <i class="fas fa-play"></i> 開工
                                 </button>
                                 <a href="{% url 'workorder:onsite_reporting:onsite_report_index' %}" class="btn btn-secondary btn-lg ms-2">
                                     <i class="fas fa-arrow-left"></i> 返回列表
@@ -208,10 +189,28 @@
 
 {% block extra_js %}
 <script src="{% static 'js/work_common.js' %}"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        console.log('SMT現場報工表單 JavaScript 載入完成');
+        
         // 初始化統一的填報控制器（處理產品編號、工單號碼、公司名稱的雙向關聯選擇）
-        new FillWorkController();
+        const fillWorkController = new FillWorkController();
+        
+        // 等待FillWorkController初始化完成
+        setTimeout(() => {
+            console.log('FillWorkController 初始化完成，開始初始化SMT現場報工控制器');
+            
+            // 檢查是否有預先填入的產品編號，如果有則觸發載入工單
+            const productSelect = document.getElementById('product_id');
+            if (productSelect && productSelect.value) {
+                console.log('檢測到預先填入的產品編號:', productSelect.value);
+                fillWorkController.handleProductChange();
+            }
+            
+            // 初始化SMT現場報工控制器
+            new SMTOnsiteReportController();
+        }, 1000);
         
         // SMT現場報工表單控制器（處理其他功能）
         class SMTOnsiteReportController {
@@ -219,123 +218,155 @@
                 this.initializeElements();
                 this.initializeEventListeners();
                 this.loadInitialData();
-                this.updateQuantityFields(); // 初始化數量欄位狀態
             }
 
             // 初始化 DOM 元素
             initializeElements() {
-                this.workDateInput = document.getElementById('work_date');
-                this.startDatetimeInput = document.getElementById('start_datetime');
+                this.operatorSelect = document.getElementById('operator');
+                this.equipmentSelect = document.getElementById('equipment');
                 this.workQuantityInput = document.getElementById('work_quantity');
                 this.defectQuantityInput = document.getElementById('defect_quantity');
-                this.statusRadios = document.querySelectorAll('input[name="status"]');
             }
 
             // 初始化事件監聽器
             initializeEventListeners() {
-                // 報工狀態變更事件
-                this.statusRadios.forEach(radio => {
-                    radio.addEventListener('change', () => {
-                        this.updateQuantityFields();
+                // SMT模板專用：設備選擇自動填入作業員功能
+                const equipmentSelect = document.getElementById('equipment');
+                if (equipmentSelect) {
+                    console.log('綁定SMT模板設備選擇事件');
+                    equipmentSelect.addEventListener('change', (e) => {
+                        this.handleEquipmentChange(e.target.value);
                     });
-                });
+                }
 
                 // 表單提交驗證
-                document.getElementById('onsiteReportForm').addEventListener('submit', (e) => {
-                    this.validateForm(e);
+                document.getElementById('onsiteReportForm').addEventListener('submit', async (e) => {
+                    const isValid = await this.validateForm(e);
+                    if (!isValid) {
+                        e.preventDefault();
+                    }
                 });
             }
 
             // 載入初始資料
             loadInitialData() {
-                this.setDefaultDateTime();
+                // 設定開始時間為當前時間
+                this.setStartDateTime();
+                // 初始化數量欄位狀態（SMT只有開工功能，數量欄位唯讀）
+                this.updateQuantityFields();
             }
 
-            // 設定預設日期時間
-            setDefaultDateTime() {
-                // 設定今天日期
-                if (this.workDateInput) {
-                    const today = new Date().toISOString().split('T')[0];
-                    this.workDateInput.value = today;
-                }
-                
-                // 設定現在時間
+            // 設定開始時間
+            setStartDateTime() {
                 const now = new Date();
-                const nowString = now.toISOString().slice(0, 16);
-                this.startDatetimeInput.value = nowString;
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const startDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+                
+                const startDateTimeInput = document.getElementById('start_datetime');
+                if (startDateTimeInput) {
+                    startDateTimeInput.value = startDateTime;
+                    console.log('設定開始時間:', startDateTime);
+                }
             }
 
-            // 更新數量欄位狀態
-            updateQuantityFields() {
-                const selectedStatus = document.querySelector('input[name="status"]:checked');
+            // SMT模板專用：設備選擇自動填入作業員功能
+            handleEquipmentChange(equipmentName) {
+                console.log('SMT模板：設備選擇變更為:', equipmentName);
                 
-                if (selectedStatus) {
-                    const status = selectedStatus.value;
-                    console.log('報工狀態變更為:', status);
-                    
-                    // 開工和重啟開工時，數量欄位唯讀且設為0
-                    if (status === 'started' || status === 'resumed') {
-                        if (this.workQuantityInput) {
-                            this.workQuantityInput.setAttribute('readonly', 'readonly');
-                            this.workQuantityInput.value = '0';
-                            this.workQuantityInput.classList.add('bg-light');
-                        }
-                        if (this.defectQuantityInput) {
-                            this.defectQuantityInput.setAttribute('readonly', 'readonly');
-                            this.defectQuantityInput.value = '0';
-                            this.defectQuantityInput.classList.add('bg-light');
-                        }
-                        console.log('數量欄位設為唯讀，數值重置為0');
-                    } else {
-                        // 暫停、完工、停工時，數量欄位可編輯
-                        if (this.workQuantityInput) {
-                            this.workQuantityInput.removeAttribute('readonly');
-                            this.workQuantityInput.classList.remove('bg-light');
-                        }
-                        if (this.defectQuantityInput) {
-                            this.defectQuantityInput.removeAttribute('readonly');
-                            this.defectQuantityInput.classList.remove('bg-light');
-                        }
-                        console.log('數量欄位設為可編輯');
+                if (equipmentName) {
+                    // 自動填入作業員欄位為設備名稱
+                    if (this.operatorSelect) {
+                        this.operatorSelect.value = equipmentName;
+                        console.log('SMT模板：已設定作業員為:', equipmentName);
                     }
-                } else {
-                    // 沒有選擇狀態時，預設為可編輯
-                    if (this.workQuantityInput) {
-                        this.workQuantityInput.removeAttribute('readonly');
-                        this.workQuantityInput.classList.remove('bg-light');
-                    }
-                    if (this.defectQuantityInput) {
-                        this.defectQuantityInput.removeAttribute('readonly');
-                        this.defectQuantityInput.classList.remove('bg-light');
-                    }
-                    console.log('數量欄位預設為可編輯');
                 }
+            }
+
+            // 更新數量欄位狀態（SMT只有開工功能，數量欄位唯讀）
+            updateQuantityFields() {
+                if (this.workQuantityInput) {
+                    this.workQuantityInput.readOnly = true;
+                    this.workQuantityInput.value = '0';
+                    this.workQuantityInput.classList.add('bg-light');
+                }
+                if (this.defectQuantityInput) {
+                    this.defectQuantityInput.readOnly = true;
+                    this.defectQuantityInput.value = '0';
+                    this.defectQuantityInput.classList.add('bg-light');
+                }
+                console.log('SMT新增報工：數量欄位設為唯讀，數值為0');
             }
 
             // 表單驗證
-            validateForm(e) {
-                const requiredFields = ['product_id', 'workorder', 'company_name', 'operator', 'process', 'status'];
+            async validateForm(e) {
                 let isValid = true;
 
-                requiredFields.forEach(fieldName => {
-                    const field = document.getElementById(fieldName);
-                    if (!field.value.trim()) {
-                        field.classList.add('is-invalid');
-                        isValid = false;
-                    } else {
-                        field.classList.remove('is-invalid');
-                    }
-                });
+                // 檢查產品編號
+                const productField = document.getElementById('product_id');
+                if (productField && !productField.value.trim()) {
+                    productField.classList.add('is-invalid');
+                    isValid = false;
+                } else if (productField) {
+                    productField.classList.remove('is-invalid');
+                }
+
+                // 檢查工單號碼
+                const workorderField = document.getElementById('workorder');
+                if (workorderField && !workorderField.value.trim()) {
+                    workorderField.classList.add('is-invalid');
+                    isValid = false;
+                } else if (workorderField) {
+                    workorderField.classList.remove('is-invalid');
+                }
+
+                // 檢查公司名稱
+                const companyField = document.getElementById('company_name');
+                if (companyField && !companyField.value.trim()) {
+                    companyField.classList.add('is-invalid');
+                    isValid = false;
+                } else if (companyField) {
+                    companyField.classList.remove('is-invalid');
+                }
+
+                // 檢查作業員
+                const operatorField = document.getElementById('operator');
+                if (operatorField && !operatorField.value.trim()) {
+                    operatorField.classList.add('is-invalid');
+                    isValid = false;
+                } else if (operatorField) {
+                    operatorField.classList.remove('is-invalid');
+                }
+
+                // 檢查工序
+                const processField = document.getElementById('process');
+                if (processField && !processField.value.trim()) {
+                    processField.classList.add('is-invalid');
+                    isValid = false;
+                } else if (processField) {
+                    processField.classList.remove('is-invalid');
+                }
+
+                // 檢查設備（SMT必填）
+                const equipmentField = document.getElementById('equipment');
+                if (equipmentField && !equipmentField.value.trim()) {
+                    equipmentField.classList.add('is-invalid');
+                    isValid = false;
+                } else if (equipmentField) {
+                    equipmentField.classList.remove('is-invalid');
+                }
 
                 if (!isValid) {
-                    e.preventDefault();
                     alert('請填寫所有必填欄位');
+                    return false;
                 }
+
+                return true;
             }
         }
-
-        // 初始化 SMT 現場報工控制器
-        new SMTOnsiteReportController();
     });
 </script>
 {% endblock %} 

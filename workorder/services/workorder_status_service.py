@@ -92,7 +92,7 @@ class WorkOrderStatusService:
             
             # 2. 檢查現場報工記錄
             try:
-                from onsite_reporting.models import OnsiteReport
+                from workorder.onsite_reporting.models import OnsiteReport
                 onsite_reports = OnsiteReport.objects.filter(
                     order_number=workorder.order_number,
                     product_code=workorder.product_code

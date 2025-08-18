@@ -323,6 +323,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 1000);
     
+    // 作業員模板：設備選擇事件（已移除自動填入功能）
+    const equipmentSelect = document.getElementById('equipment');
+    if (equipmentSelect) {
+        console.log('綁定作業員模板設備選擇事件');
+        equipmentSelect.addEventListener('change', function() {
+            const equipmentName = this.value;
+            console.log('作業員模板：設備選擇變更為:', equipmentName);
+            // 已移除自動填入作業員功能，作業員由使用者手動選擇
+        });
+    }
+    
 
     
     console.log('作業員補登填報表單初始化完成');

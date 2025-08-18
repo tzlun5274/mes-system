@@ -164,7 +164,7 @@ class FillWorkCompletionService:
             
             # 3. 更新所有工序狀態
             from ..models import WorkOrderProcess
-            processes = WorkOrderProcess.objects.filter(workorder=workorder)
+            processes = WorkOrderProcess.objects.filter(workorder_id=workorder.id)
             for process in processes:
                 process.status = 'completed'
                 process.actual_end_time = timezone.now()
@@ -324,7 +324,7 @@ class FillWorkCompletionService:
         try:
             # 清理工序記錄
             from ..models import WorkOrderProcess
-            WorkOrderProcess.objects.filter(workorder=workorder).delete()
+            WorkOrderProcess.objects.filter(workorder_id=workorder.id).delete()
             
             # 清理工單分配記錄
             from ..models import WorkOrderAssignment
@@ -413,11 +413,11 @@ class FillWorkCompletionService:
                     order_number=workorder.order_number,
                     product_code=workorder.product_code,
                     company_code=workorder.company_code,
-                    company_name=workorder.company_name if hasattr(workorder, 'company_name') else '',
-                    planned_quantity=workorder.quantity,
+                    company_name=workorder.company_name if hasattr(workorder, 'company_name') and workorder.company_name else '',
+                    quantity=workorder.quantity,
                     completed_quantity=actual_completed_quantity,  # 使用實際完成數量
                     status='completed',
-                    completed_at=workorder.completed_at or timezone.now(),
+                    completed_at=workorder.completed_at if hasattr(workorder, 'completed_at') and workorder.completed_at else timezone.now(),
                     # 統計資料
                     total_good_quantity=total_good_quantity,
                     total_defect_quantity=total_defect_quantity,
@@ -517,7 +517,7 @@ class FillWorkCompletionService:
     def _get_onsite_quantity(cls, workorder):
         """獲取現場報工數量（從 OnsiteReport 表計算，嚴格按公司分離）"""
         try:
-            from onsite_reporting.models import OnsiteReport
+            from workorder.onsite_reporting.models import OnsiteReport
             
             # 基本查詢條件
             onsite_reports = OnsiteReport.objects.filter(
@@ -673,7 +673,7 @@ class FillWorkCompletionService:
                     )
                 
                 CompletedProductionReport.objects.create(
-                    completed_workorder=completed_workorder,
+                    completed_workorder_id=completed_workorder.id,
                     report_date=fillwork.work_date,
                     process_name=fillwork.operation or (fillwork.process.name if fillwork.process else '未知工序'),
                     operator=fillwork.operator,
@@ -723,7 +723,7 @@ class FillWorkCompletionService:
             
             for onsite in onsite_records:
                 CompletedProductionReport.objects.create(
-                    completed_workorder=completed_workorder,
+                    completed_workorder_id=completed_workorder.id,
                     report_date=onsite.work_date,
                     process_name=onsite.process,
                     operator=onsite.operator,

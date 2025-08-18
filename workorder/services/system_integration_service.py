@@ -148,11 +148,12 @@ class SystemIntegrationService:
                             order_number=workorder.order_number,
                             product_code=workorder.product_code,
                             planned_quantity=workorder.quantity,
-                            status="pending",
+                            status="in_production",  # 直接設定為生產中
+                            dispatch_date=timezone.now().date(),
                             created_by="system_integration",
                         )
                         created_count += 1
-                        logger.info(f"為工單 {workorder.order_number} 建立派工單")
+                        logger.info(f"為工單 {workorder.order_number} 建立派工單（生產中狀態）")
                 
                 return {
                     'success': True,

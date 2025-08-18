@@ -34,6 +34,12 @@ urlpatterns = [
     # 現場報工刪除
     path("delete/<int:pk>/", views.OnsiteReportDeleteView.as_view(), name="onsite_report_delete"),
 
+    # 檢查設備狀態API
+    path("api/check-equipment-status/", views.check_equipment_status, name="check_equipment_status"),
+
+    # 快速狀態變更API
+    path("api/quick-status-change/<int:pk>/", views.quick_status_change, name="quick_status_change"),
+
     # 現場報工監控
     path("monitoring/", views.OnsiteReportMonitoringView.as_view(), name="onsite_report_monitoring"),
 
