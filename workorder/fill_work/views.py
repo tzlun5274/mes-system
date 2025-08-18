@@ -2805,32 +2805,40 @@ def batch_delete_fill_work(request):
         return redirect('workorder:fill_work:supervisor_pending_list')
     
     try:
-        # 取得要刪除的記錄ID列表
-        record_ids = request.POST.getlist('record_ids')
+        action = request.POST.get('action')
         
-        if not record_ids:
-            messages.warning(request, '請選擇要刪除的記錄')
-            return redirect('workorder:fill_work:supervisor_pending_list')
-        
-        # 查詢待核准的記錄（只能刪除待核准狀態的記錄）
-        pending_records = FillWork.objects.filter(
-            id__in=record_ids,
-            approval_status='pending'
-        )
-        
-        if not pending_records.exists():
-            messages.info(request, '沒有找到可以刪除的記錄（只能刪除待核准狀態的記錄）')
-            return redirect('workorder:fill_work:supervisor_pending_list')
-        
-        deleted_count = 0
-        
-        # 批量刪除記錄
-        for record in pending_records:
-            record_id = record.id
-            record.delete()
-            deleted_count += 1
-        
-        messages.success(request, f'成功刪除 {deleted_count} 筆填報記錄')
+        if action == 'delete_all':
+            # 刪除所有填報記錄（不管狀態）
+            total_count = FillWork.objects.count()
+            FillWork.objects.all().delete()
+            messages.success(request, f'成功刪除全部 {total_count} 筆填報記錄')
+        else:
+            # 批次刪除選定的記錄
+            record_ids = request.POST.getlist('record_ids')
+            
+            if not record_ids:
+                messages.warning(request, '請選擇要刪除的記錄')
+                return redirect('workorder:fill_work:supervisor_pending_list')
+            
+            # 查詢待核准的記錄（只能刪除待核准狀態的記錄）
+            pending_records = FillWork.objects.filter(
+                id__in=record_ids,
+                approval_status='pending'
+            )
+            
+            if not pending_records.exists():
+                messages.info(request, '沒有找到可以刪除的記錄（只能刪除待核准狀態的記錄）')
+                return redirect('workorder:fill_work:supervisor_pending_list')
+            
+            deleted_count = 0
+            
+            # 批量刪除記錄
+            for record in pending_records:
+                record_id = record.id
+                record.delete()
+                deleted_count += 1
+            
+            messages.success(request, f'成功刪除 {deleted_count} 筆填報記錄')
         
     except Exception as e:
         messages.error(request, f'批次刪除失敗: {str(e)}')

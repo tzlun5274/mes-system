@@ -128,18 +128,30 @@
         </div>
     </div>
 
-    <!-- 匯出功能 -->
+    <!-- 匯出和批次操作功能 -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="export-buttons">
-                <a href="{% url 'workorder:consistency_check_export' %}?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=csv" 
-                   class="btn btn-success">
-                    <i class="fas fa-download"></i> 匯出 CSV
-                </a>
-                <a href="{% url 'workorder:consistency_check_export' %}?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=excel" 
-                   class="btn btn-success">
-                    <i class="fas fa-file-excel"></i> 匯出 Excel
-                </a>
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="export-buttons">
+                    <a href="{% url 'workorder:consistency_check_export' %}?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=csv" 
+                       class="btn btn-success">
+                        <i class="fas fa-download"></i> 匯出 CSV
+                    </a>
+                    <a href="{% url 'workorder:consistency_check_export' %}?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=excel" 
+                       class="btn btn-success">
+                        <i class="fas fa-file-excel"></i> 匯出 Excel
+                    </a>
+                </div>
+                {% if not is_fixed %}
+                <div class="batch-actions">
+                    <button id="selectAllBtn" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-check-square"></i> 全選
+                    </button>
+                    <button id="batchFixBtn" class="btn btn-warning" disabled>
+                        <i class="fas fa-wrench"></i> 批次修復 (<span id="selectedCount">0</span>)
+                    </button>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -160,8 +172,17 @@
                             <table class="table table-striped table-hover">
                                 <thead>
                                     <tr>
-                                        <th colspan="3" class="text-center bg-primary text-white">來源（工單資料）</th>
-                                        <th colspan="3" class="text-center bg-warning text-dark">填報資料</th>
+                                        {% if not is_fixed %}
+                                        <th class="text-center" style="width: 50px;">
+                                            <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
+                                        </th>
+                                        {% endif %}
+                                        {% if check_type == 'missing_dispatch' %}
+                                            <th colspan="3" class="text-center bg-warning text-dark">填報資料（無對應派工單）</th>
+                                        {% else %}
+                                            <th colspan="3" class="text-center bg-primary text-white">來源（工單資料）</th>
+                                            <th colspan="3" class="text-center bg-warning text-dark">填報資料</th>
+                                        {% endif %}
                                         {% if is_fixed %}
                                             <th>修復時間</th>
                                             <th>修復人員</th>
@@ -171,12 +192,21 @@
                                         {% endif %}
                                     </tr>
                                     <tr>
-                                        <th class="text-dark fw-bold">公司名稱</th>
-                                        <th class="text-dark fw-bold">工單號碼</th>
-                                        <th class="text-dark fw-bold">產品編號</th>
-                                        <th class="text-dark fw-bold">公司名稱</th>
-                                        <th class="text-dark fw-bold">工單號碼</th>
-                                        <th class="text-dark fw-bold">產品編號</th>
+                                        {% if not is_fixed %}
+                                        <th class="text-center">選擇</th>
+                                        {% endif %}
+                                        {% if check_type == 'missing_dispatch' %}
+                                            <th class="text-dark fw-bold">公司名稱</th>
+                                            <th class="text-dark fw-bold">工單號碼</th>
+                                            <th class="text-dark fw-bold">產品編號</th>
+                                        {% else %}
+                                            <th class="text-dark fw-bold">公司名稱</th>
+                                            <th class="text-dark fw-bold">工單號碼</th>
+                                            <th class="text-dark fw-bold">產品編號</th>
+                                            <th class="text-dark fw-bold">公司名稱</th>
+                                            <th class="text-dark fw-bold">工單號碼</th>
+                                            <th class="text-dark fw-bold">產品編號</th>
+                                        {% endif %}
                                         {% if is_fixed %}
                                             <th class="text-dark fw-bold">修復時間</th>
                                             <th class="text-dark fw-bold">修復人員</th>
@@ -189,30 +219,42 @@
                                 <tbody>
                                     {% for result in results %}
                                     <tr>
-                                        <td>{{ result.company_name|default:"-" }}</td>
-                                        <td>{{ result.workorder|default:"-" }}</td>
-                                        <td>{{ result.product_code|default:"-" }}</td>
-                                        <td>
-                                            {% if check_type == 'wrong_company' %}
-                                                <span class="text-danger">{{ result.wrong_company_name|default:"-" }}</span>
-                                            {% else %}
-                                                {{ result.company_name|default:"-" }}
-                                            {% endif %}
+                                        {% if not is_fixed %}
+                                        <td class="text-center">
+                                            <input type="checkbox" class="form-check-input result-checkbox" 
+                                                   value="{{ result.id }}" data-result-id="{{ result.id }}">
                                         </td>
-                                        <td>
-                                            {% if check_type == 'wrong_workorder' %}
-                                                <span class="text-danger">{{ result.wrong_workorder|default:"-" }}</span>
-                                            {% else %}
-                                                {{ result.workorder|default:"-" }}
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if check_type == 'wrong_product_code' %}
-                                                <span class="text-danger">{{ result.wrong_product_code|default:"-" }}</span>
-                                            {% else %}
-                                                {{ result.product_code|default:"-" }}
-                                            {% endif %}
-                                        </td>
+                                        {% endif %}
+                                        {% if check_type == 'missing_dispatch' %}
+                                            <td>{{ result.company_name|default:"-" }}</td>
+                                            <td>{{ result.workorder|default:"-" }}</td>
+                                            <td>{{ result.product_code|default:"-" }}</td>
+                                        {% else %}
+                                            <td>{{ result.company_name|default:"-" }}</td>
+                                            <td>{{ result.workorder|default:"-" }}</td>
+                                            <td>{{ result.product_code|default:"-" }}</td>
+                                            <td>
+                                                {% if check_type == 'wrong_company' %}
+                                                    <span class="text-danger">{{ result.wrong_company_name|default:"-" }}</span>
+                                                {% else %}
+                                                    {{ result.company_name|default:"-" }}
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if check_type == 'wrong_workorder' %}
+                                                    <span class="text-danger">{{ result.wrong_workorder|default:"-" }}</span>
+                                                {% else %}
+                                                    {{ result.workorder|default:"-" }}
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if check_type == 'wrong_product_code' %}
+                                                    <span class="text-danger">{{ result.wrong_product_code|default:"-" }}</span>
+                                                {% else %}
+                                                    {{ result.product_code|default:"-" }}
+                                                {% endif %}
+                                            </td>
+                                        {% endif %}
                                         {% if is_fixed %}
                                             <td>{{ result.fixed_at|date:"Y-m-d H:i"|default:"-" }}</td>
                                             <td>{{ result.fixed_by|default:"-" }}</td>
@@ -256,7 +298,7 @@
     </div>
 </div>
 
-<!-- 修復確認對話框 -->
+<!-- 單筆修復確認對話框 -->
 <div class="modal fade" id="fixModal" tabindex="-1" aria-labelledby="fixModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -265,14 +307,12 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>確定要修復這個相符性問題嗎？</p>
+                <p>確定要修復這個產品編號錯誤嗎？</p>
+                <p class="text-muted"><small>將把填報紀錄的產品編號更新為工單的正確產品編號</small></p>
                 <div class="mb-3">
                     <label for="fixMethod" class="form-label">修復方式：</label>
                     <select class="form-select" id="fixMethod">
-                        <option value="update_fill_work">更新填報紀錄</option>
-                        <option value="update_dispatch">更新派工單</option>
-                        <option value="update_workorder">更新工單資料</option>
-                        <option value="manual_fix">手動修復</option>
+                        <option value="update_fill_work">更新填報紀錄產品編號</option>
                     </select>
                 </div>
             </div>
@@ -283,12 +323,42 @@
         </div>
     </div>
 </div>
+
+<!-- 批次修復確認對話框 -->
+<div class="modal fade" id="batchFixModal" tabindex="-1" aria-labelledby="batchFixModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="batchFixModalLabel">批次修復相符性問題</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>確定要批次修復選中的 <span id="batchFixCount">0</span> 筆產品編號錯誤嗎？</p>
+                <p class="text-muted"><small>將把填報紀錄的產品編號更新為工單的正確產品編號</small></p>
+                <div class="mb-3">
+                    <label for="batchFixMethod" class="form-label">修復方式：</label>
+                    <select class="form-select" id="batchFixMethod">
+                        <option value="update_fill_work">更新填報紀錄產品編號</option>
+                    </select>
+                </div>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>注意：</strong>此操作將把填報紀錄的產品編號更新為工單的正確產品編號，操作後無法復原。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" id="confirmBatchFix">確認批次修復</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 修復按鈕點擊事件
+    // 單筆修復功能
     const fixButtons = document.querySelectorAll('.fix-button');
     const fixModal = new bootstrap.Modal(document.getElementById('fixModal'));
     let currentResultId = null;
@@ -302,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // 確認修復
+    // 確認單筆修復
     document.getElementById('confirmFix').addEventListener('click', function() {
         const fixMethod = document.getElementById('fixMethod').value;
         
@@ -338,6 +408,152 @@ document.addEventListener('DOMContentLoaded', function() {
             fixModal.hide();
         });
     });
+
+    // 批次修復功能
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const resultCheckboxes = document.querySelectorAll('.result-checkbox');
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    const batchFixBtn = document.getElementById('batchFixBtn');
+    const selectedCountSpan = document.getElementById('selectedCount');
+    const batchFixModal = new bootstrap.Modal(document.getElementById('batchFixModal'));
+
+    // 全選/取消全選功能
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            resultCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateSelectedCount();
+            updateBatchFixButton();
+        });
+    }
+
+    // 全選按鈕功能
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function() {
+            const allChecked = Array.from(resultCheckboxes).every(cb => cb.checked);
+            resultCheckboxes.forEach(checkbox => {
+                checkbox.checked = !allChecked;
+            });
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = !allChecked;
+            }
+            updateSelectedCount();
+            updateBatchFixButton();
+        });
+    }
+
+    // 個別勾選框事件
+    resultCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            updateSelectedCount();
+            updateBatchFixButton();
+            updateSelectAllState();
+        });
+    });
+
+    // 批次修復按鈕點擊事件
+    if (batchFixBtn) {
+        batchFixBtn.addEventListener('click', function() {
+            const selectedIds = getSelectedResultIds();
+            if (selectedIds.length === 0) {
+                alert('請先選擇要修復的問題！');
+                return;
+            }
+            
+            document.getElementById('batchFixCount').textContent = selectedIds.length;
+            batchFixModal.show();
+        });
+    }
+
+    // 確認批次修復
+    document.getElementById('confirmBatchFix').addEventListener('click', function() {
+        const fixMethod = document.getElementById('batchFixMethod').value;
+        const selectedIds = getSelectedResultIds();
+        
+        // 顯示載入狀態
+        const button = this;
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
+        button.disabled = true;
+        
+        // 發送批次修復請求
+        fetch('{% url "workorder:consistency_check_ajax" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: new URLSearchParams({
+                'action': 'batch_fix_issues',
+                'result_ids': selectedIds.join(','),
+                'fix_method': fixMethod
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`批次修復成功！共修復 ${data.fixed_count} 筆問題。`);
+                location.reload();
+            } else {
+                alert('批次修復失敗：' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('批次修復失敗，請稍後再試');
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+            batchFixModal.hide();
+        });
+    });
+
+    // 更新選中數量
+    function updateSelectedCount() {
+        const selectedCount = document.querySelectorAll('.result-checkbox:checked').length;
+        if (selectedCountSpan) {
+            selectedCountSpan.textContent = selectedCount;
+        }
+    }
+
+    // 更新批次修復按鈕狀態
+    function updateBatchFixButton() {
+        const selectedCount = document.querySelectorAll('.result-checkbox:checked').length;
+        if (batchFixBtn) {
+            batchFixBtn.disabled = selectedCount === 0;
+        }
+    }
+
+    // 更新全選狀態
+    function updateSelectAllState() {
+        if (!selectAllCheckbox) return;
+        
+        const totalCheckboxes = resultCheckboxes.length;
+        const checkedCheckboxes = document.querySelectorAll('.result-checkbox:checked').length;
+        
+        if (checkedCheckboxes === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else if (checkedCheckboxes === totalCheckboxes) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+    }
+
+    // 取得選中的結果ID
+    function getSelectedResultIds() {
+        return Array.from(document.querySelectorAll('.result-checkbox:checked')).map(cb => cb.value);
+    }
+
+    // 初始化
+    updateSelectedCount();
+    updateBatchFixButton();
+    updateSelectAllState();
 });
 </script>
 {% endblock %} 

@@ -39,51 +39,7 @@ class ConsistencyCheckService:
             self.logger.error(f"清除舊檢查結果失敗：{str(e)}")
             raise
     
-    def check_missing_fill_work(self):
-        """
-        檢查缺失填報紀錄
-        比對條件：公司代號或公司名稱+工單號碼+產品編號
-        排除RD樣品工單
-        """
-        try:
-            self.clear_old_results('missing_fill_work')
-            
-            # 排除RD樣品工單
-            workorders = WorkOrder.objects.exclude(order_number='RD樣品')
-            missing_count = 0
-            
-            for workorder in workorders:
-                # 從 CompanyConfig 取得正確的公司名稱
-                try:
-                    company_config = CompanyConfig.objects.get(company_code=workorder.company_code)
-                    correct_company_name = company_config.company_name
-                except CompanyConfig.DoesNotExist:
-                    # 如果找不到公司配置，使用公司代號作為公司名稱
-                    correct_company_name = workorder.company_code
-                
-                # 檢查是否有對應的填報紀錄
-                fill_work_exists = FillWork.objects.filter(
-                    company_name=correct_company_name,
-                    workorder=workorder.order_number,
-                    product_id=workorder.product_code
-                ).exists()
-                
-                if not fill_work_exists:
-                    ConsistencyCheckResult.objects.create(
-                        check_type='missing_fill_work',
-                        company_code=workorder.company_code,
-                        company_name=correct_company_name,
-                        workorder=workorder.order_number,
-                        product_code=workorder.product_code,
-                    )
-                    missing_count += 1
-            
-            self.logger.info(f"缺失填報紀錄檢查完成，發現 {missing_count} 筆問題")
-            return missing_count
-            
-        except Exception as e:
-            self.logger.error(f"檢查缺失填報紀錄失敗：{str(e)}")
-            raise
+
     
     def check_missing_dispatch(self):
         """
@@ -100,11 +56,19 @@ class ConsistencyCheckService:
             
             for fill_work in fill_works:
                 # 檢查是否有對應的派工單
-                dispatch_exists = WorkOrderDispatch.objects.filter(
-                    company_code=fill_work.company_code,
-                    order_number=fill_work.workorder,
-                    product_code=fill_work.product_id
-                ).exists()
+                # 修正：當 company_code 為 None 時，只比對工單號碼和產品編號
+                if fill_work.company_code:
+                    dispatch_exists = WorkOrderDispatch.objects.filter(
+                        company_code=fill_work.company_code,
+                        order_number=fill_work.workorder,
+                        product_code=fill_work.product_id
+                    ).exists()
+                else:
+                    # 當 company_code 為 None 時，只比對工單號碼和產品編號
+                    dispatch_exists = WorkOrderDispatch.objects.filter(
+                        order_number=fill_work.workorder,
+                        product_code=fill_work.product_id
+                    ).exists()
                 
                 if not dispatch_exists:
                     ConsistencyCheckResult.objects.create(
@@ -298,7 +262,6 @@ class ConsistencyCheckService:
             self.logger.info("開始執行所有相符性檢查")
             
             results = {
-                'missing_fill_work': self.check_missing_fill_work(),
                 'missing_dispatch': self.check_missing_dispatch(),
                 'wrong_product_code': self.check_wrong_product_code(),
                 'wrong_company': self.check_wrong_company(),
@@ -326,9 +289,7 @@ class ConsistencyCheckService:
         try:
             result = ConsistencyCheckResult.objects.get(id=result_id)
             
-            if result.check_type == 'missing_fill_work':
-                self._fix_missing_fill_work(result, fix_method)
-            elif result.check_type == 'missing_dispatch':
+            if result.check_type == 'missing_dispatch':
                 self._fix_missing_dispatch(result, fix_method)
             elif result.check_type == 'wrong_product_code':
                 self._fix_wrong_product_code(result, fix_method)
@@ -344,10 +305,7 @@ class ConsistencyCheckService:
             self.logger.error(f"修復相符性問題失敗：{str(e)}")
             raise
     
-    def _fix_missing_fill_work(self, result, fix_method):
-        """修復缺失填報紀錄"""
-        # 這裡可以實作自動建立填報紀錄的邏輯
-        pass
+
     
     def _fix_missing_dispatch(self, result, fix_method):
         """修復缺失派工單"""
@@ -355,14 +313,18 @@ class ConsistencyCheckService:
         pass
     
     def _fix_wrong_product_code(self, result, fix_method):
-        """修復產品編號錯誤"""
-        if fix_method == 'update_fill_work':
-            # 更新填報紀錄的產品編號
-            FillWork.objects.filter(
-                company_name=result.company_name,
-                workorder=result.workorder,
-                product_id=result.wrong_product_code
-            ).update(product_id=result.product_code)
+        """修復產品編號錯誤 - 將填報紀錄的產品編號更新為工單的正確產品編號"""
+        # 不管修復方式，都統一更新填報紀錄的產品編號
+        from workorder.fill_work.models import FillWork
+        
+        # 更新填報紀錄的產品編號，讓它與工單的產品編號一致
+        updated_count = FillWork.objects.filter(
+            company_name=result.company_name,
+            workorder=result.workorder,
+            product_id=result.wrong_product_code
+        ).update(product_id=result.product_code)
+        
+        self.logger.info(f"已更新 {updated_count} 筆填報紀錄的產品編號：{result.wrong_product_code} → {result.product_code}")
     
     def _fix_wrong_company(self, result, fix_method):
         """修復公司代號/名稱錯誤"""

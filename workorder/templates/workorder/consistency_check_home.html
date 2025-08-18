@@ -92,50 +92,6 @@
 
     <!-- 檢查功能卡片 -->
     <div class="row">
-        <!-- 缺失填報紀錄 -->
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card consistency-card h-100">
-                <div class="card-body text-center">
-                    <div class="card-icon text-warning mb-3">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <h5 class="card-title">缺失填報紀錄</h5>
-                    <p class="card-text text-muted">
-                        檢查有工單但沒有填報紀錄的情況
-                    </p>
-                    
-                    <!-- 統計資訊 -->
-                    <div class="mb-3">
-                        <span class="badge bg-warning stats-badge me-2">
-                            總計: {{ check_stats.missing_fill_work.total }}
-                        </span>
-                        <span class="badge bg-success stats-badge me-2">
-                            已修復: {{ check_stats.missing_fill_work.fixed }}
-                        </span>
-                        <span class="badge bg-danger stats-badge">
-                            未修復: {{ check_stats.missing_fill_work.unfixed }}
-                        </span>
-                    </div>
-                    
-                    <!-- 操作按鈕 -->
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-warning check-button" 
-                                onclick="runCheck('missing_fill_work')"
-                                data-check-type="missing_fill_work">
-                            <span class="loading-spinner spinner-border spinner-border-sm me-2"></span>
-                            <span class="check-button-text">
-                                <i class="fas fa-search"></i> 執行檢查
-                            </span>
-                        </button>
-                        <a href="{% url 'workorder:consistency_check_detail' %}?type=missing_fill_work&fixed=false" 
-                           class="btn btn-outline-secondary btn-sm">
-                            <i class="fas fa-list"></i> 查看結果
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- 缺失派工單 -->
         <div class="col-lg-4 col-md-6 mb-4">
             <div class="card consistency-card h-100">
@@ -326,7 +282,7 @@
                     
                     <!-- 統計資訊 -->
                     <div class="mb-3">
-                        {% with total_issues=check_stats.missing_fill_work.total|add:check_stats.missing_dispatch.total|add:check_stats.wrong_product_code.total|add:check_stats.wrong_company.total|add:check_stats.wrong_workorder.total %}
+                        {% with total_issues=check_stats.missing_dispatch.total|add:check_stats.wrong_product_code.total|add:check_stats.wrong_company.total|add:check_stats.wrong_workorder.total %}
                         <span class="badge bg-success stats-badge">
                             總問題數: {{ total_issues }}
                         </span>

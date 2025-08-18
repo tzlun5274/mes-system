@@ -30,7 +30,6 @@ class ConsistencyCheckHomeView(LoginRequiredMixin, TemplateView):
         
         # 整理統計資料
         check_stats = {
-            'missing_fill_work': {'total': 0, 'fixed': 0, 'unfixed': 0},
             'missing_dispatch': {'total': 0, 'fixed': 0, 'unfixed': 0},
             'wrong_product_code': {'total': 0, 'fixed': 0, 'unfixed': 0},
             'wrong_company': {'total': 0, 'fixed': 0, 'unfixed': 0},
@@ -69,7 +68,7 @@ class ConsistencyCheckAjaxView(LoginRequiredMixin, View):
             action = request.POST.get('action', 'check')
             
             if action == 'fix_issue':
-                # 處理修復請求
+                # 處理單筆修復請求
                 result_id = request.POST.get('result_id')
                 fix_method = request.POST.get('fix_method', 'update_fill_work')
                 fixed_by = request.user.username
@@ -82,16 +81,54 @@ class ConsistencyCheckAjaxView(LoginRequiredMixin, View):
                     'message': '問題修復成功'
                 })
             
+            elif action == 'batch_fix_issues':
+                # 處理批次修復請求
+                result_ids = request.POST.get('result_ids', '').split(',')
+                fix_method = request.POST.get('fix_method', 'update_fill_work')
+                fixed_by = request.user.username
+                
+                if not result_ids or result_ids[0] == '':
+                    return JsonResponse({
+                        'success': False,
+                        'message': '請選擇要修復的問題'
+                    })
+                
+                service = ConsistencyCheckService()
+                fixed_count = 0
+                errors = []
+                
+                for result_id in result_ids:
+                    try:
+                        service.fix_issue(result_id, fix_method, fixed_by)
+                        fixed_count += 1
+                    except Exception as e:
+                        errors.append(f'ID {result_id}: {str(e)}')
+                
+                if fixed_count > 0:
+                    message = f'批次修復完成，成功修復 {fixed_count} 筆問題'
+                    if errors:
+                        message += f'，失敗 {len(errors)} 筆'
+                    
+                    return JsonResponse({
+                        'success': True,
+                        'message': message,
+                        'fixed_count': fixed_count,
+                        'error_count': len(errors),
+                        'errors': errors
+                    })
+                else:
+                    return JsonResponse({
+                        'success': False,
+                        'message': '批次修復失敗：' + '; '.join(errors)
+                    })
+            
             # 處理檢查請求
             check_type = request.POST.get('check_type')
             service = ConsistencyCheckService()
             
-            if check_type == 'missing_fill_work':
-                count = service.check_missing_fill_work()
-                message = f"缺失填報紀錄檢查完成，發現 {count} 筆問題（已排除RD樣品）"
-            elif check_type == 'missing_dispatch':
+            if check_type == 'missing_dispatch':
                 count = service.check_missing_dispatch()
-                message = f"缺失派工單檢查完成，發現 {count} 筆問題（已排除RD樣品）"
+                message = f"缺失派工單檢查完成，發現 {count} 筆問題（有工單但沒有派工單，已排除RD樣品）"
             elif check_type == 'wrong_product_code':
                 count = service.check_wrong_product_code()
                 message = f"產品編號錯誤檢查完成，發現 {count} 筆問題（已排除RD樣品）"
@@ -145,7 +182,6 @@ class ConsistencyCheckDetailView(LoginRequiredMixin, TemplateView):
         
         # 檢查類型顯示名稱
         type_display_names = {
-            'missing_fill_work': '缺失填報紀錄',
             'missing_dispatch': '缺失派工單',
             'wrong_product_code': '產品編號錯誤',
             'wrong_company': '公司代號/名稱錯誤',
