@@ -34,19 +34,11 @@ class RDSampleWorkOrderService:
         Returns:
             bool: 是否為RD樣品記錄
         """
-        # 檢查工單號碼是否為RD樣品
-        if fill_work_record.workorder and 'RD樣品' in fill_work_record.workorder:
-            return True
-        
-        # 檢查產品編號是否為RD樣品相關
-        if fill_work_record.product_id and 'PFP-CCT' in fill_work_record.product_id:
-            return True
-        
-        # 檢查工序是否包含RD相關關鍵字
-        if fill_work_record.process and 'RD' in fill_work_record.process.name.upper():
-            return True
-            
-        return False
+        # 使用與 FillWork._is_rd_sample() 相同的邏輯
+        # 只有工單號碼是 "RD樣品" 且產品編號以 "PFP-CCT" 開頭，才被識別為RD樣品
+        return (fill_work_record.workorder == 'RD樣品' and 
+                fill_work_record.product_id and 
+                fill_work_record.product_id.startswith('PFP-CCT'))
     
     @staticmethod
     def find_or_create_rd_workorder(fill_work_record):
@@ -60,10 +52,9 @@ class RDSampleWorkOrderService:
             tuple: (WorkOrder, bool) - 工單物件和是否為新建
         """
         try:
-            # 使用公司代號+RD樣品+產品編號作為唯一識別
-            # 如果沒有公司代號，預設為耀儀科技（RD樣品通常屬於耀儀科技）
+            # 工單號碼就是 'RD樣品'，不加上任何其他文字
             company_code = fill_work_record.company_code or '10'
-            rd_workorder_number = f"RD樣品-{fill_work_record.product_id}"
+            rd_workorder_number = 'RD樣品'
             product_code = fill_work_record.product_id
             
             # 查找現有工單
@@ -174,10 +165,9 @@ class RDSampleWorkOrderService:
             # 查找或建立派工單
             dispatch, dispatch_created = RDSampleWorkOrderService.find_or_create_rd_dispatch(workorder, fill_work_record)
             
-            # 更新填報記錄的工單號碼（如果原本是RD樣品）
-            if fill_work_record.workorder == 'RD樣品':
-                fill_work_record.workorder = workorder.order_number
-                fill_work_record.save(update_fields=['workorder', 'updated_at'])
+            # 不修改填報記錄的工單號碼，保持原樣
+            # 填報記錄的工單號碼應該是 'RD樣品'
+            # 只有建立的MES工單才使用新的格式
             
             result = {
                 'success': True,
