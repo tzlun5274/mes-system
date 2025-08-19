@@ -135,12 +135,26 @@ class UserWorkPermissionForm(forms.ModelForm):
         help_text="按住 Ctrl 鍵可多選，留空表示可操作所有工序"
     )
     
+    equipment_names_multiple = forms.MultipleChoiceField(
+        choices=[],
+        required=False,
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-control',
+            'size': '8',
+            'id': 'equipment_names_multiple'
+        }),
+        label="設備名稱（多選）",
+        help_text="按住 Ctrl 鍵可多選，留空表示可操作所有設備"
+    )
+    
     class Meta:
         model = UserWorkPermission
         fields = [
             'user',
             'operator_codes',
             'process_names',
+            'equipment_names',
+            'disable_all_equipment',
             'permission_type',
             'is_active',
             'notes'
@@ -164,6 +178,17 @@ class UserWorkPermissionForm(forms.ModelForm):
                 'id': 'process_names_text',
                 'style': 'display: none;'
             }),
+            'equipment_names': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': '例如：SMT-01, 測試機-01, 包裝機-01\n留空表示可操作所有設備',
+                'id': 'equipment_names_text',
+                'style': 'display: none;'
+            }),
+            'disable_all_equipment': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'id': 'disable_all_equipment'
+            }),
             'permission_type': forms.Select(attrs={
                 'class': 'form-control'
             }),
@@ -180,6 +205,8 @@ class UserWorkPermissionForm(forms.ModelForm):
             'user': '使用者',
             'operator_codes': '作業員編號',
             'process_names': '工序名稱',
+            'equipment_names': '設備名稱',
+            'disable_all_equipment': '禁用所有設備',
             'permission_type': '權限類型',
             'is_active': '啟用狀態',
             'notes': '備註'
@@ -187,20 +214,8 @@ class UserWorkPermissionForm(forms.ModelForm):
         help_texts = {
             'operator_codes': '可操作的作業員編號，多個用逗號分隔，留空表示可操作所有作業員',
             'process_names': '可操作的工序名稱，多個用逗號分隔，留空表示可操作所有工序',
-            'permission_type': '選擇使用者可以進行的報工類型',
-            'is_active': '啟用或停用此權限設定'
-        }
-        labels = {
-            'user': '使用者',
-            'operator_codes': '作業員編號',
-            'process_names': '工序名稱',
-            'permission_type': '權限類型',
-            'is_active': '啟用狀態',
-            'notes': '備註'
-        }
-        help_texts = {
-            'operator_codes': '可操作的作業員編號，多個用逗號分隔，留空表示可操作所有作業員',
-            'process_names': '可操作的工序名稱，多個用逗號分隔，留空表示可操作所有工序',
+            'equipment_names': '可操作的設備名稱，多個用逗號分隔，留空表示可操作所有設備',
+            'disable_all_equipment': '勾選此項將禁用該使用者的所有設備操作權限',
             'permission_type': '選擇使用者可以進行的報工類型',
             'is_active': '啟用或停用此權限設定'
         }
@@ -211,10 +226,13 @@ class UserWorkPermissionForm(forms.ModelForm):
         # 將原始欄位設為非必填
         self.fields['operator_codes'].required = False
         self.fields['process_names'].required = False
+        self.fields['equipment_names'].required = False
+        self.fields['disable_all_equipment'].required = False
         
-        # 動態獲取作業員和工序選項
+        # 動態獲取作業員、工序和設備選項
         self.fields['operator_codes_multiple'].choices = self._get_operator_choices()
         self.fields['process_names_multiple'].choices = self._get_process_choices()
+        self.fields['equipment_names_multiple'].choices = self._get_equipment_choices()
         
         # 如果有實例，設定多選欄位的初始值
         if self.instance and self.instance.pk:
@@ -225,6 +243,10 @@ class UserWorkPermissionForm(forms.ModelForm):
             if self.instance.process_names:
                 process_names = [name.strip() for name in self.instance.process_names.split(',') if name.strip()]
                 self.fields['process_names_multiple'].initial = process_names
+            
+            if self.instance.equipment_names:
+                equipment_names = [name.strip() for name in self.instance.equipment_names.split(',') if name.strip()]
+                self.fields['equipment_names_multiple'].initial = equipment_names
     
     def _get_operator_choices(self):
         """獲取作業員選項"""
@@ -306,6 +328,35 @@ class UserWorkPermissionForm(forms.ModelForm):
         except Exception:
             return []
     
+    def _get_equipment_choices(self):
+        """獲取設備選項"""
+        try:
+            # 嘗試從設備模組獲取設備資料
+            try:
+                from equip.models import Equipment
+                equipments = Equipment.objects.all().order_by('name')
+                if equipments.exists():
+                    return [(eq.name, eq.name) for eq in equipments]
+            except (ImportError, AttributeError):
+                pass
+            
+            # 嘗試從填報記錄中獲取設備資料
+            try:
+                from workorder.fill_work.models import FillWork
+                from django.db.models import Q
+                equipments = FillWork.objects.values_list('equipment', flat=True).distinct().exclude(
+                    Q(equipment__isnull=True) | Q(equipment='')
+                ).order_by('equipment')
+                if equipments.exists():
+                    return [(eq, eq) for eq in equipments]
+            except (ImportError, AttributeError):
+                pass
+            
+            # 如果沒有找到任何設備資料，返回空列表
+            return []
+        except Exception:
+            return []
+    
     def clean_operator_codes_multiple(self):
         """驗證多選作業員編號"""
         operator_codes = self.cleaned_data.get('operator_codes_multiple')
@@ -328,6 +379,17 @@ class UserWorkPermissionForm(forms.ModelForm):
                 return process_names
         return ''
     
+    def clean_equipment_names_multiple(self):
+        """驗證多選設備名稱"""
+        equipment_names = self.cleaned_data.get('equipment_names_multiple')
+        if equipment_names:
+            # 將多選結果轉換為逗號分隔的字串
+            if isinstance(equipment_names, list):
+                return ', '.join(equipment_names)
+            else:
+                return equipment_names
+        return ''
+    
     def clean(self):
         """整體驗證"""
         cleaned_data = super().clean()
@@ -335,6 +397,7 @@ class UserWorkPermissionForm(forms.ModelForm):
         # 將多選結果同步到原始欄位
         cleaned_data['operator_codes'] = self.clean_operator_codes_multiple()
         cleaned_data['process_names'] = self.clean_process_names_multiple()
+        cleaned_data['equipment_names'] = self.clean_equipment_names_multiple()
         
         user = cleaned_data.get('user')
         permission_type = cleaned_data.get('permission_type')
@@ -364,6 +427,9 @@ class UserWorkPermissionForm(forms.ModelForm):
         
         if 'process_names_multiple' in self.cleaned_data:
             instance.process_names = self.clean_process_names_multiple()
+        
+        if 'equipment_names_multiple' in self.cleaned_data:
+            instance.equipment_names = self.clean_equipment_names_multiple()
         
         if commit:
             instance.save()

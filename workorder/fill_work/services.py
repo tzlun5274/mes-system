@@ -297,7 +297,7 @@ class FillWorkApprovalService:
     @staticmethod
     def _validate_workorder_dispatch(fill_work_record):
         """
-        驗證派工單是否存在且資料一致
+        驗證派工單
         
         Args:
             fill_work_record: FillWork記錄
@@ -310,10 +310,21 @@ class FillWorkApprovalService:
             from erp_integration.models import CompanyConfig
             
             # 查找對應的派工單
-            dispatch = WorkOrderDispatch.objects.filter(
-                order_number=fill_work_record.workorder,
-                product_code=fill_work_record.product_id
+            company_config = CompanyConfig.objects.filter(
+                company_name=fill_work_record.company_name
             ).first()
+            
+            if company_config:
+                dispatch = WorkOrderDispatch.objects.filter(
+                    company_code=company_config.company_code,
+                    order_number=fill_work_record.workorder,
+                    product_code=fill_work_record.product_id
+                ).first()
+            else:
+                dispatch = WorkOrderDispatch.objects.filter(
+                    order_number=fill_work_record.workorder,
+                    product_code=fill_work_record.product_id
+                ).first()
             
             if not dispatch:
                 return {
@@ -415,4 +426,216 @@ class FillWorkApprovalService:
                 'approved_count': 0,
                 'rd_workorders_created': 0,
                 'rd_dispatches_created': 0
+            }
+
+
+class MultiFilterService:
+    """
+    多重過濾服務
+    結合原本的SMT/作業員過濾和使用者權限過濾
+    """
+    
+    @staticmethod
+    def get_multi_filtered_process_queryset(user, form_type='operator', permission_type='both'):
+        """
+        多重過濾工序查詢集：結合SMT/作業員過濾和使用者權限過濾
+        
+        Args:
+            user: 當前使用者
+            form_type: 表單類型 ('operator', 'smt')
+            permission_type: 權限類型
+            
+        Returns:
+            QuerySet: 多重過濾後的工序查詢集
+        """
+        try:
+            from process.models import ProcessName
+            from system.utils import get_user_allowed_processes
+            from django.db import models
+            
+            # 第一步：根據表單類型進行SMT/作業員過濾
+            if form_type == 'smt':
+                # SMT表單：只顯示SMT相關工序
+                base_queryset = ProcessName.objects.filter(
+                    models.Q(name__icontains='SMT') | 
+                    models.Q(name__icontains='貼片') | 
+                    models.Q(name__icontains='Pick') | 
+                    models.Q(name__icontains='Place')
+                )
+            else:
+                # 作業員表單：排除SMT相關工序
+                base_queryset = ProcessName.objects.exclude(
+                    models.Q(name__icontains='SMT') | 
+                    models.Q(name__icontains='貼片') | 
+                    models.Q(name__icontains='Pick') | 
+                    models.Q(name__icontains='Place')
+                )
+            
+            # 第二步：根據使用者權限進行進一步過濾
+            allowed_processes = get_user_allowed_processes(user, permission_type)
+            
+            if allowed_processes:
+                # 有權限設定，只顯示權限內的工序
+                return base_queryset.filter(name__in=allowed_processes).order_by('name')
+            else:
+                # 沒有權限設定，顯示所有符合表單類型的工序
+                return base_queryset.order_by('name')
+                
+        except Exception as e:
+            logger.error(f"多重過濾工序查詢集失敗: {str(e)}")
+            # 異常時返回基本的SMT/作業員過濾
+            if form_type == 'smt':
+                return ProcessName.objects.filter(name__icontains='SMT').order_by('name')
+            else:
+                return ProcessName.objects.exclude(name__icontains='SMT').order_by('name')
+
+    @staticmethod
+    def get_multi_filtered_equipment_queryset(user, form_type='operator', permission_type='both'):
+        """
+        多重過濾設備查詢集：結合SMT/作業員過濾和使用者權限過濾
+        
+        Args:
+            user: 當前使用者
+            form_type: 表單類型 ('operator', 'smt')
+            permission_type: 權限類型
+            
+        Returns:
+            QuerySet: 多重過濾後的設備查詢集
+        """
+        try:
+            from equip.models import Equipment
+            from django.db import models
+            
+            # 第一步：根據表單類型進行SMT/作業員過濾
+            if form_type == 'smt':
+                # SMT表單：只顯示SMT相關設備
+                base_queryset = Equipment.objects.filter(
+                    models.Q(name__icontains='SMT') | 
+                    models.Q(name__icontains='貼片') | 
+                    models.Q(name__icontains='Pick') | 
+                    models.Q(name__icontains='Place')
+                )
+            else:
+                # 作業員表單：排除SMT相關設備
+                base_queryset = Equipment.objects.exclude(
+                    models.Q(name__icontains='SMT') | 
+                    models.Q(name__icontains='貼片') | 
+                    models.Q(name__icontains='Pick') | 
+                    models.Q(name__icontains='Place')
+                )
+            
+            # 第二步：根據使用者權限進行進一步過濾
+            from system.utils import get_user_allowed_equipments
+            allowed_equipments = get_user_allowed_equipments(user, permission_type)
+            
+            if allowed_equipments is None:
+                # 禁用所有設備，返回空查詢集
+                return Equipment.objects.none()
+            elif allowed_equipments:
+                # 有權限設定，只顯示權限內的設備
+                return base_queryset.filter(name__in=allowed_equipments).order_by('name')
+            else:
+                # 沒有權限設定，顯示所有符合表單類型的設備
+                return base_queryset.order_by('name')
+                
+        except Exception as e:
+            logger.error(f"多重過濾設備查詢集失敗: {str(e)}")
+            # 異常時返回基本的SMT/作業員過濾
+            if form_type == 'smt':
+                return Equipment.objects.filter(name__icontains='SMT').order_by('name')
+            else:
+                return Equipment.objects.exclude(name__icontains='SMT').order_by('name')
+
+    @staticmethod
+    def get_multi_filtered_operator_queryset(user, form_type='operator', permission_type='both'):
+        """
+        多重過濾作業員查詢集：結合SMT/作業員過濾和使用者權限過濾
+        
+        Args:
+            user: 當前使用者
+            form_type: 表單類型 ('operator', 'smt')
+            permission_type: 權限類型
+            
+        Returns:
+            QuerySet: 多重過濾後的作業員查詢集
+        """
+        try:
+            from process.models import Operator
+            from system.utils import get_user_allowed_operators
+            
+            # 第一步：根據表單類型進行SMT/作業員過濾
+            if form_type == 'smt':
+                # SMT表單：顯示所有作業員（因為SMT設備會自動填入作業員）
+                base_queryset = Operator.objects.all()
+            else:
+                # 作業員表單：排除SMT相關的作業員
+                base_queryset = Operator.objects.exclude(name__icontains='SMT')
+            
+            # 第二步：根據使用者權限進行進一步過濾
+            allowed_operators = get_user_allowed_operators(user, permission_type)
+            
+            if allowed_operators:
+                # 有權限設定，只顯示權限內的作業員
+                return base_queryset.filter(name__in=allowed_operators).order_by('name')
+            else:
+                # 沒有權限設定，顯示所有符合表單類型的作業員
+                return base_queryset.order_by('name')
+                
+        except Exception as e:
+            logger.error(f"多重過濾作業員查詢集失敗: {str(e)}")
+            # 異常時返回基本的SMT/作業員過濾
+            if form_type == 'smt':
+                return Operator.objects.all().order_by('name')
+            else:
+                return Operator.objects.exclude(name__icontains='SMT').order_by('name')
+
+    @staticmethod
+    def get_multi_filtered_choices(user, form_type='operator', permission_type='both'):
+        """
+        獲取多重過濾後的選項列表
+        
+        Args:
+            user: 當前使用者
+            form_type: 表單類型 ('operator', 'smt')
+            permission_type: 權限類型
+            
+        Returns:
+            dict: 包含作業員、工序、設備選項的字典
+        """
+        try:
+            # 獲取多重過濾後的查詢集
+            operator_queryset = MultiFilterService.get_multi_filtered_operator_queryset(
+                user, form_type, permission_type
+            )
+            process_queryset = MultiFilterService.get_multi_filtered_process_queryset(
+                user, form_type, permission_type
+            )
+            equipment_queryset = MultiFilterService.get_multi_filtered_equipment_queryset(
+                user, form_type, permission_type
+            )
+            
+            # 轉換為選項列表
+            operator_choices = [("", "請選擇作業員")] + [
+                (op.name, op.name) for op in operator_queryset
+            ]
+            process_choices = [("", "請選擇工序")] + [
+                (proc.name, proc.name) for proc in process_queryset
+            ]
+            equipment_choices = [("", "請選擇使用的設備")] + [
+                (eq.name, eq.name) for eq in equipment_queryset
+            ]
+            
+            return {
+                'operators': operator_choices,
+                'processes': process_choices,
+                'equipments': equipment_choices
+            }
+            
+        except Exception as e:
+            logger.error(f"獲取多重過濾選項失敗: {str(e)}")
+            # 異常時返回空選項
+            return {
+                'operators': [("", "請選擇作業員")],
+                'processes': [("", "請選擇工序")],
+                'equipments': [("", "請選擇使用的設備")]
             } 

@@ -37,6 +37,7 @@ from process.models import ProcessName, Operator
 from equip.models import Equipment
 from workorder.models import WorkOrder
 from workorder.services.production_sync_service import ProductionReportSyncService
+from .services import MultiFilterService
 
 
 # ==================== 表單類別定義 ====================
@@ -130,17 +131,31 @@ class OperatorBackfillForm(ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        # 過濾工序，排除SMT相關
-        self.fields['process'].queryset = ProcessName.objects.exclude(name__icontains='SMT')
+        
+        # 使用多重過濾服務
+        from .services import MultiFilterService
+        
+        # 獲取多重過濾後的選項
+        filtered_choices = MultiFilterService.get_multi_filtered_choices(
+            user=self.user,  # 傳入使用者參數
+            form_type='operator',
+            permission_type='both'
+        )
+        
+        # 設定過濾後的選項
+        self.fields['process'].queryset = MultiFilterService.get_multi_filtered_process_queryset(
+            user=self.user, form_type='operator', permission_type='both'
+        )
+        self.fields['operator'].choices = filtered_choices['operators']
+        self.fields['equipment'].choices = filtered_choices['equipments']
         
         # 設定 planned_quantity 可留空
         self.fields['planned_quantity'].required = False
         
         # 載入選項
         self.fields['company_name'].choices = self.get_company_choices()
-        self.fields['operator'].choices = self.get_operator_choices()
-        self.fields['equipment'].choices = self.get_equipment_choices()
         self.fields['workorder'].choices = self.get_workorder_choices()
         
         # 設定預設值與日期選項
@@ -315,17 +330,31 @@ class OperatorRDBackfillForm(ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        # 過濾工序，排除SMT相關
-        self.fields['process'].queryset = ProcessName.objects.exclude(name__icontains='SMT')
+        
+        # 使用多重過濾服務
+        from .services import MultiFilterService
+        
+        # 獲取多重過濾後的選項
+        filtered_choices = MultiFilterService.get_multi_filtered_choices(
+            user=self.user,  # 傳入使用者參數
+            form_type='operator',
+            permission_type='both'
+        )
+        
+        # 設定過濾後的選項
+        self.fields['process'].queryset = MultiFilterService.get_multi_filtered_process_queryset(
+            user=self.user, form_type='operator', permission_type='both'
+        )
+        self.fields['operator'].choices = filtered_choices['operators']
+        self.fields['equipment'].choices = filtered_choices['equipments']
         
         # 設定planned_quantity為非必填
         self.fields['planned_quantity'].required = False
         
         # 載入選項
         self.fields['company_name'].choices = self.get_company_choices()
-        self.fields['operator'].choices = self.get_operator_choices()
-        self.fields['equipment'].choices = self.get_equipment_choices()
         
         # 設定預設值
         if not self.instance.pk:  # 新增時
@@ -494,14 +523,31 @@ class SMTBackfillForm(ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        # 過濾工序，只顯示SMT相關
-        self.fields['process'].queryset = ProcessName.objects.filter(name__icontains='SMT')
+        
+        # 使用多重過濾服務
+        from .services import MultiFilterService
+        
+        # 獲取多重過濾後的選項
+        filtered_choices = MultiFilterService.get_multi_filtered_choices(
+            user=self.user,  # 傳入使用者參數
+            form_type='smt',
+            permission_type='both'
+        )
+        
+        # 設定過濾後的選項
+        self.fields['process'].queryset = MultiFilterService.get_multi_filtered_process_queryset(
+            user=self.user, form_type='smt', permission_type='both'
+        )
+        self.fields['operator'].choices = filtered_choices['operators']
+        self.fields['equipment'].choices = filtered_choices['equipments']
+        
         # planned_quantity 非必填
         self.fields['planned_quantity'].required = False
+        
         # 載入選項
         self.fields['company_name'].choices = self.get_company_choices()
-        self.fields['equipment'].choices = self.get_equipment_choices()
         
         # 最近30天日期選項
         from datetime import timedelta, date
@@ -638,16 +684,31 @@ class SMTRDBackfillForm(ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        # 過濾工序，只顯示SMT相關
-        self.fields['process'].queryset = ProcessName.objects.filter(name__icontains='SMT')
+        
+        # 使用多重過濾服務
+        from .services import MultiFilterService
+        
+        # 獲取多重過濾後的選項
+        filtered_choices = MultiFilterService.get_multi_filtered_choices(
+            user=self.user,  # 傳入使用者參數
+            form_type='smt',
+            permission_type='both'
+        )
+        
+        # 設定過濾後的選項
+        self.fields['process'].queryset = MultiFilterService.get_multi_filtered_process_queryset(
+            user=self.user, form_type='smt', permission_type='both'
+        )
+        self.fields['operator'].choices = filtered_choices['operators']
+        self.fields['equipment'].choices = filtered_choices['equipments']
         
         # planned_quantity 非必填
         self.fields['planned_quantity'].required = False
+        
         # 載入選項
         self.fields['company_name'].choices = self.get_company_choices()
-        self.fields['operator'].choices = self.get_operator_choices()
-        self.fields['equipment'].choices = self.get_equipment_choices()
 
         # 設定預設值
         if not self.instance.pk:  # 新增時
@@ -785,6 +846,12 @@ class OperatorBackfillCreateView(LoginRequiredMixin, CreateView):
         context['minutes_range'] = [f"{m:02d}" for m in range(0, 60)]
         return context
     
+    def get_form_kwargs(self):
+        """傳遞用戶參數給表單"""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
     def form_valid(self, form):
         try:
             # 設定休息時間（作業員填報：12:00-13:00）
@@ -829,6 +896,12 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
         context['hours_range'] = [f"{h:02d}" for h in range(0, 24)]
         context['minutes_range'] = [f"{m:02d}" for m in range(0, 60)]
         return context
+    
+    def get_form_kwargs(self):
+        """傳遞用戶參數給表單"""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
     
     def form_valid(self, form):
         try:
@@ -985,6 +1058,12 @@ class SMTBackfillCreateView(LoginRequiredMixin, CreateView):
         context['minutes_range'] = [f"{m:02d}" for m in range(0, 60)]
         return context
 
+    def get_form_kwargs(self):
+        """傳遞用戶參數給表單"""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
     def form_valid(self, form):
         try:
             # 設定無休息時間（SMT填報：12:00-12:00）
@@ -1028,6 +1107,12 @@ class SMTRDBackfillCreateView(LoginRequiredMixin, CreateView):
         context['hours_range'] = [f"{h:02d}" for h in range(0, 24)]
         context['minutes_range'] = [f"{m:02d}" for m in range(0, 60)]
         return context
+    
+    def get_form_kwargs(self):
+        """傳遞用戶參數給表單"""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
     
     def form_valid(self, form):
         try:
@@ -2899,3 +2984,57 @@ def batch_unapprove_fill_work(request):
         messages.error(request, f'批次取消審核失敗: {str(e)}')
     
     return redirect('workorder:fill_work:supervisor_reviewed_list')
+
+
+# ==================== 測試視圖 ====================
+
+@login_required
+def test_multi_filter(request):
+    """測試多重過濾功能"""
+    try:
+        from .services import MultiFilterService
+        
+        # 獲取當前使用者的多重過濾選項
+        filtered_choices = MultiFilterService.get_multi_filtered_choices(
+            user=request.user,
+            form_type='operator',
+            permission_type='both'
+        )
+        
+        # 獲取工序查詢集
+        process_queryset = MultiFilterService.get_multi_filtered_process_queryset(
+            user=request.user,
+            form_type='operator',
+            permission_type='both'
+        )
+        
+        # 獲取作業員查詢集
+        operator_queryset = MultiFilterService.get_multi_filtered_operator_queryset(
+            user=request.user,
+            form_type='operator',
+            permission_type='both'
+        )
+        
+        # 獲取設備查詢集
+        equipment_queryset = MultiFilterService.get_multi_filtered_equipment_queryset(
+            user=request.user,
+            form_type='operator',
+            permission_type='both'
+        )
+        
+        context = {
+            'user': request.user,
+            'filtered_choices': filtered_choices,
+            'process_queryset': process_queryset,
+            'operator_queryset': operator_queryset,
+            'equipment_queryset': equipment_queryset,
+            'process_count': process_queryset.count(),
+            'operator_count': operator_queryset.count(),
+            'equipment_count': equipment_queryset.count(),
+        }
+        
+        return render(request, 'workorder/fill_work/test_multi_filter.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'測試多重過濾功能失敗: {str(e)}')
+        return redirect('workorder:fill_work:fill_work_index')

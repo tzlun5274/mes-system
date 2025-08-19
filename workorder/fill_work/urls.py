@@ -63,4 +63,7 @@ urlpatterns = [
     path("batch/delete/", views.batch_delete_fill_work, name="batch_delete_fill_work"),
     path("batch/approve/", views.batch_approve_fill_work, name="batch_approve_fill_work"),
     path("batch/unapprove/", views.batch_unapprove_fill_work, name="batch_unapprove_fill_work"),
+
+    # 測試路由
+    path('test_multi_filter/', views.test_multi_filter, name='test_multi_filter'),
 ] 

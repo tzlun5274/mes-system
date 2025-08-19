@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 多選功能增強
     const operatorSelect = document.getElementById('operator_codes_multiple');
     const processSelect = document.getElementById('process_names_multiple');
+    const equipmentSelect = document.getElementById('equipment_names_multiple');
+    const disableAllEquipmentCheckbox = document.getElementById('disable_all_equipment');
     
     // 為多選下拉選單增加全選/取消全選功能
     function addSelectAllOption(selectElement, label) {
@@ -38,9 +40,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // 為兩個多選下拉選單增加全選功能
+    // 為三個多選下拉選單增加全選功能
     addSelectAllOption(operatorSelect, '全選作業員');
     addSelectAllOption(processSelect, '全選工序');
+    addSelectAllOption(equipmentSelect, '全選設備');
     
     // 表單提交前驗證
     document.querySelector('form').addEventListener('submit', function(e) {
@@ -50,10 +53,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const processSelected = Array.from(processSelect.options).some(option => 
             option.selected && option.value !== 'select_all'
         );
+        const equipmentSelected = Array.from(equipmentSelect.options).some(option => 
+            option.selected && option.value !== 'select_all'
+        );
         
         // 如果都沒有選擇，顯示提示（但允許提交，表示無限制）
-        if (!operatorSelected && !processSelected) {
-            if (!confirm('您沒有選擇任何作業員和工序，這表示該使用者可以操作所有作業員和工序。確定要繼續嗎？')) {
+        if (!operatorSelected && !processSelected && !equipmentSelected) {
+            if (!confirm('您沒有選擇任何作業員、工序和設備，這表示該使用者可以操作所有作業員、工序和設備。確定要繼續嗎？')) {
                 e.preventDefault();
                 return;
             }
@@ -79,10 +85,33 @@ document.addEventListener('DOMContentLoaded', function() {
     // 監聽選擇變化
     operatorSelect.addEventListener('change', () => updateSelectionCount(operatorSelect, '作業員'));
     processSelect.addEventListener('change', () => updateSelectionCount(processSelect, '工序'));
+    equipmentSelect.addEventListener('change', () => updateSelectionCount(equipmentSelect, '設備'));
+    
+    // 監聽禁用所有設備選項
+    if (disableAllEquipmentCheckbox) {
+        disableAllEquipmentCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                // 如果勾選禁用所有設備，清空設備選擇並禁用設備選擇框
+                if (equipmentSelect) {
+                    Array.from(equipmentSelect.options).forEach(option => {
+                        option.selected = false;
+                    });
+                    equipmentSelect.disabled = true;
+                    updateSelectionCount(equipmentSelect, '設備');
+                }
+            } else {
+                // 如果取消勾選，重新啟用設備選擇框
+                if (equipmentSelect) {
+                    equipmentSelect.disabled = false;
+                }
+            }
+        });
+    }
     
     // 初始化顯示
     updateSelectionCount(operatorSelect, '作業員');
     updateSelectionCount(processSelect, '工序');
+    updateSelectionCount(equipmentSelect, '設備');
 });
 </script>
 {% endblock %}
@@ -194,6 +223,44 @@ document.addEventListener('DOMContentLoaded', function() {
                             {% endif %}
                         </div>
 
+                        <!-- 設備名稱（多選） -->
+                        <div class="mb-3">
+                            <label for="{{ form.equipment_names_multiple.id_for_label }}" class="form-label">
+                                <i class="fas fa-tools"></i> {{ form.equipment_names_multiple.label }}
+                            </label>
+                            {{ form.equipment_names_multiple }}
+                            {% if form.equipment_names_multiple.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.equipment_names_multiple.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if form.equipment_names_multiple.help_text %}
+                                <div class="form-text">{{ form.equipment_names_multiple.help_text }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 禁用所有設備 -->
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.disable_all_equipment }}
+                                <label class="form-check-label" for="{{ form.disable_all_equipment.id_for_label }}">
+                                    <i class="fas fa-ban text-danger"></i> {{ form.disable_all_equipment.label }}
+                                </label>
+                            </div>
+                            {% if form.disable_all_equipment.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.disable_all_equipment.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if form.disable_all_equipment.help_text %}
+                                <div class="form-text">{{ form.disable_all_equipment.help_text }}</div>
+                            {% endif %}
+                        </div>
+
                         <!-- 啟用狀態 -->
                         <div class="mb-3">
                             <div class="form-check">
@@ -257,7 +324,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <ul class="mb-0">
                         <li><strong>作業員編號</strong>：從下拉選單中選擇可操作的作業員，按住 Ctrl 鍵可多選</li>
                         <li><strong>工序名稱</strong>：從下拉選單中選擇可操作的工序，按住 Ctrl 鍵可多選</li>
-                        <li><strong>留空表示無限制</strong>：如果不選擇任何作業員或工序，表示該使用者可以操作所有作業員或工序</li>
+                        <li><strong>設備名稱</strong>：從下拉選單中選擇可操作的設備，按住 Ctrl 鍵可多選</li>
+                        <li><strong>留空表示無限制</strong>：如果不選擇任何作業員、工序或設備，表示該使用者可以操作所有作業員、工序或設備</li>
                         <li><strong>權限類型</strong>：選擇使用者可以進行的報工類型（填報報工、現場報工或兩者都可以）</li>
                         <li><strong>多選操作</strong>：按住 Ctrl 鍵點擊可選擇多個項目，按住 Shift 鍵可選擇範圍</li>
                     </ul>

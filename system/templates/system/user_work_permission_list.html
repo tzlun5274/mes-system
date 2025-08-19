@@ -50,6 +50,7 @@
                                 <th>權限類型</th>
                                 <th>作業員編號</th>
                                 <th>工序名稱</th>
+                                <th>設備名稱</th>
                                 <th>啟用狀態</th>
                                 <th>建立時間</th>
                                 <th>操作</th>
@@ -81,6 +82,13 @@
                                         <small>{{ permission.process_names|truncatechars:50 }}</small>
                                     {% else %}
                                         <span class="text-muted">所有工序</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if permission.equipment_names %}
+                                        <small>{{ permission.equipment_names|truncatechars:50 }}</small>
+                                    {% else %}
+                                        <span class="text-muted">所有設備</span>
                                     {% endif %}
                                 </td>
                                 <td>

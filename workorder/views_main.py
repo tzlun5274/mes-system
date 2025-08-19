@@ -4760,9 +4760,17 @@ def get_operator_list_unified(request):
     """統一作業員清單API"""
     try:
         from process.models import Operator
+        from workorder.fill_work.services import MultiFilterService
         
-        # 取得所有作業員
-        operators = Operator.objects.values('name').distinct().order_by('name')
+        # 使用多重過濾服務獲取作業員查詢集
+        operator_queryset = MultiFilterService.get_multi_filtered_operator_queryset(
+            user=request.user,
+            form_type='operator',
+            permission_type='both'
+        )
+        
+        # 轉換為API格式
+        operators = operator_queryset.values('name').distinct().order_by('name')
         
         return JsonResponse({
             'success': True,
@@ -4778,33 +4786,24 @@ def get_operator_list_unified(request):
 def get_process_list_unified(request):
     """統一工序清單API"""
     try:
-        from process.models import ProcessName
+        from workorder.fill_work.services import MultiFilterService
         
         # 取得表單類型參數
         form_type = request.GET.get('form_type', 'operator')  # 預設為作業員表單
         
-        # 取得所有工序
-        processes = ProcessName.objects.values('name').distinct().order_by('name')
+        # 使用多重過濾服務獲取工序查詢集
+        process_queryset = MultiFilterService.get_multi_filtered_process_queryset(
+            user=request.user,
+            form_type=form_type,
+            permission_type='both'
+        )
         
-        # 根據表單類型過濾工序
-        filtered_processes = []
-        for process in processes:
-            process_name = process['name']
-            should_include = True
-            
-            if form_type == 'smt':
-                # SMT表單：只顯示包含SMT的工序
-                should_include = 'SMT' in process_name.upper()
-            else:
-                # 作業員表單：排除包含SMT的工序
-                should_include = 'SMT' not in process_name.upper()
-            
-            if should_include:
-                filtered_processes.append(process)
+        # 轉換為API格式
+        processes = process_queryset.values('name').distinct().order_by('name')
         
         return JsonResponse({
             'success': True,
-            'processes': filtered_processes
+            'processes': list(processes)
         })
     except Exception as e:
         return JsonResponse({
@@ -4816,33 +4815,24 @@ def get_process_list_unified(request):
 def get_equipment_list_unified(request):
     """統一設備清單API"""
     try:
-        from equip.models import Equipment
+        from workorder.fill_work.services import MultiFilterService
         
         # 取得表單類型參數
         form_type = request.GET.get('form_type', 'operator')  # 預設為作業員表單
         
-        # 取得所有設備
-        equipments = Equipment.objects.values('name').distinct().order_by('name')
+        # 使用多重過濾服務獲取設備查詢集
+        equipment_queryset = MultiFilterService.get_multi_filtered_equipment_queryset(
+            user=request.user,
+            form_type=form_type,
+            permission_type='both'
+        )
         
-        # 根據表單類型過濾設備
-        filtered_equipments = []
-        for equipment in equipments:
-            equipment_name = equipment['name']
-            should_include = True
-            
-            if form_type == 'smt':
-                # SMT表單：只顯示包含SMT的設備
-                should_include = 'SMT' in equipment_name.upper()
-            else:
-                # 作業員表單：排除包含SMT的設備
-                should_include = 'SMT' not in equipment_name.upper()
-            
-            if should_include:
-                filtered_equipments.append(equipment)
+        # 轉換為API格式
+        equipments = equipment_queryset.values('name').distinct().order_by('name')
         
         return JsonResponse({
             'success': True,
-            'equipments': filtered_equipments
+            'equipments': list(equipments)
         })
     except Exception as e:
         return JsonResponse({

@@ -105,6 +105,29 @@ def get_user_allowed_processes(user, permission_type='both'):
         return []
 
 
+def get_user_allowed_equipments(user, permission_type='both'):
+    """
+    獲取使用者可以操作的設備列表
+    
+    Args:
+        user: 使用者物件
+        permission_type: 權限類型
+    
+    Returns:
+        list: 可操作的設備名稱列表，空列表表示可以操作所有設備，None表示禁用所有設備
+    """
+    try:
+        permission = UserWorkPermission.get_user_permission(user, permission_type)
+        if permission:
+            # 如果禁用所有設備，返回 None 表示禁用
+            if permission.disable_all_equipment:
+                return None
+            return permission.get_equipment_names_list()
+        return []
+    except Exception:
+        return []
+
+
 def can_user_fill_work(user):
     """
     檢查使用者是否可以進行填報報工

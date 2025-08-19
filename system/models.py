@@ -338,6 +338,21 @@ class UserWorkPermission(models.Model):
         help_text="可操作的工序名稱，多個用逗號分隔，留空表示可操作所有工序"
     )
     
+    # 設備名稱（支援多個，用逗號分隔）
+    equipment_names = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="設備名稱",
+        help_text="可操作的設備名稱，多個用逗號分隔，留空表示可操作所有設備"
+    )
+    
+    # 是否禁用所有設備
+    disable_all_equipment = models.BooleanField(
+        default=False,
+        verbose_name="禁用所有設備",
+        help_text="勾選此項將禁用該使用者的所有設備操作權限"
+    )
+    
     # 權限類型
     PERMISSION_TYPES = [
         ('fill_work', '填報報工'),
@@ -398,6 +413,12 @@ class UserWorkPermission(models.Model):
             return []
         return [name.strip() for name in self.process_names.split(',') if name.strip()]
     
+    def get_equipment_names_list(self):
+        """獲取設備名稱列表"""
+        if not self.equipment_names:
+            return []
+        return [name.strip() for name in self.equipment_names.split(',') if name.strip()]
+    
     def can_operate_operator(self, operator_code):
         """檢查是否可以操作指定作業員"""
         if not self.is_active:
@@ -420,6 +441,21 @@ class UserWorkPermission(models.Model):
         
         return process_name in self.get_process_names_list()
     
+    def can_operate_equipment(self, equipment_name):
+        """檢查是否可以操作指定設備"""
+        if not self.is_active:
+            return False
+        
+        # 如果禁用所有設備，則無法操作任何設備
+        if self.disable_all_equipment:
+            return False
+        
+        # 如果沒有設定設備限制，表示可以操作所有設備
+        if not self.equipment_names:
+            return True
+        
+        return equipment_name in self.get_equipment_names_list()
+    
     def can_fill_work(self):
         """檢查是否可以進行填報報工"""
         return self.is_active and self.permission_type in ['fill_work', 'both']
@@ -437,7 +473,7 @@ class UserWorkPermission(models.Model):
             return None
     
     @classmethod
-    def check_user_permission(cls, user, operator_code=None, process_name=None, permission_type='both'):
+    def check_user_permission(cls, user, operator_code=None, process_name=None, equipment_name=None, permission_type='both'):
         """檢查使用者是否有權限進行操作"""
         permission = cls.get_user_permission(user, permission_type)
         
@@ -450,6 +486,10 @@ class UserWorkPermission(models.Model):
         
         # 檢查工序權限
         if process_name and not permission.can_operate_process(process_name):
+            return False
+        
+        # 檢查設備權限
+        if equipment_name and not permission.can_operate_equipment(equipment_name):
             return False
         
         return True
