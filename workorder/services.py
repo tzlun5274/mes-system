@@ -9,7 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.db.models import Sum, Count, Q
 from workorder.models import WorkOrder, WorkOrderProcess, WorkOrderProduction, WorkOrderProductionDetail
-from workorder.fill_work.models import FillWork
+from workorder.workorder_fill_work.models import FillWork
 # 移除主管報工引用，避免混淆
 # 主管職責：監督、審核、管理，不代為報工
 

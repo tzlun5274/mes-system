@@ -1,0 +1,317 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}已完工工單詳情{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<style>
+    .detail-card {
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    .stats-badge {
+        font-size: 0.9em;
+        padding: 8px 12px;
+    }
+    .process-item {
+        border-left: 4px solid #007bff;
+        padding-left: 15px;
+        margin-bottom: 15px;
+    }
+    .process-item.completed {
+        border-left-color: #28a745;
+    }
+    .process-item.in-progress {
+        border-left-color: #ffc107;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0 text-gray-800">
+                        <i class="fas fa-check-circle text-success"></i> 已完工工單詳情
+                    </h1>
+                    <p class="text-muted">{{ completed_workorder.company_code }} - {{ completed_workorder.order_number }} - {{ completed_workorder.product_code }}</p>
+                </div>
+                <div>
+                    <a href="{% url 'workorder:completed_workorder:completed_workorder_edit' completed_workorder.id %}" class="btn btn-warning">
+                        <i class="fas fa-edit"></i> 編輯
+                    </a>
+                    <a href="{% url 'workorder:completed_workorder:completed_workorder_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 基本資訊卡片 -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card detail-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> 基本資訊</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>公司代號：</strong></td>
+                                    <td><span class="badge bg-primary">{{ completed_workorder.company_code }}</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>工單號碼：</strong></td>
+                                    <td>{{ completed_workorder.order_number }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>產品編號：</strong></td>
+                                    <td>{{ completed_workorder.product_code }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>產品名稱：</strong></td>
+                                    <td>{{ completed_workorder.product_name }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>訂單數量：</strong></td>
+                                    <td>{{ completed_workorder.order_quantity }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>完工數量：</strong></td>
+                                    <td>{{ completed_workorder.completed_quantity }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>不良品數量：</strong></td>
+                                    <td>{{ completed_workorder.defective_quantity }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>狀態：</strong></td>
+                                    <td>
+                                        {% if completed_workorder.status == 'completed' %}
+                                            <span class="badge bg-success">已完工</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">已封存</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card detail-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie"></i> 統計資訊</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <h4 class="text-success">{{ completed_workorder.completion_rate|floatformat:1 }}%</h4>
+                        <p class="text-muted mb-0">完工率</p>
+                    </div>
+                    <div class="mb-3">
+                        <h4 class="text-warning">{{ completed_workorder.defect_rate|floatformat:1 }}%</h4>
+                        <p class="text-muted mb-0">不良率</p>
+                    </div>
+                    <div class="mb-3">
+                        <h4>{{ total_processes }}</h4>
+                        <p class="text-muted mb-0">工序數量</p>
+                    </div>
+                    <div>
+                        <h4>{{ total_duration|floatformat:0 }} 分鐘</h4>
+                        <p class="text-muted mb-0">總耗時</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 時間資訊卡片 -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card detail-card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-calendar"></i> 時間資訊</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><strong>開始日期：</strong></td>
+                            <td>{{ completed_workorder.start_date|date:"Y-m-d" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>完工日期：</strong></td>
+                            <td>{{ completed_workorder.completion_date|date:"Y-m-d" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>建立時間：</strong></td>
+                            <td>{{ completed_workorder.created_at|date:"Y-m-d H:i:s" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>更新時間：</strong></td>
+                            <td>{{ completed_workorder.updated_at|date:"Y-m-d H:i:s" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card detail-card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-sticky-note"></i> 備註</h5>
+                </div>
+                <div class="card-body">
+                    {% if completed_workorder.remarks %}
+                        <p class="mb-0">{{ completed_workorder.remarks }}</p>
+                    {% else %}
+                        <p class="text-muted mb-0">無備註</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工序資訊 -->
+    {% if processes %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-tasks"></i> 工序資訊 ({{ total_processes }} 個工序)</h5>
+                </div>
+                <div class="card-body">
+                    {% for process in processes %}
+                    <div class="process-item {% if process.completion_rate >= 100 %}completed{% elif process.completion_rate > 0 %}in-progress{% endif %}">
+                        <div class="row align-items-center">
+                            <div class="col-md-2">
+                                <strong>{{ process.process_name }}</strong>
+                                <br>
+                                <small class="text-muted">順序: {{ process.process_sequence }}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-center">
+                                    <div class="h6 mb-0">{{ process.planned_quantity }}</div>
+                                    <small class="text-muted">計劃數量</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-center">
+                                    <div class="h6 mb-0 text-success">{{ process.completed_quantity }}</div>
+                                    <small class="text-muted">完工數量</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-center">
+                                    <div class="h6 mb-0 text-danger">{{ process.defective_quantity }}</div>
+                                    <small class="text-muted">不良品數量</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-center">
+                                    <div class="h6 mb-0">{{ process.completion_rate|floatformat:1 }}%</div>
+                                    <small class="text-muted">完工率</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-center">
+                                    <div class="h6 mb-0">{{ process.duration|floatformat:0 }} 分鐘</div>
+                                    <small class="text-muted">耗時</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <i class="fas fa-user"></i> 作業員: {{ process.operator_name|default:"未指定" }}
+                                </small>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <i class="fas fa-cog"></i> 設備: {{ process.equipment_name|default:"未指定" }}
+                                </small>
+                            </div>
+                        </div>
+                        {% if process.remarks %}
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <small class="text-muted">
+                                    <i class="fas fa-comment"></i> {{ process.remarks }}
+                                </small>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 生產報表 -->
+    {% if production_reports %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar"></i> 生產報表 ({{ production_reports.count }} 份)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>報表日期</th>
+                                    <th>報表類型</th>
+                                    <th>總生產量</th>
+                                    <th>良品數量</th>
+                                    <th>不良品數量</th>
+                                    <th>生產效率</th>
+                                    <th>品質率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for report in production_reports %}
+                                <tr>
+                                    <td>{{ report.report_date|date:"Y-m-d" }}</td>
+                                    <td>
+                                        {% if report.report_type == 'daily' %}
+                                            <span class="badge bg-primary">日報</span>
+                                        {% elif report.report_type == 'weekly' %}
+                                            <span class="badge bg-info">週報</span>
+                                        {% elif report.report_type == 'monthly' %}
+                                            <span class="badge bg-warning">月報</span>
+                                        {% else %}
+                                            <span class="badge bg-success">完工報表</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ report.total_production }}</td>
+                                    <td>{{ report.good_quantity }}</td>
+                                    <td>{{ report.defective_quantity }}</td>
+                                    <td>{{ report.production_efficiency }}%</td>
+                                    <td>{{ report.quality_rate }}%</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 

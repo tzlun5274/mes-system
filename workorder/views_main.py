@@ -14,7 +14,6 @@ from .models import (
     WorkOrderProcess,
     WorkOrderProcessLog,
     WorkOrderAssignment,
-    DispatchLog,
 )
 
 # 導入子模組的模型
@@ -754,7 +753,7 @@ def generate_completed_workorder_processes(workorder):
     """
     from collections import defaultdict
     from datetime import datetime, time
-    from workorder.models import CompletedProductionReport, CompletedWorkOrder
+    # from workorder.workorder_completed_workorder.models import CompletedProductionReport, CompletedWorkOrder
     
     # 收集所有填報資料
     process_data = defaultdict(lambda: {
@@ -773,46 +772,46 @@ def generate_completed_workorder_processes(workorder):
     })
     
     # 查找對應的已完工工單
-    completed_workorder = CompletedWorkOrder.objects.filter(
-        order_number=workorder.order_number,
-        company_code=workorder.company_code
-    ).first()
+    # completed_workorder = CompletedWorkOrder.objects.filter(
+    #     order_number=workorder.order_number,
+    #     company_code=workorder.company_code
+    # ).first()
     
-    if not completed_workorder:
-        # 如果沒有找到已完工工單，返回空列表
-        return []
+    # if not completed_workorder:
+    #     # 如果沒有找到已完工工單，返回空列表
+    #     return []
     
-    # 收集所有已完工的報工記錄
-    production_reports = CompletedProductionReport.objects.filter(
-        completed_workorder_id=completed_workorder.id,
-        approval_status='approved'
-    ).order_by('report_date', 'start_time')
+    # # 收集所有已完工的報工記錄
+    # production_reports = CompletedProductionReport.objects.filter(
+    #     completed_workorder_id=completed_workorder.id,
+    #     approval_status='approved'
+    # ).order_by('report_date', 'start_time')
     
-    for report in production_reports:
-        process_name = report.process_name
-        if process_name:
-            process_data[process_name]['process_name'] = process_name
-            process_data[process_name]['completed_quantity'] += report.work_quantity
-            process_data[process_name]['defect_quantity'] += report.defect_quantity
-            
-            if report.operator:
-                process_data[process_name]['assigned_operators'].add(report.operator)
-            if report.equipment:
-                process_data[process_name]['assigned_equipments'].add(report.equipment)
-            
-            # 計算時間
-            if report.start_time:
-                if not process_data[process_name]['actual_start_time'] or report.start_time < process_data[process_name]['actual_start_time']:
-                    process_data[process_name]['actual_start_time'] = report.start_time
-            if report.end_time:
-                if not process_data[process_name]['actual_end_time'] or report.end_time > process_data[process_name]['actual_end_time']:
-                    process_data[process_name]['actual_end_time'] = report.end_time
-            
-            process_data[process_name]['total_work_hours'] += float(report.work_hours or 0)
-            process_data[process_name]['total_overtime_hours'] += float(report.overtime_hours or 0)
-            
-            if report.abnormal_notes:
-                process_data[process_name]['abnormal_notes'].append(report.abnormal_notes)
+    # for report in production_reports:
+    #     process_name = report.process_name
+    #     if process_name:
+    #         process_data[process_name]['process_name'] = process_name
+    #         process_data[process_name]['completed_quantity'] += report.work_quantity
+    #         process_data[process_name]['defect_quantity'] += report.defect_quantity
+    #         
+    #         if report.operator:
+    #             process_data[process_name]['assigned_operators'].add(report.operator)
+    #         if report.equipment:
+    #             process_data[process_name]['assigned_equipments'].add(report.equipment)
+    #         
+    #         # 計算時間
+    #         if report.start_time:
+    #             if not process_data[process_name]['actual_start_time'] or report.start_time < process_data[process_name]['actual_start_time']:
+    #                 process_data[process_name]['actual_start_time'] = report.start_time
+    #         if report.end_time:
+    #             if not process_data[process_name]['actual_end_time'] or report.end_time > process_data[process_name]['actual_end_time']:
+    #                 process_data[process_name]['actual_end_time'] = report.end_time
+    #         
+    #         process_data[process_name]['total_work_hours'] += float(report.work_hours or 0)
+    #         process_data[process_name]['total_overtime_hours'] += float(report.overtime_hours or 0)
+    #         
+    #         if report.abnormal_notes:
+    #             process_data[process_name]['abnormal_notes'].append(report.abnormal_notes)
     
     # 3. 生成工序明細物件
     processes = []
@@ -1108,17 +1107,13 @@ def clear_data(request):
             # 取得要清除的數據統計
             workorder_count = WorkOrder.objects.count()
             company_order_count = CompanyOrder.objects.count()
-            dispatch_log_count = DispatchLog.objects.count()
-
             # 清除所有數據
             WorkOrder.objects.all().delete()
             CompanyOrder.objects.all().delete()
-            DispatchLog.objects.all().delete()
 
             messages.success(
                 request,
-                f"成功清除所有數據！共清除：工單 {workorder_count} 筆、公司製令單 {company_order_count} 筆、"
-                f"派工記錄 {dispatch_log_count} 筆",
+                f"成功清除所有數據！共清除：工單 {workorder_count} 筆、公司製令單 {company_order_count} 筆",
             )
             return redirect("workorder:index")
 
@@ -1129,13 +1124,11 @@ def clear_data(request):
     # GET 請求顯示確認頁面
     workorder_count = WorkOrder.objects.count()
     company_order_count = CompanyOrder.objects.count()
-    dispatch_log_count = DispatchLog.objects.count()
     
     context = {
         "workorder_count": workorder_count,
         "company_order_count": company_order_count,
-        "dispatch_log_count": dispatch_log_count,
-        "total_count": workorder_count + company_order_count + dispatch_log_count,
+        "total_count": workorder_count + company_order_count,
     }
 
     return render(request, "workorder/clear_data_confirm.html", context)
@@ -1182,16 +1175,16 @@ def start_production(request, pk):
         workorder.updated_at = timezone.now()
         workorder.save()
 
-        # 記錄派工日誌
-        # 注意：DispatchLog 模型沒有 action 欄位，所以我們只記錄基本資訊
-        # 如果需要記錄動作類型，可以考慮使用 WorkOrderProcessLog 或添加 action 欄位到 DispatchLog
-        DispatchLog.objects.create(
-            workorder=workorder,
-            process=workorder.processes.first(),  # 使用第一個工序作為記錄
-            operator=None,  # 暫時設為 None，因為需要 Operator 對象
-            quantity=workorder.quantity,
-            created_by=request.user.username,
-        )
+        # 記錄派工日誌（已移至子模組）
+        # 使用 WorkOrderProcessLog 記錄操作
+        from .models import WorkOrderProcessLog
+        first_process = workorder.processes.first()
+        if first_process:
+            WorkOrderProcessLog.objects.create(
+                workorder_process=first_process,
+                action="start_production",
+                created_by=request.user.username,
+            )
 
         messages.success(request, f"工單 {workorder.order_number} 已成功開始生產")
 
@@ -1231,15 +1224,16 @@ def stop_production(request, pk):
         workorder.updated_at = timezone.now()
         workorder.save()
 
-        # 記錄派工日誌
-        # 注意：DispatchLog 模型沒有 action 欄位，所以我們只記錄基本資訊
-        DispatchLog.objects.create(
-            workorder=workorder,
-            process=workorder.processes.first(),  # 使用第一個工序作為記錄
-            operator=None,  # 暫時設為 None，因為需要 Operator 對象
-            quantity=workorder.quantity,
-            created_by=request.user.username,
-        )
+        # 記錄派工日誌（已移至子模組）
+        # 使用 WorkOrderProcessLog 記錄操作
+        from .models import WorkOrderProcessLog
+        first_process = workorder.processes.first()
+        if first_process:
+            WorkOrderProcessLog.objects.create(
+                workorder_process=first_process,
+                action="stop_production",
+                created_by=request.user.username,
+            )
 
         messages.success(request, f"工單 {workorder.order_number} 已成功停止生產")
 
@@ -1483,7 +1477,9 @@ def process_logs(request, process_id):
     from django.shortcuts import get_object_or_404
 
     process = get_object_or_404(WorkOrderProcess, pk=process_id)
-    logs = DispatchLog.objects.filter(workorder_process=process).order_by("-created_at")
+    # 使用 WorkOrderProcessLog 替代 DispatchLog
+    from .models import WorkOrderProcessLog
+    logs = WorkOrderProcessLog.objects.filter(workorder_process=process).order_by("-created_at")
 
     return render(
         request,
@@ -1810,19 +1806,19 @@ def clear_all_production_reports(request):
     if request.method == "POST":
         try:
             # 統計要清除的資料數量
-            from workorder.models import CompletedProductionReport
-            operator_reports_count = CompletedProductionReport.objects.filter(report_type='operator').count()
-            smt_supplement_count = CompletedProductionReport.objects.filter(report_type='smt').count()
-            smt_on_site_count = 0  # 已移除 report_type 欄位
+            # from workorder.workorder_completed_workorder.models import CompletedProductionReport
+            # operator_reports_count = CompletedProductionReport.objects.filter(report_type='operator').count()
+            # smt_supplement_count = CompletedProductionReport.objects.filter(report_type='smt').count()
+            # smt_on_site_count = 0  # 已移除 report_type 欄位
             
-            total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
+            # total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
             
-            if total_count == 0:
-                messages.info(request, "目前沒有任何填報紀錄需要清除")
-                return redirect("workorder:index")
+            # if total_count == 0:
+            #     messages.info(request, "目前沒有任何填報紀錄需要清除")
+            #     return redirect("workorder:index")
             
-            # 清除所有填報紀錄
-            CompletedProductionReport.objects.all().delete()
+            # # 清除所有填報紀錄
+            # CompletedProductionReport.objects.all().delete()
             
             # 記錄操作日誌
             from system.models import OperationLog
@@ -1834,13 +1830,13 @@ def clear_all_production_reports(request):
                 ip_address=request.META.get('REMOTE_ADDR', ''),
             )
             
-            messages.success(
-                request, 
-                f"成功清除所有填報紀錄！共清除 {total_count} 筆記錄：\n"
-                                 f"• 作業員補登填報：{operator_reports_count} 筆\n"
-                 f"• SMT補登填報：{smt_supplement_count} 筆\n"
-                 f"• SMT現場填報：{smt_on_site_count} 筆"
-            )
+            # messages.success(
+            #     request, 
+            #     f"成功清除所有填報紀錄！共清除 {total_count} 筆記錄：\n"
+            #                      f"• 作業員補登填報：{operator_reports_count} 筆\n"
+            #      f"• SMT補登填報：{smt_supplement_count} 筆\n"
+            #      f"• SMT現場填報：{smt_on_site_count} 筆"
+            # )
             return redirect("workorder:index")
             
         except Exception as e:
@@ -1848,18 +1844,18 @@ def clear_all_production_reports(request):
             return redirect("workorder:clear_all_production_reports")
 
     # GET 請求顯示確認頁面
-    from workorder.models import CompletedProductionReport
-    operator_reports_count = CompletedProductionReport.objects.filter(report_type='operator').count()
-    smt_supplement_count = CompletedProductionReport.objects.filter(report_type='smt').count()
-    smt_on_site_count = 0  # 已移除 report_type 欄位
+    # from workorder.workorder_completed_workorder.models import CompletedProductionReport
+    # operator_reports_count = CompletedProductionReport.objects.filter(report_type='operator').count()
+    # smt_supplement_count = CompletedProductionReport.objects.filter(report_type='smt').count()
+    # smt_on_site_count = 0  # 已移除 report_type 欄位
     
-    total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
+    # total_count = operator_reports_count + smt_supplement_count + smt_on_site_count
     
     context = {
-        "operator_reports_count": operator_reports_count,
-        "smt_supplement_count": smt_supplement_count,
-        "smt_on_site_count": smt_on_site_count,
-        "total_count": total_count,
+        # "operator_reports_count": operator_reports_count,
+        # "smt_supplement_count": smt_supplement_count,
+        # "smt_on_site_count": smt_on_site_count,
+        # "total_count": total_count,
     }
     
     return render(request, "workorder/clear_production_reports_confirm.html", context)
@@ -2817,7 +2813,7 @@ def supervisor_report_index(request):
     recent_reviews = []
     
     # 從填報記錄中獲取最近審核記錄
-    from workorder.fill_work.models import FillWork
+    from workorder.workorder_fill_work.models import FillWork
     
     fill_work_reviews = FillWork.objects.select_related(
         'process'
@@ -2894,7 +2890,7 @@ def supervisor_functions(request):
     recent_abnormal = []
     
     # 從填報記錄中獲取異常記錄
-    from workorder.fill_work.models import FillWork
+    from workorder.workorder_fill_work.models import FillWork
     
     abnormal_reports = FillWork.objects.select_related(
         'process'
@@ -4760,7 +4756,7 @@ def get_operator_list_unified(request):
     """統一作業員清單API"""
     try:
         from process.models import Operator
-        from workorder.fill_work.services import MultiFilterService
+        from workorder.workorder_fill_work.services import MultiFilterService
         
         # 使用多重過濾服務獲取作業員查詢集
         operator_queryset = MultiFilterService.get_multi_filtered_operator_queryset(
@@ -4815,7 +4811,7 @@ def get_process_list_unified(request):
 def get_equipment_list_unified(request):
     """統一設備清單API"""
     try:
-        from workorder.fill_work.services import MultiFilterService
+        from workorder.workorder_fill_work.services import MultiFilterService
         
         # 取得表單類型參數
         form_type = request.GET.get('form_type', 'operator')  # 預設為作業員表單
@@ -4973,7 +4969,7 @@ def get_product_codes_for_autocomplete(request):
         ).values_list('product_code', flat=True).distinct().order_by('product_code')
         
         # 從派工單中獲取產品編號
-        from .models import WorkOrderDispatch
+        from .workorder_dispatch.models import WorkOrderDispatch
         dispatch_product_codes = WorkOrderDispatch.objects.exclude(
             product_code__isnull=True
         ).exclude(
@@ -5132,7 +5128,7 @@ def active_workorders(request):
     from django.db.models import Q, Count, Sum
     from django.core.paginator import Paginator
     from workorder.models import WorkOrder
-    from workorder.fill_work.models import FillWork
+    from workorder.workorder_fill_work.models import FillWork
     from erp_integration.models import CompanyConfig
     from datetime import date, timedelta
     
@@ -5247,7 +5243,7 @@ def active_workorders(request):
     
     # 2. 現場報工的出貨包裝數量
     try:
-        from workorder.onsite_reporting.models import OnsiteReport
+        from workorder.workorder_onsite_report.models import OnsiteReport
         packaging_onsite_reports = OnsiteReport.objects.filter(
             process="出貨包裝",
             status='completed'  # 只統計已完成的現場報工

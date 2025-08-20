@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.db import transaction
 from workorder.models import WorkOrder
 from workorder.workorder_erp.models import PrdMKOrdMain, PrdMkOrdMats, CompanyOrder
-from workorder.fill_work.models import FillWork
+from workorder.workorder_fill_work.models import FillWork
 from workorder.workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess
 import logging
 

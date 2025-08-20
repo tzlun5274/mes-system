@@ -21,10 +21,10 @@ class WorkorderConfig(AppConfig):
             register_workorder_status_signals()
             
             # 載入填報作業信號處理器（自動觸發完工判斷）
-            import workorder.fill_work.signals
+            import workorder.workorder_fill_work.signals
             
             # 載入現場報工信號處理器
-            import workorder.onsite_reporting.signals
+            import workorder.workorder_onsite_report.signals
             
         except Exception as e:
             # 避免在遷移時出現錯誤

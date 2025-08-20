@@ -41,10 +41,9 @@ INSTALLED_APPS = [
     "workorder.supervisor",
     "workorder.workorder_dispatch",
     "workorder.workorder_erp",
-            # "workorder.workorder_completed",  # 已移除
-    # "workorder.workorder_reporting",  # 已移除舊報工記錄模組
-    "workorder.fill_work",
-    "workorder.onsite_reporting",
+    "workorder.workorder_completed_workorder.apps.WorkorderCompletedWorkorderConfig",  # 已完工工單子模組
+    "workorder.workorder_fill_work",
+    "workorder.workorder_onsite_report",
             # 移除 production_monitoring，改用派工單監控資料
 
     "kanban.apps.KanbanConfig",

@@ -10,7 +10,7 @@ from .models import (
     WorkOrderProductionDetail,
     AutoManagementConfig,
 )
-from .fill_work.models import FillWork
+from .workorder_fill_work.models import FillWork
 # 注意：workorder_reporting 模組已棄用
 # from .workorder_reporting.models import BackupSMTSupplementReport, BackupOperatorSupplementReport
 from process.models import Operator

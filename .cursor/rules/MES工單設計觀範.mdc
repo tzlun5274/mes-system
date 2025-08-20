@@ -4,7 +4,7 @@ globs:
 alwaysApply: false
 ---
 
-工單管理有多個子模組。
+工單管理是主模組下面有多個子模組。主模組下面有多個子模組。
 1. 基本設定。
 -有多家公司，並會有重複的製令單號，設計須考慮多公司架構。
 
@@ -13,19 +13,61 @@ alwaysApply: false
 資料隔離：不同公司的資料應該完全隔離。
 
 3.子模組分類 
-公司製令單 (獨立模組)
-MES工單管理 (獨立模組)
-派工單 (獨立模組)
-填報管理 (獨立模組)
-生產監控 (獨立模組)
-已完工工單 (獨立模組)
-現場報工管理 (獨立模組)
+公司製令單子模組
+目錄名稱 workorder_companyorder
+✅ workorder_companyorder - 公司製令單
+✅ workorder_companyorder_erp_systemconfig - 公司製令單ERP系統配置
+✅ workorder_companyorder_erp_prdmkordmain - 公司製令單ERP製令主檔
+✅ workorder_companyorder_erp_prdmkordmats - 公司製令單ERP製令明細
+ 
+MES工單作業子模組
+目錄名稱 mes_workorder_operation
+✅ mes_workorder_operation - MES工單作業主表
+✅ mes_workorder_operation_detail - MES工單作業明細
+✅ mes_workorder_operation_history - MES工單作業歷史
+
+派工單子模組
+目錄名稱 workorder_dispatch
+✅ workorder_dispatch - 派工單主表
+✅ workorder_dispatch_process - 派工單工序
+✅ workorder_dispatch_history - 派工歷史記錄
+
+填報作業子模組
+目錄名稱 workorder_fill_work
+✅ workorder_fill_work - 填報作業
+
+已完工工單子模組
+目錄名稱 workorder_completed_workorder
+✅ workorder_completed_workorder - 已完工工單
+✅ workorder_completed_workorder_process - 已完工工單工序
+✅ workorder_completed_production_report - 已完工生產報表
+✅ workorder_auto_allocation_settings - 自動分配設定
+✅ workorder_auto_allocation_log - 自動分配日誌
+
+現場報工子模組
+錄名稱 workorder_onsite_report 
+✅ workorder_onsite_report - 現場報工記錄
+✅ workorder_onsite_report_session - 現場報工工作時段
+✅ workorder_onsite_report_history - 現場報工歷史記錄
+✅ workorder_onsite_report_config - 現場報工配置
+
+ 主模組其他資料表
+✅ workorder_workorder - 工單主表
+✅ workorder_workorderprocess - 工單工序明細
+✅ workorder_workorderprocesslog - 工單工序日誌
+✅ workorder_process_capacity - 工序產能設定
+✅ workorder_auto_management_config - 自動管理配置
+✅ workorder_consistency_check_result - 一致性檢查結果
+
 每個功能都是獨立的子模組。
 
-4. 生產監控有工序紀錄來源為現場報工資料，填報紀錄來源為填報管理，完工功能判斷程式需分成兩個，一個工序紀錄完工判斷，一個填報紀錄完工判斷。
+4. 生產監控有工序紀錄來源為現場報工資料，填報紀錄來源為填報管理。
 4-1. 派工單的工序與現場報工做關聯，工單詳情的工序紀錄與現場報工關聯。
 4-2. 工單詳情的填報紀錄與填報管理做關聯。 
 4-3. 工單詳情的完工判斷 以工序紀錄跟填報紀錄做合併計算
+
+###統一資料來源####
+workorder_workorder
 
 ## 統一API端點規範
 

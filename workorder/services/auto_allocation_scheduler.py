@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from workorder.models import (
     WorkOrder, WorkOrderProcess, AutoAllocationSettings, AutoAllocationLog
 )
-from workorder.fill_work.models import FillWork
+from workorder.workorder_fill_work.models import FillWork
 
 logger = logging.getLogger(__name__)
 

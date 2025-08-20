@@ -32,7 +32,7 @@ except Exception:
 
 from .models import WorkOrder, WorkOrderProcess, WorkOrderProduction, WorkOrderProductionDetail, CompletedWorkOrder, CompletedWorkOrderProcess
 from workorder.workorder_dispatch.models import WorkOrderDispatch
-from workorder.fill_work.models import FillWork
+from workorder.workorder_fill_work.models import FillWork
 from erp_integration.models import CompanyConfig
 from process.models import ProcessName, Operator
 from equip.models import Equipment

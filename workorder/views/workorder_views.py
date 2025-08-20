@@ -28,15 +28,15 @@ from django.utils import timezone
 from django.core.management import call_command
 import logging
 
-from ..models import WorkOrder, WorkOrderProductionDetail, CompletedWorkOrder
+from ..models import WorkOrder, WorkOrderProductionDetail
 # 移除 ProductionMonitoringData 引用，改用派工單監控資料
 from ..workorder_erp.models import CompanyOrder, SystemConfig, PrdMKOrdMain
 from ..forms import WorkOrderForm
 from erp_integration.models import CompanyConfig
 from ..workorder_dispatch.models import WorkOrderDispatch
 from ..workorder_dispatch.services import WorkOrderDispatchService
-from ..fill_work.models import FillWork
-from ..onsite_reporting.models import OnsiteReport
+from ..workorder_fill_work.models import FillWork
+from ..workorder_onsite_report.models import OnsiteReport
 from ..services.completion_service import FillWorkCompletionService
 
 # 設定 logger

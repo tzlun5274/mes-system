@@ -62,7 +62,7 @@ class ProcessUpdateService:
         """
         try:
             # 獲取該工序的所有已核准填報記錄
-            from workorder.fill_work.models import FillWork
+            from workorder.workorder_fill_work.models import FillWork
             
             # 先獲取工單資訊
             workorder = WorkOrder.objects.get(id=process.workorder_id)

@@ -23,10 +23,11 @@ from .views.workorder_import_views import (
     workorder_import_page, workorder_import_file, download_workorder_template
 )
 
-from .views.completed_workorder_views import (
-    CompletedWorkOrderListView, CompletedWorkOrderDetailView,
-    transfer_workorder_to_completed, batch_transfer_completed_workorders
-)
+# 暫時註解掉，因為 CompletedWorkOrder 模型可能已被移除
+# from .views.completed_workorder_views import (
+#     CompletedWorkOrderListView, CompletedWorkOrderDetailView,
+#     transfer_workorder_to_completed, batch_transfer_completed_workorders
+# )
 from .views import api_views
 # 自動分配功能已移除
 from .views.auto_management_views import (
@@ -104,11 +105,8 @@ urlpatterns = [
     
     # 自動分配功能已移除
     
-    # 已完工工單相關 URL
-    path('completed/', CompletedWorkOrderListView.as_view(), name='completed_workorder_list'),
-    path('completed/<int:pk>/', CompletedWorkOrderDetailView.as_view(), name='completed_workorder_detail'),
-    path('completed/transfer/<int:workorder_id>/', transfer_workorder_to_completed, name='transfer_workorder_to_completed'),
-    path('completed/batch-transfer/', batch_transfer_completed_workorders, name='batch_transfer_completed_workorders'),
+    # 已完工工單子模組
+    path("completed/", include('workorder.workorder_completed_workorder.urls', namespace='completed_workorder')),
     
     # 公司製令單管理 - 使用類別視圖
     path("company/", CompanyOrderListView.as_view(), name="company_orders"),
@@ -147,10 +145,10 @@ urlpatterns = [
     path("report/", RedirectView.as_view(url="/workorder/fill_work/", permanent=True)),
     
     # 填報作業管理首頁
-    path("fill_work/", include('workorder.fill_work.urls', namespace='fill_work')),
+    path("fill_work/", include('workorder.workorder_fill_work.urls', namespace='fill_work')),
     
     # 現場報工管理子模組
-    path("onsite_reporting/", include(('workorder.onsite_reporting.urls', 'onsite_reporting'))),
+    path("onsite_reporting/", include(('workorder.workorder_onsite_report.urls', 'onsite_reporting'))),
     
     # 主管功能子模組（原路徑保留）
     path("supervisor/", include('workorder.supervisor.urls')),
