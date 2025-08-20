@@ -3,7 +3,7 @@
 """
 
 from django.contrib import admin
-from .models import WorkOrderDispatch, WorkOrderDispatchProcess
+from .models import WorkOrderDispatch, WorkOrderDispatchProcess, DispatchHistory
 
 
 @admin.register(WorkOrderDispatch)
@@ -60,6 +60,37 @@ class WorkOrderDispatchProcessAdmin(admin.ModelAdmin):
         }),
         ('系統資訊', {
             'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(DispatchHistory)
+class DispatchHistoryAdmin(admin.ModelAdmin):
+    """
+    派工歷史記錄管理介面
+    """
+    list_display = [
+        'workorder_dispatch', 'action', 'old_status', 'new_status', 
+        'operator', 'created_at'
+    ]
+    list_filter = ['action', 'created_at']
+    search_fields = ['workorder_dispatch__order_number', 'operator']
+    readonly_fields = ['created_at']
+    ordering = ['-created_at']
+
+    fieldsets = (
+        ('基本資訊', {
+            'fields': ('workorder_dispatch', 'action', 'operator')
+        }),
+        ('狀態變更', {
+            'fields': ('old_status', 'new_status')
+        }),
+        ('備註', {
+            'fields': ('notes',)
+        }),
+        ('系統資訊', {
+            'fields': ('created_at',),
             'classes': ('collapse',)
         }),
     ) 

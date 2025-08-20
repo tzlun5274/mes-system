@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}MES 工單管理{% endblock %}
+{% block title %}MES 工單作業{% endblock %}
 {% block content %}
 
 <!-- 麵包屑導航 -->
@@ -7,12 +7,12 @@
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
         <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理</a></li>
-        <li class="breadcrumb-item active" aria-current="page">MES 工單管理</li>
+        <li class="breadcrumb-item active" aria-current="page">MES 工單作業</li>
     </ol>
 </nav>
 
 <div class="container mt-4">
-  <h2>MES 工單管理</h2>
+  <h2>MES 工單作業</h2>
 
   <!-- 統計卡片 -->
   <div class="row mb-4">
@@ -113,32 +113,36 @@
       <tbody>
         {% for o in orders %}
         <tr>
-          <td><input type="checkbox" class="row-chk" value="{{ o.order_number }}" {% if o.order_number in dispatched_map %}disabled{% endif %} /></td>
+          <td><input type="checkbox" class="row-chk" value="{{ o.workorder_number }}" {% if o.status == 'in_progress' %}disabled{% endif %} /></td>
           <td>{{ o.company_name|default:o.company_code|default:'-' }}</td>
-          <td>{{ o.order_number }}</td>
+          <td>{{ o.workorder_number }}</td>
           <td>{{ o.product_code }}</td>
-          <td>{{ o.quantity }}</td>
+          <td>{{ o.planned_quantity }}</td>
           <td>{{ o.created_at|date:'Y-m-d H:i' }}</td>
           <td>
-            {% if o.order_number in dispatched_map %}
-              <span class="badge bg-success">已派工</span>
+            {% if o.status == 'in_progress' %}
+              <span class="badge bg-success">作業中</span>
+            {% elif o.status == 'pending' %}
+              <span class="badge bg-warning text-dark">待作業</span>
+            {% elif o.status == 'paused' %}
+              <span class="badge bg-info">暫停</span>
             {% else %}
-              <span class="badge bg-warning text-dark">未派工</span>
+              <span class="badge bg-secondary">{{ o.get_status_display }}</span>
             {% endif %}
           </td>
           <td>
-            {% if o.order_number not in dispatched_map %}
-              <button class="btn btn-sm btn-primary dispatch-btn" data-order="{{ o.order_number }}" title="派工">
-                <i class="fas fa-tasks"></i>
+            {% if o.status == 'pending' %}
+              <button class="btn btn-sm btn-primary dispatch-btn" data-order="{{ o.workorder_number }}" title="開始作業">
+                <i class="fas fa-play"></i>
               </button>
             {% endif %}
-            <button class="btn btn-sm btn-danger delete-btn" data-order="{{ o.order_number }}" title="刪除">
+            <button class="btn btn-sm btn-danger delete-btn" data-order="{{ o.workorder_number }}" title="刪除">
               <i class="fas fa-trash"></i>
             </button>
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="8" class="text-center text-muted">目前沒有 MES 工單</td></tr>
+        <tr><td colspan="8" class="text-center text-muted">目前沒有 MES 工單作業</td></tr>
         {% endfor %}
       </tbody>
     </table>

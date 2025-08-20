@@ -64,10 +64,12 @@ class FillWorkController {
             this.handleWorkorderChange();
         });
 
-        // 設備選擇事件（已移至各模板中處理）
-        // 設備選擇自動填入作業員功能已移至各模板中處理
-        // SMT模板：在 smt_backfill_form.html 中處理
-        // 作業員模板：在 operator_backfill_form.html 中處理
+        // 設備選擇事件 - 自動填入作業員功能
+        if (this.equipmentSelect) {
+            this.equipmentSelect.addEventListener('change', () => {
+                this.handleEquipmentChange();
+            });
+        }
     }
 
     // 載入初始資料
@@ -329,12 +331,19 @@ class FillWorkController {
             // 根據表單類型決定API參數
             const formType = this.getFormType();
             const url = `/workorder/static/api/equipment-list/?form_type=${formType}`;
+            console.log('載入設備API URL:', url);
+            
             const data = await this.fetchAPI(url);
+            console.log('設備API回應:', data);
+            
             if (data.success && data.equipments) {
+                console.log('設備資料:', data.equipments);
                 this.populateSelect(this.equipmentSelect, data.equipments, {
                     placeholder: '請選擇設備',
                     preserveValue: false  // 不保留之前的值，避免觸發change事件
                 });
+            } else {
+                console.error('設備API回應失敗:', data);
             }
         } catch (error) {
             console.error('載入設備失敗:', error);
@@ -435,12 +444,49 @@ class FillWorkController {
         }
     }
 
-    // 處理設備變更（已移至各模板中處理）
+    // 處理設備變更 - 自動填入作業員功能
     handleEquipmentChange() {
-        console.log('handleEquipmentChange 被呼叫 - 此功能已移至各模板中處理');
-        // 設備選擇自動填入作業員功能已移至各模板中處理
-        // SMT模板：在 smt_backfill_form.html 中處理
-        // 作業員模板：在 operator_backfill_form.html 中處理
+        const selectedOption = this.equipmentSelect.options[this.equipmentSelect.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            const equipmentName = selectedOption.textContent;
+            console.log('設備選擇變更為:', equipmentName);
+            
+            // 根據表單類型處理作業員欄位
+            const formType = this.getFormType();
+            
+            if (formType === 'smt') {
+                // SMT表單：自動填入設備名稱到作業員欄位
+                if (this.operatorDisplay) {
+                    this.operatorDisplay.value = equipmentName;
+                    console.log('SMT表單：已設定作業員顯示欄位為:', equipmentName);
+                }
+                if (this.operatorSelect) {
+                    this.operatorSelect.value = equipmentName;
+                    console.log('SMT表單：已設定作業員隱藏欄位為:', equipmentName);
+                }
+            } else {
+                // 作業員表單：清空作業員欄位，讓使用者手動選擇
+                if (this.operatorSelect) {
+                    this.operatorSelect.value = '';
+                    console.log('作業員表單：已清空作業員欄位');
+                }
+                if (this.operatorDisplay) {
+                    this.operatorDisplay.value = '';
+                    console.log('作業員表單：已清空作業員顯示欄位');
+                }
+            }
+        } else {
+            // 清空作業員欄位
+            if (this.operatorDisplay) {
+                this.operatorDisplay.value = '';
+                console.log('已清空作業員顯示欄位');
+            }
+            if (this.operatorSelect) {
+                this.operatorSelect.value = '';
+                console.log('已清空作業員隱藏欄位');
+            }
+            console.log('設備未選擇，已清空作業員欄位');
+        }
     }
 
     // 獲取CSRF Token

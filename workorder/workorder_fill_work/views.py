@@ -913,6 +913,7 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
             # 取得表單資料
             company_name = form.cleaned_data.get('company_name')
             product_code = form.cleaned_data.get('product_id')
+            process_name = form.cleaned_data.get('process').name if form.cleaned_data.get('process') else 'RD樣品工序'
             
             # 取得公司代號
             company_config = CompanyConfig.objects.filter(company_name=company_name).first()

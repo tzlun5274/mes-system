@@ -141,7 +141,7 @@
                     <a class="nav-link active" href="{% url 'workorder:company_orders' %}">公司製令</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'workorder:mes_orders' %}">MES工單管理</a>
+                    <a class="nav-link" href="{% url 'workorder:mes_orders' %}">MES工單作業</a>
                 </li>
             </ul>
         </div>
@@ -162,7 +162,7 @@
                     {% for workorder in workorders %}
                         <option value="{{ workorder.company_code }}">公司代號</option>
                         <option value="{{ workorder.mkordno }}">製令單號</option>
-                        <option value="{{ workorder.ProductID }}">產品編號</option>
+                        <option value="{{ workorder.product_id }}">產品編號</option>
                     {% endfor %}
                 </datalist>
             </div>
@@ -195,10 +195,10 @@
                 <td>
                     <strong>{{ workorder.mkordno }}</strong>
                 </td>
-                <td>{{ workorder.ProductID }}</td>
-                <td>{{ workorder.ProdtQty }}</td>
-                <td>{{ workorder.EstTakeMatDate }}</td>
-                <td>{{ workorder.EstStockOutDate }}</td>
+                <td>{{ workorder.product_id }}</td>
+                <td>{{ workorder.prodt_qty }}</td>
+                <td>{{ workorder.est_take_mat_date }}</td>
+                <td>{{ workorder.est_stock_out_date }}</td>
                 <td>
                     {% if workorder.is_converted %}
                         <span class="badge bg-success">已轉換</span>

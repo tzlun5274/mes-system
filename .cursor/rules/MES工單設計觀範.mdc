@@ -15,7 +15,7 @@ alwaysApply: false
 3.子模組分類 
 公司製令單子模組
 目錄名稱 workorder_companyorder
-✅ workorder_companyorder - 公司製令單
+✅ workorder_companyorder_companyorder - 公司製令單主表
 ✅ workorder_companyorder_erp_systemconfig - 公司製令單ERP系統配置
 ✅ workorder_companyorder_erp_prdmkordmain - 公司製令單ERP製令主檔
 ✅ workorder_companyorder_erp_prdmkordmats - 公司製令單ERP製令明細
@@ -34,19 +34,19 @@ MES工單作業子模組
 
 填報作業子模組
 目錄名稱 workorder_fill_work
-✅ workorder_fill_work - 填報作業
+✅ workorder_fill_work - 填報作業主表
 
 已完工工單子模組
 目錄名稱 workorder_completed_workorder
-✅ workorder_completed_workorder - 已完工工單
+✅ workorder_completed_workorder - 已完工工單主表
 ✅ workorder_completed_workorder_process - 已完工工單工序
 ✅ workorder_completed_production_report - 已完工生產報表
 ✅ workorder_auto_allocation_settings - 自動分配設定
 ✅ workorder_auto_allocation_log - 自動分配日誌
 
 現場報工子模組
-錄名稱 workorder_onsite_report 
-✅ workorder_onsite_report - 現場報工記錄
+目錄名稱 workorder_onsite_report 
+✅ workorder_onsite_report - 現場報工記錄主表
 ✅ workorder_onsite_report_session - 現場報工工作時段
 ✅ workorder_onsite_report_history - 現場報工歷史記錄
 ✅ workorder_onsite_report_config - 現場報工配置

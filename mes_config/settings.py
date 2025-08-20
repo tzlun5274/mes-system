@@ -41,7 +41,9 @@ INSTALLED_APPS = [
     "workorder.supervisor",
     "workorder.workorder_dispatch",
     "workorder.workorder_erp",
+    "workorder.workorder_companyorder",
     "workorder.workorder_completed_workorder.apps.WorkorderCompletedWorkorderConfig",  # 已完工工單子模組
+    "workorder.mes_workorder_operation.apps.MesWorkorderOperationConfig",  # MES 工單作業子模組
     "workorder.workorder_fill_work",
     "workorder.workorder_onsite_report",
             # 移除 production_monitoring，改用派工單監控資料

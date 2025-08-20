@@ -30,6 +30,7 @@ import logging
 
 from ..models import WorkOrder, WorkOrderProductionDetail
 # 移除 ProductionMonitoringData 引用，改用派工單監控資料
+# 修改：使用 workorder_erp.models 中的 CompanyOrder
 from ..workorder_erp.models import CompanyOrder, SystemConfig, PrdMKOrdMain
 from ..forms import WorkOrderForm
 from erp_integration.models import CompanyConfig
@@ -38,6 +39,7 @@ from ..workorder_dispatch.services import WorkOrderDispatchService
 from ..workorder_fill_work.models import FillWork
 from ..workorder_onsite_report.models import OnsiteReport
 from ..services.completion_service import FillWorkCompletionService
+from ..mes_workorder_operation.models import MesWorkorderOperation
 
 # 設定 logger
 workorder_logger = logging.getLogger('workorder')
@@ -382,7 +384,7 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
     """
 
     model = CompanyOrder
-    template_name = "workorder/dispatch/company_orders.html"
+    template_name = "workorder/workorder_dispatch/company_orders.html"
     context_object_name = "workorders"
     paginate_by = 20
     ordering = ["sync_time"]
@@ -475,10 +477,10 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
                 "company_code": formatted_company_code,
                 "mkordno": order.mkordno,
                 "MKOrdNO": f"{formatted_company_code}_{order.mkordno}",
-                "ProductID": order.product_id,
-                "ProdtQty": order.prodt_qty,
-                "EstTakeMatDate": order.est_take_mat_date,
-                "EstStockOutDate": order.est_stock_out_date,
+                "product_id": order.product_id,  # 修正：使用與模板一致的欄位名稱
+                "prodt_qty": order.prodt_qty,    # 修正：使用與模板一致的欄位名稱
+                "est_take_mat_date": order.est_take_mat_date,  # 修正：使用與模板一致的欄位名稱
+                "est_stock_out_date": order.est_stock_out_date,  # 修正：使用與模板一致的欄位名稱
                 "is_converted": order.is_converted,
                 "conversion_status": "已轉換" if order.is_converted else "未轉換",
             }
@@ -590,10 +592,10 @@ def get_company_order_info(request):
 
 class MesOrderListView(LoginRequiredMixin, ListView):
     """
-    MES 工單管理清單：集中查看已轉成 MES 的工單，並提供批量派工入口
+    MES 工單作業清單：集中查看 MES 工單作業，並提供批量派工入口
     """
 
-    model = WorkOrder
+    model = MesWorkorderOperation
     template_name = "workorder/mes_orders.html"
     context_object_name = "orders"
     paginate_by = 20
@@ -602,52 +604,39 @@ class MesOrderListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = super().get_queryset()
         
-        # 排除已完工的工單（已完工的工單不應該在 MES 工單管理中顯示）
+        # 排除已完成的作業（已完成的作業不應該在 MES 工單作業中顯示）
         qs = qs.exclude(status='completed')
         
         # 依關鍵字過濾（工單號/產品/公司代號）
         search = self.request.GET.get("search", "").strip()
         if search:
             qs = qs.filter(
-                Q(order_number__icontains=search)
+                Q(workorder_number__icontains=search)
                 | Q(product_code__icontains=search)
                 | Q(company_code__icontains=search)
             )
-        # 派工狀態過濾：undispatched/dispatched/all
+        # 作業狀態過濾：pending/in_progress/all
         status = self.request.GET.get("dispatch_status", "all")
         if status == "undispatched":
-            qs = qs.exclude(order_number__in=WorkOrderDispatch.objects.values_list("order_number", flat=True))
+            qs = qs.filter(status='pending')
         elif status == "dispatched":
-            qs = qs.filter(order_number__in=WorkOrderDispatch.objects.values_list("order_number", flat=True))
-        
-        # 添加公司名稱
-        qs = qs.extra(
-            select={'company_name': '''
-                SELECT company_name 
-                FROM erp_integration_companyconfig 
-                WHERE erp_integration_companyconfig.company_code = workorder_workorder.company_code
-            '''}
-        )
+            qs = qs.filter(status='in_progress')
         
         return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        dispatched_numbers = set(
-            WorkOrderDispatch.objects.values_list("order_number", flat=True)
-        )
-        ctx["dispatched_map"] = dispatched_numbers
-        ctx["search"] = self.request.GET.get("search", "")
-        ctx["dispatch_status"] = self.request.GET.get("dispatch_status", "all")
         
-        # 統計資料（排除已完工的工單）
-        total_orders = WorkOrder.objects.exclude(status='completed').count()
-        dispatched_orders = WorkOrderDispatch.objects.count()
-        undispatched_orders = total_orders - dispatched_orders
+        # 統計資料（排除已完成的作業）
+        total_orders = MesWorkorderOperation.objects.exclude(status='completed').count()
+        dispatched_orders = MesWorkorderOperation.objects.filter(status='in_progress').count()
+        undispatched_orders = MesWorkorderOperation.objects.filter(status='pending').count()
         
         ctx["total_orders"] = total_orders
         ctx["dispatched_orders"] = dispatched_orders
         ctx["undispatched_orders"] = undispatched_orders
+        ctx["search"] = self.request.GET.get("search", "")
+        ctx["dispatch_status"] = self.request.GET.get("dispatch_status", "all")
         
         # 讀取自動批次派工間隔設定
         auto_dispatch_interval = 60
@@ -664,7 +653,7 @@ class MesOrderListView(LoginRequiredMixin, ListView):
 @require_POST
 def mes_orders_bulk_dispatch(request):
     """
-    批量派工：從 MES 工單管理頁選取多筆工單，建立派工單
+            批量派工：從 MES 工單作業頁選取多筆工單，建立派工單
     """
     import json
 
