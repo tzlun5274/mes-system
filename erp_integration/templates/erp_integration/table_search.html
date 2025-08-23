@@ -112,7 +112,7 @@
                         {% for row in result.rows %}
                             <tr>
                                 {% for value in row %}
-                                    <td>{{ value|default:"" }}</td>
+                                    <td>{% if value is None %}(NULL){% else %}{{ value }}{% endif %}</td>
                                 {% endfor %}
                             </tr>
                         {% empty %}

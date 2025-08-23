@@ -180,6 +180,7 @@ urlpatterns = [
     
     # 其餘路由維持不變...
     path("mes-orders/", MesOrderListView.as_view(), name="mes_orders"),
+    path("mes-orders/create/", WorkOrderCreateView.as_view(), name="workorder_create"),
     path("mes-orders/bulk-dispatch/", mes_orders_bulk_dispatch, name="mes_orders_bulk_dispatch"),
     path("mes-orders/dispatch/", mes_order_dispatch, name="mes_order_dispatch"),
     path("mes-orders/delete/", mes_order_delete, name="mes_order_delete"),

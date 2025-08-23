@@ -1236,6 +1236,7 @@ class ConsistencyCheckResult(models.Model):
     fixed_at = models.DateTimeField(verbose_name="修復時間", null=True, blank=True)
     fixed_by = models.CharField(max_length=100, verbose_name="修復人員", null=True, blank=True)
     fix_method = models.CharField(max_length=50, verbose_name="修復方式", null=True, blank=True)
+    fix_data = models.JSONField(default=dict, verbose_name="修復資料", blank=True, help_text="儲存修復時的額外資料")
     
     # 系統欄位
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")

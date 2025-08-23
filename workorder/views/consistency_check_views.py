@@ -71,10 +71,18 @@ class ConsistencyCheckAjaxView(LoginRequiredMixin, View):
                 # 處理單筆修復請求
                 result_id = request.POST.get('result_id')
                 fix_method = request.POST.get('fix_method', 'update_fill_work')
+                fix_data_json = request.POST.get('fix_data', '{}')
                 fixed_by = request.user.username
                 
+                # 解析修復資料
+                import json
+                try:
+                    fix_data = json.loads(fix_data_json)
+                except (json.JSONDecodeError, TypeError):
+                    fix_data = {}
+                
                 service = ConsistencyCheckService()
-                service.fix_issue(result_id, fix_method, fixed_by)
+                service.fix_issue(result_id, fix_method, fixed_by, fix_data)
                 
                 return JsonResponse({
                     'success': True,
@@ -99,7 +107,7 @@ class ConsistencyCheckAjaxView(LoginRequiredMixin, View):
                 
                 for result_id in result_ids:
                     try:
-                        service.fix_issue(result_id, fix_method, fixed_by)
+                        service.fix_issue(result_id, fix_method, fixed_by, {})
                         fixed_count += 1
                     except Exception as e:
                         errors.append(f'ID {result_id}: {str(e)}')
@@ -212,7 +220,7 @@ class ConsistencyCheckFixView(LoginRequiredMixin, View):
             fixed_by = request.user.username
             
             service = ConsistencyCheckService()
-            service.fix_issue(result_id, fix_method, fixed_by)
+            service.fix_issue(result_id, fix_method, fixed_by, {})
             
             return JsonResponse({
                 'success': True,

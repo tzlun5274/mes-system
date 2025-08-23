@@ -1,0 +1,269 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-control, .form-select {
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+        padding: 0.75rem;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+    
+    .help-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    
+    .btn-container {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-top: 2rem;
+    }
+    
+    .card-header {
+        background-color: #007bff;
+        color: white;
+        font-weight: 500;
+    }
+    
+    .required {
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            {% for item in breadcrumb %}
+                {% if item.url %}
+                    <li class="breadcrumb-item">
+                        <a href="{{ item.url }}"><i class="fas fa-home"></i> {{ item.name }}</a>
+                    </li>
+                {% else %}
+                    <li class="breadcrumb-item active" aria-current="page">{{ item.name }}</li>
+                {% endif %}
+            {% endfor %}
+        </ol>
+    </nav>
+
+    <div class="form-container">
+        <div class="card shadow">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-plus-circle me-2"></i>{{ title }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.company_code.id_for_label }}" class="form-label">
+                                    {{ form.company_code.label }} <span class="required">*</span>
+                                </label>
+                                {{ form.company_code }}
+                                {% if form.company_code.help_text %}
+                                    <div class="help-text">{{ form.company_code.help_text }}</div>
+                                {% endif %}
+                                {% if form.company_code.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.company_code.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.order_number.id_for_label }}" class="form-label">
+                                    {{ form.order_number.label }} <span class="required">*</span>
+                                </label>
+                                {{ form.order_number }}
+                                {% if form.order_number.help_text %}
+                                    <div class="help-text">{{ form.order_number.help_text }}</div>
+                                {% endif %}
+                                {% if form.order_number.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.order_number.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.product_code.id_for_label }}" class="form-label">
+                                    {{ form.product_code.label }} <span class="required">*</span>
+                                </label>
+                                {{ form.product_code }}
+                                {% if form.product_code.help_text %}
+                                    <div class="help-text">{{ form.product_code.help_text }}</div>
+                                {% endif %}
+                                {% if form.product_code.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.product_code.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.quantity.id_for_label }}" class="form-label">
+                                    {{ form.quantity.label }} <span class="required">*</span>
+                                </label>
+                                {{ form.quantity }}
+                                {% if form.quantity.help_text %}
+                                    <div class="help-text">{{ form.quantity.help_text }}</div>
+                                {% endif %}
+                                {% if form.quantity.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.quantity.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="{{ form.order_source.id_for_label }}" class="form-label">
+                                    {{ form.order_source.label }}
+                                </label>
+                                {{ form.order_source }}
+                                {% if form.order_source.help_text %}
+                                    <div class="help-text">{{ form.order_source.help_text }}</div>
+                                {% endif %}
+                                {% if form.order_source.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.order_source.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="btn-container">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save me-2"></i>建立工單
+                        </button>
+                        <a href="{% url 'workorder:mes_orders' %}" class="btn btn-secondary btn-lg">
+                            <i class="fas fa-times me-2"></i>取消
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 說明區域 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>說明
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>工單號碼規則</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>必須是唯一的識別碼</li>
+                            <li><i class="fas fa-check text-success me-2"></i>建議格式：公司代號-年月日-序號</li>
+                            <li><i class="fas fa-check text-success me-2"></i>例如：02-20250823-001</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>注意事項</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-info text-info me-2"></i>工單建立後將顯示在 MES 工單作業中</li>
+                            <li><i class="fas fa-info text-info me-2"></i>可透過派工功能分配給作業員</li>
+                            <li><i class="fas fa-info text-info me-2"></i>工單來源預設為「MES手動建立」</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 表單驗證
+    const form = document.querySelector('form');
+    const submitBtn = document.querySelector('button[type="submit"]');
+    
+    form.addEventListener('submit', function(e) {
+        // 禁用提交按鈕防止重複提交
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>建立中...';
+        
+        // 如果表單驗證失敗，重新啟用按鈕
+        setTimeout(() => {
+            if (!form.checkValidity()) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-save me-2"></i>建立工單';
+            }
+        }, 100);
+    });
+    
+    // 工單號碼輸入提示
+    const orderNumberInput = document.getElementById('{{ form.order_number.id_for_label }}');
+    const companySelect = document.getElementById('{{ form.company_code.id_for_label }}');
+    
+    if (orderNumberInput && companySelect) {
+        companySelect.addEventListener('change', function() {
+            if (this.value && !orderNumberInput.value) {
+                const today = new Date();
+                const dateStr = today.getFullYear() + 
+                              String(today.getMonth() + 1).padStart(2, '0') + 
+                              String(today.getDate()).padStart(2, '0');
+                const suggestion = `${this.value}-${dateStr}-001`;
+                orderNumberInput.placeholder = `建議格式：${suggestion}`;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

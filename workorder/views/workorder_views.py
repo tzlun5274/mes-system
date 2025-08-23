@@ -1078,3 +1078,59 @@ class CreateMissingWorkOrdersView(LoginRequiredMixin, View):
             return redirect('workorder:list')
 
 
+class WorkOrderCreateView(LoginRequiredMixin, CreateView):
+    """
+    新增 MES 工單視圖
+    """
+    model = WorkOrder
+    template_name = 'workorder/workorder_create.html'
+    success_url = reverse_lazy('workorder:mes_orders')
+    
+    def get_form_class(self):
+        from workorder.forms import WorkOrderCreateForm
+        return WorkOrderCreateForm
+    
+    def form_valid(self, form):
+        """表單驗證成功時的處理"""
+        try:
+            # 儲存工單（不需要設定 company_name，因為 WorkOrder 模型沒有這個欄位）
+            response = super().form_valid(form)
+            
+            # 記錄成功訊息
+            messages.success(
+                self.request, 
+                f'工單 {form.instance.order_number} 建立成功！'
+            )
+            
+            # 記錄日誌
+            workorder_logger.info(
+                f"使用者 {self.request.user.username} 手動建立工單：{form.instance.order_number}"
+            )
+            
+            return response
+            
+        except Exception as e:
+            workorder_logger.error(f"建立工單失敗：{str(e)}")
+            messages.error(self.request, f'建立工單失敗：{str(e)}')
+            return self.form_invalid(form)
+    
+    def form_invalid(self, form):
+        """表單驗證失敗時的處理"""
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(self.request, f'{form.fields[field].label}: {error}')
+        return super().form_invalid(form)
+    
+    def get_context_data(self, **kwargs):
+        """添加額外的上下文資料"""
+        context = super().get_context_data(**kwargs)
+        context['title'] = '新增 MES 工單'
+        context['breadcrumb'] = [
+            {'name': '首頁', 'url': '/'},
+            {'name': '工單管理功能入口', 'url': reverse_lazy('workorder:index')},
+            {'name': 'MES 工單作業', 'url': reverse_lazy('workorder:mes_orders')},
+            {'name': '新增工單', 'url': ''}
+        ]
+        return context
+
+

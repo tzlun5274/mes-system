@@ -69,6 +69,10 @@
 			<input type="text" name="operator" value="{{ filter_operator }}" class="form-control" placeholder="輸入作業員">
 		</div>
 		<div class="col-sm-2">
+			<label class="form-label">公司名稱</label>
+			<input type="text" name="company_name" value="{{ filter_company_name }}" class="form-control" placeholder="輸入公司名稱">
+		</div>
+		<div class="col-sm-2">
 			<label class="form-label">工單號碼</label>
 			<input type="text" name="workorder" value="{{ filter_workorder }}" class="form-control" placeholder="輸入工單號碼">
 		</div>
@@ -114,6 +118,7 @@
 								<input type="checkbox" id="selectAll" class="form-check-input">
 							</th>
 							<th>作業員</th>
+							<th>公司名稱</th>
 							<th>工單號碼</th>
 							<th>產品編號</th>
 							<th>工序</th>
@@ -135,6 +140,7 @@
 								<input type="checkbox" class="form-check-input row-checkbox" value="{{ r.id }}">
 							</td>
 							<td>{{ r.operator }}</td>
+							<td>{{ r.company_name }}</td>
 							<td>{{ r.workorder }}</td>
 							<td>{{ r.product_id }}</td>
 							<td>{% if r.operation %}{{ r.operation }}{% else %}{{ r.process.name }}{% endif %}</td>
@@ -154,8 +160,8 @@
 						</tr>
 					{% empty %}
 						<tr>
-							<td colspan="14" class="text-center text-muted py-4">
-								{% if request.GET.operator or request.GET.workorder or request.GET.product_id or request.GET.operation or request.GET.start_date or request.GET.end_date %}
+							<td colspan="15" class="text-center text-muted py-4">
+								{% if request.GET.operator or request.GET.company_name or request.GET.workorder or request.GET.product_id or request.GET.operation or request.GET.start_date or request.GET.end_date %}
 									<i class="fas fa-search me-2"></i>
 									根據目前的搜尋條件，沒有找到待審核的填報記錄<br>
 									<small class="text-info">請嘗試調整搜尋條件或<a href="?" class="text-decoration-none">清除所有篩選</a></small>

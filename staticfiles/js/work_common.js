@@ -217,9 +217,32 @@ class FillWorkController {
                 url = `/workorder/static/api/products-by-company/?company_name=${encodeURIComponent(companyName)}`;
             }
             
+            console.log('載入產品編號，URL:', url);
             const data = await this.fetchAPI(url);
+            console.log('產品編號API回應:', data);
+            
             if (data.success && data.products) {
-                this.populateSelect(this.productSelect, data.products, {
+                // 根據表單類型過濾產品
+                let filteredProducts = data.products;
+                const formType = this.getFormType();
+                
+                if (formType === 'smt' || formType === 'smt_rd') {
+                    // SMT表單：顯示所有產品（SMT設備可以處理所有產品）
+                    // 不進行產品過濾，因為產品編號本身不包含SMT字串
+                    console.log('SMT表單：顯示所有產品');
+                } else if (formType === 'operator_rd') {
+                    // 作業員RD樣品表單：只顯示PFP-CCT開頭的產品
+                    filteredProducts = filteredProducts.filter(p => 
+                        p.product_id && p.product_id.toUpperCase().startsWith('PFP-CCT')
+                    );
+                } else {
+                    // 作業員表單：顯示所有產品（因為產品編號不包含SMT字串）
+                    console.log('作業員表單：顯示所有產品');
+                }
+                
+                console.log('過濾後的產品:', filteredProducts);
+                
+                this.populateSelect(this.productSelect, filteredProducts, {
                     placeholder: '請選擇產品編號',
                     valueKey: 'product_id',
                     textKey: 'product_id'
@@ -345,7 +368,18 @@ class FillWorkController {
     getFormType() {
         // 檢查URL路徑來判斷表單類型
         const pathname = window.location.pathname;
-        if (pathname.includes('/smt/')) {
+        
+        // 檢查是否為RD樣品表單
+        if (pathname.includes('/rd/') || pathname.includes('rd_')) {
+            if (pathname.includes('/smt/') || pathname.includes('smt_')) {
+                return 'smt_rd';  // SMT RD樣品
+            } else {
+                return 'operator_rd';  // 作業員 RD樣品
+            }
+        }
+        
+        // 檢查是否為SMT表單
+        if (pathname.includes('/smt/') || pathname.includes('smt_')) {
             return 'smt';
         } else {
             return 'operator';

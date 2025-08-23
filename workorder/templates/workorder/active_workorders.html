@@ -301,6 +301,91 @@
         </div>
     </div>
 
+    <!-- 篩選表單 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-filter text-primary me-2"></i>篩選條件
+                </div>
+                <div class="card-body">
+                    <form method="GET" action="{% url 'workorder:active_workorders' %}" class="row g-3">
+                        <!-- 公司名稱篩選 -->
+                        <div class="col-md-3">
+                            <label for="company_name" class="form-label">
+                                <i class="fas fa-building text-primary"></i> 公司名稱
+                            </label>
+                            <select name="company_name" id="company_name" class="form-select">
+                                <option value="">全部公司</option>
+                                {% for company in all_companies %}
+                                    <option value="{{ company }}" {% if company == company_name_filter %}selected{% endif %}>
+                                        {{ company }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- 工單號碼篩選 -->
+                        <div class="col-md-3">
+                            <label for="workorder_number" class="form-label">
+                                <i class="fas fa-clipboard-list text-primary"></i> 工單號碼
+                            </label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="workorder_number" 
+                                   name="workorder_number" 
+                                   value="{{ workorder_number_filter }}"
+                                   placeholder="輸入工單號碼關鍵字">
+                        </div>
+                        
+                        <!-- 產品編號篩選 -->
+                        <div class="col-md-3">
+                            <label for="product_code" class="form-label">
+                                <i class="fas fa-box text-primary"></i> 產品編號
+                            </label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="product_code" 
+                                   name="product_code" 
+                                   value="{{ product_code_filter }}"
+                                   placeholder="輸入產品編號關鍵字">
+                        </div>
+                        
+                        <!-- 篩選按鈕 -->
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="d-flex gap-2 w-100">
+                                <button type="submit" class="btn btn-primary flex-fill">
+                                    <i class="fas fa-search"></i> 篩選
+                                </button>
+                                <a href="{% url 'workorder:active_workorders' %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times"></i> 清除
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                    
+                    <!-- 篩選結果提示 -->
+                    {% if has_filters %}
+                        <div class="mt-3">
+                            <div class="alert alert-info border-0 py-2">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-filter text-info me-2"></i>
+                                    <span class="small">
+                                        篩選條件：
+                                        {% if company_name_filter %}<span class="badge bg-primary me-1">公司：{{ company_name_filter }}</span>{% endif %}
+                                        {% if workorder_number_filter %}<span class="badge bg-primary me-1">工單：{{ workorder_number_filter }}</span>{% endif %}
+                                        {% if product_code_filter %}<span class="badge bg-primary me-1">產品：{{ product_code_filter }}</span>{% endif %}
+                                        共找到 <strong>{{ total_filtered }}</strong> 筆記錄
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 簡化工單列表 -->
     <div class="row">
         <div class="col-12">

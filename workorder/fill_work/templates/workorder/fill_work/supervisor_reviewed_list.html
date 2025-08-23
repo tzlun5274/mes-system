@@ -11,6 +11,16 @@
         border-radius: 5px;
         margin-bottom: 15px;
         border: 1px solid #dee2e6;
+        /* 調試樣式：確保可見性 */
+        position: relative;
+        z-index: 1000;
+    }
+    
+    /* 調試：批次操作區域可見性 */
+    .batch-actions[style*="display: none"] {
+        display: block !important;
+        background-color: #fff3cd !important;
+        border-color: #ffc107 !important;
     }
     
     .select-all-container {
@@ -162,6 +172,13 @@
 		</div>
 	</form>
 	
+	<!-- 批次操作提示 -->
+	<div class="alert alert-info alert-dismissible fade show" role="alert">
+		<strong><i class="fas fa-info-circle"></i> 批次操作說明：</strong>
+		勾選下方表格中的記錄，即可顯示批次取消審核功能。
+		<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+	</div>
+	
 	<!-- 批次操作區域 -->
 	<div class="batch-actions" id="batchActions" style="display: none;">
 		<div class="row align-items-center">
@@ -182,6 +199,16 @@
 	
 	<div class="card">
 		<div class="card-body p-0">
+			<!-- 快速操作按鈕 -->
+			<div class="p-2 border-bottom bg-light">
+				<button type="button" class="btn btn-outline-primary btn-sm" onclick="selectAllRecords()">
+					<i class="fas fa-check-square"></i> 全選所有記錄
+				</button>
+				<button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearAllSelections()">
+					<i class="fas fa-square"></i> 清除選擇
+				</button>
+			</div>
+			
 			<div class="table-responsive">
 				<form id="batchForm" method="post" action="{% url 'workorder:fill_work:batch_unapprove_fill_work' %}">
 					{% csrf_token %}
@@ -294,21 +321,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const batchUnapproveBtn = document.getElementById('batchUnapproveBtn');
     const batchForm = document.getElementById('batchForm');
     
-    console.log('元素檢查:', {
-        headerCheckbox: !!headerCheckbox,
-        selectAllCheckbox: !!selectAllCheckbox,
-        recordCheckboxes: recordCheckboxes.length,
-        batchActions: !!batchActions,
-        selectedCountSpan: !!selectedCountSpan,
-        batchUnapproveBtn: !!batchUnapproveBtn,
-        batchForm: !!batchForm
-    });
+
     
     // 更新選中數量
     function updateSelectedCount() {
         const checkedBoxes = document.querySelectorAll('.record-checkbox:checked');
         const count = checkedBoxes.length;
-        console.log('選中數量:', count);
         
         if (selectedCountSpan) {
             selectedCountSpan.textContent = count;
@@ -345,7 +363,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 表頭勾選框事件
     if (headerCheckbox) {
         headerCheckbox.addEventListener('change', function() {
-            console.log('表頭勾選框變更:', this.checked);
             recordCheckboxes.forEach(checkbox => {
                 checkbox.checked = this.checked;
             });
@@ -356,7 +373,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 全選勾選框事件
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function() {
-            console.log('全選勾選框變更:', this.checked);
             recordCheckboxes.forEach(checkbox => {
                 checkbox.checked = this.checked;
             });
@@ -367,7 +383,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 個別記錄勾選框事件
     recordCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
-            console.log('個別勾選框變更:', this.checked, this.value);
             updateSelectedCount();
         });
     });
@@ -375,9 +390,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 批次取消審核按鈕事件
     if (batchUnapproveBtn) {
         batchUnapproveBtn.addEventListener('click', function() {
-            console.log('批次取消審核按鈕被點擊');
             const checkedBoxes = document.querySelectorAll('.record-checkbox:checked');
-            console.log('選中的記錄:', checkedBoxes.length);
             
             if (checkedBoxes.length === 0) {
                 alert('請選擇要取消審核的記錄');
@@ -387,14 +400,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // 檢查表單數據
             const formData = new FormData(batchForm);
             const recordIds = formData.getAll('record_ids');
-            console.log('表單中的記錄ID:', recordIds);
             
             if (confirm(`確定要取消審核選中的 ${checkedBoxes.length} 筆記錄嗎？\n\n取消審核後，這些記錄將回到待審核狀態。`)) {
-                console.log('提交表單');
                 if (batchForm) {
                     batchForm.submit();
                 } else {
-                    console.error('找不到表單元素');
+                    alert('系統錯誤：找不到表單元素');
                 }
             }
         });
@@ -402,7 +413,22 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始化
     updateSelectedCount();
-    console.log('初始化完成');
 });
+
+function selectAllRecords() {
+    const recordCheckboxes = document.querySelectorAll('.record-checkbox');
+    recordCheckboxes.forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    updateSelectedCount();
+}
+
+function clearAllSelections() {
+    const recordCheckboxes = document.querySelectorAll('.record-checkbox');
+    recordCheckboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    updateSelectedCount();
+}
 </script>
 {% endblock %} 

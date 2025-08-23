@@ -1713,16 +1713,19 @@ def import_fill_work_records_operator(request):
     if not file:
         messages.error(request, '未選擇檔案')
         return redirect('workorder:fill_work:fill_work_settings_data_operator')
-    created, errors = _import_any(file, is_smt=False, username=request.user.username)
+    created, updated, errors = _import_any(file, is_smt=False, username=request.user.username)
     if errors:
-        if created > 0:
+        if created > 0 or updated > 0:
             preview = '；'.join(errors[:5])
             more = '' if len(errors) <= 5 else f'（另有 {len(errors) - 5} 筆錯誤省略）'
-            messages.warning(request, f'部分匯入成功：成功 {created} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
+            messages.warning(request, f'部分匯入成功：成功 {created} 筆，覆蓋 {updated} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
         else:
             messages.error(request, f'匯入失敗：{errors[0]}')
     else:
-        messages.success(request, f'匯入完成，共建立 {created} 筆')
+        if updated > 0:
+            messages.success(request, f'匯入完成，共建立 {created} 筆，覆蓋 {updated} 筆')
+        else:
+            messages.success(request, f'匯入完成，共建立 {created} 筆')
     return redirect('workorder:fill_work:fill_work_settings_data_operator')
 
 
@@ -1735,16 +1738,19 @@ def import_fill_work_records_smt(request):
     if not file:
         messages.error(request, '未選擇檔案')
         return redirect('workorder:fill_work:fill_work_settings_data_smt')
-    created, errors = _import_any(file, is_smt=True, username=request.user.username)
+    created, updated, errors = _import_any(file, is_smt=True, username=request.user.username)
     if errors:
-        if created > 0:
+        if created > 0 or updated > 0:
             preview = '；'.join(errors[:5])
             more = '' if len(errors) <= 5 else f'（另有 {len(errors) - 5} 筆錯誤省略）'
-            messages.warning(request, f'部分匯入成功：成功 {created} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
+            messages.warning(request, f'部分匯入成功：成功 {created} 筆，覆蓋 {updated} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
         else:
             messages.error(request, f'匯入失敗：{errors[0]}')
     else:
-        messages.success(request, f'匯入完成，共建立 {created} 筆')
+        if updated > 0:
+            messages.success(request, f'匯入完成，共建立 {created} 筆，覆蓋 {updated} 筆')
+        else:
+            messages.success(request, f'匯入完成，共建立 {created} 筆')
     return redirect('workorder:fill_work:fill_work_settings_data_smt')
 
 
@@ -1946,11 +1952,9 @@ def _create_fillwork_from_row(row: dict, is_smt: bool, username: str) -> FillWor
 
     if provided_hours:
         obj._skip_auto_hours_calculation = True
-        obj.save()
-    else:
-        # 未提供則自動計算（依 has_break 決定規則）
-        obj.calculate_work_hours()
-        obj.save()
+    
+    # 儲存物件（如果發現重複會自動覆蓋）
+    obj.save()
     return obj
 
 
@@ -1998,16 +2002,19 @@ def import_fill_work_records_operator(request):
     if not file:
         messages.error(request, '未選擇檔案')
         return redirect('workorder:fill_work:fill_work_settings_data_operator')
-    created, errors = _import_any(file, is_smt=False, username=request.user.username)
+    created, updated, errors = _import_any(file, is_smt=False, username=request.user.username)
     if errors:
-        if created > 0:
+        if created > 0 or updated > 0:
             preview = '；'.join(errors[:5])
             more = '' if len(errors) <= 5 else f'（另有 {len(errors) - 5} 筆錯誤省略）'
-            messages.warning(request, f'部分匯入成功：成功 {created} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
+            messages.warning(request, f'部分匯入成功：成功 {created} 筆，覆蓋 {updated} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
         else:
             messages.error(request, f'匯入失敗：{errors[0]}')
     else:
-        messages.success(request, f'匯入完成，共建立 {created} 筆')
+        if updated > 0:
+            messages.success(request, f'匯入完成，共建立 {created} 筆，覆蓋 {updated} 筆')
+        else:
+            messages.success(request, f'匯入完成，共建立 {created} 筆')
     return redirect('workorder:fill_work:fill_work_settings_data_operator')
 
 
@@ -2020,38 +2027,42 @@ def import_fill_work_records_smt(request):
     if not file:
         messages.error(request, '未選擇檔案')
         return redirect('workorder:fill_work:fill_work_settings_data_smt')
-    created, errors = _import_any(file, is_smt=True, username=request.user.username)
+    created, updated, errors = _import_any(file, is_smt=True, username=request.user.username)
     if errors:
-        if created > 0:
+        if created > 0 or updated > 0:
             preview = '；'.join(errors[:5])
             more = '' if len(errors) <= 5 else f'（另有 {len(errors) - 5} 筆錯誤省略）'
-            messages.warning(request, f'部分匯入成功：成功 {created} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
+            messages.warning(request, f'部分匯入成功：成功 {created} 筆，覆蓋 {updated} 筆，失敗 {len(errors)} 筆。錯誤摘要：{preview}{more}')
         else:
             messages.error(request, f'匯入失敗：{errors[0]}')
     else:
-        messages.success(request, f'匯入完成，共建立 {created} 筆')
+        if updated > 0:
+            messages.success(request, f'匯入完成，共建立 {created} 筆，覆蓋 {updated} 筆')
+        else:
+            messages.success(request, f'匯入完成，共建立 {created} 筆')
     return redirect('workorder:fill_work:fill_work_settings_data_smt')
 
 
 def _import_any(file, is_smt: bool, username: str):
     name = (file.name or '').lower()
     created = 0
+    updated = 0
     errors: list[str] = []
     try:
         if file.size == 0:
-            return 0, ['上傳檔案為空']
+            return 0, 0, ['上傳檔案為空']
         if name.endswith('.xlsx'):
             if openpyxl is None:
-                return 0, ['系統未安裝 openpyxl，無法解析 Excel']
+                return 0, 0, ['系統未安裝 openpyxl，無法解析 Excel']
             wb = openpyxl.load_workbook(file)
             ws = wb.active
             headers = [str(c.value).strip() if c.value is not None else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
             header_map = {h: i for i, h in enumerate(headers)}
             missing = [h for h in TEMPLATE_HEADERS if h not in header_map]
             if missing:
-                return 0, [f"必要欄位缺漏：{', '.join(missing)}"]
+                return 0, 0, [f"必要欄位缺漏：{', '.join(missing)}"]
             if ws.max_row <= 1:
-                return 0, ['Excel 無資料內容']
+                return 0, 0, ['Excel 無資料內容']
             for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
                 # 跳過整列空白
                 if row is None or all((cell is None or str(cell).strip() == '') for cell in row):
@@ -2061,23 +2072,30 @@ def _import_any(file, is_smt: bool, username: str):
                     # 再次檢查必要欄位是否皆空，若皆空則忽略
                     if all((data.get(h) in (None, '') or str(data.get(h)).strip() == '') for h in TEMPLATE_HEADERS):
                         continue
-                    _create_fillwork_from_row(data, is_smt=is_smt, username=username)
-                    created += 1
+                    
+                    # 檢查是否為重複記錄
+                    is_duplicate = _check_duplicate_record(data)
+                    obj = _create_fillwork_from_row(data, is_smt=is_smt, username=username)
+                    
+                    if is_duplicate:
+                        updated += 1
+                    else:
+                        created += 1
                 except Exception as e:
                     errors.append(f'第 {idx} 列：{e}')
-            return created, errors
+            return created, updated, errors
         else:
             # CSV
             try:
                 decoded = file.read().decode('utf-8')
             except Exception:
-                return 0, ['CSV 編碼非 UTF-8，請轉存為 UTF-8 後再上傳']
+                return 0, 0, ['CSV 編碼非 UTF-8，請轉存為 UTF-8 後再上傳']
             reader = csv.DictReader(StringIO(decoded))
             headers = [h.strip() for h in (reader.fieldnames or [])]
             header_map = {h: i for i, h in enumerate(headers)}
             missing = [h for h in TEMPLATE_HEADERS if h not in header_map]
             if missing:
-                return 0, [f"必要欄位缺漏：{', '.join(missing)}"]
+                return 0, 0, [f"必要欄位缺漏：{', '.join(missing)}"]
             any_row = False
             for idx, row in enumerate(reader, start=2):
                 # 跳過整列空白
@@ -2088,16 +2106,57 @@ def _import_any(file, is_smt: bool, username: str):
                     # 若必要欄位皆空白，忽略
                     if all((str(row.get(h, '')).strip() == '') for h in TEMPLATE_HEADERS):
                         continue
-                    _create_fillwork_from_row(row, is_smt=is_smt, username=username)
-                    created += 1
+                    
+                    # 檢查是否為重複記錄
+                    is_duplicate = _check_duplicate_record(row)
+                    obj = _create_fillwork_from_row(row, is_smt=is_smt, username=username)
+                    
+                    if is_duplicate:
+                        updated += 1
+                    else:
+                        created += 1
                 except Exception as e:
                     errors.append(f'第 {idx} 列：{e}')
             if not any_row:
-                return 0, ['CSV 無資料內容']
-            return created, errors
+                return 0, 0, ['CSV 無資料內容']
+            return created, updated, errors
     except Exception as e:
         errors.append(f'匯入過程發生未預期錯誤：{e}')
-        return created, errors
+        return created, updated, errors
+
+
+def _check_duplicate_record(data: dict) -> bool:
+    """檢查是否為重複記錄"""
+    from datetime import datetime
+    
+    # 解析資料
+    company_name = str(data.get('公司名稱', '')).strip()
+    workorder = str(data.get('工單號', '')).strip()
+    product_id = str(data.get('產品編號', '')).strip()
+    operation = str(data.get('工序名稱', '')).strip()
+    operator = str(data.get('作業員名稱', '')).strip()
+    work_date_raw = data.get('報工日期', '')
+    start_time_raw = data.get('開始時間', '')
+    
+    # 解析日期和時間
+    try:
+        work_date = _parse_date(work_date_raw)
+        start_time = _parse_time(start_time_raw)
+    except:
+        return False
+    
+    # 檢查是否已存在相同記錄
+    existing_record = FillWork.objects.filter(
+        company_name=company_name,
+        workorder=workorder,
+        product_id=product_id,
+        operation=operation,
+        operator=operator,
+        work_date=work_date,
+        start_time=start_time
+    ).first()
+    
+    return existing_record is not None
 
 
 # 匯出：新增 XLSX
@@ -2284,6 +2343,7 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
         from datetime import datetime
         qs = FillWork.objects.filter(approval_status='pending')
         operator = self.request.GET.get('operator', '').strip()
+        company_name = self.request.GET.get('company_name', '').strip()
         workorder = self.request.GET.get('workorder', '').strip()
         product_id = self.request.GET.get('product_id', '').strip()
         operation = self.request.GET.get('operation', '').strip()
@@ -2291,6 +2351,8 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
         end_date = self.request.GET.get('end_date', '').strip()
         if operator:
             qs = qs.filter(operator__icontains=operator)
+        if company_name:
+            qs = qs.filter(company_name__icontains=company_name)
         if workorder:
             qs = qs.filter(workorder__icontains=workorder)
         if product_id:
@@ -2320,6 +2382,7 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
         
         # 應用相同的過濾條件
         operator = self.request.GET.get('operator', '').strip()
+        company_name = self.request.GET.get('company_name', '').strip()
         workorder = self.request.GET.get('workorder', '').strip()
         product_id = self.request.GET.get('product_id', '').strip()
         operation = self.request.GET.get('operation', '').strip()
@@ -2328,6 +2391,8 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
         
         if operator:
             base_qs = base_qs.filter(operator__icontains=operator)
+        if company_name:
+            base_qs = base_qs.filter(company_name__icontains=company_name)
         if workorder:
             base_qs = base_qs.filter(workorder__icontains=workorder)
         if product_id:
@@ -2355,6 +2420,7 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
         # 回填查詢值
         request_get = self.request.GET
         context['filter_operator'] = request_get.get('operator', '').strip()
+        context['filter_company_name'] = request_get.get('company_name', '').strip()
         context['filter_workorder'] = request_get.get('workorder', '').strip()
         context['filter_product_id'] = request_get.get('product_id', '').strip()
         context['filter_operation'] = request_get.get('operation', '').strip()
@@ -2369,6 +2435,7 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
                 'total_pages': context.get('page_obj', {}).paginator.num_pages if context.get('page_obj') else 1,
                 'filters_applied': {
                     'operator': operator,
+                    'company_name': company_name,
                     'workorder': workorder,
                     'product_id': product_id,
                     'operation': operation,

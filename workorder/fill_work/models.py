@@ -119,13 +119,43 @@ class FillWork(models.Model):
             ).first()
             
             if existing_record:
-                # 如果存在重複記錄，拋出異常
-                raise ValueError(
-                    f"已存在相同的填報記錄：公司名稱={self.company_name}, "
-                    f"工單號碼={self.workorder}, 產品編號={self.product_id}, "
-                    f"工序={self.operation}, 作業員={self.operator}, "
-                    f"工作日期={self.work_date}, 開始時間={self.start_time}"
-                )
+                # 如果存在重複記錄，覆蓋舊記錄而不是拋出異常
+                # 更新現有記錄的所有欄位
+                existing_record.operator = self.operator
+                existing_record.company_name = self.company_name
+                existing_record.workorder = self.workorder
+                existing_record.product_id = self.product_id
+                existing_record.planned_quantity = self.planned_quantity
+                existing_record.process_id = self.process_id
+                existing_record.operation = self.operation
+                existing_record.equipment = self.equipment
+                existing_record.work_date = self.work_date
+                existing_record.start_time = self.start_time
+                existing_record.end_time = self.end_time
+                existing_record.has_break = self.has_break
+                existing_record.break_start_time = self.break_start_time
+                existing_record.break_end_time = self.break_end_time
+                existing_record.work_quantity = self.work_quantity
+                existing_record.defect_quantity = self.defect_quantity
+                existing_record.approval_status = self.approval_status
+                existing_record.remarks = self.remarks
+                existing_record.abnormal_notes = self.abnormal_notes
+                existing_record.created_by = self.created_by
+                
+                # 計算工作時數和加班時數（允許在匯入時以臨時旗標跳過）
+                if not getattr(self, '_skip_auto_hours_calculation', False):
+                    existing_record.calculate_work_hours()
+                else:
+                    # 如果跳過自動計算，直接使用提供的值
+                    existing_record.work_hours_calculated = self.work_hours_calculated
+                    existing_record.overtime_hours_calculated = self.overtime_hours_calculated
+                
+                # 儲存更新後的記錄
+                existing_record.save()
+                
+                # 將現有記錄的ID設定給當前物件，這樣調用者可以知道記錄已更新
+                self.pk = existing_record.pk
+                return
             
             # 移除派工單驗證，直接使用匯入的工單號碼
             # 驗證派工單（RD樣品除外）

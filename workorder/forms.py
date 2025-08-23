@@ -2747,3 +2747,86 @@ class OperatorOnSiteReportForm(forms.ModelForm):
         self.fields["workorder"].queryset = workorders
 
 
+
+
+
+class WorkOrderCreateForm(forms.ModelForm):
+    """
+    新增 MES 工單表單
+    """
+    
+    class Meta:
+        model = WorkOrder
+        fields = ["company_code", "order_number", "product_code", "quantity", "order_source"]
+        widgets = {
+            "company_code": forms.Select(attrs={
+                "class": "form-select",
+                "required": True
+            }),
+            "order_number": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "請輸入工單號碼",
+                "required": True
+            }),
+            "product_code": forms.TextInput(attrs={
+                "class": "form-control", 
+                "placeholder": "請輸入產品編號",
+                "required": True
+            }),
+            "quantity": forms.NumberInput(attrs={
+                "class": "form-control",
+                "placeholder": "請輸入數量",
+                "min": "1",
+                "required": True
+            }),
+            "order_source": forms.Select(attrs={
+                "class": "form-select"
+            })
+        }
+        labels = {
+            "company_code": "公司代號",
+            "order_number": "工單號碼",
+            "product_code": "產品編號",
+            "quantity": "生產數量",
+            "order_source": "工單來源"
+        }
+        help_texts = {
+            "company_code": "選擇此工單所屬的公司",
+            "order_number": "工單的唯一識別號碼",
+            "product_code": "要生產的產品編號",
+            "quantity": "預計生產的數量",
+            "order_source": "工單的來源系統"
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # 載入公司選項
+        companies = CompanyConfig.objects.all().order_by("company_name")
+        company_choices = [("", "請選擇公司")]
+        for company in companies:
+            company_choices.append((company.company_code, f"{company.company_name} ({company.company_code})"))
+        self.fields["company_code"].widget.choices = company_choices
+        
+        # 設定工單來源預設值為 MES 手動建立
+        self.fields["order_source"].initial = "mes"
+        
+    def clean_order_number(self):
+        """驗證工單號碼在同一公司內的唯一性"""
+        order_number = self.cleaned_data.get("order_number")
+        company_code = self.cleaned_data.get("company_code")
+        
+        if order_number and company_code:
+            # 檢查同一公司內是否已有相同工單號碼
+            if WorkOrder.objects.filter(order_number=order_number, company_code=company_code).exists():
+                raise forms.ValidationError("此工單號碼在該公司已存在，請使用其他號碼。")
+        
+        return order_number
+    
+    def clean_quantity(self):
+        """驗證數量必須大於 0"""
+        quantity = self.cleaned_data.get("quantity")
+        if quantity and quantity <= 0:
+            raise forms.ValidationError("數量必須大於 0。")
+        return quantity
+

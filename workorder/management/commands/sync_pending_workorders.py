@@ -30,13 +30,13 @@ class Command(BaseCommand):
                 )
                 cursor = conn.cursor()
 
-                # 查詢：Flag IN (1,3) 且 CompleteStatus=2；排除 340-/341-；未結案；日期自 2024-01-01 起
+                # 查詢：Flag IN (1,3) 且未完工狀態；排除 340-/341-；未結案；日期自 2024-01-01 起
                 sql = """
                     SELECT "MKOrdNO", "ProductID", "ProdtQty", "EstTakeMatDate", 
                            "EstStockOutDate", "CompleteStatus", "BillStatus"
                     FROM "prdMKOrdMain" 
                     WHERE "Flag" IN (1,3)
-                    AND "CompleteStatus"=2
+                    AND "CompleteStatus" = 2
                     AND ("BillStatus" IS NULL OR "BillStatus"<>1)
                     AND LEFT("MKOrdNO",4) NOT IN ('340-','341-')
                     AND COALESCE("MKOrdDate", 0) >= 20240101

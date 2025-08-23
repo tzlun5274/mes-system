@@ -4501,12 +4501,12 @@ def get_product_by_workorder(request):
 
 @require_GET
 def get_workorder_list_unified(request):
-    """統一工單列表API - 統一使用 WorkOrderDispatch 資料來源"""
+    """統一工單列表API - 統一使用 workorder_workorder 資料來源"""
     try:
-        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        from workorder.models import WorkOrder
         
-        # 統一使用 WorkOrderDispatch 作為資料來源，不檢查狀態
-        workorders = WorkOrderDispatch.objects.all().order_by('-created_at')
+        # 統一使用 workorder_workorder 作為資料來源，不檢查狀態
+        workorders = WorkOrder.objects.all().order_by('-created_at')
         
         workorder_list = []
         for workorder in workorders:
@@ -4525,7 +4525,7 @@ def get_workorder_list_unified(request):
                 'workorder': workorder.order_number,
                 'product_id': workorder.product_code,
                 'company_name': company_name,
-                'planned_quantity': workorder.planned_quantity or 0,
+                'planned_quantity': workorder.quantity or 0,
                 'display_name': f"{workorder.order_number} - {workorder.product_code}"
             })
         
@@ -4543,9 +4543,9 @@ def get_workorder_list_unified(request):
 @require_GET
 @login_required
 def get_workorder_by_product_unified(request):
-    """統一根據產品編號取得工單API - 統一使用 WorkOrderDispatch 資料來源"""
+    """統一根據產品編號取得工單API - 統一使用 workorder_workorder 資料來源"""
     try:
-        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        from workorder.models import WorkOrder
         
         product_id = request.GET.get('product_id')
         if not product_id:
@@ -4556,9 +4556,9 @@ def get_workorder_by_product_unified(request):
         
         print(f"查詢產品編號: {product_id}")
         
-        # 統一使用 WorkOrderDispatch 作為資料來源
-        workorders = WorkOrderDispatch.objects.filter(product_code=product_id).order_by('-created_at')
-        print(f"WorkOrderDispatch 查詢結果: {workorders.count()} 筆")
+        # 統一使用 workorder_workorder 作為資料來源
+        workorders = WorkOrder.objects.filter(product_code=product_id).order_by('-created_at')
+        print(f"WorkOrder 查詢結果: {workorders.count()} 筆")
         
         workorder_list = []
         for workorder in workorders:
@@ -4577,7 +4577,7 @@ def get_workorder_by_product_unified(request):
                 'workorder': workorder.order_number,
                 'product_id': workorder.product_code,
                 'company_name': company_name,
-                'planned_quantity': workorder.planned_quantity or 0,
+                'planned_quantity': workorder.quantity or 0,
                 'display_name': f"{workorder.order_number} - {workorder.product_code}"
             })
         
@@ -4597,9 +4597,9 @@ def get_workorder_by_product_unified(request):
 @require_GET
 @login_required
 def get_workorder_detail_unified(request):
-    """統一工單詳細資訊API - 統一使用 WorkOrderDispatch 資料來源"""
+    """統一工單詳細資訊API - 統一使用 workorder_workorder 資料來源"""
     try:
-        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        from workorder.models import WorkOrder
         
         workorder_id = request.GET.get('workorder_id')
         if not workorder_id:
@@ -4608,8 +4608,8 @@ def get_workorder_detail_unified(request):
                 'message': '缺少工單號碼參數'
             }, status=400)
         
-        # 統一使用 WorkOrderDispatch 作為資料來源
-        workorder = WorkOrderDispatch.objects.filter(order_number=workorder_id).first()
+        # 統一使用 workorder_workorder 作為資料來源
+        workorder = WorkOrder.objects.filter(order_number=workorder_id).first()
         if not workorder:
             return JsonResponse({
                 'success': False,
@@ -4633,7 +4633,7 @@ def get_workorder_detail_unified(request):
                 'workorder': workorder.order_number,
                 'product_id': workorder.product_code,
                 'company_name': company_name,
-                'planned_quantity': workorder.planned_quantity or 0
+                'planned_quantity': workorder.quantity or 0
             }
         })
         
@@ -4646,12 +4646,12 @@ def get_workorder_detail_unified(request):
 @require_GET
 @login_required
 def get_product_list_unified(request):
-    """統一產品清單API - 統一使用 WorkOrderDispatch 資料來源"""
+    """統一產品清單API - 統一使用 workorder_workorder 資料來源"""
     try:
-        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        from workorder.models import WorkOrder
         
-        # 統一使用 WorkOrderDispatch 作為資料來源
-        products = WorkOrderDispatch.objects.values_list('product_code', flat=True).distinct().order_by('product_code')
+        # 統一使用 workorder_workorder 作為資料來源
+        products = WorkOrder.objects.values_list('product_code', flat=True).distinct().order_by('product_code')
         print(f"產品編號查詢結果: {len(products)} 個產品")
         
         product_list = []
@@ -4675,9 +4675,9 @@ def get_product_list_unified(request):
 @require_GET
 @login_required
 def get_products_by_company_unified(request):
-    """統一根據公司名稱取得產品清單API - 統一使用 WorkOrderDispatch 資料來源"""
+    """統一根據公司名稱取得產品清單API - 統一使用 workorder_workorder 資料來源"""
     try:
-        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        from workorder.models import WorkOrder
         
         company_name = request.GET.get('company_name')
         if not company_name:
@@ -4696,8 +4696,8 @@ def get_products_by_company_unified(request):
         except:
             pass
         
-        # 統一使用 WorkOrderDispatch 作為資料來源
-        products = WorkOrderDispatch.objects.filter(company_code=company_code).values_list('product_code', flat=True).distinct().order_by('product_code')
+        # 統一使用 workorder_workorder 作為資料來源
+        products = WorkOrder.objects.filter(company_code=company_code).values_list('product_code', flat=True).distinct().order_by('product_code')
         
         product_list = []
         for product in products:
@@ -4853,9 +4853,9 @@ def get_equipment_list_unified(request):
 @require_GET
 @login_required
 def get_workorder_data_unified(request):
-    """統一工單資料API - 統一使用 WorkOrderDispatch 資料來源"""
+    """統一工單資料API - 統一使用 workorder_workorder 資料來源"""
     try:
-        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        from workorder.models import WorkOrder
         from erp_integration.models import CompanyConfig
         
         product_id = request.GET.get('product_id')
@@ -4863,7 +4863,7 @@ def get_workorder_data_unified(request):
         
         if product_id:
             # 根據產品編號獲取工單資料
-            workorder = WorkOrderDispatch.objects.filter(product_code=product_id).first()
+            workorder = WorkOrder.objects.filter(product_code=product_id).first()
             
             if workorder:
                 # 獲取公司名稱
@@ -4879,12 +4879,12 @@ def get_workorder_data_unified(request):
                     'success': True,
                     'workorder': workorder.order_number,
                     'company_name': company_name,
-                    'planned_quantity': workorder.planned_quantity
+                    'planned_quantity': workorder.quantity
                 })
         
         elif workorder_id:
             # 根據工單號碼獲取工單資料
-            workorder = WorkOrderDispatch.objects.filter(order_number=workorder_id).first()
+            workorder = WorkOrder.objects.filter(order_number=workorder_id).first()
             
             if workorder:
                 # 獲取公司名稱
@@ -4900,7 +4900,7 @@ def get_workorder_data_unified(request):
                     'success': True,
                     'product_id': workorder.product_code,
                     'company_name': company_name,
-                    'planned_quantity': workorder.planned_quantity
+                    'planned_quantity': workorder.quantity
                 })
         
         return JsonResponse({
@@ -4917,9 +4917,9 @@ def get_workorder_data_unified(request):
 @require_GET
 @login_required
 def get_workorder_info_unified(request):
-    """統一根據工單號碼獲取工單詳細資訊API - 統一使用 WorkOrderDispatch 資料來源"""
+    """統一根據工單號碼獲取工單詳細資訊API - 統一使用 workorder_workorder 資料來源"""
     try:
-        from workorder.workorder_dispatch.models import WorkOrderDispatch
+        from workorder.models import WorkOrder
         from erp_integration.models import CompanyConfig
         
         workorder_id = request.GET.get('workorder_id')
@@ -4930,7 +4930,7 @@ def get_workorder_info_unified(request):
             }, status=400)
         
         # 根據工單號碼獲取工單資料
-        workorder = WorkOrderDispatch.objects.filter(order_number=workorder_id).first()
+        workorder = WorkOrder.objects.filter(order_number=workorder_id).first()
         
         if workorder:
             # 獲取公司名稱
@@ -4949,7 +4949,7 @@ def get_workorder_info_unified(request):
                     'workorder': workorder.order_number,
                     'product_id': workorder.product_code,
                     'company_name': company_name,
-                    'planned_quantity': workorder.planned_quantity
+                    'planned_quantity': workorder.quantity
                 })
             else:
                 return JsonResponse({
@@ -5146,6 +5146,11 @@ def active_workorders(request):
     from erp_integration.models import CompanyConfig
     from datetime import date, timedelta
     
+    # 獲取篩選參數
+    company_name_filter = request.GET.get('company_name', '').strip()
+    workorder_number_filter = request.GET.get('workorder_number', '').strip()
+    product_code_filter = request.GET.get('product_code', '').strip()
+    
     # 獲取今天的日期
     today = date.today()
     
@@ -5210,8 +5215,25 @@ def active_workorders(request):
     for workorder in workorders_with_approved_reports:
         workorder.company_name = company_configs.get(workorder.company_code, workorder.company_code or '-')
     
+    # 應用篩選條件
+    filtered_workorders = []
+    for workorder in workorders_with_approved_reports:
+        # 公司名稱篩選
+        if company_name_filter and company_name_filter.lower() not in workorder.company_name.lower():
+            continue
+        
+        # 工單號碼篩選
+        if workorder_number_filter and workorder_number_filter.lower() not in workorder.order_number.lower():
+            continue
+        
+        # 產品編號篩選
+        if product_code_filter and product_code_filter.lower() not in workorder.product_code.lower():
+            continue
+        
+        filtered_workorders.append(workorder)
+    
     # 分頁處理
-    paginator = Paginator(workorders_with_approved_reports, 10)  # 每頁顯示10筆
+    paginator = Paginator(filtered_workorders, 10)  # 每頁顯示10筆
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
@@ -5276,8 +5298,13 @@ def active_workorders(request):
     total_work_hours = float(total_work_hours) if total_work_hours else 0.0
     total_overtime_hours = float(total_overtime_hours) if total_overtime_hours else 0.0
     
+    # 獲取所有公司名稱供篩選下拉選單使用
+    all_companies = list(set([workorder.company_name for workorder in workorders_with_approved_reports]))
+    all_companies.sort()
+    
     context = {
         'total_active': total_active,
+        'total_filtered': len(filtered_workorders),  # 篩選後的工單數量
         'total_pending': total_pending,
         'total_approved_reports': total_approved_reports,
         'total_approved_reports_with_workorder': total_approved_reports_with_workorder,
@@ -5286,6 +5313,12 @@ def active_workorders(request):
         'workorders_with_approved_reports': page_obj,  # 使用分頁後的資料
         'page_obj': page_obj,  # 加入分頁物件供模板使用
         'today': today,
+        # 篩選相關
+        'company_name_filter': company_name_filter,
+        'workorder_number_filter': workorder_number_filter,
+        'product_code_filter': product_code_filter,
+        'all_companies': all_companies,
+        'has_filters': bool(company_name_filter or workorder_number_filter or product_code_filter),
     }
     
     return render(request, 'workorder/active_workorders.html', context)

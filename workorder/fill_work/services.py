@@ -34,16 +34,8 @@ class RDSampleWorkOrderService:
         Returns:
             bool: 是否為RD樣品記錄
         """
-        # 檢查工單號碼是否為RD樣品
+        # 檢查工單號碼是否包含RD樣品
         if fill_work_record.workorder and 'RD樣品' in fill_work_record.workorder:
-            return True
-        
-        # 檢查產品編號是否為RD樣品相關
-        if fill_work_record.product_id and 'PFP-CCT' in fill_work_record.product_id:
-            return True
-        
-        # 檢查工序是否包含RD相關關鍵字
-        if fill_work_record.process and 'RD' in fill_work_record.process.name.upper():
             return True
             
         return False
@@ -60,15 +52,15 @@ class RDSampleWorkOrderService:
             tuple: (WorkOrder, bool) - 工單物件和是否為新建
         """
         try:
-            # 使用公司代號+RD樣品+產品編號作為唯一識別
-            # 如果沒有公司代號，預設為耀儀科技（RD樣品通常屬於耀儀科技）
-            company_code = fill_work_record.company_code or '10'
-            rd_workorder_number = f"RD樣品-{fill_work_record.product_id}"
+            # 使用公司名稱+RD樣品+產品編號作為唯一識別
+            company_name = fill_work_record.company_name or '耀儀科技'
             product_code = fill_work_record.product_id
+            
+            # 生成唯一的工單號碼：公司名稱+RD樣品+產品編號
+            rd_workorder_number = f"{company_name}-RD樣品-{product_code}"
             
             # 查找現有工單
             existing_workorder = WorkOrder.objects.filter(
-                company_code=company_code,
                 order_number=rd_workorder_number,
                 product_code=product_code
             ).first()
@@ -79,6 +71,13 @@ class RDSampleWorkOrderService:
             
             # 建立新工單
             with transaction.atomic():
+                # 獲取公司代號
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(
+                    company_name=company_name
+                ).first()
+                company_code = company_config.company_code if company_config else '10'
+                
                 new_workorder = WorkOrder.objects.create(
                     company_code=company_code,
                     order_number=rd_workorder_number,
@@ -222,8 +221,11 @@ class FillWorkApprovalService:
         """
         try:
             with transaction.atomic():
+                # 檢查是否為RD樣品記錄
+                is_rd_sample = RDSampleWorkOrderService.is_rd_sample_record(fill_work_record)
+                
                 # 核准前驗證派工單（RD樣品除外）
-                if not fill_work_record._is_rd_sample():
+                if not is_rd_sample:
                     validation_result = FillWorkApprovalService._validate_workorder_dispatch(fill_work_record)
                     if not validation_result['success']:
                         return validation_result
@@ -238,46 +240,57 @@ class FillWorkApprovalService:
                     'approval_remarks', 'updated_at'
                 ])
                 
-                # 處理RD樣品工單建立
-                rd_result = RDSampleWorkOrderService.process_rd_sample_approval(
-                    fill_work_record, approved_by
-                )
+                # 只有RD樣品才處理工單建立
+                rd_result = {
+                    'success': True,
+                    'message': '非RD樣品記錄，跳過工單建立流程',
+                    'workorder_created': False,
+                    'dispatch_created': False
+                }
                 
-                # 更新工單狀態
-                try:
-                    from workorder.services.workorder_status_service import WorkOrderStatusService
-                    from workorder.models import WorkOrder
-                    from erp_integration.models import CompanyConfig
-                    
-                    # 查找對應的工單
-                    company_config = CompanyConfig.objects.filter(
-                        company_name=fill_work_record.company_name
-                    ).first()
-                    
-                    if company_config:
-                        workorder = WorkOrder.objects.filter(
-                            company_code=company_config.company_code,
-                            order_number=fill_work_record.workorder,
-                            product_code=fill_work_record.product_id
-                        ).first()
-                    else:
-                        workorder = WorkOrder.objects.filter(
-                            order_number=fill_work_record.workorder,
-                            product_code=fill_work_record.product_id
-                        ).first()
-                    
-                    if workorder:
-                        WorkOrderStatusService.update_workorder_status(workorder.id)
-                        logger.info(f"工單 {workorder.order_number} 狀態更新成功")
-                    else:
-                        logger.warning(f"找不到對應的工單: {fill_work_record.workorder}")
+                if is_rd_sample:
+                    # 處理RD樣品工單建立
+                    rd_result = RDSampleWorkOrderService.process_rd_sample_approval(
+                        fill_work_record, approved_by
+                    )
+                
+                # 更新工單狀態（只有非RD樣品才更新）
+                if not is_rd_sample:
+                    try:
+                        from workorder.services.workorder_status_service import WorkOrderStatusService
+                        from workorder.models import WorkOrder
+                        from erp_integration.models import CompanyConfig
                         
-                except Exception as status_error:
-                    logger.error(f"工單狀態更新失敗: {str(status_error)}")
+                        # 查找對應的工單
+                        company_config = CompanyConfig.objects.filter(
+                            company_name=fill_work_record.company_name
+                        ).first()
+                        
+                        if company_config:
+                            workorder = WorkOrder.objects.filter(
+                                company_code=company_config.company_code,
+                                order_number=fill_work_record.workorder,
+                                product_code=fill_work_record.product_id
+                            ).first()
+                        else:
+                            workorder = WorkOrder.objects.filter(
+                                order_number=fill_work_record.workorder,
+                                product_code=fill_work_record.product_id
+                            ).first()
+                        
+                        if workorder:
+                            WorkOrderStatusService.update_workorder_status(workorder.id)
+                            logger.info(f"工單 {workorder.order_number} 狀態更新成功")
+                        else:
+                            logger.warning(f"找不到對應的工單: {fill_work_record.workorder}")
+                            
+                    except Exception as status_error:
+                        logger.error(f"工單狀態更新失敗: {str(status_error)}")
                 
                 result = {
                     'success': True,
                     'message': '填報記錄核准成功',
+                    'is_rd_sample': is_rd_sample,
                     'rd_sample_processed': rd_result['success'],
                     'rd_message': rd_result['message'],
                     'workorder_created': rd_result.get('workorder_created', False),

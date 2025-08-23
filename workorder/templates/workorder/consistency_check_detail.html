@@ -307,13 +307,8 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>確定要修復這個產品編號錯誤嗎？</p>
-                <p class="text-muted"><small>將把填報紀錄的產品編號更新為工單的正確產品編號</small></p>
-                <div class="mb-3">
-                    <label for="fixMethod" class="form-label">修復方式：</label>
-                    <select class="form-select" id="fixMethod">
-                        <option value="update_fill_work">更新填報紀錄產品編號</option>
-                    </select>
+                <div id="fixModalContent">
+                    <!-- 動態內容將由 JavaScript 填入 -->
                 </div>
             </div>
             <div class="modal-footer">
@@ -368,13 +363,168 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             currentResultId = this.dataset.resultId;
             currentCheckType = this.dataset.checkType;
+            
+            // 根據檢查類型生成對話框內容
+            generateFixModalContent(currentCheckType);
+            
             fixModal.show();
         });
     });
 
+    // 根據檢查類型生成修復對話框內容
+    function generateFixModalContent(checkType) {
+        const modalContent = document.getElementById('fixModalContent');
+        let content = '';
+
+        if (checkType === 'missing_dispatch') {
+            // 工單缺失的修復選項
+            content = `
+                <p>選擇如何修復這個工單缺失問題：</p>
+                <div class="mb-3">
+                    <label for="fixMethod" class="form-label">修復方式：</label>
+                    <select class="form-select" id="fixMethod">
+                        <option value="update_company_name">修改公司名稱</option>
+                        <option value="update_workorder">修改工單號碼</option>
+                        <option value="update_product_code">修改產品編號</option>
+                        <option value="delete_fill_work">刪除填報記錄</option>
+                        <option value="create_workorder">創建對應工單</option>
+                    </select>
+                </div>
+                <div id="fixInputs">
+                    <!-- 動態輸入欄位 -->
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>說明：</strong>此操作將修改填報記錄或創建工單，請謹慎選擇。
+                </div>
+            `;
+        } else if (checkType === 'wrong_product_code') {
+            // 產品編號錯誤的修復選項
+            content = `
+                <p>確定要修復這個產品編號錯誤嗎？</p>
+                <p class="text-muted"><small>將把填報紀錄的產品編號更新為工單的正確產品編號</small></p>
+                <div class="mb-3">
+                    <label for="fixMethod" class="form-label">修復方式：</label>
+                    <select class="form-select" id="fixMethod">
+                        <option value="update_fill_work">更新填報紀錄產品編號</option>
+                    </select>
+                </div>
+            `;
+        } else {
+            // 其他類型的預設內容
+            content = `
+                <p>確定要修復這個相符性問題嗎？</p>
+                <div class="mb-3">
+                    <label for="fixMethod" class="form-label">修復方式：</label>
+                    <select class="form-select" id="fixMethod">
+                        <option value="update_fill_work">更新填報紀錄</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        modalContent.innerHTML = content;
+        
+        // 如果是工單缺失，初始化輸入欄位和事件監聽器
+        if (checkType === 'missing_dispatch') {
+            toggleFixInputs();
+            
+            // 添加選項變更事件監聽器
+            const fixMethodSelect = document.getElementById('fixMethod');
+            if (fixMethodSelect) {
+                fixMethodSelect.addEventListener('change', toggleFixInputs);
+            }
+        }
+    }
+
+    // 切換修復輸入欄位
+    function toggleFixInputs() {
+        const fixMethod = document.getElementById('fixMethod').value;
+        const fixInputs = document.getElementById('fixInputs');
+        let inputsHtml = '';
+
+        if (fixMethod === 'update_company_name') {
+            inputsHtml = `
+                <div class="mb-3">
+                    <label for="newCompanyName" class="form-label">新的公司名稱：</label>
+                    <input type="text" class="form-control" id="newCompanyName" placeholder="請輸入正確的公司名稱" required>
+                </div>
+            `;
+        } else if (fixMethod === 'update_workorder') {
+            inputsHtml = `
+                <div class="mb-3">
+                    <label for="newWorkorder" class="form-label">新的工單號碼：</label>
+                    <input type="text" class="form-control" id="newWorkorder" placeholder="請輸入正確的工單號碼" required>
+                </div>
+            `;
+        } else if (fixMethod === 'update_product_code') {
+            inputsHtml = `
+                <div class="mb-3">
+                    <label for="newProductCode" class="form-label">新的產品編號：</label>
+                    <input type="text" class="form-control" id="newProductCode" placeholder="請輸入正確的產品編號" required>
+                </div>
+            `;
+        } else if (fixMethod === 'delete_fill_work') {
+            inputsHtml = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>警告：</strong>此操作將永久刪除相關的填報記錄，無法復原！
+                </div>
+            `;
+        } else if (fixMethod === 'create_workorder') {
+            inputsHtml = `
+                <div class="alert alert-success">
+                    <i class="fas fa-plus-circle"></i>
+                    <strong>說明：</strong>系統將根據填報記錄的資訊自動創建對應的工單記錄。
+                </div>
+            `;
+        }
+
+        if (fixInputs) {
+            fixInputs.innerHTML = inputsHtml;
+        }
+    }
+
     // 確認單筆修復
     document.getElementById('confirmFix').addEventListener('click', function() {
         const fixMethod = document.getElementById('fixMethod').value;
+        
+        // 收集額外的修復資料
+        let fixData = {};
+        if (fixMethod === 'update_company_name') {
+            const newCompanyName = document.getElementById('newCompanyName')?.value;
+            if (!newCompanyName) {
+                alert('請輸入新的公司名稱');
+                return;
+            }
+            fixData.new_company_name = newCompanyName;
+        } else if (fixMethod === 'update_workorder') {
+            const newWorkorder = document.getElementById('newWorkorder')?.value;
+            if (!newWorkorder) {
+                alert('請輸入新的工單號碼');
+                return;
+            }
+            fixData.new_workorder = newWorkorder;
+        } else if (fixMethod === 'update_product_code') {
+            const newProductCode = document.getElementById('newProductCode')?.value;
+            if (!newProductCode) {
+                alert('請輸入新的產品編號');
+                return;
+            }
+            fixData.new_product_code = newProductCode;
+        }
+        
+        // 準備請求參數
+        const params = new URLSearchParams({
+            'action': 'fix_issue',
+            'result_id': currentResultId,
+            'fix_method': fixMethod
+        });
+        
+        // 如果有額外資料，加入請求中
+        if (Object.keys(fixData).length > 0) {
+            params.append('fix_data', JSON.stringify(fixData));
+        }
         
         // 發送修復請求
         fetch('{% url "workorder:consistency_check_ajax" %}', {
@@ -383,11 +533,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
             },
-            body: new URLSearchParams({
-                'action': 'fix_issue',
-                'result_id': currentResultId,
-                'fix_method': fixMethod
-            })
+            body: params
         })
         .then(response => response.json())
         .then(data => {
