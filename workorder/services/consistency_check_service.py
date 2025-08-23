@@ -8,7 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 from workorder.models import WorkOrder, ConsistencyCheckResult
 from workorder.workorder_dispatch.models import WorkOrderDispatch
-from workorder.workorder_fill_work.models import FillWork
+from workorder.fill_work.models import FillWork
 from erp_integration.models import CompanyConfig
 
 logger = logging.getLogger('workorder')
@@ -315,7 +315,7 @@ class ConsistencyCheckService:
     def _fix_wrong_product_code(self, result, fix_method):
         """修復產品編號錯誤 - 將填報紀錄的產品編號更新為工單的正確產品編號"""
         # 不管修復方式，都統一更新填報紀錄的產品編號
-        from workorder.workorder_fill_work.models import FillWork
+        from workorder.fill_work.models import FillWork
         
         # 更新填報紀錄的產品編號，讓它與工單的產品編號一致
         updated_count = FillWork.objects.filter(

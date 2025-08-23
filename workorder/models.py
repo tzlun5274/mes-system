@@ -10,7 +10,7 @@ from django.db.models import Sum
 # from .workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess
 
 # 導入公司製令單子模組的模型
-from .workorder_erp.models import PrdMKOrdMain, PrdMkOrdMats, CompanyOrder, SystemConfig
+from .company_order.models import CompanyOrder, CompanyOrderSystemConfig
 
 # 導入已完工工單子模組的模型
 # from .workorder_completed.models import CompletedWorkOrder, CompletedWorkOrderProcess  # 已移除
@@ -423,8 +423,34 @@ class WorkOrderProcessCapacity(models.Model):
 # 注意：ERP同步相關功能已移至 erp_integration 模組
 # 請使用 erp_integration.models.ERPSyncConfig 和 erp_integration.models.ERPSyncLog
 
-# DispatchLog 已移至 workorder_dispatch 子模組
-# 請使用 workorder_dispatch.models.DispatchLog
+class DispatchLog(models.Model):
+    """
+    派工單記錄：每次派工都會產生一筆記錄，方便追蹤與查詢。
+    包含工單、工序、作業員、派工數量、建立人員、建立時間。
+    """
+
+    workorder_id = models.IntegerField(verbose_name="工單ID", default=0)
+    process_id = models.IntegerField(verbose_name="工序ID", default=0)
+    operator_id = models.IntegerField(verbose_name="作業員ID", null=True, blank=True)
+    quantity = models.PositiveIntegerField(default=0, verbose_name="派工數量")
+    created_by = models.CharField(max_length=100, verbose_name="建立人員")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+
+    class Meta:
+        verbose_name = "派工單記錄"
+        verbose_name_plural = "派工單記錄"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        workorder = WorkOrder.objects.filter(id=self.workorder_id).first()
+        process = WorkOrderProcess.objects.filter(id=self.process_id).first()
+        operator = Operator.objects.filter(id=self.operator_id).first() if self.operator_id else None
+        
+        workorder_number = workorder.order_number if workorder else f"工單{self.workorder_id}"
+        process_name = process.process_name if process else f"工序{self.process_id}"
+        operator_name = operator.name if operator else "未分配"
+        
+        return f"{workorder_number} - {process_name} - {operator_name} - {self.quantity}"
 
 # ============================================================================
 # 重新設計的工單資料表架構
@@ -578,20 +604,421 @@ class WorkOrderProductionDetail(models.Model):
             workorder_number = f"生產記錄{self.workorder_production_id}"
         return f"{workorder_number} - {self.process_name} - {self.report_date}"
 
-# CompletedWorkOrder 已移至 workorder_completed_workorder 子模組
-# 請使用 workorder_completed_workorder.models.CompletedWorkOrder
+class CompletedWorkOrder(models.Model):
+    """
+    已完工工單模型
+    當工單狀態變更為 'completed' 時，資料會從 WorkOrder 轉移到此模型
+    """
+    # 原始工單資訊
+    original_workorder_id = models.IntegerField(verbose_name="原始工單ID", help_text="對應的原始工單ID")
+    order_number = models.CharField(max_length=100, verbose_name="工單號")
+    product_code = models.CharField(max_length=100, verbose_name="產品編號")
+    company_code = models.CharField(max_length=10, verbose_name="公司代號")
+    company_name = models.CharField(max_length=100, verbose_name="公司名稱", default="")
+    
+    # 工單基本資訊
+    planned_quantity = models.IntegerField(verbose_name="計劃數量")
+    completed_quantity = models.IntegerField(default=0, verbose_name="完成數量")
+    status = models.CharField(max_length=20, default='completed', verbose_name="工單狀態")
+    
+    # 時間資訊
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    started_at = models.DateTimeField(null=True, blank=True, verbose_name="開始時間")
+    completed_at = models.DateTimeField(auto_now_add=True, verbose_name="完工時間")
+    
+    # 生產記錄資訊
+    production_record_id = models.IntegerField(verbose_name="生產記錄ID", null=True, blank=True, default=0)
+    
+    # 統計資訊
+    total_work_hours = models.FloatField(default=0.0, verbose_name="總工作時數")
+    total_overtime_hours = models.FloatField(default=0.0, verbose_name="總加班時數")
+    total_all_hours = models.FloatField(default=0.0, verbose_name="全部總時數")
+    total_good_quantity = models.IntegerField(default=0, verbose_name="總合格品")
+    total_defect_quantity = models.IntegerField(default=0, verbose_name="總不良品")
+    total_report_count = models.IntegerField(default=0, verbose_name="報工次數")
+    
+    # 參與人員和設備
+    unique_operators = models.JSONField(default=list, verbose_name="參與作業員")
+    unique_equipment = models.JSONField(default=list, verbose_name="使用設備")
+    
+    class Meta:
+        verbose_name = "已完工工單"
+        verbose_name_plural = "已完工工單"
+        db_table = 'workorder_completed_workorder'
+        ordering = ['-completed_at']
+        unique_together = (("company_code", "order_number", "product_code"),)  # 公司代號+工單號碼+產品編號唯一
+        indexes = [
+            models.Index(fields=['order_number']),
+            models.Index(fields=['product_code']),
+            models.Index(fields=['company_code']),
+            models.Index(fields=['company_name']),
+            models.Index(fields=['completed_at']),
+        ]
 
-# CompletedWorkOrderProcess 已移至 workorder_completed_workorder 子模組
-# 請使用 workorder_completed_workorder.models.CompletedWorkOrderProcess
+    def __str__(self):
+        return f"{self.order_number} - {self.product_code}"
 
-# CompletedProductionReport 已移至 workorder_completed_workorder 子模組
-# 請使用 workorder_completed_workorder.models.CompletedProductionReport
+    def get_completion_rate(self):
+        """計算完工率"""
+        if self.planned_quantity > 0:
+            return (self.completed_quantity / self.planned_quantity) * 100
+        return 0.0
 
-# AutoAllocationSettings 已移至 workorder_completed_workorder 子模組
-# 請使用 workorder_completed_workorder.models.AutoAllocationSettings
+    def get_completion_rate_display(self):
+        """取得完工率顯示文字"""
+        return f"{self.get_completion_rate():.1f}%"
 
-# AutoAllocationLog 已移至 workorder_completed_workorder 子模組
-# 請使用 workorder_completed_workorder.models.AutoAllocationLog
+class CompletedWorkOrderProcess(models.Model):
+    """
+    已完工工單工序模型
+    儲存已完工工單的工序資訊
+    """
+    completed_workorder_id = models.IntegerField(verbose_name="已完工工單ID", default=0)
+    
+    # 工序資訊
+    process_name = models.CharField(max_length=100, verbose_name="工序名稱")
+    process_order = models.IntegerField(verbose_name="工序順序")
+    planned_quantity = models.IntegerField(verbose_name="計劃數量")
+    completed_quantity = models.IntegerField(default=0, verbose_name="完成數量")
+    status = models.CharField(max_length=20, default='completed', verbose_name="工序狀態")
+    
+    # 分配資訊
+    assigned_operator = models.CharField(max_length=100, null=True, blank=True, verbose_name="分配作業員")
+    assigned_equipment = models.CharField(max_length=100, null=True, blank=True, verbose_name="分配設備")
+    
+    # 統計資訊
+    total_work_hours = models.FloatField(default=0.0, verbose_name="工作時數")
+    total_good_quantity = models.IntegerField(default=0, verbose_name="合格品數量")
+    total_defect_quantity = models.IntegerField(default=0, verbose_name="不良品數量")
+    report_count = models.IntegerField(default=0, verbose_name="報工次數")
+    
+    # 參與人員和設備
+    operators = models.JSONField(default=list, verbose_name="參與作業員")
+    equipment = models.JSONField(default=list, verbose_name="使用設備")
+    
+    class Meta:
+        verbose_name = "已完工工單工序"
+        verbose_name_plural = "已完工工單工序"
+        db_table = 'workorder_completed_workorder_process'
+        ordering = ['process_order']
+
+    def __str__(self):
+        completed_workorder = CompletedWorkOrder.objects.filter(id=self.completed_workorder_id).first()
+        workorder_number = completed_workorder.order_number if completed_workorder else f"已完工工單{self.completed_workorder_id}"
+        return f"{workorder_number} - {self.process_name}"
+
+    def get_completion_rate(self):
+        """計算工序完工率"""
+        if self.planned_quantity > 0:
+            return (self.completed_quantity / self.planned_quantity) * 100
+        return 0.0
+
+class CompletedProductionReport(models.Model):
+    """
+    已完工生產報工記錄模型
+    儲存已完工工單的所有報工記錄
+    """
+    completed_workorder_id = models.IntegerField(verbose_name="已完工工單ID", default=0)
+    
+    # 報工基本資訊
+    report_date = models.DateField(verbose_name="報工日期")
+    process_name = models.CharField(max_length=100, verbose_name="工序名稱")
+    operator = models.CharField(max_length=100, verbose_name="作業員")
+    equipment = models.CharField(max_length=100, verbose_name="設備")
+    
+    # 數量資訊
+    work_quantity = models.IntegerField(default=0, verbose_name="合格品數量")
+    defect_quantity = models.IntegerField(default=0, verbose_name="不良品數量")
+    
+    # 時數資訊
+    work_hours = models.FloatField(default=0.0, verbose_name="工作時數")
+    overtime_hours = models.FloatField(default=0.0, verbose_name="加班時數")
+    
+    # 時間資訊
+    start_time = models.DateTimeField(null=True, blank=True, verbose_name="開始時間")
+    end_time = models.DateTimeField(null=True, blank=True, verbose_name="結束時間")
+    
+    # 報工來源
+    report_source = models.CharField(max_length=50, verbose_name="報工來源")
+    report_type = models.CharField(max_length=20, verbose_name="報工類型")  # operator, smt, supervisor
+    
+    # 其他資訊
+    remarks = models.TextField(null=True, blank=True, verbose_name="備註")
+    abnormal_notes = models.TextField(null=True, blank=True, verbose_name="異常紀錄")
+    
+    # 審核資訊
+    approval_status = models.CharField(max_length=20, default='approved', verbose_name="審核狀態")
+    approved_by = models.CharField(max_length=100, null=True, blank=True, verbose_name="審核者")
+    approved_at = models.DateTimeField(auto_now_add=True, verbose_name="審核時間")
+    
+    # 自動分配標記
+    allocated_at = models.DateTimeField(null=True, blank=True, verbose_name="分配時間")
+    allocation_method = models.CharField(max_length=50, null=True, blank=True, verbose_name="分配方式")
+    is_system_allocated = models.BooleanField(default=False, verbose_name="系統分配標記", help_text="標記此數量是否為系統自動分配")
+    
+    class Meta:
+        verbose_name = "已完工生產報工記錄"
+        verbose_name_plural = "已完工生產報工記錄"
+        db_table = 'workorder_completed_production_report'
+        ordering = ['report_date', 'start_time']
+
+    def __str__(self):
+        completed_workorder = CompletedWorkOrder.objects.filter(id=self.completed_workorder_id).first()
+        workorder_number = completed_workorder.order_number if completed_workorder else f"已完工工單{self.completed_workorder_id}"
+        return f"{workorder_number} - {self.process_name} - {self.report_date}"
+
+class AutoAllocationSettings(models.Model):
+    """
+    自動分配設定模型
+    用於管理自動分配功能的執行設定
+    """
+    
+    # 基本設定
+    enabled = models.BooleanField(
+        default=False,
+        verbose_name="啟用自動執行",
+        help_text="是否啟用自動分配功能"
+    )
+    
+    # 已完工工單數量分配設定
+    completed_workorder_allocation_enabled = models.BooleanField(
+        default=False,
+        verbose_name="啟用已完工工單數量分配",
+        help_text="是否啟用已完工工單工序紀錄數量自動分配"
+    )
+    
+    completed_workorder_allocation_interval = models.IntegerField(
+        default=60,
+        verbose_name="已完工工單分配執行頻率（分鐘）",
+        help_text="已完工工單數量分配的執行間隔時間"
+    )
+    
+    interval_minutes = models.IntegerField(
+        default=30,
+        verbose_name="執行頻率（分鐘）",
+        help_text="自動執行的間隔時間"
+    )
+    
+    start_time = models.TimeField(
+        default="08:00",
+        verbose_name="開始時間",
+        help_text="允許執行的開始時間"
+    )
+    
+    end_time = models.TimeField(
+        default="18:00",
+        verbose_name="結束時間",
+        help_text="允許執行的結束時間"
+    )
+    
+    max_execution_time = models.IntegerField(
+        default=30,
+        verbose_name="最大執行時間（分鐘）",
+        help_text="單次執行的最大時間限制"
+    )
+    
+    notification_enabled = models.BooleanField(
+        default=True,
+        verbose_name="啟用通知",
+        help_text="是否啟用執行結果通知"
+    )
+    
+    # 執行狀態
+    is_running = models.BooleanField(
+        default=False,
+        verbose_name="正在執行",
+        help_text="當前是否正在執行"
+    )
+    
+    last_execution = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="最後執行時間",
+        help_text="最近一次執行的時間"
+    )
+    
+    next_execution = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="下次執行時間",
+        help_text="預定的下次執行時間"
+    )
+    
+    # 統計資訊
+    total_executions = models.IntegerField(
+        default=0,
+        verbose_name="總執行次數",
+        help_text="累計執行次數"
+    )
+    
+    success_count = models.IntegerField(
+        default=0,
+        verbose_name="成功次數",
+        help_text="成功執行的次數"
+    )
+    
+    failure_count = models.IntegerField(
+        default=0,
+        verbose_name="失敗次數",
+        help_text="執行失敗的次數"
+    )
+    
+    total_execution_time = models.DurationField(
+        null=True,
+        blank=True,
+        verbose_name="總執行時間",
+        help_text="累計執行時間"
+    )
+    
+    # 系統欄位
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    
+    class Meta:
+        verbose_name = "自動分配設定"
+        verbose_name_plural = "自動分配設定"
+        db_table = "workorder_auto_allocation_settings"
+    
+    def __str__(self):
+        return f"自動分配設定 (啟用: {self.enabled}, 頻率: {self.interval_minutes}分鐘)"
+    
+    @property
+    def avg_execution_time(self):
+        """計算平均執行時間"""
+        if self.total_executions > 0 and self.total_execution_time:
+            total_seconds = self.total_execution_time.total_seconds()
+            return total_seconds / self.total_executions
+        return 0
+    
+    def get_avg_execution_time_display(self):
+        """取得平均執行時間的顯示格式"""
+        try:
+            avg_seconds = self.avg_execution_time
+            if avg_seconds < 60:
+                return f"{avg_seconds:.1f}秒"
+            elif avg_seconds < 3600:
+                return f"{avg_seconds/60:.1f}分鐘"
+            else:
+                return f"{avg_seconds/3600:.1f}小時"
+        except Exception:
+            return "0秒"
+    
+    def is_within_execution_window(self):
+        """檢查當前時間是否在執行時間範圍內"""
+        from django.utils import timezone
+        from datetime import time
+        
+        now = timezone.now().time()
+        return self.start_time <= now <= self.end_time
+    
+    def should_execute(self):
+        """判斷是否應該執行"""
+        if not self.enabled:
+            return False
+        
+        # 移除執行時間範圍檢查，允許全天候執行
+        # if not self.is_within_execution_window():
+        #     return False
+        
+        if self.is_running:
+            return False
+        
+        if self.next_execution and timezone.now() < self.next_execution:
+            return False
+        
+        return True
+
+class AutoAllocationLog(models.Model):
+    """
+    自動分配執行記錄模型
+    記錄每次自動分配的執行結果
+    """
+    
+    # 執行資訊
+    started_at = models.DateTimeField(
+        verbose_name="開始時間",
+        help_text="執行開始時間"
+    )
+    
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="完成時間",
+        help_text="執行完成時間"
+    )
+    
+    execution_time = models.DurationField(
+        null=True,
+        blank=True,
+        verbose_name="執行時間",
+        help_text="實際執行時間"
+    )
+    
+    # 執行結果
+    success = models.BooleanField(
+        default=False,
+        verbose_name="執行成功",
+        help_text="是否執行成功"
+    )
+    
+    total_workorders = models.IntegerField(
+        default=0,
+        verbose_name="處理工單數",
+        help_text="本次處理的工單數量"
+    )
+    
+    successful_allocations = models.IntegerField(
+        default=0,
+        verbose_name="成功分配數",
+        help_text="成功分配的工單數量"
+    )
+    
+    failed_allocations = models.IntegerField(
+        default=0,
+        verbose_name="失敗分配數",
+        help_text="分配失敗的工單數量"
+    )
+    
+    # 錯誤資訊
+    error_message = models.TextField(
+        blank=True,
+        verbose_name="錯誤訊息",
+        help_text="執行失敗時的錯誤訊息"
+    )
+    
+    # 詳細結果
+    result_details = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name="詳細結果",
+        help_text="執行的詳細結果資訊"
+    )
+    
+    # 系統欄位
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    
+    class Meta:
+        verbose_name = "自動分配執行記錄"
+        verbose_name_plural = "自動分配執行記錄"
+        db_table = "workorder_auto_allocation_log"
+        ordering = ['-started_at']
+    
+    def __str__(self):
+        status = "成功" if self.success else "失敗"
+        return f"自動分配記錄 ({self.started_at.strftime('%Y-%m-%d %H:%M')}) - {status}"
+    
+    @property
+    def execution_time_display(self):
+        """取得執行時間的顯示格式"""
+        if self.execution_time:
+            total_seconds = self.execution_time.total_seconds()
+            if total_seconds < 60:
+                return f"{total_seconds:.1f}秒"
+            elif total_seconds < 3600:
+                return f"{total_seconds/60:.1f}分鐘"
+            else:
+                return f"{total_seconds/3600:.1f}小時"
+        return "--"
 
 class AutoManagementConfig(models.Model):
     """
@@ -773,14 +1200,6 @@ class AutoManagementConfig(models.Model):
 
 # 生產中監控資料表已移至 workorder.production_monitoring.models.ProductionMonitoringData
 
-
-
-
-
-
-
-
-
 class ConsistencyCheckResult(models.Model):
     """
     相符性檢查結果模型
@@ -847,6 +1266,52 @@ class ConsistencyCheckResult(models.Model):
         self.fixed_by = fixed_by
         self.fix_method = fix_method
         self.save()
+
+
+class SystemConfig(models.Model):
+    """
+    全域系統設定模型
+    用於管理各種系統級別的設定參數
+    """
+    
+    key = models.CharField(max_length=50, unique=True, verbose_name="設定名稱", help_text="設定名稱")
+    value = models.CharField(max_length=100, verbose_name="設定值", help_text="設定值")
+    description = models.TextField(blank=True, verbose_name="設定說明", help_text="設定說明")
+    
+    # 系統欄位
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間", help_text="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間", help_text="更新時間")
+
+    class Meta:
+        verbose_name = "系統設定"
+        verbose_name_plural = "系統設定"
+        db_table = 'workorder_system_config'
+        ordering = ['key']
+
+    def __str__(self):
+        return f"{self.key}: {self.value}"
+    
+    @classmethod
+    def get_config(cls, key, default=None):
+        """取得設定值"""
+        try:
+            config = cls.objects.get(key=key)
+            return config.value
+        except cls.DoesNotExist:
+            return default
+    
+    @classmethod
+    def set_config(cls, key, value, description=""):
+        """設定值"""
+        config, created = cls.objects.get_or_create(
+            key=key,
+            defaults={'value': value, 'description': description}
+        )
+        if not created:
+            config.value = value
+            config.description = description
+            config.save()
+        return config
 
 
 

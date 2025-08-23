@@ -20,7 +20,7 @@ from django.utils import timezone
 from datetime import datetime
 import logging
 
-from ..models import AutoManagementConfig
+from ..models import AutoManagementConfig, AutoAllocationSettings
 from ..forms import AutoManagementConfigForm
 
 logger = logging.getLogger(__name__)

@@ -7,7 +7,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 from workorder.models import WorkOrder
-from workorder.workorder_erp.models import PrdMKOrdMain, PrdMkOrdMats, CompanyOrder
+from workorder.company_order.models import PrdMKOrdMain, PrdMkOrdMats, CompanyOrder
 from workorder.fill_work.models import FillWork
 import logging
 

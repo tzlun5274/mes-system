@@ -217,12 +217,23 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadQuickStats() {
-    // 這裡可以透過AJAX載入實際的統計資料
-    // 目前使用模擬資料
-    document.getElementById('totalRecords').textContent = '1,234';
-    document.getElementById('totalHours').textContent = '8,567.5';
-    document.getElementById('totalOperators').textContent = '45';
-    document.getElementById('avgDailyHours').textContent = '8.2';
+    // 透過AJAX載入實際的統計資料
+    fetch('/reporting/api/work-hour-stats/')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('totalRecords').textContent = data.total_records || '0';
+            document.getElementById('totalHours').textContent = data.total_hours || '0';
+            document.getElementById('totalOperators').textContent = data.total_operators || '0';
+            document.getElementById('avgDailyHours').textContent = data.avg_daily_hours || '0';
+        })
+        .catch(error => {
+            console.error('載入統計資料失敗:', error);
+            // 如果API失敗，顯示預設值
+            document.getElementById('totalRecords').textContent = '0';
+            document.getElementById('totalHours').textContent = '0';
+            document.getElementById('totalOperators').textContent = '0';
+            document.getElementById('avgDailyHours').textContent = '0';
+        });
 }
 
 function showDataStats() {

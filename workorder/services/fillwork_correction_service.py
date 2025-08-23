@@ -25,7 +25,7 @@ class FillWorkCorrectionService:
         """
         取得三種修正類型的分析報告
         """
-        from workorder.workorder_fill_work.models import FillWork
+        from workorder.fill_work.models import FillWork
         from workorder.models import WorkOrder
         from erp_integration.models import CompanyConfig
         
@@ -131,7 +131,7 @@ class FillWorkCorrectionService:
         """
         類型1: 公司代號+工單號碼一樣，修復產品編號
         """
-        from workorder.workorder_fill_work.models import FillWork
+        from workorder.fill_work.models import FillWork
         from workorder.models import WorkOrder
         from erp_integration.models import CompanyConfig
         
@@ -220,7 +220,7 @@ class FillWorkCorrectionService:
         """
         類型2: 公司代號+產品編號一樣，修復工單號碼
         """
-        from workorder.workorder_fill_work.models import FillWork
+        from workorder.fill_work.models import FillWork
         from workorder.models import WorkOrder
         from erp_integration.models import CompanyConfig
         
@@ -319,7 +319,7 @@ class FillWorkCorrectionService:
         """
         類型3: 工單號碼+產品編號一樣，修復公司代號
         """
-        from workorder.workorder_fill_work.models import FillWork
+        from workorder.fill_work.models import FillWork
         from workorder.models import WorkOrder
         from erp_integration.models import CompanyConfig
         

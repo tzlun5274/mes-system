@@ -18,7 +18,7 @@ import re
 
 from ..models import WorkOrder
 from erp_integration.models import CompanyConfig
-from ..workorder_erp.models import PrdMKOrdMain, CompanyOrder
+from ..company_order.models import CompanyOrder, CompanyOrderSystemConfig
 
 logger = logging.getLogger(__name__)
 

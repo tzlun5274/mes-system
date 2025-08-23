@@ -124,7 +124,7 @@ class DispatchListView(LoginRequiredMixin, ListView):
             
             # 然後處理 ERP 製令單資訊
             try:
-                from workorder.workorder_erp.models import CompanyOrder
+                from workorder.company_order.models import CompanyOrder
                 # 使用公司代號和工單號碼來精確匹配
                 company_order = CompanyOrder.objects.filter(
                     mkordno=dispatch.order_number,
@@ -296,7 +296,7 @@ class DispatchDetailView(LoginRequiredMixin, DetailView):
         
         # 取得 ERP 製令單資訊（預定開工日和預定出貨日）
         try:
-            from workorder.workorder_erp.models import CompanyOrder
+            from workorder.company_order.models import CompanyOrder
             # 使用公司代號和工單號碼來精確匹配
             company_order = CompanyOrder.objects.filter(
                 mkordno=dispatch.order_number,

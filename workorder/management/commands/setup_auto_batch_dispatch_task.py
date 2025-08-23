@@ -6,7 +6,7 @@
 from django.core.management.base import BaseCommand
 from django_celery_beat.models import PeriodicTask, IntervalSchedule
 from django.utils import timezone
-from workorder.workorder_erp.models import SystemConfig
+from workorder.company_order.models import SystemConfig
 import logging
 
 workorder_logger = logging.getLogger("workorder")

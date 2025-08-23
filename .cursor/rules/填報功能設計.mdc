@@ -11,13 +11,13 @@ SMT填報為SMT產線專用的填報模組，工序跟設備都只能跟SMT有�
 
 3. 靜止變更作業員填報跟SMT填報資料表欄位 必須保持一致 依照作業員填報資料表為主要
 資料表 所以填報資料表都必須跟作業員填報資料表一樣不能多不能少 
-工單號碼 產品編號 公司名稱 API 來源為 WorkOrderDispatch 不檢查狀態
+工單號碼 產品編號 公司名稱 API 來源為 workorder_workorder 不檢查狀態
 填報結構:
 一個資料庫資料表
 一個模型
 四個獨立的填報模板
 
-4. 填報共用資料表名稱: FillWork
+4. 填報共用資料表名稱: workorder_fill_work
 資料表欄位格式
 基本資訊欄位
 operator - 作業員（CharField，純文字輸入）
@@ -127,6 +127,10 @@ end_time - 結束時間
  SMT填報作業首頁 三個卡片 新增SMT填報紀錄 新增SMT_RD樣品填報紀錄 SMT填報資料維護
  主管審核首頁 三個卡片 待審核填報 已審核填報作業 填報功能設定
 
+
+###統一資料來源###
+workorder_workorder
+
 ## API路徑
 所有工單相關API統一使用 `/var/www/mes/workorder/static/api/` 路徑
 
@@ -134,9 +138,6 @@ end_time - 結束時間
 ```javascript
 apiPrefix: '/var/www/mes/workorder/static/js/work_common.js'
 ```
-
-###統一資料來源###
-WorkOrderDispatch
 
 ### 實作要求
 1. 所有新功能必須使用統一API端點

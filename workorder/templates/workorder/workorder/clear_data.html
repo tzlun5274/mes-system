@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}清除工單管理數據{% endblock %}
+{% block title %}清除工單管理功能入口數據{% endblock %}
 {% block content %}
 {% if not is_debug %}
 <div class="alert alert-danger mt-4">
@@ -13,7 +13,7 @@
                 <div class="card-header bg-danger text-white">
                     <h4 class="mb-0">
                         <i class="fas fa-trash-alt"></i>
-                        清除工單管理數據
+                        清除工單管理功能入口數據
                     </h4>
                 </div>
                 <div class="card-body">
@@ -105,7 +105,7 @@
                         <!-- 操作按鈕 -->
                         <div class="d-flex justify-content-between">
                             <a href="{% url 'workorder:index' %}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> 返回工單管理
+                                <i class="fas fa-arrow-left"></i> 返回工單管理功能入口
                             </a>
                             <button type="submit" class="btn btn-danger" id="submitBtn" disabled>
                                 <i class="fas fa-trash"></i> 確認清除選定數據

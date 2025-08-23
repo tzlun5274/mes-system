@@ -16,7 +16,7 @@ def create_missing_workorders_from_fillwork():
     from workorder.fill_work.models import FillWork
     from workorder.models import WorkOrder
     from erp_integration.models import CompanyConfig
-    from workorder.workorder_erp.models import PrdMKOrdMain, CompanyOrder
+    from workorder.company_order.models import PrdMKOrdMain, CompanyOrder
     from django.db import transaction
     import logging
     

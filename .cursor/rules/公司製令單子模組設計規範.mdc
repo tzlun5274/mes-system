@@ -1,0 +1,71 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+
+公司製令單子模組設計規範
+1. 資料來源層與步驟
+第一步：去哪裡找公司設定同步資料庫
+位置： erp_integration_companyconfig 資料表
+第二步：去哪裡找同步過來的資料庫
+位置： PostgreSQL 中的公司專用資料庫
+第三步：要去查找那些資料表名稱
+位置： 各公司專用資料庫中的資料表
+資料表名稱：
+prdMKOrdMain
+prdMkOrdMats
+第四步：依照公司製令未完工判斷機制 將資料寫入 company_order 資料表
+位置： company_order 資料表
+判斷機制：
+狀態過濾：Flag = 1 或 3
+完工過濾：
+CompleteStatus = 2 (未完工）
+CompleteStatus = 1 (完工)
+
+結案過濾：
+BillStatus = 1 (已結案）
+停工
+CompleteStatus = 2
+BillStatus = 1
+
+單號過濾：排除 340- 和 341- 開頭
+日期過濾：2024年1月1日之後
+
+2. 業務管理層
+MES 工單作業
+1. workorder_company_order - 公司製令單主表
+2. workorder_company_order_systemconfig - 系統設定表（製令單同步跟工單轉換相關）
+- 管理製令單狀態
+- 處理製令單轉換
+
+公司製令單子模組負責
+✅ 製令單的業務管理
+✅ 製令單轉換成工單
+✅ 製令單狀態管理
+
+基本欄位：公司代號、製令單號、產品編號、生產數量
+✅ 時間欄位：預定開工日、預定出貨日、同步時間
+✅ 狀態欄位：完工狀態、單況、是否已轉換成工單
+✅ 唯一性約束：(company_code, mkordno, product_id)
+✅ 統計顯示：總製令單、已轉工單、未轉工單數量
+✅ 搜尋功能：按公司、單號、產品編號搜尋
+✅ 排序功能：按預定出貨日排序
+✅ 狀態顯示：已轉換/未轉換狀態標籤
+✅ 自動化設定：
+自動轉換工單間隔（預設30分鐘）
+自動同步製令間隔（預設30分鐘）
+✅ 手動操作：
+手動同步製令：從公司專用資料庫同步最新製令單
+手動轉換工單：將未轉換製令單轉成MES工單
+選擇性轉回製令：將已轉換製令單退回
+公司製令單資訊查詢：根據產品編號取得製令單資訊
+✅ 公司統計資料：各公司的製令單數量統計
+✅ 自動同步：透過 sync_pending_workorders 管理命令
+✅ 篩選條件：只同步未結案製令單（CompleteStatus=2 且 BillStatus!=1）
+✅ 多公司支援：透過 CompanyConfig 模型查找各公司資料
+✅ 工單建立：將製令單轉換成MES工單
+✅ 工序建立：自動建立預設工序明細
+✅ 狀態管理：轉換後標記 is_converted=True
+✅ 刪除條件：只要狀態不是 （CompleteStatus=2 且 BillStatus!=1）就移除資料
+

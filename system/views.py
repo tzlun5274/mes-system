@@ -1689,7 +1689,7 @@ def workorder_settings(request):
     工單管理設定頁面
     管理工單系統相關設定，包含審核流程、定時任務和完工判斷等
     """
-    from workorder.workorder_erp.models import SystemConfig
+    from workorder.company_order.models import SystemConfig
     
     if request.method == "POST":
         # 處理表單提交
@@ -2146,7 +2146,7 @@ def auto_approval_settings(request):
 @login_required
 def test_switches(request):
     """測試開關功能"""
-    from workorder.workorder_erp.models import SystemConfig
+    from workorder.company_order.models import SystemConfig
     
     # 取得設定值
     try:

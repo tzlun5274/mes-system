@@ -1,0 +1,348 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load auth_extras %}
+
+{% block title %}填報記錄列表{% endblock %}
+
+{% block extra_css %}
+<style>
+    .fill-work-list-card {
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
+    }
+    
+    .fill-work-list-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .status-badge {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .filter-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .table-responsive {
+        border-radius: 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+    }
+    
+    .btn-action {
+        margin: 0 0.1rem;
+    }
+    
+    /* 確保操作欄位始終可見 */
+    .table-responsive {
+        position: relative;
+    }
+    
+    .table th:last-child,
+    .table td:last-child {
+        position: sticky;
+        right: 0;
+        background: white;
+        z-index: 10;
+        box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    }
+    
+    .table th:last-child {
+        background: #f8f9fa;
+    }
+    
+    /* 確保按鈕組不會被擠壓 */
+    .btn-group {
+        white-space: nowrap;
+        flex-wrap: nowrap;
+    }
+    
+    .btn-group .btn {
+        flex-shrink: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-list-alt text-primary"></i>
+                    填報記錄列表
+                </h2>
+                <a href="{% url 'workorder:fill_work:fill_work_index' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i>
+                    返回首頁
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 過濾器 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="filter-section">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="type" class="form-label">填報類型</label>
+                        <select name="type" id="type" class="form-select">
+                            <option value="">全部類型</option>
+                            <option value="operator" {% if fill_type == 'operator' %}selected{% endif %}>作業員填報</option>
+                            <option value="smt" {% if fill_type == 'smt' %}selected{% endif %}>SMT填報</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="status" class="form-label">審核狀態</label>
+                        <select name="status" id="status" class="form-select">
+                            <option value="">全部狀態</option>
+                            <option value="pending" {% if status == 'pending' %}selected{% endif %}>待審核</option>
+                            <option value="approved" {% if status == 'approved' %}selected{% endif %}>已核准</option>
+                            <option value="rejected" {% if status == 'rejected' %}selected{% endif %}>已駁回</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="date_from" class="form-label">開始日期</label>
+                        <input type="date" name="date_from" id="date_from" class="form-control" value="{{ request.GET.date_from }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="date_to" class="form-label">結束日期</label>
+                        <input type="date" name="date_to" id="date_to" class="form-control" value="{{ request.GET.date_to }}">
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i>
+                            搜尋
+                        </button>
+                        <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-refresh"></i>
+                            重置
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card fill-work-list-card">
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <h4 class="text-primary">{{ page_obj.paginator.count|default:0 }}</h4>
+                            <p class="mb-0">總記錄數</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-warning">{{ pending_count|default:0 }}</h4>
+                            <p class="mb-0">待審核</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-success">{{ approved_count|default:0 }}</h4>
+                            <p class="mb-0">已核准</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-danger">{{ rejected_count|default:0 }}</h4>
+                            <p class="mb-0">已駁回</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 記錄列表 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card fill-work-list-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i>
+                        填報記錄
+                    </h5>
+                    <div class="d-flex gap-2"></div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-bordered mb-0" style="white-space: nowrap; min-width: 1200px;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="min-width: 80px;">作業員</th>
+                                    <th style="min-width: 120px;">工單號碼</th>
+                                    <th style="min-width: 150px;">產品編號</th>
+                                    <th style="min-width: 80px;">工序</th>
+                                    <th style="min-width: 100px;">設備</th>
+                                    <th style="min-width: 100px;">工作日期</th>
+                                    <th style="min-width: 80px;">開始時間</th>
+                                    <th style="min-width: 80px;">結束時間</th>
+                                    <th style="min-width: 80px;">工作時數</th>
+                                    <th style="min-width: 80px;">加班時數</th>
+                                    <th style="min-width: 80px;">填報數量</th>
+                                    <th style="min-width: 80px;">不良品數量</th>
+                                    <th style="min-width: 80px;">狀態</th>
+                                    <th style="min-width: 100px; position: sticky; right: 0; background: white; z-index: 10;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for fill_work in fill_works %}
+                                <tr>
+                                    <td>{{ fill_work.operator }}</td>
+                                    <td>{{ fill_work.workorder }}</td>
+                                    <td>{{ fill_work.product_id }}</td>
+                                    <td>{{ fill_work.process.name }}</td>
+                                    <td>{{ fill_work.equipment }}</td>
+                                    <td>{{ fill_work.work_date|date:"Y-m-d" }}</td>
+                                    <td>{{ fill_work.start_time|time:"H:i" }}</td>
+                                    <td>{{ fill_work.end_time|time:"H:i" }}</td>
+                                    <td>{{ fill_work.work_hours_calculated }}小時</td>
+                                    <td>{{ fill_work.overtime_hours_calculated }}小時</td>
+                                    <td>{{ fill_work.work_quantity }}</td>
+                                    <td>{{ fill_work.defect_quantity }}</td>
+                                    <td>
+                                        {% if fill_work.approval_status == 'pending' %}
+                                            <span class="badge bg-warning status-badge">待審核</span>
+                                        {% elif fill_work.approval_status == 'approved' %}
+                                            <span class="badge bg-success status-badge">已核准</span>
+                                        {% elif fill_work.approval_status == 'rejected' %}
+                                            <span class="badge bg-danger status-badge">已駁回</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="position: sticky; right: 0; background: white; z-index: 10;">
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'workorder:fill_work:fill_work_detail' fill_work.id %}"
+                                               class="btn btn-sm btn-outline-primary btn-action"
+                                               title="查看詳情">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if fill_work.approval_status == 'pending' %}
+                                            <a href="{% url 'workorder:fill_work:approve_fill_work' fill_work.id %}"
+                                               class="btn btn-sm btn-outline-success btn-action"
+                                               title="核准">
+                                                <i class="fas fa-check"></i>
+                                            </a>
+                                            <a href="{% url 'workorder:fill_work:reject_fill_work' fill_work.id %}"
+                                               class="btn btn-sm btn-outline-danger btn-action"
+                                               title="駁回">
+                                                <i class="fas fa-times"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="14" class="text-center py-4">
+                                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                                        <p class="text-muted">暫無填報記錄</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分頁 -->
+    {% if is_paginated %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <nav aria-label="填報記錄分頁">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if fill_type %}&type={{ fill_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if fill_type %}&type={{ fill_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if fill_type %}&type={{ fill_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if fill_type %}&type={{ fill_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if fill_type %}&type={{ fill_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 詳情模態框 -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">填報記錄詳情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detailContent">
+                <!-- 詳情內容將在這裡載入 -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function viewDetail(id) {
+    // 導向到詳情頁
+    var url = '{% url "workorder:fill_work:fill_work_detail" 0 %}'.replace('/0/','/'+id+'/');
+    window.location.href = url;
+}
+
+// 核准/駁回功能僅在「主管待審核填報作業」頁面提供，這裡不再提供對應操作
+
+// 自動提交過濾表單
+document.addEventListener('DOMContentLoaded', function() {
+    const typeSelect = document.getElementById('type');
+    const statusSelect = document.getElementById('status');
+    
+    typeSelect.addEventListener('change', function() {
+        this.form.submit();
+    });
+    
+    statusSelect.addEventListener('change', function() {
+        this.form.submit();
+    });
+});
+</script>
+{% endblock %} 

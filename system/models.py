@@ -495,7 +495,7 @@ class UserWorkPermission(models.Model):
         return True
 
 
-# 完工判斷設定已整合到 workorder.workorder_erp.models.SystemConfig
+# 完工判斷設定已整合到 workorder.company_order.models.SystemConfig
 # 使用現有的 SystemConfig 模型來管理完工判斷相關設定
 
 

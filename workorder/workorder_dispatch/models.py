@@ -124,42 +124,8 @@ class WorkOrderDispatch(models.Model):
 
     def save(self, *args, **kwargs):
         """儲存前處理"""
-        # 檢查是否為更新操作且狀態有變更
-        if self.pk:
-            try:
-                old_instance = WorkOrderDispatch.objects.get(pk=self.pk)
-                if old_instance.status != self.status:
-                    # 狀態變更，記錄歷史
-                    self._record_status_change(old_instance.status, self.status)
-            except WorkOrderDispatch.DoesNotExist:
-                pass
-        
         self.clean()
         super().save(*args, **kwargs)
-    
-    def _record_status_change(self, old_status, new_status):
-        """記錄狀態變更歷史"""
-        from .models import DispatchHistory
-        
-        action_map = {
-            ('pending', 'dispatched'): '派工',
-            ('dispatched', 'in_production'): '開始生產',
-            ('in_production', 'completed'): '完工',
-            ('in_production', 'cancelled'): '取消',
-            ('dispatched', 'cancelled'): '取消',
-            ('pending', 'cancelled'): '取消',
-        }
-        
-        action = action_map.get((old_status, new_status), '狀態變更')
-        
-        DispatchHistory.objects.create(
-            workorder_dispatch=self,
-            action=action,
-            old_status=old_status,
-            new_status=new_status,
-            operator=self.created_by or 'system',
-            notes=f'狀態從 {self.get_status_display()} 變更為 {self.get_status_display()}'
-        )
     
     def update_all_statistics(self):
         """更新所有統計資料"""
@@ -191,7 +157,7 @@ class WorkOrderDispatch(models.Model):
     
     def _update_fillwork_statistics(self):
         """更新填報記錄統計"""
-        from workorder.workorder_fill_work.models import FillWork
+        from workorder.fill_work.models import FillWork
         
         # 基本查詢條件
         fillwork_reports = FillWork.objects.filter(
@@ -258,7 +224,7 @@ class WorkOrderDispatch(models.Model):
     def _update_onsite_statistics(self):
         """更新現場報工統計"""
         try:
-            from workorder.workorder_onsite_report.models import OnsiteReport
+            from workorder.onsite_reporting.models import OnsiteReport
             
             onsite_reports = OnsiteReport.objects.filter(
                 order_number=self.order_number,
@@ -292,7 +258,7 @@ class WorkOrderDispatch(models.Model):
             ).count()
             
             # 從填報記錄獲取已完成的工序
-            from workorder.workorder_fill_work.models import FillWork
+            from workorder.fill_work.models import FillWork
             from erp_integration.models import CompanyConfig
             
             # 獲取公司名稱
@@ -371,7 +337,7 @@ class WorkOrderDispatch(models.Model):
     def _get_onsite_packaging_quantity(self):
         """獲取現場報工出貨包裝數量"""
         try:
-            from workorder.workorder_onsite_report.models import OnsiteReport
+            from workorder.onsite_reporting.models import OnsiteReport
             
             onsite_packaging_reports = OnsiteReport.objects.filter(
                 order_number=self.order_number,

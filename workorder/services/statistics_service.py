@@ -5,8 +5,7 @@
 
 from datetime import date, timedelta
 from django.db.models import Q, Count
-# 暫時註解掉，因為 CompletedProductionReport 模型可能已被移除
-# from workorder.models import CompletedProductionReport
+from workorder.models import CompletedProductionReport
 class StatisticsService:
     """
     統一統計服務類別

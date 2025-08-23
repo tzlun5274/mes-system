@@ -7,8 +7,8 @@ import logging
 from django.db import transaction
 from django.utils import timezone
 from django.db.models import Sum
-from ..models import WorkOrder, WorkOrderProductionDetail
-from ..workorder_fill_work.models import FillWork
+from ..models import WorkOrder, CompletedWorkOrder, WorkOrderProductionDetail
+from ..fill_work.models import FillWork
 from ..workorder_dispatch.models import WorkOrderDispatch
 
 logger = logging.getLogger(__name__)
@@ -517,7 +517,7 @@ class FillWorkCompletionService:
     def _get_onsite_quantity(cls, workorder):
         """獲取現場報工數量（從 OnsiteReport 表計算，嚴格按公司分離）"""
         try:
-            from workorder.workorder_onsite_report.models import OnsiteReport
+            from workorder.onsite_reporting.models import OnsiteReport
             
             # 基本查詢條件
             onsite_reports = OnsiteReport.objects.filter(
@@ -636,7 +636,7 @@ class FillWorkCompletionService:
             completed_workorder: 已完工工單
         """
         try:
-            from workorder.workorder_fill_work.models import FillWork
+            from workorder.fill_work.models import FillWork
             
             # 根據公司代號獲取公司名稱（從ERP整合模組）
             from erp_integration.models import CompanyConfig
@@ -708,7 +708,7 @@ class FillWorkCompletionService:
             completed_workorder: 已完工工單
         """
         try:
-            from workorder.workorder_onsite_report.models import OnsiteReport
+            from workorder.onsite_reporting.models import OnsiteReport
             
             # 獲取已完成的現場報工記錄
             onsite_records = OnsiteReport.objects.filter(

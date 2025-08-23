@@ -9,7 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.db.models import Sum, Count, Q
 from workorder.models import WorkOrder, WorkOrderProcess, WorkOrderProduction, WorkOrderProductionDetail
-from workorder.workorder_fill_work.models import FillWork
+from workorder.fill_work.models import FillWork
 # 移除主管報工引用，避免混淆
 # 主管職責：監督、審核、管理，不代為報工
 
@@ -282,7 +282,7 @@ def create_missing_workorders_from_fillwork():
     from .fill_work.models import FillWork
     from .models import WorkOrder
     from erp_integration.models import CompanyConfig
-    from .workorder_erp.models import PrdMKOrdMain, CompanyOrder
+    from .company_order.models import CompanyOrder, CompanyOrderSystemConfig
     from django.db import transaction
     import logging
     
@@ -317,7 +317,8 @@ def create_missing_workorders_from_fillwork():
                         company_code = company_config.company_code
                     else:
                         # 如果找不到公司配置，嘗試從製令資料中查找
-                        mkord_main = PrdMKOrdMain.objects.filter(
+                        # 移除對 PrdMKOrdMain 的引用，改用 CompanyOrder
+            company_order = CompanyOrder.objects.filter(
                             MKOrdNO=fill_work.workorder,
                             ProductID=fill_work.product_id
                         ).first()

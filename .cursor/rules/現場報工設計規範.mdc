@@ -11,7 +11,7 @@ alwaysApply: false
 
 2. 現場報工結構
 
-一個資料庫資料表 workorder_onsite_report
+資料庫資料表 workorder_onsite_report， workorder_onsite_report_session， workorder_onsite_report_history， workorder_onsite_report_config
 一個模型
 四個獨立的填報模板
 
@@ -58,7 +58,7 @@ apiPrefix: '/var/www/mes/workorder/static/js/work_common.js'
 ```
 
 ###統一資料來源###
-WorkOrderDispatch
+workorder_workorder
 
 ### 實作要求
 1. 所有新功能必須使用統一API端點

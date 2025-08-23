@@ -438,7 +438,7 @@ class UserWorkPermissionForm(forms.ModelForm):
 
 
 # 完工判斷設定已整合到現有的工單管理設定中
-# 使用 workorder.workorder_erp.models.SystemConfig 來管理設定
+# 使用 workorder.company_order.models.SystemConfig 來管理設定
 
 
 class AutoApprovalSettingsForm(forms.ModelForm):
