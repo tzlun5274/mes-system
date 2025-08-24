@@ -175,6 +175,7 @@ urlpatterns = [
     path("mes-orders/dispatch/", mes_order_dispatch, name="mes_order_dispatch"),
     path("mes-orders/delete/", mes_order_delete, name="mes_order_delete"),
     path("mes-orders/auto-dispatch/", mes_orders_auto_dispatch, name="mes_orders_auto_dispatch"),
+    path("mes-orders/convert-to-production/", workorder_views.mes_orders_convert_to_production, name="mes_orders_convert_to_production"),
     path("mes-orders/set-auto-dispatch-interval/", mes_orders_set_auto_dispatch_interval, name="mes_orders_set_auto_dispatch_interval"),
 
 

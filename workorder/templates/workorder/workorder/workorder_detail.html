@@ -1358,7 +1358,11 @@ function forceCompleteWorkorder() {
         })
         .catch(error => {
             console.error('強制完工錯誤：', error);
-            alert('網路錯誤，請重試\n\n錯誤詳情：' + error.message);
+            let errorMessage = '網路錯誤，請重試';
+            if (error.message) {
+                errorMessage += '\n\n錯誤詳情：' + error.message;
+            }
+            alert(errorMessage);
         })
         .finally(() => {
             // 恢復按鈕狀態

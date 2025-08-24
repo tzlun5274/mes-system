@@ -1070,7 +1070,7 @@ class SMTRDBackfillCreateView(LoginRequiredMixin, CreateView):
                     order_number='RD樣品',
                     product_code=product_code,
                     quantity=0,
-                    status='in_progress',
+                    status='in_progress',  # RD樣品直接設為生產中狀態
                     order_source='MES手動建立'
                 )
                 workorder_created = True

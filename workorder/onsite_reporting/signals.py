@@ -21,6 +21,27 @@ def onsite_report_post_save(sender, instance, created, **kwargs):
     當現場報工記錄被建立或更新時，自動更新對應工單的工序完成數量
     """
     try:
+        # 自動更新派工單統計資料
+        try:
+            from workorder.workorder_dispatch.models import WorkOrderDispatch
+            
+            # 查找對應的派工單
+            dispatch = WorkOrderDispatch.objects.filter(
+                order_number=instance.workorder,
+                product_code=instance.product_id,
+                company_code=instance.company_code
+            ).first()
+            
+            if dispatch:
+                # 更新派工單統計資料
+                dispatch.update_all_statistics()
+                logger.info(f"已更新派工單統計資料: {dispatch.order_number}")
+            else:
+                logger.warning(f"找不到對應的派工單：{instance.workorder} - {instance.product_id}")
+                
+        except Exception as e:
+            logger.error(f"更新派工單統計資料失敗：{str(e)}")
+        
         # 查找對應的工單
         from workorder.models import WorkOrder
         try:

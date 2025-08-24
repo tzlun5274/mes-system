@@ -89,6 +89,9 @@
       <button id="btn-auto-dispatch" class="btn btn-info me-2">
         <i class="fas fa-magic"></i> 自動批次派工
       </button>
+      <button id="btn-convert-to-production" class="btn btn-warning me-2">
+        <i class="fas fa-play-circle"></i> 全部工單轉生產中
+      </button>
       <button id="btn-bulk-dispatch" class="btn btn-success me-2" disabled>
         <i class="fas fa-tasks"></i> 批量派工
       </button>
@@ -245,6 +248,34 @@
       alert('自動批次派工失敗');
     } finally {
       btnAutoDispatch.disabled = false;
+    }
+  });
+
+  // 全部工單轉生產中功能
+  const btnConvertToProduction = document.getElementById('btn-convert-to-production');
+  btnConvertToProduction && (btnConvertToProduction.onclick = async () => {
+    if (!confirm('確定要將所有待生產工單轉換為生產中狀態嗎？此操作將同步更新工單和派工單狀態。')) return;
+    
+    btnConvertToProduction.disabled = true;
+    btnConvertToProduction.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 轉換中...';
+    
+    try {
+      const resp = await fetch('{% url "workorder:mes_orders_convert_to_production" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
+      });
+      const data = await resp.json();
+      if (data.success) {
+        alert(data.message);
+        window.location.reload();
+      } else {
+        alert(data.error || '轉換失敗');
+      }
+    } catch (e) {
+      alert('轉換失敗');
+    } finally {
+      btnConvertToProduction.disabled = false;
+      btnConvertToProduction.innerHTML = '<i class="fas fa-play-circle"></i> 全部工單轉生產中';
     }
   });
 

@@ -174,7 +174,7 @@ class Command(BaseCommand):
                 order_number=rd_workorder_number,
                 product_code=product_code,
                 quantity=fill_work.planned_quantity or 0,
-                status='pending',
+                status='in_progress',  # RD樣品直接設為生產中狀態
                 order_source='mes',
                 created_at=timezone.now()
             )

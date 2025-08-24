@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+
+{% block title %}工作時數日報表{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}">報表管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'reporting:work_time_report_index' %}">工作時數報表</a></li>
+            <li class="breadcrumb-item active" aria-current="page">日報表</li>
+        </ol>
+    </nav>
+
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="report-main-title">
+                <i class="fas fa-calendar-day"></i> 工作時數日報表
+            </h2>
+            <p class="text-muted">查看每日工作時數統計與分析</p>
+        </div>
+    </div>
+
+    <!-- 報表設定表單 -->
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-cog"></i> 報表設定
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="reportForm">
+                        {% csrf_token %}
+                        
+                        <!-- 公司代號 -->
+                        <div class="mb-3">
+                            <label for="company_code" class="form-label">
+                                <i class="fas fa-building me-2"></i>公司代號 *
+                            </label>
+                            <select name="company_code" id="company_code" class="form-select" required>
+                                <option value="">請選擇公司</option>
+                                <option value="A001">A001 - 公司A</option>
+                                <option value="B001">B001 - 公司B</option>
+                                <option value="C001">C001 - 公司C</option>
+                            </select>
+                            <div class="form-text">選擇要查詢的公司代號</div>
+                        </div>
+
+                        <!-- 報表日期 -->
+                        <div class="mb-3">
+                            <label for="report_date" class="form-label">
+                                <i class="fas fa-calendar me-2"></i>報表日期 *
+                            </label>
+                            <input type="date" name="report_date" id="report_date" 
+                                   class="form-control" value="{{ current_date|date:'Y-m-d' }}" required>
+                            <div class="form-text">選擇要查詢的報表日期</div>
+                        </div>
+
+                        <!-- 匯出格式 -->
+                        <div class="mb-3">
+                            <label for="format" class="form-label">
+                                <i class="fas fa-file-alt me-2"></i>匯出格式
+                            </label>
+                            <select name="format" id="format" class="form-select">
+                                <option value="web">網頁顯示</option>
+                                <option value="excel">Excel 檔案</option>
+                                <option value="csv">CSV 檔案</option>
+                            </select>
+                            <div class="form-text">選擇報表的顯示或匯出格式</div>
+                        </div>
+
+                        <!-- 快速日期選擇 -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-bolt me-2"></i>快速選擇
+                            </label>
+                            <div class="btn-group w-100" role="group">
+                                <button type="button" class="btn btn-outline-secondary" onclick="setDate('today')">
+                                    今天
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="setDate('yesterday')">
+                                    昨天
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="setDate('last_week')">
+                                    上週
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="setDate('last_month')">
+                                    上月
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 提交按鈕 -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> 生成報表
+                            </button>
+                            <a href="{% url 'reporting:work_time_report_index' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> 返回
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表說明 -->
+    <div class="row mt-4">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle"></i> 報表說明
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-list-ul text-primary"></i> 報表內容</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> 總工作時數統計</li>
+                                <li><i class="fas fa-check text-success"></i> 加班時數分析</li>
+                                <li><i class="fas fa-check text-success"></i> 作業員工作時數</li>
+                                <li><i class="fas fa-check text-success"></i> 效率率計算</li>
+                                <li><i class="fas fa-check text-success"></i> 不良率統計</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-chart-bar text-info"></i> 統計指標</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> 參與作業員數</li>
+                                <li><i class="fas fa-check text-success"></i> 使用設備數</li>
+                                <li><i class="fas fa-check text-success"></i> 工單數量</li>
+                                <li><i class="fas fa-check text-success"></i> 完工率</li>
+                                <li><i class="fas fa-check text-success"></i> 良率統計</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 快速日期選擇功能
+function setDate(type) {
+    const today = new Date();
+    let targetDate = new Date();
+    
+    switch(type) {
+        case 'today':
+            targetDate = today;
+            break;
+        case 'yesterday':
+            targetDate.setDate(today.getDate() - 1);
+            break;
+        case 'last_week':
+            targetDate.setDate(today.getDate() - 7);
+            break;
+        case 'last_month':
+            targetDate.setMonth(today.getMonth() - 1);
+            break;
+    }
+    
+    // 格式化日期為 YYYY-MM-DD
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const day = String(targetDate.getDate()).padStart(2, '0');
+    const formattedDate = `${year}-${month}-${day}`;
+    
+    document.getElementById('report_date').value = formattedDate;
+}
+
+// 表單驗證
+document.getElementById('reportForm').addEventListener('submit', function(e) {
+    const companyCode = document.getElementById('company_code').value;
+    const reportDate = document.getElementById('report_date').value;
+    
+    if (!companyCode) {
+        e.preventDefault();
+        alert('請選擇公司代號');
+        return false;
+    }
+    
+    if (!reportDate) {
+        e.preventDefault();
+        alert('請選擇報表日期');
+        return false;
+    }
+    
+    // 檢查日期是否為未來日期
+    const selectedDate = new Date(reportDate);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // 設為今天的最後一刻
+    
+    if (selectedDate > today) {
+        e.preventDefault();
+        alert('報表日期不能為未來日期');
+        return false;
+    }
+});
+
+// 載入公司資料
+document.addEventListener('DOMContentLoaded', function() {
+    // 這裡可以透過 AJAX 載入公司資料
+    loadCompanyData();
+});
+
+function loadCompanyData() {
+    // 從 ERP 整合模組獲取公司資料
+    fetch('/api/companies/')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('company_code');
+            select.innerHTML = '<option value="">請選擇公司</option>';
+            
+            data.forEach(company => {
+                const option = document.createElement('option');
+                option.value = company.company_code;
+                option.textContent = `${company.company_code} - ${company.company_name}`;
+                select.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.log('載入公司資料失敗:', error);
+        });
+}
+</script>
+
+<style>
+.report-main-title {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.breadcrumb {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 0.75rem 1rem;
+}
+
+.btn-group .btn {
+    border-radius: 0.375rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #495057;
+}
+
+.form-text {
+    font-size: 0.875em;
+    color: #6c757d;
+}
+</style>
+{% endblock %}

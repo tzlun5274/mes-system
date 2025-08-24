@@ -4,12 +4,13 @@
 {% block title %}已完工工單報表 - 報表管理{% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">
+                    <h3 class="report-main-title">
                         <i class="fas fa-check-circle"></i> 已完工工單報表
                     </h3>
                 </div>
@@ -17,8 +18,8 @@
                     <!-- 統計摘要 -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <h5 class="mb-3">
-                                <i class="fas fa-chart-pie text-primary"></i> 統計摘要
+                            <h5 class="report-section-title">
+                                <i class="fas fa-chart-pie"></i> 統計摘要
                             </h5>
                         </div>
                         <div class="col-md-2 mb-3">
@@ -74,27 +75,27 @@
                     <!-- 圖表視覺化 -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <h5 class="mb-3">
-                                <i class="fas fa-chart-area text-primary"></i> 圖表視覺化
+                            <h5 class="report-section-title">
+                                <i class="fas fa-chart-area"></i> 圖表視覺化
                             </h5>
                         </div>
                         <div class="col-md-6 mb-3">
                             <div class="card">
-                                <div class="card-header">
+                                <div class="card-header bg-dark text-white">
                                     <h6 class="mb-0"><i class="fas fa-chart-line"></i> 完工工單趨勢</h6>
                                 </div>
                                 <div class="card-body">
-                                    <canvas id="completedWorkorderTrendChart" width="400" height="200"></canvas>
+                                    <canvas id="completedWorkorderTrendChart" width="400" height="200" style="height: 300px !important;"></canvas>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <div class="card">
-                                <div class="card-header">
+                                <div class="card-header bg-dark text-white">
                                     <h6 class="mb-0"><i class="fas fa-chart-pie"></i> 公司完工分布</h6>
                                 </div>
                                 <div class="card-body">
-                                    <canvas id="completedWorkorderDistributionChart" width="400" height="200"></canvas>
+                                    <canvas id="completedWorkorderDistributionChart" width="400" height="200" style="height: 300px !important;"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -103,8 +104,8 @@
                     <!-- 快速操作 -->
                     <div class="row">
                         <div class="col-12">
-                            <h5 class="mb-3">
-                                <i class="fas fa-bolt text-warning"></i> 快速操作
+                            <h5 class="report-section-title">
+                                <i class="fas fa-bolt"></i> 快速操作
                             </h5>
                             <div class="row">
                                 <div class="col-md-4 mb-3">
@@ -154,42 +155,43 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('頁面載入完成，開始載入圖表資料...');
+    
     // 載入圖表資料
     loadCompletedWorkorderChartData();
 });
 
 function loadCompletedWorkorderChartData() {
+    console.log('開始載入圖表資料...');
+    
     // 完工工單趨勢圖
-    $.ajax({
-        url: '{% url "reporting:chart_data" %}',
-        method: 'GET',
-        data: { chart_type: 'completed_workorder_trend' },
-        success: function(data) {
+    fetch('{% url "reporting:chart_data" %}?chart_type=completed_workorder_trend')
+        .then(response => response.json())
+        .then(data => {
+            console.log('趨勢圖資料載入成功:', data);
             createCompletedWorkorderTrendChart(data);
-        },
-        error: function() {
-            console.log('載入完工工單趨勢圖失敗');
-        }
-    });
+        })
+        .catch(error => {
+            console.error('載入完工工單趨勢圖失敗:', error);
+        });
 
     // 公司完工分布圖
-    $.ajax({
-        url: '{% url "reporting:chart_data" %}',
-        method: 'GET',
-        data: { chart_type: 'completed_workorder_distribution' },
-        success: function(data) {
+    fetch('{% url "reporting:chart_data" %}?chart_type=completed_workorder_distribution')
+        .then(response => response.json())
+        .then(data => {
+            console.log('分布圖資料載入成功:', data);
             createCompletedWorkorderDistributionChart(data);
-        },
-        error: function() {
-            console.log('載入公司完工分布圖失敗');
-        }
-    });
+        })
+        .catch(error => {
+            console.error('載入公司完工分布圖失敗:', error);
+        });
 }
 
 function createCompletedWorkorderTrendChart(data) {
+    console.log('開始創建趨勢圖...');
     const ctx = document.getElementById('completedWorkorderTrendChart').getContext('2d');
     new Chart(ctx, {
         type: 'line',
@@ -229,9 +231,11 @@ function createCompletedWorkorderTrendChart(data) {
             }
         }
     });
+    console.log('趨勢圖創建成功！');
 }
 
 function createCompletedWorkorderDistributionChart(data) {
+    console.log('開始創建分布圖...');
     const ctx = document.getElementById('completedWorkorderDistributionChart').getContext('2d');
     new Chart(ctx, {
         type: 'doughnut',
@@ -258,6 +262,7 @@ function createCompletedWorkorderDistributionChart(data) {
             }
         }
     });
+    console.log('分布圖創建成功！');
 }
 
 function syncCompletedWorkorderData() {
@@ -268,13 +273,18 @@ function syncCompletedWorkorderData() {
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 同步中...';
     button.disabled = true;
     
-    $.ajax({
-        url: '{% url "reporting:sync_completed_workorder_data" %}',
+    // 獲取CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('{% url "reporting:sync_completed_workorder_data" %}', {
         method: 'POST',
         headers: {
-            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
-        },
-        success: function(response) {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        }
+    })
+    .then(response => {
+        if (response.ok) {
             // 顯示成功訊息
             button.innerHTML = '<i class="fas fa-check"></i> 同步完成';
             button.className = 'btn btn-sm btn-success';
@@ -283,19 +293,22 @@ function syncCompletedWorkorderData() {
             setTimeout(function() {
                 location.reload();
             }, 2000);
-        },
-        error: function() {
-            // 顯示錯誤訊息
-            button.innerHTML = '<i class="fas fa-times"></i> 同步失敗';
-            button.className = 'btn btn-sm btn-danger';
-            
-            // 3秒後恢復原狀
-            setTimeout(function() {
-                button.innerHTML = originalText;
-                button.className = 'btn btn-sm btn-outline-info';
-                button.disabled = false;
-            }, 3000);
+        } else {
+            throw new Error('同步失敗');
         }
+    })
+    .catch(error => {
+        console.error('同步錯誤:', error);
+        // 顯示錯誤訊息
+        button.innerHTML = '<i class="fas fa-times"></i> 同步失敗';
+        button.className = 'btn btn-sm btn-danger';
+        
+        // 3秒後恢復原狀
+        setTimeout(function() {
+            button.innerHTML = originalText;
+            button.className = 'btn btn-sm btn-outline-info';
+            button.disabled = false;
+        }, 3000);
     });
 }
 </script>

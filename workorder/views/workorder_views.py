@@ -832,6 +832,68 @@ def mes_orders_auto_dispatch(request):
 
 @login_required
 @require_POST
+def mes_orders_convert_to_production(request):
+    """
+    全部工單轉生產中：將所有待生產工單轉換為生產中狀態
+    """
+    try:
+        from django.db import transaction
+        
+        with transaction.atomic():
+            # 取得所有待生產的工單
+            pending_workorders = WorkOrder.objects.filter(status='pending')
+            total_count = pending_workorders.count()
+            
+            if total_count == 0:
+                return JsonResponse({
+                    "success": True,
+                    "message": "沒有待生產的工單需要轉換"
+                })
+            
+            updated_count = 0
+            for workorder in pending_workorders:
+                # 更新工單狀態為生產中
+                workorder.status = 'in_progress'
+                workorder.updated_at = timezone.now()
+                workorder.save()
+                updated_count += 1
+                
+                # 記錄操作日誌
+                workorder_logger.info(
+                    f"工單轉生產中：工單 {workorder.order_number} 狀態更新為生產中。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
+                )
+                
+                # 同時更新對應的派工單狀態（如果存在）
+                try:
+                    dispatch = WorkOrderDispatch.objects.filter(
+                        order_number=workorder.order_number,
+                        product_code=workorder.product_code,
+                        company_code=workorder.company_code
+                    ).first()
+                    
+                    if dispatch and dispatch.status != 'in_production':
+                        dispatch.status = 'in_production'
+                        dispatch.save()
+                        workorder_logger.info(
+                            f"派工單狀態同步：派工單 {dispatch.order_number} 狀態更新為生產中"
+                        )
+                except Exception as e:
+                    workorder_logger.warning(f"更新派工單狀態失敗: {str(e)}")
+            
+            return JsonResponse({
+                "success": True,
+                "message": f"成功將 {updated_count} 個工單轉換為生產中狀態"
+            })
+            
+    except Exception as e:
+        workorder_logger.error(f"全部工單轉生產中失敗: {str(e)}")
+        return JsonResponse({
+            "success": False,
+            "error": f"轉換失敗：{str(e)}"
+        }, status=500)
+
+@login_required
+@require_POST
 def mes_orders_set_auto_dispatch_interval(request):
     """
     設定自動批次派工間隔

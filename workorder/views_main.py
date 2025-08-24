@@ -54,6 +54,7 @@ from django.utils.decorators import method_decorator
 from django.views import View
 import json
 from django.views.decorators.csrf import ensure_csrf_cookie
+from workorder.workorder_dispatch.models import WorkOrderDispatch
 # 完工判斷服務已移除，避免資料汙染
 # WorkOrderCompletionService 已移除，功能已整合到 FillWorkCompletionService
 
@@ -5380,18 +5381,22 @@ def force_complete_workorder(request, pk):
         result = FillWorkCompletionService.force_complete_workorder(pk, force_reason)
         
         if result['success']:
-            # 記錄操作日誌
+            # 記錄操作日誌（如果系統有操作日誌功能的話）
             try:
-                from system.models import OperationLog
-                OperationLog.objects.create(
-                    user=request.user.username,
-                    module="workorder",
-                    action=f"強制完工工單 {result['workorder_number']} - 原因: {force_reason}",
-                    timestamp=timezone.now(),
-                    ip_address=request.META.get('REMOTE_ADDR', ''),
-                )
+                # 檢查是否有操作日誌模型
+                from django.apps import apps
+                if apps.is_installed('system') and hasattr(apps.get_app_config('system').models_module, 'OperationLog'):
+                    from system.models import OperationLog
+                    OperationLog.objects.create(
+                        user=request.user.username,
+                        module="workorder",
+                        action=f"強制完工工單 {result['workorder_number']} - 原因: {force_reason}",
+                        timestamp=timezone.now(),
+                        ip_address=request.META.get('REMOTE_ADDR', ''),
+                    )
             except Exception as log_error:
-                logger.warning(f"記錄操作日誌失敗: {str(log_error)}")
+                # 如果操作日誌記錄失敗，不影響主要功能
+                workorder_logger.warning(f"記錄操作日誌失敗: {str(log_error)}")
             
             return JsonResponse({
                 "success": True,
@@ -5407,11 +5412,12 @@ def force_complete_workorder(request, pk):
         else:
             return JsonResponse({
                 "success": False,
-                "message": result.get('error', '強制完工失敗')
+                "message": result.get('error', '強制完工失敗'),
+                "error": result.get('error', '強制完工失敗')
             }, status=400)
             
     except Exception as e:
-        logger.error(f"強制完工工單 {pk} 失敗: {str(e)}")
+        workorder_logger.error(f"強制完工工單 {pk} 失敗: {str(e)}")
         return JsonResponse({
             "success": False,
             "message": f"強制完工失敗：{str(e)}"
@@ -5440,7 +5446,7 @@ def auto_complete_workorder(request, pk):
         return JsonResponse(result)
         
     except Exception as e:
-        logger.error(f"自動完工工單 {pk} 失敗: {str(e)}")
+        workorder_logger.error(f"自動完工工單 {pk} 失敗: {str(e)}")
         return JsonResponse({
             "success": False,
             "message": f"自動完工失敗: {str(e)}"
@@ -5514,3 +5520,65 @@ def quick_create_processes_from_route(request, workorder_id):
         messages.error(request, f"建立工序明細失敗：{str(e)}")
     
     return redirect("workorder:workorder_process_detail", workorder_id=workorder_id)
+
+@login_required
+@require_POST
+def mes_orders_convert_to_production(request):
+    """
+    全部工單轉生產中：將所有待生產工單轉換為生產中狀態
+    """
+    try:
+        from django.db import transaction
+        
+        with transaction.atomic():
+            # 取得所有待生產的工單
+            pending_workorders = WorkOrder.objects.filter(status='pending')
+            total_count = pending_workorders.count()
+            
+            if total_count == 0:
+                return JsonResponse({
+                    "success": True,
+                    "message": "沒有待生產的工單需要轉換"
+                })
+            
+            updated_count = 0
+            for workorder in pending_workorders:
+                # 更新工單狀態為生產中
+                workorder.status = 'in_progress'
+                workorder.updated_at = timezone.now()
+                workorder.save()
+                updated_count += 1
+                
+                # 記錄操作日誌
+                workorder_logger.info(
+                    f"工單轉生產中：工單 {workorder.order_number} 狀態更新為生產中。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
+                )
+                
+                # 同時更新對應的派工單狀態（如果存在）
+                try:
+                    dispatch = WorkOrderDispatch.objects.filter(
+                        order_number=workorder.order_number,
+                        product_code=workorder.product_code,
+                        company_code=workorder.company_code
+                    ).first()
+                    
+                    if dispatch and dispatch.status != 'in_production':
+                        dispatch.status = 'in_production'
+                        dispatch.save()
+                        workorder_logger.info(
+                            f"派工單狀態同步：派工單 {dispatch.order_number} 狀態更新為生產中"
+                        )
+                except Exception as e:
+                    workorder_logger.warning(f"更新派工單狀態失敗: {str(e)}")
+            
+            return JsonResponse({
+                "success": True,
+                "message": f"成功將 {updated_count} 個工單轉換為生產中狀態"
+            })
+            
+    except Exception as e:
+        workorder_logger.error(f"全部工單轉生產中失敗: {str(e)}")
+        return JsonResponse({
+            "success": False,
+            "error": f"轉換失敗：{str(e)}"
+        }, status=500)

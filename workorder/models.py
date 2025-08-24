@@ -753,7 +753,7 @@ class CompletedProductionReport(models.Model):
     
     # 自動分配標記
     allocated_at = models.DateTimeField(null=True, blank=True, verbose_name="分配時間")
-    allocation_method = models.CharField(max_length=50, null=True, blank=True, verbose_name="分配方式")
+    allocation_method = models.CharField(max_length=50, null=True, blank=True, default='manual', verbose_name="分配方式")
     is_system_allocated = models.BooleanField(default=False, verbose_name="系統分配標記", help_text="標記此數量是否為系統自動分配")
     
     class Meta:
