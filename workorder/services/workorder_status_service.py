@@ -81,21 +81,12 @@ class WorkOrderStatusService:
             bool: 是否有生產活動
         """
         try:
-            # 1. 檢查工序記錄（已移除，因為 WorkOrderProductionDetail 模型已移除外鍵關係）
-            # has_process_records = WorkOrderProductionDetail.objects.filter(
-            #     workorder_production__workorder=workorder
-            # ).exists()
-            # 
-            # if has_process_records:
-            #     logger.debug(f"工單 {workorder.order_number} 有工序記錄")
-            #     return True
-            
-            # 2. 檢查現場報工記錄
+            # 1. 檢查現場報工記錄（任何狀態的記錄都算生產活動）
             try:
                 from workorder.onsite_reporting.models import OnsiteReport
                 onsite_reports = OnsiteReport.objects.filter(
-                    order_number=workorder.order_number,
-                    product_code=workorder.product_code
+                    workorder=workorder.order_number,
+                    product_id=workorder.product_code
                 )
                 
                 # 如果工單有公司代號，則按公司分離過濾
@@ -112,7 +103,7 @@ class WorkOrderStatusService:
                 logger.debug(f"現場報工模組不存在，跳過檢查")
                 has_onsite_reports = False
             
-            # 3. 檢查填報核准記錄
+            # 2. 檢查填報記錄（任何狀態的記錄都算生產活動）
             # 根據多公司架構，需要同時檢查公司名稱、工單號碼和產品編號
             from erp_integration.models import CompanyConfig
             
@@ -122,20 +113,19 @@ class WorkOrderStatusService:
             ).first()
             
             if company_config:
-                has_approved_reports = FillWork.objects.filter(
+                has_fillwork_reports = FillWork.objects.filter(
                     workorder=workorder.order_number,
                     product_id=workorder.product_code,
-                    company_name=company_config.company_name,
-                    approval_status='approved'
+                    company_name=company_config.company_name
                 ).exists()
             else:
-                has_approved_reports = False
+                has_fillwork_reports = False
             
-            if has_approved_reports:
-                logger.debug(f"工單 {workorder.order_number} 有已核准填報記錄")
+            if has_fillwork_reports:
+                logger.debug(f"工單 {workorder.order_number} 有填報記錄")
                 return True
             
-            # 4. 檢查是否有生產記錄
+            # 3. 檢查是否有生產記錄
             has_production_record = hasattr(workorder, 'production_record') and workorder.production_record is not None
             
             if has_production_record:

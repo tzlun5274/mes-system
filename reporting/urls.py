@@ -31,6 +31,7 @@ urlpatterns = [
     
     # 工作時數報表
     path('work-hour/', views.work_hour_report_index, name='work_hour_report_index'),
+    path('work-hour/daily/', views.daily_report, name='daily_report'),
     path('work-hour/weekly/', views.weekly_report, name='weekly_report'),
     path('work-hour/monthly/', views.monthly_report, name='monthly_report'),
     path('work-hour/quarterly/', views.quarterly_report, name='quarterly_report'),
@@ -56,4 +57,5 @@ urlpatterns = [
     path('api/chart-data/', views.chart_data, name='chart_data'),
     path('api/report-data/', views.report_data_list, name='report_data_list'),
     path('api/dashboard-stats/', views.dashboard_stats, name='dashboard_stats'),
+    path('api/work-hour-stats/', views.work_hour_stats, name='work_hour_stats'),
 ] 

@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}季工作時數報表 - MES系統{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2><i class="fas fa-chart-bar text-info"></i> 季工作時數報表</h2>
+            <div class="alert alert-info">
+                <i class="fas fa-tools"></i> 此功能正在開發中，敬請期待！
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-12">
+            <a href="{% url 'reporting:work_hour_report_index' %}" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> 返回工作時數報表
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

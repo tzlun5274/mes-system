@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}日工作時數報表 - MES系統{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-calendar-day text-info"></i> 日工作時數報表</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}">報表管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'reporting:work_hour_report_index' %}">工作時數報表</a></li>
+                        <li class="breadcrumb-item active">日報表</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表表單 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-edit"></i> 報表參數設定</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'reporting:daily_report' %}">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label for="company_code" class="form-label">公司代號</label>
+                                <select name="company_code" id="company_code" class="form-select" required>
+                                    <option value="">請選擇公司</option>
+                                    <option value="01">01 - 中儀科技</option>
+                                    <option value="02">02 - 耀儀科技</option>
+                                    <option value="03">03 - 其他公司</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="year" class="form-label">年份</label>
+                                <select name="year" id="year" class="form-select" required>
+                                    <option value="">請選擇年份</option>
+                                    {% for year in years %}
+                                        <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="month" class="form-label">月份</label>
+                                <select name="month" id="month" class="form-select" required>
+                                    <option value="">請選擇月份</option>
+                                    {% for month in months %}
+                                        <option value="{{ month }}" {% if month == current_month %}selected{% endif %}>{{ month }}月</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="day" class="form-label">日期</label>
+                                <select name="day" id="day" class="form-select" required>
+                                    <option value="">請選擇日期</option>
+                                    {% for day in days %}
+                                        <option value="{{ day }}" {% if day == current_day %}selected{% endif %}>{{ day }}日</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="format" class="form-label">匯出格式</label>
+                                <select name="format" id="format" class="form-select">
+                                    <option value="web">網頁格式</option>
+                                    <option value="excel">Excel 格式</option>
+                                    <option value="csv">CSV 格式</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary me-2">
+                                    <i class="fas fa-search"></i> 生成報表
+                                </button>
+                                <a href="{% url 'reporting:work_hour_report_index' %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> 返回
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 功能說明 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> 功能說明</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-list text-primary"></i> 報表內容</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> 指定日期的所有填報記錄</li>
+                                <li><i class="fas fa-check text-success"></i> 作業員工作時數統計</li>
+                                <li><i class="fas fa-check text-success"></i> 設備使用時數統計</li>
+                                <li><i class="fas fa-check text-success"></i> 工單完成狀況</li>
+                                <li><i class="fas fa-check text-success"></i> 生產效率分析</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-download text-primary"></i> 匯出格式</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-globe text-info"></i> <strong>網頁格式：</strong> 線上查看，支援列印</li>
+                                <li><i class="fas fa-file-excel text-success"></i> <strong>Excel 格式：</strong> 下載 Excel 檔案</li>
+                                <li><i class="fas fa-file-csv text-warning"></i> <strong>CSV 格式：</strong> 下載 CSV 檔案</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 動態調整日期選項
+document.addEventListener('DOMContentLoaded', function() {
+    const yearSelect = document.getElementById('year');
+    const monthSelect = document.getElementById('month');
+    const daySelect = document.getElementById('day');
+    
+    function updateDays() {
+        const year = parseInt(yearSelect.value);
+        const month = parseInt(monthSelect.value);
+        
+        if (year && month) {
+            // 清空現有選項
+            daySelect.innerHTML = '<option value="">請選擇日期</option>';
+            
+            // 計算該月的天數
+            const daysInMonth = new Date(year, month, 0).getDate();
+            
+            // 添加日期選項
+            for (let day = 1; day <= daysInMonth; day++) {
+                const option = document.createElement('option');
+                option.value = day;
+                option.textContent = day + '日';
+                daySelect.appendChild(option);
+            }
+        }
+    }
+    
+    yearSelect.addEventListener('change', updateDays);
+    monthSelect.addEventListener('change', updateDays);
+});
+</script>
+{% endblock %}

@@ -21,6 +21,15 @@ class WorkHourReportService:
     def __init__(self, company_code=None):
         self.company_code = company_code
     
+    def get_daily_report(self, company_code, year, month, day):
+        """日報表"""
+        return WorkOrderReportData.objects.filter(
+            company=company_code,
+            work_year=year,
+            work_month=month,
+            work_date__day=day
+        )
+    
     def get_weekly_report(self, company_code, year, week):
         """週報表"""
         return WorkOrderReportData.objects.filter(
@@ -51,6 +60,21 @@ class WorkHourReportService:
             company=company_code,
             work_year=year
         )
+    
+    def get_daily_summary(self, company_code, year, month, day):
+        """日報表摘要"""
+        data = self.get_daily_report(company_code, year, month, day)
+        
+        summary = {
+            'total_work_hours': data.aggregate(total=Sum('daily_work_hours'))['total'] or Decimal('0'),
+            'total_operators': data.aggregate(total=Sum('operator_count'))['total'] or 0,
+            'total_equipment_hours': data.aggregate(total=Sum('equipment_hours'))['total'] or Decimal('0'),
+            'workorder_count': data.count(),
+            'avg_daily_hours': data.aggregate(avg=Avg('daily_work_hours'))['avg'] or Decimal('0'),
+            'avg_hourly_output': data.aggregate(avg=Avg('hourly_output'))['avg'] or Decimal('0'),
+        }
+        
+        return summary
     
     def get_weekly_summary(self, company_code, year, week):
         """週報表摘要"""
@@ -194,6 +218,34 @@ class ReportGeneratorService:
                 
         except Exception as e:
             logger.error(f"生成季報表失敗: {str(e)}")
+            raise
+    
+    def generate_daily_report(self, company_code, year, month, day, format='excel'):
+        """生成日報表"""
+        try:
+            data = self.work_hour_service.get_daily_report(company_code, year, month, day)
+            summary = self.work_hour_service.get_daily_summary(company_code, year, month, day)
+            
+            report_data = {
+                'report_type': '日報表',
+                'company_code': company_code,
+                'year': year,
+                'month': month,
+                'day': day,
+                'generated_at': timezone.now(),
+                'summary': summary,
+                'details': list(data.values()),
+            }
+            
+            if format == 'excel':
+                return self._export_to_excel(report_data, f'日報表_{company_code}_{year}_{month}_{day}')
+            elif format == 'csv':
+                return self._export_to_csv(report_data, f'日報表_{company_code}_{year}_{month}_{day}')
+            else:
+                return report_data
+                
+        except Exception as e:
+            logger.error(f"生成日報表失敗: {str(e)}")
             raise
     
     def generate_yearly_report(self, company_code, year, format='excel'):

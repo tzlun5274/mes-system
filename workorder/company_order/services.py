@@ -6,7 +6,7 @@
 import logging
 from datetime import datetime
 from django.utils import timezone
-from .models import CompanyOrder, CompanyOrderSystemConfig
+from .models import CompanyOrder
 
 logger = logging.getLogger(__name__)
 

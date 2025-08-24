@@ -73,6 +73,10 @@ urlpatterns = [
     path("execute_auto_allocation/", views.execute_auto_allocation, name="execute_auto_allocation"),
     path("execute_completion_check/", views.execute_completion_check, name="execute_completion_check"),
     path("execute_data_transfer/", views.execute_data_transfer, name="execute_data_transfer"),
+    
+    # 自動完工功能 API 端點
+    path("enable_auto_completion/", views.enable_auto_completion, name="enable_auto_completion"),
+    path("disable_auto_completion/", views.disable_auto_completion, name="disable_auto_completion"),
 
     # 完工檢查配置（已整合到工單管理設定中）
     # path('completion-check/config/', views.completion_check_config, name='completion_check_config'),

@@ -10,7 +10,7 @@ from django.db.models import Sum
 # from .workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess
 
 # 導入公司製令單子模組的模型
-from .company_order.models import CompanyOrder, CompanyOrderSystemConfig
+from .company_order.models import CompanyOrder
 
 # 導入已完工工單子模組的模型
 # from .workorder_completed.models import CompletedWorkOrder, CompletedWorkOrderProcess  # 已移除
@@ -1207,7 +1207,7 @@ class ConsistencyCheckResult(models.Model):
     """
     CHECK_TYPE_CHOICES = [
         ('missing_fill_work', '缺失填報紀錄'),
-        ('missing_dispatch', '缺失派工單'),
+        ('missing_dispatch', '填報異常'),
         ('wrong_product_code', '產品編號錯誤'),
         ('wrong_company', '公司代號/名稱錯誤'),
         ('wrong_workorder', '工單號碼錯誤'),

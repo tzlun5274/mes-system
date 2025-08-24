@@ -9,7 +9,7 @@ from celery import shared_task
 from django.utils import timezone
 from workorder.services.completion_service import FillWorkCompletionService
 from workorder.services.auto_allocation_service import AutoAllocationService
-from workorder.services.completed_workorder_allocation_service import CompletedWorkOrderAllocationService
+from workorder.services.auto_allocation_service import AutoAllocationService
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ def auto_allocate_completed_workorder_quantities():
         logger.info("開始執行已完工工單數量自動分配任務")
         
         # 執行已完工工單數量分配
-        service = CompletedWorkOrderAllocationService()
+        service = AutoAllocationService()
         result = service.allocate_all_pending_workorders()
         
         logger.info(f"已完工工單數量自動分配完成: {result}")

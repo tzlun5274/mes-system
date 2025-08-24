@@ -494,6 +494,25 @@
                 </div>
             </div>
 
+            <!-- 自動完工功能控制 -->
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">智能自動完工</div>
+                        <div class="setting-description">啟用後，填報記錄提交時會自動檢查完工條件並觸發完工流程</div>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-success btn-sm" onclick="enableAutoCompletion()">
+                            <i class="fas fa-play mr-1"></i>啟用
+                        </button>
+                        <button type="button" class="btn btn-warning btn-sm" onclick="disableAutoCompletion()">
+                            <i class="fas fa-pause mr-1"></i>停用
+                        </button>
+                    </div>
+                </div>
+                <div id="auto-completion-result" class="mt-2"></div>
+            </div>
+
             <!-- 手動執行按鈕 -->
             <div class="setting-item">
                 <div class="setting-header">
@@ -590,10 +609,15 @@ function executeAutoAllocation() {
         method: 'POST',
         headers: {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
         },
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             resultDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
@@ -603,7 +627,7 @@ function executeAutoAllocation() {
     })
     .catch(error => {
         console.error('執行自動分配失敗:', error);
-        resultDiv.innerHTML = '<div class="alert alert-danger">執行失敗，請稍後再試</div>';
+        resultDiv.innerHTML = `<div class="alert alert-danger">執行失敗：${error.message}</div>`;
     })
     .finally(() => {
         // 恢復按鈕狀態
@@ -628,10 +652,15 @@ function executeCompletionCheck() {
         method: 'POST',
         headers: {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
         },
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             resultDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
@@ -641,7 +670,7 @@ function executeCompletionCheck() {
     })
     .catch(error => {
         console.error('執行完工檢查失敗:', error);
-        resultDiv.innerHTML = '<div class="alert alert-danger">執行失敗，請稍後再試</div>';
+        resultDiv.innerHTML = `<div class="alert alert-danger">執行失敗：${error.message}</div>`;
     })
     .finally(() => {
         // 恢復按鈕狀態
@@ -666,10 +695,15 @@ function executeDataTransfer() {
         method: 'POST',
         headers: {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
         },
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             resultDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
@@ -679,7 +713,93 @@ function executeDataTransfer() {
     })
     .catch(error => {
         console.error('執行資料轉移失敗:', error);
-        resultDiv.innerHTML = '<div class="alert alert-danger">執行失敗，請稍後再試</div>';
+        resultDiv.innerHTML = `<div class="alert alert-danger">執行失敗：${error.message}</div>`;
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+// 啟用自動完工功能
+function enableAutoCompletion() {
+    const resultDiv = document.getElementById('auto-completion-result');
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // 顯示載入中
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>啟用中...';
+    button.disabled = true;
+    resultDiv.innerHTML = '';
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:enable_auto_completion" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+        }
+    })
+    .catch(error => {
+        console.error('啟用自動完工功能失敗:', error);
+        resultDiv.innerHTML = `<div class="alert alert-danger">啟用失敗：${error.message}</div>`;
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+// 停用自動完工功能
+function disableAutoCompletion() {
+    const resultDiv = document.getElementById('auto-completion-result');
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // 顯示載入中
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>停用中...';
+    button.disabled = true;
+    resultDiv.innerHTML = '';
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:disable_auto_completion" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+        }
+    })
+    .catch(error => {
+        console.error('停用自動完工功能失敗:', error);
+        resultDiv.innerHTML = `<div class="alert alert-danger">停用失敗：${error.message}</div>`;
     })
     .finally(() => {
         // 恢復按鈕狀態

@@ -885,7 +885,68 @@ def placeholder_view(request, function_name):
 @login_required
 def work_hour_report_index(request):
     """工作時數報表首頁"""
-    return render(request, 'reporting/reporting/work_hour_report.html')
+    return render(request, 'reporting/work_hour_report.html')
+
+@login_required
+def daily_report(request):
+    """日報表"""
+    if request.method == 'POST':
+        company_code = request.POST.get('company_code')
+        year = int(request.POST.get('year'))
+        month = int(request.POST.get('month'))
+        day = int(request.POST.get('day'))
+        format = request.POST.get('format', 'excel')
+        
+        try:
+            service = WorkHourReportService()
+            generator = ReportGeneratorService()
+            
+            # 取得報表資料
+            data = service.get_daily_report(company_code, year, month, day)
+            summary = service.get_daily_summary(company_code, year, month, day)
+            
+            if format in ['excel', 'csv']:
+                # 生成檔案
+                result = generator.generate_daily_report(company_code, year, month, day, format)
+                
+                # 下載檔案
+                with open(result['file_path'], 'rb') as f:
+                    response = HttpResponse(f.read(), content_type='application/octet-stream')
+                    response['Content-Disposition'] = f'attachment; filename="{result["filename"]}"'
+                    return response
+            else:
+                # 顯示網頁報表
+                context = {
+                    'report_type': '日報表',
+                    'company_code': company_code,
+                    'year': year,
+                    'month': month,
+                    'day': day,
+                    'work_date': datetime(year, month, day).date(),
+                    'summary': summary,
+                    'data': data,
+                    'generated_at': timezone.now(),
+                }
+                return render(request, 'reporting/daily_report.html', context)
+                
+        except Exception as e:
+            messages.error(request, f'生成日報表失敗: {str(e)}')
+            return redirect('reporting:work_hour_report_index')
+    
+    # GET 請求顯示表單
+    current_year = timezone.now().year
+    current_month = timezone.now().month
+    current_day = timezone.now().day
+    
+    context = {
+        'current_year': current_year,
+        'current_month': current_month,
+        'current_day': current_day,
+        'years': range(current_year - 5, current_year + 1),
+        'months': range(1, 13),
+        'days': range(1, 32),
+    }
+    return render(request, 'reporting/daily_report_form.html', context)
 
 
 @login_required
@@ -925,7 +986,7 @@ def weekly_report(request):
                     'data': data,
                     'generated_at': timezone.now(),
                 }
-                return render(request, 'reporting/reporting/weekly_report.html', context)
+                return render(request, 'reporting/weekly_report.html', context)
                 
         except Exception as e:
             messages.error(request, f'生成週報表失敗: {str(e)}')
@@ -941,7 +1002,7 @@ def weekly_report(request):
         'years': range(current_year - 5, current_year + 1),
         'weeks': range(1, 53),
     }
-    return render(request, 'reporting/reporting/weekly_report_form.html', context)
+    return render(request, 'reporting/weekly_report_form.html', context)
 
 
 @login_required
@@ -981,7 +1042,7 @@ def monthly_report(request):
                     'data': data,
                     'generated_at': timezone.now(),
                 }
-                return render(request, 'reporting/reporting/monthly_report.html', context)
+                return render(request, 'reporting/monthly_report.html', context)
                 
         except Exception as e:
             messages.error(request, f'生成月報表失敗: {str(e)}')
@@ -997,7 +1058,7 @@ def monthly_report(request):
         'years': range(current_year - 5, current_year + 1),
         'months': range(1, 13),
     }
-    return render(request, 'reporting/reporting/monthly_report_form.html', context)
+    return render(request, 'reporting/monthly_report_form.html', context)
 
 
 @login_required
@@ -1037,7 +1098,7 @@ def quarterly_report(request):
                     'data': data,
                     'generated_at': timezone.now(),
                 }
-                return render(request, 'reporting/reporting/quarterly_report.html', context)
+                return render(request, 'reporting/quarterly_report.html', context)
                 
         except Exception as e:
             messages.error(request, f'生成季報表失敗: {str(e)}')
@@ -1053,7 +1114,7 @@ def quarterly_report(request):
         'years': range(current_year - 5, current_year + 1),
         'quarters': range(1, 5),
     }
-    return render(request, 'reporting/reporting/quarterly_report_form.html', context)
+    return render(request, 'reporting/quarterly_report_form.html', context)
 
 
 @login_required
@@ -1091,7 +1152,7 @@ def yearly_report(request):
                     'data': data,
                     'generated_at': timezone.now(),
                 }
-                return render(request, 'reporting/reporting/yearly_report.html', context)
+                return render(request, 'reporting/yearly_report.html', context)
                 
         except Exception as e:
             messages.error(request, f'生成年報表失敗: {str(e)}')
@@ -1104,7 +1165,7 @@ def yearly_report(request):
         'current_year': current_year,
         'years': range(current_year - 10, current_year + 1),
     }
-    return render(request, 'reporting/reporting/yearly_report_form.html', context)
+    return render(request, 'reporting/yearly_report_form.html', context)
 
 
 @login_required
@@ -1121,7 +1182,7 @@ def report_schedule_list(request):
         'page_obj': page_obj,
         'schedules': page_obj,
     }
-    return render(request, 'reporting/reporting/report_schedule_list.html', context)
+    return render(request, 'reporting/report_schedule_list.html', context)
 
 
 @login_required
@@ -1168,13 +1229,19 @@ def report_schedule_form(request, schedule_id=None):
         'report_types': ReportSchedule.REPORT_TYPES,
         'status_choices': ReportSchedule.STATUS_CHOICES,
     }
-    return render(request, 'reporting/reporting/report_schedule_form.html', context)
+    return render(request, 'reporting/report_schedule_form.html', context)
 
 
 @login_required
 def report_execution_log(request):
     """報表執行日誌"""
     logs = ReportExecutionLog.objects.all().order_by('-execution_time')
+    
+    # 計算統計數據
+    total_logs = logs.count()
+    completed_logs = logs.filter(status='completed').count()
+    running_logs = logs.filter(status='running').count()
+    failed_logs = logs.filter(status='failed').count()
     
     # 分頁
     paginator = Paginator(logs, 50)
@@ -1184,8 +1251,12 @@ def report_execution_log(request):
     context = {
         'page_obj': page_obj,
         'logs': page_obj,
+        'total_logs': total_logs,
+        'completed_logs': completed_logs,
+        'running_logs': running_logs,
+        'failed_logs': failed_logs,
     }
-    return render(request, 'reporting/reporting/report_execution_log.html', context)
+    return render(request, 'reporting/report_execution_log.html', context)
 
 
 @login_required
@@ -1385,7 +1456,7 @@ def completed_workorder_report_index(request):
             'company_data': {},
         }
     
-    return render(request, 'reporting/reporting/completed_workorder_report.html', context)
+    return render(request, 'reporting/completed_workorder_report.html', context)
 
 
 @login_required
@@ -1440,7 +1511,7 @@ def completed_workorder_report_list(request):
             'selected_quarter': None,
         }
     
-    return render(request, 'reporting/reporting/completed_workorder_report_list.html', context)
+    return render(request, 'reporting/completed_workorder_report_list.html', context)
 
 
 @login_required
@@ -1457,7 +1528,7 @@ def completed_workorder_report_detail(request, report_id):
         messages.error(request, '取得報表詳情失敗')
         return redirect('reporting:completed_workorder_report_list')
     
-    return render(request, 'reporting/reporting/completed_workorder_report_detail.html', context) 
+    return render(request, 'reporting/completed_workorder_report_detail.html', context) 
 
 @login_required
 def sync_completed_workorder_data(request):
@@ -1772,3 +1843,57 @@ def score_period_detail(request, period_type):
     }
     
     return render(request, 'reporting/score_period_detail.html', context)
+
+
+@login_required
+def work_hour_stats(request):
+    """工作時數統計 API"""
+    from django.http import JsonResponse
+    from django.db.models import Sum, Avg, Count
+    from workorder.fill_work.models import FillWork
+    from datetime import datetime, timedelta
+    
+    try:
+        # 取得工作時數統計資料
+        stats = WorkOrderReportData.objects.aggregate(
+            total_records=Count('id'),
+            total_hours=Sum('daily_work_hours'),
+            avg_daily_hours=Avg('daily_work_hours')
+        )
+        
+        # 取得真實的獨立作業員數量（從填報資料中統計）
+        unique_operators = FillWork.objects.values('operator').distinct().count()
+        
+        # 計算上周工作時數
+        today = datetime.now().date()
+        # 計算上周一：今天是週一(0)時，上周一是7天前；今天是週二(1)時，上周一是8天前，以此類推
+        days_since_monday = today.weekday()  # 0=週一, 1=週二, ..., 6=週日
+        last_week_start = today - timedelta(days=days_since_monday + 7)  # 上周一
+        last_week_end = last_week_start + timedelta(days=6)  # 上周日
+        
+        last_week_stats = WorkOrderReportData.objects.filter(
+            work_date__range=[last_week_start, last_week_end]
+        ).aggregate(
+            last_week_hours=Sum('daily_work_hours')
+        )
+        
+        # 格式化數據
+        response_data = {
+            'total_records': stats['total_records'] or 0,
+            'total_hours': float(stats['total_hours'] or 0),
+            'total_operators': unique_operators,
+            'avg_daily_hours': float(stats['avg_daily_hours'] or 0),
+            'last_week_hours': float(last_week_stats['last_week_hours'] or 0)
+        }
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        logger.error(f"取得工作時數統計失敗: {str(e)}")
+        return JsonResponse({
+            'total_records': 0,
+            'total_hours': 0,
+            'total_operators': 0,
+            'avg_daily_hours': 0,
+            'last_week_hours': 0
+        })

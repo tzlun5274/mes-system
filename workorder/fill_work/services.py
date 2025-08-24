@@ -52,12 +52,9 @@ class RDSampleWorkOrderService:
             tuple: (WorkOrder, bool) - 工單物件和是否為新建
         """
         try:
-            # 使用公司名稱+RD樣品+產品編號作為唯一識別
-            company_name = fill_work_record.company_name or '耀儀科技'
+            # 直接使用 workorder 欄位的內容作為工單號碼
+            rd_workorder_number = fill_work_record.workorder
             product_code = fill_work_record.product_id
-            
-            # 生成唯一的工單號碼：公司名稱+RD樣品+產品編號
-            rd_workorder_number = f"{company_name}-RD樣品-{product_code}"
             
             # 查找現有工單
             existing_workorder = WorkOrder.objects.filter(
@@ -74,7 +71,7 @@ class RDSampleWorkOrderService:
                 # 獲取公司代號
                 from erp_integration.models import CompanyConfig
                 company_config = CompanyConfig.objects.filter(
-                    company_name=company_name
+                    company_name=fill_work_record.company_name
                 ).first()
                 company_code = company_config.company_code if company_config else '10'
                 

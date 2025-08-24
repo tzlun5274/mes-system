@@ -86,45 +86,4 @@ class CompanyOrder(models.Model):
         return self.bill_status == 1
 
 
-class CompanyOrderSystemConfig(models.Model):
-    """
-    系統設定表：存放全域設定，例如自動轉換工單間隔（分鐘）
-    """
-    
-    key = models.CharField(max_length=50, unique=True, verbose_name="設定名稱", help_text="設定名稱")
-    value = models.CharField(max_length=100, verbose_name="設定值", help_text="設定值")
-    description = models.TextField(blank=True, verbose_name="設定說明", help_text="設定說明")
-    
-    # 系統欄位
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間", help_text="建立時間")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間", help_text="更新時間")
-
-    class Meta:
-        verbose_name = "公司製令單系統設定"
-        verbose_name_plural = "公司製令單系統設定"
-        db_table = 'workorder_company_order_systemconfig'
-        ordering = ['key']
-
-    def __str__(self):
-        return f"{self.key}: {self.value}"
-    
-    @classmethod
-    def get_config(cls, key, default=None):
-        """取得設定值"""
-        try:
-            config = cls.objects.get(key=key)
-            return config.value
-        except cls.DoesNotExist:
-            return default
-    
-    @classmethod
-    def set_config(cls, key, value, description=""):
-        """設定值"""
-        config, created = cls.objects.get_or_create(
-            key=key,
-            defaults={'value': value, 'description': description}
-        )
-        if not created:
-            config.value = value
-            config.description = description
-            config.save() 
+ 

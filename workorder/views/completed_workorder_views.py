@@ -102,11 +102,18 @@ class CompletedWorkOrderDetailView(LoginRequiredMixin, DetailView):
         context['company_name'] = company_name
         
         # 計算已完成工序數量
-        completed_processes_count = completed_workorder.processes.filter(status='completed').count()
+        from workorder.models import CompletedWorkOrderProcess
+        completed_processes_count = CompletedWorkOrderProcess.objects.filter(
+            completed_workorder_id=completed_workorder.id,
+            status='completed'
+        ).count()
         context['completed_processes_count'] = completed_processes_count
         
         # 獲取所有填報記錄
-        production_reports = completed_workorder.production_reports.all().order_by('report_date', 'start_time')
+        from workorder.models import CompletedProductionReport
+        production_reports = CompletedProductionReport.objects.filter(
+            completed_workorder_id=completed_workorder.id
+        ).order_by('report_date', 'start_time')
         
         # 計算統計資料
         from collections import defaultdict
@@ -183,10 +190,17 @@ class CompletedWorkOrderDetailView(LoginRequiredMixin, DetailView):
             key=lambda x: process_order.get(x[0], 999)  # 如果找不到順序，排在最後
         ))
         
+        # 獲取工序資料
+        processes = CompletedWorkOrderProcess.objects.filter(
+            completed_workorder_id=completed_workorder.id
+        ).order_by('process_order')
+        
         context['all_production_reports'] = production_reports
         context['total_reports_count'] = len(production_reports)
         context['production_stats_by_process'] = sorted_stats_by_process
         context['production_total_stats'] = total_stats
+        context['processes'] = processes
+        context['processes_count'] = processes.count()
         
         return context
 

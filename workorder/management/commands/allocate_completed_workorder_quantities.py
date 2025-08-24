@@ -7,7 +7,7 @@
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from workorder.services.completed_workorder_allocation_service import CompletedWorkOrderAllocationService
+from workorder.services.auto_allocation_service import AutoAllocationService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         """執行命令"""
         try:
-            service = CompletedWorkOrderAllocationService()
+            service = AutoAllocationService()
             
             # 獲取參數
             workorder_number = options.get('workorder')

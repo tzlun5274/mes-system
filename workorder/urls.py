@@ -11,11 +11,7 @@ from .views.workorder_views import (
     mes_orders_set_auto_dispatch_interval, CreateMissingWorkOrdersView
 )
 
-from .views.fillwork_correction_views import (
-    FillWorkCorrectionView, FillWorkCorrectionAjaxView,
-    FillWorkCorrectionAnalysisView, FillWorkCorrectionPreviewView,
-    execute_correction_view
-)
+
 from .views.workorder_clear_views import (
     WorkOrderClearView, WorkOrderClearAjaxView
 )
@@ -69,12 +65,7 @@ urlpatterns = [
 
 
     
-    # 填報紀錄修正
-    path("fillwork-correction/", FillWorkCorrectionView.as_view(), name="fillwork_correction"),
-    path("fillwork-correction/ajax/", FillWorkCorrectionAjaxView.as_view(), name="fillwork_correction_ajax"),
-    path("fillwork-correction/analysis/", FillWorkCorrectionAnalysisView.as_view(), name="fillwork_correction_analysis"),
-    path("fillwork-correction/preview/", FillWorkCorrectionPreviewView.as_view(), name="fillwork_correction_preview"),
-    path("fillwork-correction/execute/", execute_correction_view, name="fillwork_correction_execute"),
+
     
     # 工單清除功能
     path("clear-workorders/", WorkOrderClearView.as_view(), name="clear_workorders"),
@@ -180,7 +171,6 @@ urlpatterns = [
     
     # 其餘路由維持不變...
     path("mes-orders/", MesOrderListView.as_view(), name="mes_orders"),
-    path("mes-orders/create/", WorkOrderCreateView.as_view(), name="workorder_create"),
     path("mes-orders/bulk-dispatch/", mes_orders_bulk_dispatch, name="mes_orders_bulk_dispatch"),
     path("mes-orders/dispatch/", mes_order_dispatch, name="mes_order_dispatch"),
     path("mes-orders/delete/", mes_order_delete, name="mes_order_delete"),

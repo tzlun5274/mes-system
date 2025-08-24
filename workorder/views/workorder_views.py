@@ -30,7 +30,8 @@ import logging
 
 from ..models import WorkOrder, WorkOrderProductionDetail, CompletedWorkOrder
 # 移除 ProductionMonitoringData 引用，改用派工單監控資料
-from ..company_order.models import CompanyOrder, CompanyOrderSystemConfig
+from ..company_order.models import CompanyOrder
+from ..models import SystemConfig
 from ..forms import WorkOrderForm
 from erp_integration.models import CompanyConfig
 from ..workorder_dispatch.models import WorkOrderDispatch
@@ -445,23 +446,23 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
         context["unconverted_orders"] = queryset.filter(is_converted=False).count()
 
         # 讀取系統設定
-        from workorder.company_order.models import CompanyOrderSystemConfig
+        from workorder.models import SystemConfig
         
         # 自動轉換工單間隔設定（預設 30 分鐘）
         auto_convert_interval = 30
         try:
-            config = CompanyOrderSystemConfig.objects.get(key="auto_convert_interval")
+            config = SystemConfig.objects.get(key="auto_convert_interval")
             auto_convert_interval = int(config.value)
-        except CompanyOrderSystemConfig.DoesNotExist:
+        except SystemConfig.DoesNotExist:
             pass
         context["auto_convert_interval"] = auto_convert_interval
 
         # 自動同步製令間隔（預設 30 分鐘）
         auto_sync_companyorder_interval = 30
         try:
-            config = CompanyOrderSystemConfig.objects.get(key="auto_sync_companyorder_interval")
+            config = SystemConfig.objects.get(key="auto_sync_companyorder_interval")
             auto_sync_companyorder_interval = int(config.value)
-        except CompanyOrderSystemConfig.DoesNotExist:
+        except SystemConfig.DoesNotExist:
             pass
         context["auto_sync_companyorder_interval"] = auto_sync_companyorder_interval
 
@@ -509,7 +510,7 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
             and int(new_convert_interval) > 0
         ):
             old_value = request.POST.get("current_auto_convert_interval", "30")
-            CompanyOrderSystemConfig.objects.update_or_create(
+            SystemConfig.objects.update_or_create(
                 key="auto_convert_interval",
                 defaults={"value": new_convert_interval},
             )
@@ -526,7 +527,7 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
             old_value = request.POST.get(
                 "current_auto_sync_companyorder_interval", "30"
             )
-            CompanyOrderSystemConfig.objects.update_or_create(
+            SystemConfig.objects.update_or_create(
                 key="auto_sync_companyorder_interval",
                 defaults={"value": new_sync_interval},
             )
@@ -970,21 +971,14 @@ class CreateMissingWorkOrdersView(LoginRequiredMixin, View):
                             if company_config:
                                 company_code = company_config.company_code
                             else:
-                                # 如果找不到公司配置，嘗試從製令資料中查找
-                                mkord_main = PrdMKOrdMain.objects.filter(
-                                    MKOrdNO=fill_work.workorder,
-                                    ProductID=fill_work.product_id
+                                # 如果找不到公司配置，嘗試從公司製令單中查找
+                                company_order = CompanyOrder.objects.filter(
+                                    mkordno=fill_work.workorder,
+                                    product_id=fill_work.product_id
                                 ).first()
                                 
-                                if mkord_main:
-                                    # 從製令資料中查找公司代號
-                                    company_order = CompanyOrder.objects.filter(
-                                        mkordno=fill_work.workorder,
-                                        product_id=fill_work.product_id
-                                    ).first()
-                                    
-                                    if company_order:
-                                        company_code = company_order.company_code
+                                if company_order:
+                                    company_code = company_order.company_code
                         
                         except Exception as e:
                             workorder_logger.error(f"查找公司代號時發生錯誤: {e}")

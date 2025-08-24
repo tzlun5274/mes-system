@@ -93,6 +93,7 @@ class ConsistencyCheckAjaxView(LoginRequiredMixin, View):
                 # 處理批次修復請求
                 result_ids = request.POST.get('result_ids', '').split(',')
                 fix_method = request.POST.get('fix_method', 'update_fill_work')
+                fix_data_json = request.POST.get('fix_data', '{}')
                 fixed_by = request.user.username
                 
                 if not result_ids or result_ids[0] == '':
@@ -101,13 +102,20 @@ class ConsistencyCheckAjaxView(LoginRequiredMixin, View):
                         'message': '請選擇要修復的問題'
                     })
                 
+                # 解析修復資料
+                import json
+                try:
+                    fix_data = json.loads(fix_data_json)
+                except (json.JSONDecodeError, TypeError):
+                    fix_data = {}
+                
                 service = ConsistencyCheckService()
                 fixed_count = 0
                 errors = []
                 
                 for result_id in result_ids:
                     try:
-                        service.fix_issue(result_id, fix_method, fixed_by, {})
+                        service.fix_issue(result_id, fix_method, fixed_by, fix_data)
                         fixed_count += 1
                     except Exception as e:
                         errors.append(f'ID {result_id}: {str(e)}')
@@ -136,7 +144,7 @@ class ConsistencyCheckAjaxView(LoginRequiredMixin, View):
             
             if check_type == 'missing_dispatch':
                 count = service.check_missing_dispatch()
-                message = f"缺失派工單檢查完成，發現 {count} 筆問題（有工單但沒有派工單，已排除RD樣品）"
+                message = f"填報異常檢查完成，發現 {count} 筆問題（已排除RD樣品）"
             elif check_type == 'wrong_product_code':
                 count = service.check_wrong_product_code()
                 message = f"產品編號錯誤檢查完成，發現 {count} 筆問題（已排除RD樣品）"
@@ -190,7 +198,7 @@ class ConsistencyCheckDetailView(LoginRequiredMixin, TemplateView):
         
         # 檢查類型顯示名稱
         type_display_names = {
-            'missing_dispatch': '缺失派工單',
+            'missing_dispatch': '填報異常',
             'wrong_product_code': '產品編號錯誤',
             'wrong_company': '公司代號/名稱錯誤',
             'wrong_workorder': '工單號碼錯誤',
@@ -217,10 +225,18 @@ class ConsistencyCheckFixView(LoginRequiredMixin, View):
         try:
             result_id = request.POST.get('result_id')
             fix_method = request.POST.get('fix_method', 'update_fill_work')
+            fix_data_json = request.POST.get('fix_data', '{}')
             fixed_by = request.user.username
             
+            # 解析修復資料
+            import json
+            try:
+                fix_data = json.loads(fix_data_json)
+            except (json.JSONDecodeError, TypeError):
+                fix_data = {}
+            
             service = ConsistencyCheckService()
-            service.fix_issue(result_id, fix_method, fixed_by, {})
+            service.fix_issue(result_id, fix_method, fixed_by, fix_data)
             
             return JsonResponse({
                 'success': True,

@@ -1284,7 +1284,20 @@ function transferToCompleted() {
 }
 
 function forceCompleteWorkorder() {
-    if (confirm('確定要強制完工此工單嗎？\n\n此操作將：\n1. 將工單狀態改為完工\n2. 將完成數量設為計劃數量（如果當前為0）\n3. 轉移所有資料到已完工工單模組\n\n此操作無法復原！')) {
+    // 詢問強制完工原因
+    const reason = prompt('請輸入強制完工原因：\n\n（此原因將被記錄在系統日誌中）', '管理員強制完工');
+    
+    if (reason === null) {
+        // 用戶取消了操作
+        return;
+    }
+    
+    if (!reason.trim()) {
+        alert('請輸入強制完工原因');
+        return;
+    }
+    
+    if (confirm(`確定要強制完工此工單嗎？\n\n強制完工原因：${reason}\n\n此操作將：\n1. 不檢查完工條件，直接將工單設為完工狀態\n2. 記錄當前的完工進度和出貨包裝數量\n3. 轉移所有資料到已完工工單模組\n4. 在系統中記錄強制完工原因\n\n此操作無法復原！`)) {
         const workorderId = {{ workorder.id }};
         
         // 取得 CSRF token
@@ -1301,11 +1314,15 @@ function forceCompleteWorkorder() {
         button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>處理中...';
         button.disabled = true;
         
+        // 準備表單數據
+        const formData = new FormData();
+        formData.append('reason', reason.trim());
+        
         fetch(`/workorder/force-complete/${workorderId}/`, {
             method: 'POST',
+            body: formData,
             headers: {
-                'X-CSRFToken': csrfToken,
-                'Content-Type': 'application/json'
+                'X-CSRFToken': csrfToken
             }
         })
         .then(response => {
@@ -1316,9 +1333,25 @@ function forceCompleteWorkorder() {
         })
         .then(data => {
             if (data.success) {
-                alert('工單強制完工成功！\n\n' + data.message);
-                // 重新載入頁面以顯示更新後的狀態
-                location.reload();
+                let message = `工單強制完工成功！\n\n${data.message}`;
+                
+                // 顯示詳細信息
+                if (data.original_packaging_quantity !== undefined && data.target_quantity !== undefined) {
+                    message += `\n\n完工時狀態：`;
+                    message += `\n• 出貨包裝數量：${data.original_packaging_quantity}/${data.target_quantity}`;
+                    message += `\n• 完工進度：${data.original_completion_rate.toFixed(1)}%`;
+                    message += `\n• 強制完工原因：${data.force_reason}`;
+                }
+                
+                alert(message);
+                
+                // 跳轉到已完工工單詳情頁面
+                if (data.completed_workorder_id) {
+                    window.location.href = `/workorder/completed/${data.completed_workorder_id}/`;
+                } else {
+                    // 如果沒有已完工工單ID，則重新載入頁面
+                    location.reload();
+                }
             } else {
                 alert('強制完工失敗：' + data.message);
             }

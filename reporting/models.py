@@ -264,8 +264,14 @@ class CompletedWorkOrderReportData(models.Model):
         unique_equipment_count = len(completed_workorder.unique_equipment) if completed_workorder.unique_equipment else 0
         
         # 計算工序統計
-        total_processes = completed_workorder.processes.count()
-        completed_processes = completed_workorder.processes.filter(status='completed').count()
+        from workorder.models import CompletedWorkOrderProcess
+        total_processes = CompletedWorkOrderProcess.objects.filter(
+            completed_workorder_id=completed_workorder.id
+        ).count()
+        completed_processes = CompletedWorkOrderProcess.objects.filter(
+            completed_workorder_id=completed_workorder.id,
+            status='completed'
+        ).count()
         
         # 建立或更新報表資料
         report_data, created = cls.objects.get_or_create(

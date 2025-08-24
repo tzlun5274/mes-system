@@ -178,7 +178,7 @@
                                         </th>
                                         {% endif %}
                                         {% if check_type == 'missing_dispatch' %}
-                                            <th colspan="3" class="text-center bg-warning text-dark">填報資料（無對應派工單）</th>
+                                            <th colspan="3" class="text-center bg-warning text-dark">填報資料（無對應工單）</th>
                                         {% else %}
                                             <th colspan="3" class="text-center bg-primary text-white">來源（工單資料）</th>
                                             <th colspan="3" class="text-center bg-warning text-dark">填報資料</th>
@@ -218,7 +218,7 @@
                                 </thead>
                                 <tbody>
                                     {% for result in results %}
-                                    <tr>
+                                    <tr data-result-id="{{ result.id }}">
                                         {% if not is_fixed %}
                                         <td class="text-center">
                                             <input type="checkbox" class="form-check-input result-checkbox" 
@@ -226,28 +226,28 @@
                                         </td>
                                         {% endif %}
                                         {% if check_type == 'missing_dispatch' %}
-                                            <td>{{ result.company_name|default:"-" }}</td>
-                                            <td>{{ result.workorder|default:"-" }}</td>
-                                            <td>{{ result.product_code|default:"-" }}</td>
+                                            <td class="wrong-company-name">{{ result.wrong_company_name|default:result.company_name|default:"-" }}</td>
+                                            <td class="wrong-workorder">{{ result.wrong_workorder|default:result.workorder|default:"-" }}</td>
+                                            <td class="wrong-product-code">{{ result.wrong_product_code|default:result.product_code|default:"-" }}</td>
                                         {% else %}
-                                            <td>{{ result.company_name|default:"-" }}</td>
-                                            <td>{{ result.workorder|default:"-" }}</td>
-                                            <td>{{ result.product_code|default:"-" }}</td>
-                                            <td>
+                                            <td class="company-name">{{ result.company_name|default:"-" }}</td>
+                                            <td class="workorder">{{ result.workorder|default:"-" }}</td>
+                                            <td class="product-code">{{ result.product_code|default:"-" }}</td>
+                                            <td class="wrong-company-name">
                                                 {% if check_type == 'wrong_company' %}
                                                     <span class="text-danger">{{ result.wrong_company_name|default:"-" }}</span>
                                                 {% else %}
                                                     {{ result.company_name|default:"-" }}
                                                 {% endif %}
                                             </td>
-                                            <td>
+                                            <td class="wrong-workorder">
                                                 {% if check_type == 'wrong_workorder' %}
                                                     <span class="text-danger">{{ result.wrong_workorder|default:"-" }}</span>
                                                 {% else %}
                                                     {{ result.workorder|default:"-" }}
                                                 {% endif %}
                                             </td>
-                                            <td>
+                                            <td class="wrong-product-code">
                                                 {% if check_type == 'wrong_product_code' %}
                                                     <span class="text-danger">{{ result.wrong_product_code|default:"-" }}</span>
                                                 {% else %}
@@ -307,8 +307,39 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div id="fixModalContent">
-                    <!-- 動態內容將由 JavaScript 填入 -->
+                <p id="fixModalMessage">確定要修復這個問題嗎？</p>
+                <p class="text-muted" id="fixModalDescription"><small>修復說明</small></p>
+                
+                <!-- 顯示原始錯誤資料 -->
+                <div class="alert alert-info mb-3">
+                    <h6><i class="fas fa-info-circle"></i> 原始錯誤資料：</h6>
+                    <div id="originalErrorData">
+                        <small class="text-muted">載入中...</small>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="fixMethod" class="form-label">修復方式：</label>
+                    <select class="form-select" id="fixMethod">
+                        <option value="update_fill_work">修改填報紀錄</option>
+                        <option value="delete_fill_work">刪除填報紀錄</option>
+                    </select>
+                </div>
+                
+                <!-- 修改選項（當選擇 update_fill_work 時顯示） -->
+                <div id="singleUpdateOptions" style="display: none;">
+                    <div class="mb-3">
+                        <label for="singleNewCompanyName" class="form-label">公司名稱：</label>
+                        <input type="text" class="form-control" id="singleNewCompanyName" placeholder="輸入新的公司名稱">
+                    </div>
+                    <div class="mb-3">
+                        <label for="singleNewWorkorder" class="form-label">工單號碼：</label>
+                        <input type="text" class="form-control" id="singleNewWorkorder" placeholder="輸入新的工單號碼">
+                    </div>
+                    <div class="mb-3">
+                        <label for="singleNewProductId" class="form-label">產品編號：</label>
+                        <input type="text" class="form-control" id="singleNewProductId" placeholder="輸入新的產品編號">
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -328,17 +359,34 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>確定要批次修復選中的 <span id="batchFixCount">0</span> 筆產品編號錯誤嗎？</p>
-                <p class="text-muted"><small>將把填報紀錄的產品編號更新為工單的正確產品編號</small></p>
+                <p>確定要批次修復選中的 <span id="batchFixCount">0</span> 筆問題嗎？</p>
                 <div class="mb-3">
                     <label for="batchFixMethod" class="form-label">修復方式：</label>
                     <select class="form-select" id="batchFixMethod">
-                        <option value="update_fill_work">更新填報紀錄產品編號</option>
+                        <option value="update_fill_work">修改填報紀錄</option>
+                        <option value="delete_fill_work">刪除填報紀錄</option>
                     </select>
                 </div>
+                
+                <!-- 修改選項（當選擇 update_fill_work 時顯示） -->
+                <div id="updateOptions">
+                    <div class="mb-3">
+                        <label for="newCompanyName" class="form-label">公司名稱：</label>
+                        <input type="text" class="form-control" id="newCompanyName" placeholder="輸入新的公司名稱">
+                    </div>
+                    <div class="mb-3">
+                        <label for="newWorkorder" class="form-label">工單號碼：</label>
+                        <input type="text" class="form-control" id="newWorkorder" placeholder="輸入新的工單號碼">
+                    </div>
+                    <div class="mb-3">
+                        <label for="newProductId" class="form-label">產品編號：</label>
+                        <input type="text" class="form-control" id="newProductId" placeholder="輸入新的產品編號">
+                    </div>
+                </div>
+                
                 <div class="alert alert-warning">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <strong>注意：</strong>此操作將把填報紀錄的產品編號更新為工單的正確產品編號，操作後無法復原。
+                    <strong>注意：</strong>此操作將修改或刪除填報紀錄，操作後無法復原。
                 </div>
             </div>
             <div class="modal-footer">
@@ -364,169 +412,134 @@ document.addEventListener('DOMContentLoaded', function() {
             currentResultId = this.dataset.resultId;
             currentCheckType = this.dataset.checkType;
             
-            // 根據檢查類型生成對話框內容
-            generateFixModalContent(currentCheckType);
+            // 根據檢查類型設定對話框內容
+            updateFixModalContent(currentCheckType);
+            
+            // 載入原始錯誤資料
+            loadOriginalErrorData(currentResultId);
+            
+            // 重置修改選項的顯示狀態（預設顯示修改選項）
+            const singleUpdateOptions = document.getElementById('singleUpdateOptions');
+            singleUpdateOptions.style.display = 'block';
             
             fixModal.show();
         });
     });
 
-    // 根據檢查類型生成修復對話框內容
-    function generateFixModalContent(checkType) {
-        const modalContent = document.getElementById('fixModalContent');
-        let content = '';
-
-        if (checkType === 'missing_dispatch') {
-            // 工單缺失的修復選項
-            content = `
-                <p>選擇如何修復這個工單缺失問題：</p>
-                <div class="mb-3">
-                    <label for="fixMethod" class="form-label">修復方式：</label>
-                    <select class="form-select" id="fixMethod">
-                        <option value="update_company_name">修改公司名稱</option>
-                        <option value="update_workorder">修改工單號碼</option>
-                        <option value="update_product_code">修改產品編號</option>
-                        <option value="delete_fill_work">刪除填報記錄</option>
-                        <option value="create_workorder">創建對應工單</option>
-                    </select>
-                </div>
-                <div id="fixInputs">
-                    <!-- 動態輸入欄位 -->
-                </div>
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i>
-                    <strong>說明：</strong>此操作將修改填報記錄或創建工單，請謹慎選擇。
-                </div>
-            `;
-        } else if (checkType === 'wrong_product_code') {
-            // 產品編號錯誤的修復選項
-            content = `
-                <p>確定要修復這個產品編號錯誤嗎？</p>
-                <p class="text-muted"><small>將把填報紀錄的產品編號更新為工單的正確產品編號</small></p>
-                <div class="mb-3">
-                    <label for="fixMethod" class="form-label">修復方式：</label>
-                    <select class="form-select" id="fixMethod">
-                        <option value="update_fill_work">更新填報紀錄產品編號</option>
-                    </select>
-                </div>
-            `;
-        } else {
-            // 其他類型的預設內容
-            content = `
-                <p>確定要修復這個相符性問題嗎？</p>
-                <div class="mb-3">
-                    <label for="fixMethod" class="form-label">修復方式：</label>
-                    <select class="form-select" id="fixMethod">
-                        <option value="update_fill_work">更新填報紀錄</option>
-                    </select>
-                </div>
-            `;
+    // 載入原始錯誤資料
+    function loadOriginalErrorData(resultId) {
+        // 從頁面中查找對應的結果資料
+        const resultRow = document.querySelector(`tr[data-result-id="${resultId}"]`);
+        if (!resultRow) {
+            document.getElementById('originalErrorData').innerHTML = '<small class="text-danger">無法載入原始資料</small>';
+            return;
         }
-
-        modalContent.innerHTML = content;
         
-        // 如果是工單缺失，初始化輸入欄位和事件監聽器
+        // 提取原始錯誤資料
+        const companyName = resultRow.querySelector('.company-name')?.textContent?.trim() || '';
+        const workorder = resultRow.querySelector('.workorder')?.textContent?.trim() || '';
+        const productCode = resultRow.querySelector('.product-code')?.textContent?.trim() || '';
+        const wrongCompanyName = resultRow.querySelector('.wrong-company-name')?.textContent?.trim() || '';
+        const wrongWorkorder = resultRow.querySelector('.wrong-workorder')?.textContent?.trim() || '';
+        const wrongProductCode = resultRow.querySelector('.wrong-product-code')?.textContent?.trim() || '';
+        
+        // 顯示原始錯誤資料
+        let errorDataHtml = '<div class="row">';
+        errorDataHtml += '<div class="col-md-6">';
+        errorDataHtml += '<strong>填報紀錄：</strong><br>';
+        errorDataHtml += `<small>公司名稱: ${wrongCompanyName || companyName}<br>`;
+        errorDataHtml += `工單號碼: ${wrongWorkorder || workorder}<br>`;
+        errorDataHtml += `產品編號: ${wrongProductCode || productCode}</small>`;
+        errorDataHtml += '</div>';
+        
+        // 如果是填報異常，沒有正確資料
+        if (currentCheckType === 'missing_dispatch') {
+            errorDataHtml += '<div class="col-md-6">';
+            errorDataHtml += '<strong>問題說明：</strong><br>';
+            errorDataHtml += '<small class="text-danger">此填報紀錄沒有對應的工單資料</small>';
+            errorDataHtml += '</div>';
+        } else {
+            errorDataHtml += '<div class="col-md-6">';
+            errorDataHtml += '<strong>正確資料：</strong><br>';
+            errorDataHtml += `<small>公司名稱: ${companyName}<br>`;
+            errorDataHtml += `工單號碼: ${workorder}<br>`;
+            errorDataHtml += `產品編號: ${productCode}</small>`;
+            errorDataHtml += '</div>';
+        }
+        errorDataHtml += '</div>';
+        
+        document.getElementById('originalErrorData').innerHTML = errorDataHtml;
+        
+        // 預填修復欄位（使用錯誤的資料作為預設值）
+        document.getElementById('singleNewCompanyName').value = wrongCompanyName || companyName;
+        document.getElementById('singleNewWorkorder').value = wrongWorkorder || workorder;
+        document.getElementById('singleNewProductId').value = wrongProductCode || productCode;
+    }
+
+    // 更新修復對話框內容
+    function updateFixModalContent(checkType) {
+        const messageEl = document.getElementById('fixModalMessage');
+        const descriptionEl = document.getElementById('fixModalDescription');
+        
         if (checkType === 'missing_dispatch') {
-            toggleFixInputs();
-            
-            // 添加選項變更事件監聽器
-            const fixMethodSelect = document.getElementById('fixMethod');
-            if (fixMethodSelect) {
-                fixMethodSelect.addEventListener('change', toggleFixInputs);
-            }
+            messageEl.textContent = '確定要修復這個填報異常嗎？';
+            descriptionEl.innerHTML = '<small>可以刪除填報紀錄或修改公司名稱、工單號碼、產品編號</small>';
+        } else if (checkType === 'wrong_product_code') {
+            messageEl.textContent = '確定要修復這個產品編號錯誤嗎？';
+            descriptionEl.innerHTML = '<small>將把填報紀錄的產品編號更新為工單的正確產品編號</small>';
+        } else if (checkType === 'wrong_company') {
+            messageEl.textContent = '確定要修復這個公司名稱錯誤嗎？';
+            descriptionEl.innerHTML = '<small>將把填報紀錄的公司名稱更新為工單的正確公司名稱</small>';
+        } else if (checkType === 'wrong_workorder') {
+            messageEl.textContent = '確定要修復這個工單號碼錯誤嗎？';
+            descriptionEl.innerHTML = '<small>將把填報紀錄的工單號碼更新為正確的工單號碼</small>';
+        } else {
+            messageEl.textContent = '確定要修復這個問題嗎？';
+            descriptionEl.innerHTML = '<small>修復說明</small>';
         }
     }
 
-    // 切換修復輸入欄位
-    function toggleFixInputs() {
-        const fixMethod = document.getElementById('fixMethod').value;
-        const fixInputs = document.getElementById('fixInputs');
-        let inputsHtml = '';
-
-        if (fixMethod === 'update_company_name') {
-            inputsHtml = `
-                <div class="mb-3">
-                    <label for="newCompanyName" class="form-label">新的公司名稱：</label>
-                    <input type="text" class="form-control" id="newCompanyName" placeholder="請輸入正確的公司名稱" required>
-                </div>
-            `;
-        } else if (fixMethod === 'update_workorder') {
-            inputsHtml = `
-                <div class="mb-3">
-                    <label for="newWorkorder" class="form-label">新的工單號碼：</label>
-                    <input type="text" class="form-control" id="newWorkorder" placeholder="請輸入正確的工單號碼" required>
-                </div>
-            `;
-        } else if (fixMethod === 'update_product_code') {
-            inputsHtml = `
-                <div class="mb-3">
-                    <label for="newProductCode" class="form-label">新的產品編號：</label>
-                    <input type="text" class="form-control" id="newProductCode" placeholder="請輸入正確的產品編號" required>
-                </div>
-            `;
-        } else if (fixMethod === 'delete_fill_work') {
-            inputsHtml = `
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <strong>警告：</strong>此操作將永久刪除相關的填報記錄，無法復原！
-                </div>
-            `;
-        } else if (fixMethod === 'create_workorder') {
-            inputsHtml = `
-                <div class="alert alert-success">
-                    <i class="fas fa-plus-circle"></i>
-                    <strong>說明：</strong>系統將根據填報記錄的資訊自動創建對應的工單記錄。
-                </div>
-            `;
+    // 單筆修復方式變更事件
+    document.getElementById('fixMethod').addEventListener('change', function() {
+        console.log('修復方式變更為：', this.value);
+        const singleUpdateOptions = document.getElementById('singleUpdateOptions');
+        if (this.value === 'update_fill_work') {
+            singleUpdateOptions.style.display = 'block';
+            console.log('顯示修改選項');
+        } else {
+            singleUpdateOptions.style.display = 'none';
+            console.log('隱藏修改選項');
         }
-
-        if (fixInputs) {
-            fixInputs.innerHTML = inputsHtml;
-        }
-    }
+    });
 
     // 確認單筆修復
     document.getElementById('confirmFix').addEventListener('click', function() {
         const fixMethod = document.getElementById('fixMethod').value;
         
-        // 收集額外的修復資料
+        // 收集修改資料
         let fixData = {};
-        if (fixMethod === 'update_company_name') {
-            const newCompanyName = document.getElementById('newCompanyName')?.value;
-            if (!newCompanyName) {
-                alert('請輸入新的公司名稱');
-                return;
-            }
-            fixData.new_company_name = newCompanyName;
-        } else if (fixMethod === 'update_workorder') {
-            const newWorkorder = document.getElementById('newWorkorder')?.value;
-            if (!newWorkorder) {
-                alert('請輸入新的工單號碼');
-                return;
-            }
-            fixData.new_workorder = newWorkorder;
-        } else if (fixMethod === 'update_product_code') {
-            const newProductCode = document.getElementById('newProductCode')?.value;
-            if (!newProductCode) {
-                alert('請輸入新的產品編號');
-                return;
-            }
-            fixData.new_product_code = newProductCode;
+        if (fixMethod === 'update_fill_work') {
+            const newCompanyName = document.getElementById('singleNewCompanyName').value.trim();
+            const newWorkorder = document.getElementById('singleNewWorkorder').value.trim();
+            const newProductId = document.getElementById('singleNewProductId').value.trim();
+            
+            if (newCompanyName) fixData.company_name = newCompanyName;
+            if (newWorkorder) fixData.workorder = newWorkorder;
+            if (newProductId) fixData.product_id = newProductId;
         }
         
-        // 準備請求參數
+        // 發送修復請求
         const params = new URLSearchParams({
             'action': 'fix_issue',
             'result_id': currentResultId,
             'fix_method': fixMethod
         });
         
-        // 如果有額外資料，加入請求中
+        // 如果有修改資料，加入請求中
         if (Object.keys(fixData).length > 0) {
             params.append('fix_data', JSON.stringify(fixData));
         }
         
-        // 發送修復請求
         fetch('{% url "workorder:consistency_check_ajax" %}', {
             method: 'POST',
             headers: {
@@ -607,15 +620,60 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
+            // 預填修復資料（使用第一個選中項目的資料）
+            const firstSelectedRow = document.querySelector('.result-checkbox:checked').closest('tr');
+            if (firstSelectedRow) {
+                const wrongCompanyName = firstSelectedRow.querySelector('.wrong-company-name')?.textContent?.trim() || '';
+                const wrongWorkorder = firstSelectedRow.querySelector('.wrong-workorder')?.textContent?.trim() || '';
+                const wrongProductCode = firstSelectedRow.querySelector('.wrong-product-code')?.textContent?.trim() || '';
+                
+                document.getElementById('newCompanyName').value = wrongCompanyName;
+                document.getElementById('newWorkorder').value = wrongWorkorder;
+                document.getElementById('newProductId').value = wrongProductCode;
+            }
+            
             document.getElementById('batchFixCount').textContent = selectedIds.length;
             batchFixModal.show();
         });
     }
 
+    // 修復方式變更事件
+    document.getElementById('batchFixMethod').addEventListener('change', function() {
+        const updateOptions = document.getElementById('updateOptions');
+        if (this.value === 'update_fill_work') {
+            updateOptions.style.display = 'block';
+        } else {
+            updateOptions.style.display = 'none';
+        }
+    });
+
+    // 批次修復對話框顯示時初始化
+    document.getElementById('batchFixModal').addEventListener('shown.bs.modal', function() {
+        const batchFixMethod = document.getElementById('batchFixMethod');
+        const updateOptions = document.getElementById('updateOptions');
+        if (batchFixMethod.value === 'update_fill_work') {
+            updateOptions.style.display = 'block';
+        } else {
+            updateOptions.style.display = 'none';
+        }
+    });
+
     // 確認批次修復
     document.getElementById('confirmBatchFix').addEventListener('click', function() {
         const fixMethod = document.getElementById('batchFixMethod').value;
         const selectedIds = getSelectedResultIds();
+        
+        // 收集修改資料
+        let fixData = {};
+        if (fixMethod === 'update_fill_work') {
+            const newCompanyName = document.getElementById('newCompanyName').value.trim();
+            const newWorkorder = document.getElementById('newWorkorder').value.trim();
+            const newProductId = document.getElementById('newProductId').value.trim();
+            
+            if (newCompanyName) fixData.company_name = newCompanyName;
+            if (newWorkorder) fixData.workorder = newWorkorder;
+            if (newProductId) fixData.product_id = newProductId;
+        }
         
         // 顯示載入狀態
         const button = this;
@@ -624,17 +682,24 @@ document.addEventListener('DOMContentLoaded', function() {
         button.disabled = true;
         
         // 發送批次修復請求
+        const params = new URLSearchParams({
+            'action': 'batch_fix_issues',
+            'result_ids': selectedIds.join(','),
+            'fix_method': fixMethod
+        });
+        
+        // 如果有修改資料，加入請求中
+        if (Object.keys(fixData).length > 0) {
+            params.append('fix_data', JSON.stringify(fixData));
+        }
+        
         fetch('{% url "workorder:consistency_check_ajax" %}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
             },
-            body: new URLSearchParams({
-                'action': 'batch_fix_issues',
-                'result_ids': selectedIds.join(','),
-                'fix_method': fixMethod
-            })
+            body: params
         })
         .then(response => response.json())
         .then(data => {

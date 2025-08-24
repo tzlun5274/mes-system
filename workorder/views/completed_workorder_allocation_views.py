@@ -12,7 +12,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from workorder.services.completed_workorder_allocation_service import CompletedWorkOrderAllocationService
+from workorder.services.auto_allocation_service import AutoAllocationService
 from workorder.models import CompletedWorkOrder
 from erp_integration.models import CompanyConfig
 
@@ -24,7 +24,7 @@ def completed_workorder_allocation_dashboard(request):
     已完工工單數量分配儀表板
     """
     try:
-        service = CompletedWorkOrderAllocationService()
+        service = AutoAllocationService()
         
         # 獲取公司列表
         companies = CompanyConfig.objects.all().order_by('company_name')
@@ -32,12 +32,18 @@ def completed_workorder_allocation_dashboard(request):
         # 獲取選定的公司
         selected_company = request.GET.get('company')
         
-        # 獲取待分配工單列表
-        pending_workorders = service.get_pending_allocation_workorders(selected_company)
+        # 獲取待分配摘要
+        summary = service.get_pending_allocation_summary(selected_company)
         
         # 統計資訊
-        total_pending = len(pending_workorders)
-        total_zero_reports = sum(w['zero_quantity_reports_count'] for w in pending_workorders)
+        if 'error' in summary:
+            total_pending = 0
+            total_zero_reports = 0
+            pending_workorders = []
+        else:
+            total_pending = summary.get('total_workorders', 0)
+            total_zero_reports = summary.get('total_pending_reports', 0)
+            pending_workorders = summary.get('workorders', {})
         
         context = {
             'companies': companies,
@@ -60,7 +66,7 @@ def completed_workorder_allocation_detail(request, workorder_number):
     已完工工單數量分配詳情頁面
     """
     try:
-        service = CompletedWorkOrderAllocationService()
+        service = AutoAllocationService()
         
         # 獲取分配摘要
         summary = service.get_allocation_summary(workorder_number)
@@ -93,7 +99,7 @@ def allocate_single_workorder(request, workorder_number):
     為單一工單執行數量分配
     """
     try:
-        service = CompletedWorkOrderAllocationService()
+        service = AutoAllocationService()
         
         # 獲取公司代號
         company_code = request.POST.get('company_code')
@@ -125,7 +131,7 @@ def allocate_all_workorders(request):
     為所有待分配工單執行批量分配
     """
     try:
-        service = CompletedWorkOrderAllocationService()
+        service = AutoAllocationService()
         
         # 獲取公司代號
         company_code = request.POST.get('company_code')
@@ -133,21 +139,14 @@ def allocate_all_workorders(request):
         # 執行批量分配
         result = service.allocate_all_pending_workorders(company_code)
         
-        if result['success']:
-            if result['total_processed'] == 0:
-                messages.info(request, result['message'])
-            else:
-                messages.success(
-                    request,
-                    f'批量分配完成！處理 {result["total_processed"]} 個工單，'
-                    f'成功 {result["total_success"]} 個，失敗 {result["total_failed"]} 個'
-                )
-                
-                if result['failed_workorders']:
-                    failed_list = ', '.join([w['workorder_number'] for w in result['failed_workorders']])
-                    messages.warning(request, f'失敗的工單: {failed_list}')
+        if result.get('success', False):
+            messages.success(
+                request,
+                f'批量分配完成！處理 {result.get("total_allocated_workorders", 0)} 個工單，'
+                f'分配 {result.get("total_allocated_quantity", 0)} 件給 {result.get("total_allocated_reports", 0)} 筆紀錄'
+            )
         else:
-            messages.error(request, f'批量分配失敗: {result["message"]}')
+            messages.error(request, f'批量分配失敗: {result.get("message", "未知錯誤")}')
         
         return redirect('workorder:completed_workorder_allocation_dashboard')
         
@@ -163,7 +162,7 @@ def get_allocation_summary_api(request, workorder_number):
     獲取分配摘要的API端點
     """
     try:
-        service = CompletedWorkOrderAllocationService()
+        service = AutoAllocationService()
         summary = service.get_allocation_summary(workorder_number)
         
         return JsonResponse(summary)
@@ -179,17 +178,17 @@ def get_pending_workorders_api(request):
     獲取待分配工單列表的API端點
     """
     try:
-        service = CompletedWorkOrderAllocationService()
+        service = AutoAllocationService()
         
         # 獲取公司代號
         company_code = request.GET.get('company')
         
-        pending_workorders = service.get_pending_allocation_workorders(company_code)
+        summary = service.get_pending_allocation_summary(company_code)
         
         return JsonResponse({
             'success': True,
-            'pending_workorders': pending_workorders,
-            'total_count': len(pending_workorders)
+            'pending_workorders': summary.get('workorders', {}),
+            'total_count': summary.get('total_workorders', 0)
         })
         
     except Exception as e:

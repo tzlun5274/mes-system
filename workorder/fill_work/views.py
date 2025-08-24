@@ -849,10 +849,13 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
             
             company_code_value = company_config.company_code
             
+            # 直接使用 workorder 欄位的內容作為工單號碼
+            workorder_number = form.cleaned_data.get('workorder')
+            
             # 查找現有工單（只根據公司代號和工單號碼，因為唯一性約束是 (company_code, order_number)）
             existing_workorder = WorkOrder.objects.filter(
                 company_code=company_code_value,
-                order_number='RD樣品'
+                order_number=workorder_number
             ).first()
             
             workorder = None
@@ -865,7 +868,7 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
                 # 建立新工單
                 workorder = WorkOrder.objects.create(
                     company_code=company_code_value,
-                    order_number='RD樣品',
+                    order_number=workorder_number,
                     product_code=product_code,
                     quantity=0,
                     status='in_progress',
@@ -877,7 +880,7 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
             # 檢查並建立派工單（比對公司代號+工單號碼+產品編號+工序）
             existing_dispatch = WorkOrderDispatch.objects.filter(
                 company_code=company_code_value,
-                order_number='RD樣品',
+                order_number=workorder_number,
                 product_code=product_code,
                 process_name=process_name
             ).first()
@@ -890,20 +893,20 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
                 # 建立新派工單
                 new_dispatch = WorkOrderDispatch.objects.create(
                     company_code=company_code_value,
-                    order_number='RD樣品',
+                    order_number=workorder_number,
                     product_code=product_code,
-                    product_name=f'RD樣品-{product_code}',
+                    product_name=f'{order_type}-{product_code}',
                     planned_quantity=0,
                     status='in_production',
                     dispatch_date=timezone.now().date(),
                     assigned_operator=form.cleaned_data.get('operator'),
                     assigned_equipment=form.cleaned_data.get('equipment') or '',
                     process_name=process_name,
-                    notes=f"作業員RD樣品補登填報自動建立 - 建立時間: {timezone.now()} - 注意：RD樣品無預定工序流程",
+                    notes=f"作業員{order_type}補登填報自動建立 - 建立時間: {timezone.now()} - 注意：{order_type}無預定工序流程",
                     created_by=self.request.user.username
                 )
                 dispatch_created = True
-                messages.info(self.request, f'建立新RD樣品派工單: {new_dispatch.order_number}')
+                messages.info(self.request, f'建立新{order_type}派工單: {new_dispatch.order_number}')
             
             # 設定休息時間（作業員RD填報：12:00-13:00）
             form.instance.has_break = True

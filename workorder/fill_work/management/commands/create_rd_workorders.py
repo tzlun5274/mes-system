@@ -149,7 +149,8 @@ class Command(BaseCommand):
     def find_or_create_workorder(self, fill_work, dry_run, force):
         """查找或建立工單"""
         company_code = fill_work.company_code or '10'
-        rd_workorder_number = f"RD樣品-{fill_work.product_id}"
+        # 直接使用 workorder 欄位的內容作為工單號碼
+        rd_workorder_number = fill_work.workorder
         product_code = fill_work.product_id
 
         # 查找現有工單

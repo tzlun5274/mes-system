@@ -3,12 +3,14 @@
 """
 自動分配服務
 為已完工工單的數量為0的填報紀錄自動分配數量
+整合了 CompletedWorkOrderAllocationService 的功能
 """
 
 import logging
 from django.db import transaction
 from django.db.models import Sum, Q
-from workorder.models import CompletedWorkOrder
+from django.utils import timezone
+from workorder.models import CompletedWorkOrder, CompletedProductionReport
 from workorder.fill_work.models import FillWork
 from process.models import Operator
 
@@ -18,10 +20,27 @@ class AutoAllocationService:
     """
     自動分配服務類別
     負責為已完工工單的數量為0的填報紀錄自動分配數量
+    整合了 CompletedWorkOrderAllocationService 的功能
     """
     
     def __init__(self):
         self.packaging_process_keywords = ['出貨包裝', '包裝', 'packaging']
+    
+    def _is_packaging_process(self, process_name):
+        """
+        判斷是否為出貨包裝工序
+        
+        Args:
+            process_name: 工序名稱
+            
+        Returns:
+            bool: 是否為出貨包裝工序
+        """
+        if not process_name:
+            return False
+        
+        process_name_lower = process_name.lower()
+        return any(keyword.lower() in process_name_lower for keyword in self.packaging_process_keywords)
     
     def get_pending_allocation_summary(self, company_code=None):
         """
@@ -39,32 +58,24 @@ class AutoAllocationService:
             if company_code:
                 completed_workorders = completed_workorders.filter(company_code=company_code)
             
-            # 獲取所有數量為0的填報紀錄
-            zero_quantity_reports = FillWork.objects.filter(
-                work_quantity=0,
-                approval_status='approved'
-            )
+            # 獲取所有數量為0的已完工生產報工記錄
+            zero_quantity_reports = CompletedProductionReport.objects.filter(work_quantity=0)
             
-            # 篩選已完工工單的填報紀錄
+            # 篩選已完工工單的報工記錄
             pending_reports = []
             for completed_workorder in completed_workorders:
                 workorder_reports = zero_quantity_reports.filter(
-                    workorder=completed_workorder.order_number,
-                    product_id=completed_workorder.product_code
+                    completed_workorder_id=completed_workorder.id
                 )
                 pending_reports.extend(list(workorder_reports))
             
-            if company_code:
-                # 根據多公司架構，需要同時檢查公司代號、工單號碼和產品編號
-                from erp_integration.models import CompanyConfig
-                company_config = CompanyConfig.objects.filter(company_code=company_code).first()
-                if company_config:
-                    pending_reports = pending_reports.filter(company_name=company_config.company_name)
+            # 排除出貨包裝工序
+            pending_reports = [r for r in pending_reports if not self._is_packaging_process(r.process_name)]
             
             # 按工序統計
             processes_summary = {}
             for report in pending_reports:
-                process_name = report.operation
+                process_name = report.process_name
                 if process_name not in processes_summary:
                     processes_summary[process_name] = {
                         'report_count': 0,
@@ -73,22 +84,24 @@ class AutoAllocationService:
                     }
                 
                 processes_summary[process_name]['report_count'] += 1
-                processes_summary[process_name]['total_hours'] += float(report.work_hours_calculated or 0)
+                processes_summary[process_name]['total_hours'] += float(report.work_hours or 0)
             
             # 按工單統計
             workorders_summary = {}
             for report in pending_reports:
-                workorder_number = report.workorder
-                if workorder_number not in workorders_summary:
-                    workorder = completed_workorders.filter(order_number=workorder_number).first()
-                    workorders_summary[workorder_number] = {
-                        'report_count': 0,
-                        'total_hours': 0.0,
-                        'planned_quantity': workorder.planned_quantity if workorder else 0
-                    }
-                
-                workorders_summary[workorder_number]['report_count'] += 1
-                workorders_summary[workorder_number]['total_hours'] += float(report.work_hours_calculated or 0)
+                # 通過 completed_workorder_id 查找工單
+                workorder = completed_workorders.filter(id=report.completed_workorder_id).first()
+                if workorder:
+                    workorder_number = workorder.order_number
+                    if workorder_number not in workorders_summary:
+                        workorders_summary[workorder_number] = {
+                            'report_count': 0,
+                            'total_hours': 0.0,
+                            'planned_quantity': workorder.planned_quantity
+                        }
+                    
+                    workorders_summary[workorder_number]['report_count'] += 1
+                    workorders_summary[workorder_number]['total_hours'] += float(report.work_hours or 0)
             
             return {
                 'total_pending_reports': len(pending_reports),
@@ -114,52 +127,59 @@ class AutoAllocationService:
         try:
             # 獲取待分配摘要
             summary = self.get_pending_allocation_summary(company_code)
+            
             if 'error' in summary:
-                return {'error': summary['error']}
+                return summary
             
-            results = []
-            successful_allocations = 0
-            failed_allocations = 0
+            # 獲取所有已完工工單
+            completed_workorders = CompletedWorkOrder.objects.all()
+            if company_code:
+                completed_workorders = completed_workorders.filter(company_code=company_code)
             
-            # 為每個工單進行分配
-            for workorder_number in summary['workorders'].keys():
-                try:
-                    result = self.allocate_workorder_quantities(workorder_number, company_code)
-                    results.append({
-                        'workorder_number': workorder_number,
-                        'result': result
-                    })
-                    
-                    if result.get('success', True):
-                        successful_allocations += 1
-                    else:
-                        failed_allocations += 1
-                        
-                except Exception as e:
-                    logger.error(f"分配工單 {workorder_number} 時發生錯誤: {str(e)}")
-                    results.append({
-                        'workorder_number': workorder_number,
-                        'result': {
-                            'success': False,
-                            'message': str(e)
-                        }
-                    })
-                    failed_allocations += 1
+            total_allocated_workorders = 0
+            total_allocated_quantity = 0
+            total_allocated_reports = 0
+            allocation_results = []
+            
+            for completed_workorder in completed_workorders:
+                result = self.allocate_completed_workorder_quantities(
+                    completed_workorder.order_number, 
+                    company_code
+                )
+                
+                if result.get('success', False):
+                    total_allocated_workorders += 1
+                    total_allocated_quantity += result.get('total_allocated_quantity', 0)
+                    total_allocated_reports += result.get('total_allocated_reports', 0)
+                    allocation_results.append(result)
             
             return {
-                'total_workorders': len(results),
-                'successful_allocations': successful_allocations,
-                'failed_allocations': failed_allocations,
-                'results': results
+                'success': True,
+                'total_allocated_workorders': total_allocated_workorders,
+                'total_allocated_quantity': total_allocated_quantity,
+                'total_allocated_reports': total_allocated_reports,
+                'allocation_results': allocation_results
             }
             
         except Exception as e:
             logger.error(f"批量分配時發生錯誤: {str(e)}")
             return {'error': str(e)}
     
-    def allocate_workorder_quantities(self, workorder_number, company_code=None):
+    def allocate_completed_workorder_quantities(self, workorder_number, company_code=None):
         """
-        為指定工單分配數量
+        為已完工工單分配工序紀錄數量
+        
+        分配規則：
+        1. 排除出貨包裝工序
+        2. 每個工序名稱分配完整的工單數量
+        3. 同一個工序名稱的多筆記錄平均分配該工序的數量
+        4. 如果某筆記錄已有數量，則從分配數量中扣除
+        
+        範例：
+        - 工單數量1000，一個工序名稱一筆記錄 → 分配1000
+        - 工單數量1000，一個工序名稱兩筆記錄 → 每筆分配500
+        - 工單數量1000，兩個工序名稱各一筆記錄 → 每個工序分配1000，每筆記錄分配1000
+        - 工單數量1000，10個目檢記錄 → 每筆分配100
         
         Args:
             workorder_number: 工單號碼
@@ -181,113 +201,113 @@ class AutoAllocationService:
                         'message': f'工單 {workorder_number} 不存在或未完工'
                     }
                 
-                # 獲取該工單數量為0的填報紀錄
-                zero_reports = FillWork.objects.filter(
-                    workorder=workorder_number,
-                    product_id=completed_workorder.product_code,
-                    work_quantity=0,
-                    approval_status='approved'
+                # 獲取該工單的所有工序紀錄（從已完工生產報工記錄）
+                production_reports = CompletedProductionReport.objects.filter(
+                    completed_workorder_id=completed_workorder.id
                 )
                 
-                if company_code:
-                    # 根據多公司架構，需要同時檢查公司代號、工單號碼和產品編號
-                    from erp_integration.models import CompanyConfig
-                    company_config = CompanyConfig.objects.filter(company_code=company_code).first()
-                    if company_config:
-                        zero_reports = zero_reports.filter(company_name=company_config.company_name)
+                # 排除出貨包裝工序
+                production_reports = production_reports.exclude(
+                    process_name__icontains='出貨包裝'
+                )
                 
-                if not zero_reports.exists():
+                if not production_reports.exists():
                     return {
                         'success': False,
-                        'message': f'工單 {workorder_number} 沒有需要分配的記錄'
+                        'message': f'工單 {workorder_number} 沒有需要分配的工序紀錄'
                     }
                 
-                # 按工序分組
+                # 按工序名稱分組
                 processes_data = {}
-                excluded_processes = []
                 
-                for report in zero_reports:
-                    process_name = report.operation
-                    
-                    # 檢查是否為出貨包裝工序
-                    if self._is_packaging_process(process_name):
-                        excluded_processes.append({
-                            'process_name': process_name,
-                            'reason': '出貨包裝工序不參與分配',
-                            'report_count': zero_reports.filter(operation=process_name).count()
-                        })
-                        continue
+                for report in production_reports:
+                    process_name = report.process_name
                     
                     if process_name not in processes_data:
                         processes_data[process_name] = {
                             'reports': [],
-                            'total_hours': 0.0
+                            'total_existing_quantity': 0,
+                            'zero_quantity_reports': []
                         }
                     
                     processes_data[process_name]['reports'].append(report)
-                    processes_data[process_name]['total_hours'] += float(report.work_hours_calculated or 0)
+                    
+                    # 統計已有數量
+                    if report.work_quantity > 0:
+                        processes_data[process_name]['total_existing_quantity'] += report.work_quantity
+                    else:
+                        processes_data[process_name]['zero_quantity_reports'].append(report)
                 
-                # 計算分配數量
+                # 計算分配結果
                 total_planned_quantity = completed_workorder.planned_quantity
-                total_work_hours = sum(data['total_hours'] for data in processes_data.values())
+                allocation_results = []
+                total_allocated_quantity = 0
+                total_allocated_reports = 0
                 
-                allocated_reports = []
-                processes_allocated = []
-                total_quantity_allocated = 0
-                total_reports_allocated = 0
-                
+                # 每個工序名稱分配完整的工單數量
                 for process_name, data in processes_data.items():
-                    if data['total_hours'] <= 0:
+                    if not data['zero_quantity_reports']:
+                        # 沒有需要分配的記錄
                         continue
                     
-                    # 按工時比例分配數量
-                    process_quantity = int((data['total_hours'] / total_work_hours) * total_planned_quantity)
+                    # 該工序分配完整的工單數量
+                    process_quantity = total_planned_quantity
                     
-                    # 為每個填報紀錄分配數量
-                    reports_count = len(data['reports'])
-                    quantity_per_report = process_quantity // reports_count
-                    remainder = process_quantity % reports_count
+                    # 扣除已有數量
+                    existing_quantity = data['total_existing_quantity']
+                    remaining_quantity = process_quantity - existing_quantity
                     
-                    process_allocated_reports = []
+                    if remaining_quantity <= 0:
+                        # 已有數量已達到工單總數量，不需要分配
+                        continue
                     
-                    for i, report in enumerate(data['reports']):
-                        # 分配數量（最後一個記錄獲得剩餘數量）
-                        allocated_quantity = quantity_per_report + (1 if i < remainder else 0)
+                    # 計算每筆記錄的分配數量（平均分配）
+                    zero_reports_count = len(data['zero_quantity_reports'])
+                    quantity_per_report = remaining_quantity // zero_reports_count
+                    report_remainder = remaining_quantity % zero_reports_count
+                    
+                    process_allocated_quantity = 0
+                    process_allocated_reports = 0
+                    
+                    for j, report in enumerate(data['zero_quantity_reports']):
+                        # 分配數量（前面的記錄獲得餘數）
+                        allocated_quantity = quantity_per_report + (1 if j < report_remainder else 0)
                         
-                        # 更新填報紀錄
+                        # 更新記錄
                         report.work_quantity = allocated_quantity
+                        report.is_system_allocated = True
+                        report.allocated_at = timezone.now()
+                        report.allocation_method = 'auto_allocation'
                         report.save()
                         
-                        process_allocated_reports.append({
-                            'operator': report.operator,
-                            'report_date': report.work_date.strftime('%Y-%m-%d'),
-                            'allocated_quantity': allocated_quantity,
-                            'work_hours': report.work_hours_calculated or 0
-                        })
-                        
-                        allocated_reports.append(report)
-                        total_quantity_allocated += allocated_quantity
-                        total_reports_allocated += 1
+                        process_allocated_quantity += allocated_quantity
+                        process_allocated_reports += 1
+                        total_allocated_quantity += allocated_quantity
+                        total_allocated_reports += 1
                     
-                    processes_allocated.append({
+                    allocation_results.append({
                         'process_name': process_name,
-                        'quantity_allocated': process_quantity,
-                        'reports_allocated': len(data['reports']),
-                        'allocated_reports': process_allocated_reports
+                        'process_quantity': process_quantity,
+                        'existing_quantity': existing_quantity,
+                        'remaining_quantity': remaining_quantity,
+                        'zero_reports_count': zero_reports_count,
+                        'allocated_quantity': process_allocated_quantity,
+                        'allocated_reports': process_allocated_reports,
+                        'quantity_per_report': quantity_per_report,
+                        'remainder': report_remainder
                     })
                 
                 return {
                     'success': True,
                     'workorder_number': workorder_number,
                     'total_planned_quantity': total_planned_quantity,
-                    'total_reports_allocated': total_reports_allocated,
-                    'total_quantity_allocated': total_quantity_allocated,
-                    'excluded_processes': excluded_processes,
-                    'processes_allocated': processes_allocated
+                    'total_allocated_quantity': total_allocated_quantity,
+                    'total_allocated_reports': total_allocated_reports,
+                    'allocation_results': allocation_results
                 }
                 
         except Exception as e:
-            logger.error(f"分配工單 {workorder_number} 數量時發生錯誤: {str(e)}")
+            logger.error(f"分配已完工工單 {workorder_number} 數量時發生錯誤: {str(e)}")
             return {
                 'success': False,
                 'message': str(e)
@@ -295,7 +315,7 @@ class AutoAllocationService:
     
     def get_allocation_summary(self, workorder_number):
         """
-        獲取指定工單的分配摘要
+        獲取指定已完工工單的分配摘要
         
         Args:
             workorder_number: 工單號碼
@@ -312,52 +332,49 @@ class AutoAllocationService:
             if not completed_workorder:
                 return {'error': f'工單 {workorder_number} 不存在或未完工'}
             
-            # 獲取該工單的所有填報紀錄
-            all_reports = FillWork.objects.filter(
-                workorder=workorder_number,
-                product_id=completed_workorder.product_code,
-                approval_status='approved'
+            # 獲取該工單的所有工序紀錄
+            production_reports = CompletedProductionReport.objects.filter(
+                completed_workorder=completed_workorder
             )
             
-            # 如果工單有公司代號，則按公司分離過濾
-            if completed_workorder.company_code:
-                from erp_integration.models import CompanyConfig
-                company_config = CompanyConfig.objects.filter(company_code=completed_workorder.company_code).first()
-                if company_config:
-                    all_reports = all_reports.filter(company_name=company_config.company_name)
+            # 排除出貨包裝工序
+            production_reports = production_reports.exclude(
+                process_name__icontains='出貨包裝'
+            )
             
-            # 按工序統計
+            # 按工序名稱分組統計
             processes_summary = {}
-            excluded_processes = []
+            total_reports = 0
+            total_zero_quantity_reports = 0
+            total_existing_quantity = 0
             
-            for report in all_reports:
-                process_name = report.operation
-                
-                if self._is_packaging_process(process_name):
-                    if process_name not in excluded_processes:
-                        excluded_processes.append(process_name)
-                    continue
+            for report in production_reports:
+                process_name = report.process_name
+                total_reports += 1
                 
                 if process_name not in processes_summary:
                     processes_summary[process_name] = {
-                        'original_quantity': 0,
-                        'allocated_quantity': 0,
-                        'report_count': 0
+                        'total_reports': 0,
+                        'zero_quantity_reports': 0,
+                        'existing_quantity': 0,
+                        'is_packaging': self._is_packaging_process(process_name)
                     }
                 
-                processes_summary[process_name]['original_quantity'] += report.work_quantity or 0
-                processes_summary[process_name]['report_count'] += 1
+                processes_summary[process_name]['total_reports'] += 1
                 
-                # 如果數量為0，計算需要分配的數量
                 if report.work_quantity == 0:
-                    processes_summary[process_name]['allocated_quantity'] += 1  # 預估分配1件
+                    processes_summary[process_name]['zero_quantity_reports'] += 1
+                    total_zero_quantity_reports += 1
+                else:
+                    processes_summary[process_name]['existing_quantity'] += report.work_quantity
+                    total_existing_quantity += report.work_quantity
             
             return {
                 'workorder_number': workorder_number,
                 'planned_quantity': completed_workorder.planned_quantity,
-                'total_original_quantity': sum(data['original_quantity'] for data in processes_summary.values()),
-                'total_allocated_quantity': sum(data['allocated_quantity'] for data in processes_summary.values()),
-                'excluded_processes': excluded_processes,
+                'total_reports': total_reports,
+                'total_zero_quantity_reports': total_zero_quantity_reports,
+                'total_existing_quantity': total_existing_quantity,
                 'processes': processes_summary
             }
             
@@ -365,24 +382,60 @@ class AutoAllocationService:
             logger.error(f"獲取工單 {workorder_number} 分配摘要時發生錯誤: {str(e)}")
             return {'error': str(e)}
     
-    def _is_packaging_process(self, process_name):
+    def allocate_single_report(self, report_id, allocated_quantity):
         """
-        判斷是否為出貨包裝工序
+        為單筆填報紀錄分配數量
         
         Args:
-            process_name: 工序名稱（可能是 ProcessName 物件或字串）
+            report_id: 填報紀錄ID
+            allocated_quantity: 分配數量
             
         Returns:
-            bool: 是否為出貨包裝工序
+            dict: 分配結果
         """
-        if not process_name:
-            return False
-        
-        # 如果是 ProcessName 物件，獲取其 name 屬性
-        if hasattr(process_name, 'name'):
-            process_name_str = process_name.name
-        else:
-            process_name_str = str(process_name)
-        
-        process_name_lower = process_name_str.lower()
-        return any(keyword in process_name_lower for keyword in self.packaging_process_keywords) 
+        try:
+            with transaction.atomic():
+                # 獲取填報紀錄
+                report = FillWork.objects.get(id=report_id)
+                
+                # 檢查是否為出貨包裝工序
+                if self._is_packaging_process(report.operation):
+                    return {
+                        'success': False,
+                        'message': '出貨包裝工序不參與數量分配'
+                    }
+                
+                # 檢查是否已經有數量
+                if report.work_quantity > 0:
+                    return {
+                        'success': False,
+                        'message': '該紀錄已有數量，無法重新分配'
+                    }
+                
+                # 分配數量
+                report.work_quantity = allocated_quantity
+                report.is_system_allocated = True
+                report.allocated_at = timezone.now()
+                report.allocation_method = 'manual_allocation'
+                report.save()
+                
+                logger.info(f"成功為填報紀錄 {report_id} 分配數量 {allocated_quantity}")
+                
+                return {
+                    'success': True,
+                    'report_id': report_id,
+                    'allocated_quantity': allocated_quantity,
+                    'message': '數量分配成功'
+                }
+                
+        except FillWork.DoesNotExist:
+            return {
+                'success': False,
+                'message': f'填報紀錄 {report_id} 不存在'
+            }
+        except Exception as e:
+            logger.error(f"分配單筆紀錄 {report_id} 時發生錯誤: {str(e)}")
+            return {
+                'success': False,
+                'message': str(e)
+            } 

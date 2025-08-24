@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}月工作時數報表 - MES系統{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-calendar-alt text-info"></i> 月工作時數報表</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}">報表管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'reporting:work_hour_report_index' %}">工作時數報表</a></li>
+                        <li class="breadcrumb-item active">月報表</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表資訊 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> 報表資訊</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>報表類型：</strong> {{ report_type }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>公司代號：</strong> {{ company_code }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>年份：</strong> {{ year }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>月份：</strong> {{ month }}月
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-12">
+                            <strong>生成時間：</strong> {{ generated_at|date:"Y-m-d H:i:s" }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計摘要 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie"></i> 統計摘要</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-primary">{{ summary.total_work_hours|floatformat:1 }}</h3>
+                                <p class="text-muted">總工作時數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-success">{{ summary.total_operators }}</h3>
+                                <p class="text-muted">總作業員數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-info">{{ summary.total_equipment_hours|floatformat:1 }}</h3>
+                                <p class="text-muted">總設備時數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-warning">{{ summary.workorder_count }}</h3>
+                                <p class="text-muted">工單數量</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細資料 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-table"></i> 詳細資料</h5>
+                </div>
+                <div class="card-body">
+                    {% if data %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>日期</th>
+                                        <th>作業員</th>
+                                        <th>工單號碼</th>
+                                        <th>產品編號</th>
+                                        <th>工作時數</th>
+                                        <th>加班時數</th>
+                                        <th>工作數量</th>
+                                        <th>不良品數量</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in data %}
+                                    <tr>
+                                        <td>{{ item.work_date|date:"Y-m-d" }}</td>
+                                        <td>{{ item.operator }}</td>
+                                        <td>{{ item.workorder }}</td>
+                                        <td>{{ item.product_id }}</td>
+                                        <td>{{ item.work_hours_calculated|floatformat:2 }}</td>
+                                        <td>{{ item.overtime_hours_calculated|floatformat:2 }}</td>
+                                        <td>{{ item.work_quantity }}</td>
+                                        <td>{{ item.defect_quantity }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 目前沒有月報表資料
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="d-flex gap-2">
+                <a href="{% url 'reporting:work_hour_report_index' %}" class="btn btn-primary">
+                    <i class="fas fa-arrow-left"></i> 返回工作時數報表
+                </a>
+                <button type="button" class="btn btn-success" onclick="window.print()">
+                    <i class="fas fa-print"></i> 列印報表
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -18,7 +18,8 @@ from .models import (
 )
 
 # 導入子模組的模型
-from .company_order.models import CompanyOrder, CompanyOrderSystemConfig
+from .company_order.models import CompanyOrder
+from .models import SystemConfig
 # from .tasks import get_standard_processes
 from .forms import WorkOrderForm
 from django.contrib import messages
@@ -54,7 +55,7 @@ from django.views import View
 import json
 from django.views.decorators.csrf import ensure_csrf_cookie
 # 完工判斷服務已移除，避免資料汙染
-# from .services.completion_service import WorkOrderCompletionService
+# WorkOrderCompletionService 已移除，功能已整合到 FillWorkCompletionService
 
 # 棄用警告函數
 def deprecated_warning(func_name):
@@ -5337,10 +5338,6 @@ def check_workorder_completion(request):
     
     production_workorders = WorkOrder.objects.filter(
         status='in_progress'
-    ).select_related(
-        'production_record'
-    ).prefetch_related(
-        'processes'
     ).order_by('-created_at')
     
     # 分頁處理
@@ -5373,73 +5370,48 @@ def force_complete_workorder(request, pk):
         }, status=403)
     
     try:
-        workorder = WorkOrder.objects.get(pk=pk)
+        # 獲取強制完工原因
+        force_reason = request.POST.get('reason', '管理員強制完工')
+        if not force_reason.strip():
+            force_reason = '管理員強制完工'
         
-        # 檢查工單是否已經完工
-        if workorder.status == 'completed':
-            return JsonResponse({
-                "success": False,
-                "message": "此工單已經完工"
-            }, status=400)
+        # 使用新的強制完工服務
+        from workorder.services.completion_service import FillWorkCompletionService
+        result = FillWorkCompletionService.force_complete_workorder(pk, force_reason)
         
-        # 記錄操作前的狀態
-        original_status = workorder.status
-        original_completed_quantity = workorder.completed_quantity
-        
-        # 更新工單狀態為完工
-        workorder.status = 'completed'
-        workorder.completed_at = timezone.now()
-        
-        # 如果完成數量為0，設定為計劃數量
-        if workorder.completed_quantity == 0:
-            workorder.completed_quantity = workorder.quantity
-        
-        workorder.save()
-        
-        # 轉移到已完工工單模組
-        try:
-            from workorder.services import FillWorkCompletionService
-            completed_workorder = FillWorkCompletionService.transfer_workorder_to_completed(workorder.id)
-            
+        if result['success']:
             # 記錄操作日誌
-            from system.models import OperationLog
-            OperationLog.objects.create(
-                user=request.user.username,
-                module="workorder",
-                action=f"強制完工工單 {workorder.order_number}（原狀態：{original_status}，原完成數量：{original_completed_quantity}）",
-                timestamp=timezone.now(),
-                ip_address=request.META.get('REMOTE_ADDR', ''),
-            )
+            try:
+                from system.models import OperationLog
+                OperationLog.objects.create(
+                    user=request.user.username,
+                    module="workorder",
+                    action=f"強制完工工單 {result['workorder_number']} - 原因: {force_reason}",
+                    timestamp=timezone.now(),
+                    ip_address=request.META.get('REMOTE_ADDR', ''),
+                )
+            except Exception as log_error:
+                logger.warning(f"記錄操作日誌失敗: {str(log_error)}")
             
             return JsonResponse({
                 "success": True,
-                "message": f"工單 {workorder.order_number} 強制完工成功，已轉移到已完工工單模組",
-                "workorder_id": workorder.id,
-                "completed_workorder_id": completed_workorder.id if completed_workorder else None
+                "message": result['message'],
+                "workorder_number": result['workorder_number'],
+                "force_reason": result['force_reason'],
+                "original_packaging_quantity": result.get('original_packaging_quantity', 0),
+                "target_quantity": result.get('target_quantity', 0),
+                "original_completion_rate": result.get('original_completion_rate', 0.0),
+                "completed_workorder_id": result.get('completed_workorder_id'),
+                "was_already_completed": result.get('was_already_completed', False)
             })
-            
-        except Exception as transfer_error:
-            # 如果轉移失敗，回滾工單狀態
-            workorder.status = original_status
-            workorder.completed_quantity = original_completed_quantity
-            workorder.completed_at = None
-            workorder.save()
-            
-            logger.error(f"強制完工工單 {workorder.order_number} 轉移失敗：{str(transfer_error)}")
-            
+        else:
             return JsonResponse({
                 "success": False,
-                "message": f"工單狀態已更新為完工，但轉移到已完工模組失敗：{str(transfer_error)}"
-            }, status=500)
+                "message": result.get('error', '強制完工失敗')
+            }, status=400)
             
-    except WorkOrder.DoesNotExist:
-        return JsonResponse({
-            "success": False,
-            "message": "找不到指定的工單"
-        }, status=404)
-        
     except Exception as e:
-        logger.error(f"強制完工工單失敗：{str(e)}")
+        logger.error(f"強制完工工單 {pk} 失敗: {str(e)}")
         return JsonResponse({
             "success": False,
             "message": f"強制完工失敗：{str(e)}"

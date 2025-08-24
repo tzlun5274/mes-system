@@ -1689,7 +1689,7 @@ def workorder_settings(request):
     工單管理設定頁面
     管理工單系統相關設定，包含審核流程、定時任務和完工判斷等
     """
-    from workorder.company_order.models import SystemConfig
+    from workorder.models import SystemConfig
     
     if request.method == "POST":
         # 處理表單提交
@@ -1990,20 +1990,13 @@ def execute_auto_allocation(request):
         return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
     
     try:
-        from workorder.services.completed_workorder_allocation_service import CompletedWorkOrderAllocationService
+        from workorder.services.auto_allocation_service import AutoAllocationService
         
-        service = CompletedWorkOrderAllocationService()
+        service = AutoAllocationService()
         result = service.allocate_all_pending_workorders()
         
-        if result['success']:
-            if result['total_processed'] == 0:
-                message = result['message']
-            else:
-                message = f"自動分配完成！處理 {result['total_processed']} 個工單，成功 {result['total_success']} 個，失敗 {result['total_failed']} 個"
-                
-                if result['failed_workorders']:
-                    failed_list = ', '.join([w['workorder_number'] for w in result['failed_workorders']])
-                    message += f"（失敗的工單: {failed_list}）"
+        if result.get('success', False):
+            message = f"自動分配完成！處理 {result.get('total_allocated_workorders', 0)} 個工單，分配 {result.get('total_allocated_quantity', 0)} 件給 {result.get('total_allocated_reports', 0)} 筆紀錄"
             
             return JsonResponse({
                 'success': True,
@@ -2012,7 +2005,7 @@ def execute_auto_allocation(request):
         else:
             return JsonResponse({
                 'success': False,
-                'message': result['message']
+                'message': result.get('message', '未知錯誤')
             })
             
     except Exception as e:
@@ -2052,8 +2045,10 @@ def execute_completion_check(request):
             
     except Exception as e:
         import logging
+        import traceback
         logger = logging.getLogger(__name__)
-        logger.error(f"手動執行完工檢查失敗: {str(e)}")
+        error_details = traceback.format_exc()
+        logger.error(f"手動執行完工檢查失敗: {str(e)}\n詳細錯誤:\n{error_details}")
         return JsonResponse({
             'success': False,
             'message': f'執行失敗: {str(e)}'
@@ -2070,12 +2065,21 @@ def execute_data_transfer(request):
         return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
     
     try:
-        # 這裡可以實作資料轉移邏輯
-        # 暫時返回成功訊息
-        return JsonResponse({
-            'success': True,
-            'message': '資料轉移功能尚未實作'
-        })
+        from workorder.services.completion_service import FillWorkCompletionService
+        
+        # 執行資料轉移
+        result = FillWorkCompletionService.transfer_completed_workorders()
+        
+        if 'error' not in result:
+            return JsonResponse({
+                'success': True,
+                'message': f"資料轉移完成！{result.get('message', '轉移完成')}"
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': result['error']
+            })
         
     except Exception as e:
         import logging
@@ -2087,8 +2091,80 @@ def execute_data_transfer(request):
         })
 
 
-# 完工判斷功能已整合到現有的 SimpleCompletionService 中
+# 完工判斷功能已整合到現有的 FillWorkCompletionService 中
 # 手動執行功能可以通過現有的管理命令實現
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def enable_auto_completion(request):
+    """
+    啟用自動完工功能 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from workorder.services.completion_service import FillWorkCompletionService
+        
+        # 啟用自動完工功能
+        success = FillWorkCompletionService.enable_auto_completion()
+        
+        if success:
+            return JsonResponse({
+                'success': True,
+                'message': '自動完工功能已啟用！填報記錄提交時會自動檢查完工條件'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': '啟用自動完工功能失敗'
+            })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"啟用自動完工功能失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'啟用失敗: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def disable_auto_completion(request):
+    """
+    停用自動完工功能 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from workorder.services.completion_service import FillWorkCompletionService
+        
+        # 停用自動完工功能
+        success = FillWorkCompletionService.disable_auto_completion()
+        
+        if success:
+            return JsonResponse({
+                'success': True,
+                'message': '自動完工功能已停用'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': '停用自動完工功能失敗'
+            })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"停用自動完工功能失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'停用失敗: {str(e)}'
+        })
 
 
 @login_required
@@ -2146,7 +2222,7 @@ def auto_approval_settings(request):
 @login_required
 def test_switches(request):
     """測試開關功能"""
-    from workorder.company_order.models import SystemConfig
+    from workorder.models import SystemConfig
     
     # 取得設定值
     try:

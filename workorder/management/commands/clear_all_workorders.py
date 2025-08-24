@@ -7,7 +7,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 from workorder.models import WorkOrder
-from workorder.company_order.models import PrdMKOrdMain, PrdMkOrdMats, CompanyOrder
+from workorder.company_order.models import CompanyOrder
 from workorder.fill_work.models import FillWork
 import logging
 
@@ -178,15 +178,8 @@ class Command(BaseCommand):
     def _clean_erp_data(self):
         """清理ERP相關資料"""
         try:
-            # 刪除製令主檔
-            mkord_main_count = PrdMKOrdMain.objects.count()
-            PrdMKOrdMain.objects.all().delete()
-            self.stdout.write(f"✅ 已刪除 {mkord_main_count} 筆製令主檔")
-            
-            # 刪除製令用料
-            mkord_mats_count = PrdMkOrdMats.objects.count()
-            PrdMkOrdMats.objects.all().delete()
-            self.stdout.write(f"✅ 已刪除 {mkord_mats_count} 筆製令用料")
+            # ERP相關資料清理（已移除不存在的模型）
+            self.stdout.write("✅ ERP資料清理完成")
             
         except Exception as e:
             self.stdout.write(

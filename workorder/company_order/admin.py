@@ -5,7 +5,7 @@
 
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import CompanyOrder, CompanyOrderSystemConfig
+from .models import CompanyOrder
 
 
 @admin.register(CompanyOrder)
@@ -66,28 +66,4 @@ class CompanyOrderAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related()
 
 
-@admin.register(CompanyOrderSystemConfig)
-class CompanyOrderSystemConfigAdmin(admin.ModelAdmin):
-    """公司製令單系統設定管理介面"""
-    
-    list_display = ['key', 'value', 'description', 'updated_at']
-    
-    search_fields = ['key', 'value', 'description']
-    
-    readonly_fields = ['created_at', 'updated_at']
-    
-    fieldsets = (
-        ('設定資訊', {
-            'fields': ('key', 'value', 'description')
-        }),
-        ('系統資訊', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
-    
-    ordering = ['key']
-    
-    def has_delete_permission(self, request, obj=None):
-        """禁止刪除系統設定"""
-        return False 
+ 

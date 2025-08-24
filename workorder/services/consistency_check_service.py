@@ -43,11 +43,10 @@ class ConsistencyCheckService:
     
     def check_missing_dispatch(self):
         """
-        檢查工單缺失
-        比對填報記錄與工單記錄
-        比對條件：公司名稱+工單號碼+產品編號作為唯一性
-        有填報記錄但沒有工單記錄的才列出
+        檢查填報異常
+        比對條件：公司代號或公司名稱+工單號碼+產品編號
         排除RD樣品工單
+        修正：先檢查是否有對應的工單，再檢查是否有派工單
         """
         try:
             self.clear_old_results('missing_dispatch')
@@ -57,57 +56,59 @@ class ConsistencyCheckService:
             missing_count = 0
             
             for fill_work in fill_works:
-                # 檢查是否有對應的工單記錄
-                # 使用公司名稱+工單號碼+產品編號作為唯一性比對
-                
-                # 首先嘗試根據公司名稱找到公司代號
-                company_code = None
-                if fill_work.company_name:
-                    try:
-                        company_config = CompanyConfig.objects.filter(
-                            company_name__icontains=fill_work.company_name
-                        ).first()
-                        if company_config:
-                            company_code = company_config.company_code
-                    except Exception:
-                        pass
-                
-                # 檢查工單是否存在
+                # 修正邏輯：先檢查是否有對應的工單
                 workorder_exists = False
                 
-                # 方法1：使用公司代號+工單號碼+產品編號比對
-                if company_code:
+                # 檢查是否有對應的工單
+                if fill_work.company_code:
+                    # 有公司代號時，直接比對公司代號
                     workorder_exists = WorkOrder.objects.filter(
-                        company_code=company_code,
+                        company_code=fill_work.company_code,
                         order_number=fill_work.workorder,
                         product_code=fill_work.product_id
                     ).exists()
+                else:
+                    # 當 company_code 為 None 時，使用公司名稱進行比對
+                    # 先從 CompanyConfig 找到對應的公司代號
+                    try:
+                        company_config = CompanyConfig.objects.get(company_name=fill_work.company_name)
+                        workorder_exists = WorkOrder.objects.filter(
+                            company_code=company_config.company_code,
+                            order_number=fill_work.workorder,
+                            product_code=fill_work.product_id
+                        ).exists()
+                    except CompanyConfig.DoesNotExist:
+                        # 如果找不到公司配置，只比對工單號碼和產品編號
+                        workorder_exists = WorkOrder.objects.filter(
+                            order_number=fill_work.workorder,
+                            product_code=fill_work.product_id
+                        ).exists()
                 
-                # 方法2：如果找不到公司代號，直接用工單號碼+產品編號比對
-                if not workorder_exists:
-                    workorder_exists = WorkOrder.objects.filter(
-                        order_number=fill_work.workorder,
-                        product_code=fill_work.product_id
-                    ).exists()
-                
-                # 如果沒有對應的工單記錄，記錄為缺失
+                # 如果沒有對應的工單，才算是真正的填報異常
                 if not workorder_exists:
                     ConsistencyCheckResult.objects.create(
                         check_type='missing_dispatch',
-                        company_code=company_code,
+                        company_code=fill_work.company_code,
                         company_name=fill_work.company_name,
                         workorder=fill_work.workorder,
                         product_code=fill_work.product_id,
+                        # 記錄錯誤的資料，用於修復時查找
+                        wrong_company_name=fill_work.company_name,
+                        wrong_workorder=fill_work.workorder,
+                        wrong_product_code=fill_work.product_id,
                         operator=fill_work.operator,
                         work_date=fill_work.work_date,
                     )
                     missing_count += 1
+                    self.logger.debug(f"發現填報異常：{fill_work.company_name} {fill_work.workorder} {fill_work.product_id} - 無對應工單")
+                else:
+                    self.logger.debug(f"跳過正常填報：{fill_work.company_name} {fill_work.workorder} {fill_work.product_id} - 有對應工單")
             
-            self.logger.info(f"工單缺失檢查完成，發現 {missing_count} 筆問題")
+            self.logger.info(f"填報異常檢查完成，發現 {missing_count} 筆問題")
             return missing_count
             
         except Exception as e:
-            self.logger.error(f"檢查工單缺失失敗：{str(e)}")
+            self.logger.error(f"檢查填報異常失敗：{str(e)}")
             raise
     
     def check_wrong_product_code(self):
@@ -306,24 +307,19 @@ class ConsistencyCheckService:
             result_id: 檢查結果ID
             fix_method: 修復方式
             fixed_by: 修復人員
-            fix_data: 修復資料字典
+            fix_data: 修復資料字典（可選）
         """
         try:
             result = ConsistencyCheckResult.objects.get(id=result_id)
             
-            # 將修復資料儲存到結果記錄中
-            if fix_data:
-                result.fix_data = fix_data
-                result.save()
-            
             if result.check_type == 'missing_dispatch':
-                self._fix_missing_dispatch(result, fix_method)
+                self._fix_missing_dispatch(result, fix_method, fix_data)
             elif result.check_type == 'wrong_product_code':
-                self._fix_wrong_product_code(result, fix_method)
+                self._fix_wrong_product_code(result, fix_method, fix_data)
             elif result.check_type == 'wrong_company':
-                self._fix_wrong_company(result, fix_method)
+                self._fix_wrong_company(result, fix_method, fix_data)
             elif result.check_type == 'wrong_workorder':
-                self._fix_wrong_workorder(result, fix_method)
+                self._fix_wrong_workorder(result, fix_method, fix_data)
             
             result.mark_as_fixed(fixed_by, fix_method)
             self.logger.info(f"已修復相符性問題：{result}")
@@ -334,186 +330,120 @@ class ConsistencyCheckService:
     
 
     
-    def _fix_missing_dispatch(self, result, fix_method):
-        """修復工單缺失"""
+    def _fix_missing_dispatch(self, result, fix_method, fix_data=None):
+        """修復填報異常"""
         from workorder.fill_work.models import FillWork
         
-        if fix_method == 'update_company_name':
-            # 修復選項1：修改填報記錄的公司名稱
-            new_company_name = result.fix_data.get('new_company_name', '')
-            if new_company_name:
-                # 更精確的查詢條件，避免違反唯一約束
-                updated_count = 0
-                fill_works = FillWork.objects.filter(
-                    company_name=result.company_name,
-                    workorder=result.workorder,
-                    product_id=result.product_code
-                )
-                
-                for fill_work in fill_works:
-                    # 檢查更新後是否會違反唯一約束
-                    existing_check = FillWork.objects.filter(
-                        company_name=new_company_name,
-                        workorder=fill_work.workorder,
-                        product_id=fill_work.product_id,
-                        operation=fill_work.operation,
-                        operator=fill_work.operator,
-                        work_date=fill_work.work_date,
-                        start_time=fill_work.start_time
-                    ).exclude(pk=fill_work.pk).exists()
-                    
-                    if not existing_check:
-                        fill_work.company_name = new_company_name
-                        fill_work.save()
-                        updated_count += 1
-                    else:
-                        self.logger.warning(f"跳過更新填報記錄 ID={fill_work.id}，因為會違反唯一約束")
-                
-                self.logger.info(f"已更新 {updated_count} 筆填報紀錄的公司名稱：{result.company_name} → {new_company_name}")
-        
-        elif fix_method == 'update_workorder':
-            # 修復選項2：修改填報記錄的工單號碼
-            new_workorder = result.fix_data.get('new_workorder', '')
-            if new_workorder:
-                # 更精確的查詢條件，避免違反唯一約束
-                updated_count = 0
-                fill_works = FillWork.objects.filter(
-                    company_name=result.company_name,
-                    workorder=result.workorder,
-                    product_id=result.product_code
-                )
-                
-                for fill_work in fill_works:
-                    # 檢查更新後是否會違反唯一約束
-                    existing_check = FillWork.objects.filter(
-                        company_name=fill_work.company_name,
-                        workorder=new_workorder,
-                        product_id=fill_work.product_id,
-                        operation=fill_work.operation,
-                        operator=fill_work.operator,
-                        work_date=fill_work.work_date,
-                        start_time=fill_work.start_time
-                    ).exclude(pk=fill_work.pk).exists()
-                    
-                    if not existing_check:
-                        fill_work.workorder = new_workorder
-                        fill_work.save()
-                        updated_count += 1
-                    else:
-                        self.logger.warning(f"跳過更新填報記錄 ID={fill_work.id}，因為會違反唯一約束")
-                
-                self.logger.info(f"已更新 {updated_count} 筆填報紀錄的工單號碼：{result.workorder} → {new_workorder}")
-        
-        elif fix_method == 'update_product_code':
-            # 修復選項3：修改填報記錄的產品編號
-            new_product_code = result.fix_data.get('new_product_code', '')
-            if new_product_code:
-                # 更精確的查詢條件，避免違反唯一約束
-                updated_count = 0
-                fill_works = FillWork.objects.filter(
-                    company_name=result.company_name,
-                    workorder=result.workorder,
-                    product_id=result.product_code
-                )
-                
-                for fill_work in fill_works:
-                    # 檢查更新後是否會違反唯一約束
-                    existing_check = FillWork.objects.filter(
-                        company_name=fill_work.company_name,
-                        workorder=fill_work.workorder,
-                        product_id=new_product_code,
-                        operation=fill_work.operation,
-                        operator=fill_work.operator,
-                        work_date=fill_work.work_date,
-                        start_time=fill_work.start_time
-                    ).exclude(pk=fill_work.pk).exists()
-                    
-                    if not existing_check:
-                        fill_work.product_id = new_product_code
-                        fill_work.save()
-                        updated_count += 1
-                    else:
-                        self.logger.warning(f"跳過更新填報記錄 ID={fill_work.id}，因為會違反唯一約束")
-                
-                self.logger.info(f"已更新 {updated_count} 筆填報紀錄的產品編號：{result.product_code} → {new_product_code}")
-        
-        elif fix_method == 'delete_fill_work':
-            # 修復選項4：刪除填報記錄
-            deleted_count, _ = FillWork.objects.filter(
-                company_name=result.company_name,
-                workorder=result.workorder,
-                product_id=result.product_code
-            ).delete()
-            self.logger.info(f"已刪除 {deleted_count} 筆填報紀錄：公司={result.company_name}, 工單={result.workorder}, 產品={result.product_code}")
-        
-        elif fix_method == 'create_workorder':
-            # 修復選項5：創建對應的工單記錄
-            from workorder.models import WorkOrder
-            from erp_integration.models import CompanyConfig
+        if fix_method == 'delete_fill_work':
+            # 刪除填報紀錄
+            # 使用錯誤的公司名稱、工單號碼、產品編號來查找要刪除的填報紀錄
+            deleted_count = FillWork.objects.filter(
+                company_name=result.wrong_company_name or result.company_name,
+                workorder=result.wrong_workorder or result.workorder,
+                product_id=result.wrong_product_code or result.product_code
+            ).delete()[0]
+            self.logger.info(f"已刪除 {deleted_count} 筆填報紀錄")
             
-            # 根據公司名稱找到公司代號
-            company_code = None
-            if result.company_name:
-                try:
-                    company_config = CompanyConfig.objects.filter(
-                        company_name__icontains=result.company_name
-                    ).first()
-                    if company_config:
-                        company_code = company_config.company_code
-                except Exception:
-                    pass
+        elif fix_method == 'update_fill_work':
+            # 更新填報紀錄
+            # 先查找需要修改的填報紀錄（使用錯誤的資料來查找）
+            fill_works = FillWork.objects.filter(
+                company_name=result.wrong_company_name or result.company_name,
+                workorder=result.wrong_workorder or result.workorder,
+                product_id=result.wrong_product_code or result.product_code
+            )
             
-            # 創建工單記錄
-            if company_code:
-                workorder = WorkOrder.objects.create(
-                    company_code=company_code,
-                    order_number=result.workorder,
-                    product_code=result.product_code,
-                    quantity=result.quantity or 0,
-                    status='pending',
-                    order_source='manual_fix',
-                    created_by='consistency_fix'
-                )
-                self.logger.info(f"已創建工單記錄：{workorder.order_number}")
+            if not fill_works.exists():
+                self.logger.warning(f"找不到要修改的填報紀錄：公司={result.wrong_company_name or result.company_name}, 工單={result.wrong_workorder or result.workorder}, 產品={result.wrong_product_code or result.product_code}")
+                return
+            
+            # 準備更新欄位
+            update_fields = {}
+            
+            if fix_data:
+                # 有修改資料時，使用提供的修復資料
+                if 'company_name' in fix_data and fix_data['company_name'].strip():
+                    update_fields['company_name'] = fix_data['company_name'].strip()
+                if 'workorder' in fix_data and fix_data['workorder'].strip():
+                    update_fields['workorder'] = fix_data['workorder'].strip()
+                if 'product_id' in fix_data and fix_data['product_id'].strip():
+                    update_fields['product_id'] = fix_data['product_id'].strip()
             else:
-                raise ValueError(f"無法找到公司 '{result.company_name}' 的公司代號，無法創建工單")
-        
+                # 沒有修改資料時，提示用戶需要提供修復資料
+                self.logger.warning("選擇修改填報紀錄但沒有提供修改資料，無法執行修復")
+                raise ValueError("修改填報紀錄需要提供修復資料（公司名稱、工單號碼或產品編號）")
+            
+            if update_fields:
+                updated_count = fill_works.update(**update_fields)
+                self.logger.info(f"已更新 {updated_count} 筆填報紀錄：{update_fields}")
+            else:
+                self.logger.warning("沒有需要更新的欄位，請檢查修復資料")
+                
         else:
-            raise ValueError(f"不支援的修復方式：{fix_method}")
+            # 預設：僅標記為已修復，不刪除資料
+            self.logger.info(f"未知的修復方式：{fix_method}，僅標記為已修復")
     
-    def _fix_wrong_product_code(self, result, fix_method):
-        """修復產品編號錯誤 - 將填報紀錄的產品編號更新為工單的正確產品編號"""
-        # 不管修復方式，都統一更新填報紀錄的產品編號
+    def _fix_wrong_product_code(self, result, fix_method, fix_data=None):
+        """修復產品編號錯誤"""
         from workorder.fill_work.models import FillWork
         
-        # 更新填報紀錄的產品編號，讓它與工單的產品編號一致
+        if fix_method == 'update_fill_work' and fix_data and 'product_id' in fix_data:
+            # 使用指定的產品編號
+            new_product_id = fix_data['product_id']
+        else:
+            # 使用工單的正確產品編號
+            new_product_id = result.product_code
+        
+        # 更新填報紀錄的產品編號
         updated_count = FillWork.objects.filter(
             company_name=result.company_name,
             workorder=result.workorder,
             product_id=result.wrong_product_code
-        ).update(product_id=result.product_code)
+        ).update(product_id=new_product_id)
         
-        self.logger.info(f"已更新 {updated_count} 筆填報紀錄的產品編號：{result.wrong_product_code} → {result.product_code}")
+        self.logger.info(f"已更新 {updated_count} 筆填報紀錄的產品編號：{result.wrong_product_code} → {new_product_id}")
     
-    def _fix_wrong_company(self, result, fix_method):
+    def _fix_wrong_company(self, result, fix_method, fix_data=None):
         """修復公司代號/名稱錯誤"""
-        if fix_method == 'update_fill_work':
-            # 更新填報紀錄的公司名稱
-            FillWork.objects.filter(
-                workorder=result.workorder,
-                product_id=result.product_code,
-                company_name=result.wrong_company_name
-            ).update(
-                company_code=result.company_code,
-                company_name=result.company_name
-            )
+        from workorder.fill_work.models import FillWork
+        
+        if fix_method == 'update_fill_work' and fix_data and 'company_name' in fix_data:
+            # 使用指定的公司名稱
+            new_company_name = fix_data['company_name']
+            new_company_code = fix_data.get('company_code', result.company_code)
+        else:
+            # 使用工單的正確公司名稱
+            new_company_name = result.company_name
+            new_company_code = result.company_code
+        
+        # 更新填報紀錄的公司名稱
+        updated_count = FillWork.objects.filter(
+            workorder=result.workorder,
+            product_id=result.product_code,
+            company_name=result.wrong_company_name
+        ).update(
+            company_code=new_company_code,
+            company_name=new_company_name
+        )
+        
+        self.logger.info(f"已更新 {updated_count} 筆填報紀錄的公司名稱：{result.wrong_company_name} → {new_company_name}")
     
-    def _fix_wrong_workorder(self, result, fix_method):
+    def _fix_wrong_workorder(self, result, fix_method, fix_data=None):
         """修復工單號碼錯誤"""
-        if fix_method == 'update_fill_work':
-            # 更新填報紀錄的工單號碼
-            FillWork.objects.filter(
-                company_name=result.company_name,
-                product_id=result.product_code,
-                workorder=result.wrong_workorder
-            ).update(workorder=result.workorder) 
+        from workorder.fill_work.models import FillWork
+        
+        if fix_method == 'update_fill_work' and fix_data and 'workorder' in fix_data:
+            # 使用指定的工單號碼
+            new_workorder = fix_data['workorder']
+        else:
+            # 使用工單的正確號碼
+            new_workorder = result.workorder
+        
+        # 更新填報紀錄的工單號碼
+        updated_count = FillWork.objects.filter(
+            company_name=result.company_name,
+            product_id=result.product_code,
+            workorder=result.wrong_workorder
+        ).update(workorder=new_workorder)
+        
+        self.logger.info(f"已更新 {updated_count} 筆填報紀錄的工單號碼：{result.wrong_workorder} → {new_workorder}") 

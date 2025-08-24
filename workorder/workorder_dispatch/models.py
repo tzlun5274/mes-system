@@ -148,12 +148,22 @@ class WorkOrderDispatch(models.Model):
             # 6. 更新完工判斷
             self._update_completion_status()
             
+            # 7. 同步工單狀態
+            self._sync_workorder_status()
+            
             self.save()
             
         except Exception as e:
             import logging
+            import traceback
             logger = logging.getLogger('workorder')
-            logger.error(f"更新派工單 {self.order_number} 統計資料失敗: {str(e)}")
+            error_details = traceback.format_exc()
+            logger.error(f"更新派工單 {self.order_number} 統計資料失敗: {str(e)}\n詳細錯誤:\n{error_details}")
+            # 即使有錯誤，也要嘗試儲存已更新的資料
+            try:
+                self.save()
+            except:
+                pass
     
     def _update_fillwork_statistics(self):
         """更新填報記錄統計"""
@@ -200,7 +210,7 @@ class WorkOrderDispatch(models.Model):
         self.total_quantity = self.total_good_quantity + self.total_defect_quantity
         
         # 出貨包裝專項統計（填報記錄）
-        packaging_reports = approved_reports.filter(operation='出貨包裝')
+        packaging_reports = approved_reports.filter(process__name='出貨包裝')
         packaging_good_quantity = packaging_reports.aggregate(
             total=Sum('work_quantity')
         )['total'] or 0
@@ -340,9 +350,9 @@ class WorkOrderDispatch(models.Model):
             from workorder.onsite_reporting.models import OnsiteReport
             
             onsite_packaging_reports = OnsiteReport.objects.filter(
-                order_number=self.order_number,
-                product_code=self.product_code,
-                process='出貨包裝',
+                workorder=self.order_number,
+                product_id=self.product_code,
+                operation='出貨包裝',
                 status='completed'
             )
             
@@ -370,6 +380,47 @@ class WorkOrderDispatch(models.Model):
         except ImportError:
             # 如果現場報工模組不存在，返回0
             return {'good': 0, 'defect': 0, 'total': 0}
+    
+    def _sync_workorder_status(self):
+        """同步工單狀態"""
+        try:
+            from workorder.models import WorkOrder
+            import logging
+            logger = logging.getLogger('workorder')
+            
+            # 查找對應的工單
+            workorder = WorkOrder.objects.filter(
+                order_number=self.order_number,
+                product_code=self.product_code,
+                company_code=self.company_code
+            ).first()
+            
+            if workorder:
+                # 根據派工單狀態和完工判斷來更新工單狀態
+                if self.can_complete:
+                    # 如果達到完工條件，標記為已完成
+                    if workorder.status != 'completed':
+                        workorder.status = 'completed'
+                        workorder.completed_at = timezone.now()
+                        workorder.save()
+                        logger.info(f"工單 {workorder.order_number} 狀態更新為已完成")
+                elif self.total_quantity > 0:
+                    # 如果有生產數量，標記為生產中
+                    if workorder.status == 'pending':
+                        workorder.status = 'in_progress'
+                        workorder.save()
+                        logger.info(f"工單 {workorder.order_number} 狀態更新為生產中")
+                else:
+                    # 如果沒有生產數量，保持待生產狀態
+                    if workorder.status != 'pending':
+                        workorder.status = 'pending'
+                        workorder.save()
+                        logger.info(f"工單 {workorder.order_number} 狀態更新為待生產")
+                        
+        except Exception as e:
+            import logging
+            logger = logging.getLogger('workorder')
+            logger.error(f"同步工單狀態失敗: {str(e)}")
 
 
 class WorkOrderDispatchProcess(models.Model):

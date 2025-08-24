@@ -92,16 +92,16 @@
 
     <!-- 檢查功能卡片 -->
     <div class="row">
-        <!-- 缺失派工單 -->
+        <!-- 填報異常 -->
         <div class="col-lg-4 col-md-6 mb-4">
             <div class="card consistency-card h-100">
                 <div class="card-body text-center">
                     <div class="card-icon text-info mb-3">
                         <i class="fas fa-clipboard-list"></i>
                     </div>
-                    <h5 class="card-title">工單缺失</h5>
+                    <h5 class="card-title">填報異常</h5>
                     <p class="card-text text-muted">
-                        檢查有填報紀錄但沒有對應工單的情況
+                        檢查填報紀錄的異常情況
                     </p>
                     
                     <!-- 統計資訊 -->
@@ -224,89 +224,7 @@
             </div>
         </div>
 
-        <!-- 工單號碼錯誤 -->
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card consistency-card h-100">
-                <div class="card-body text-center">
-                    <div class="card-icon text-secondary mb-3">
-                        <i class="fas fa-file-alt"></i>
-                    </div>
-                    <h5 class="card-title">工單號碼錯誤</h5>
-                    <p class="card-text text-muted">
-                        檢查填報紀錄中工單號碼錯誤的情況
-                    </p>
-                    
-                    <!-- 統計資訊 -->
-                    <div class="mb-3">
-                        <span class="badge bg-secondary stats-badge me-2">
-                            總計: {{ check_stats.wrong_workorder.total }}
-                        </span>
-                        <span class="badge bg-success stats-badge me-2">
-                            已修復: {{ check_stats.wrong_workorder.fixed }}
-                        </span>
-                        <span class="badge bg-warning stats-badge">
-                            未修復: {{ check_stats.wrong_workorder.unfixed }}
-                        </span>
-                    </div>
-                    
-                    <!-- 操作按鈕 -->
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-secondary check-button" 
-                                onclick="runCheck('wrong_workorder')"
-                                data-check-type="wrong_workorder">
-                            <span class="loading-spinner spinner-border spinner-border-sm me-2"></span>
-                            <span class="check-button-text">
-                                <i class="fas fa-search"></i> 執行檢查
-                            </span>
-                        </button>
-                        <a href="{% url 'workorder:consistency_check_detail' %}?type=wrong_workorder&fixed=false" 
-                           class="btn btn-outline-secondary btn-sm">
-                            <i class="fas fa-list"></i> 查看結果
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- 全部檢查 -->
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card consistency-card h-100 border-success">
-                <div class="card-body text-center">
-                    <div class="card-icon text-success mb-3">
-                        <i class="fas fa-tasks"></i>
-                    </div>
-                    <h5 class="card-title">全部檢查</h5>
-                    <p class="card-text text-muted">
-                        一次性執行所有相符性檢查
-                    </p>
-                    
-                    <!-- 統計資訊 -->
-                    <div class="mb-3">
-                        {% with total_issues=check_stats.missing_dispatch.total|add:check_stats.wrong_product_code.total|add:check_stats.wrong_company.total|add:check_stats.wrong_workorder.total %}
-                        <span class="badge bg-success stats-badge">
-                            總問題數: {{ total_issues }}
-                        </span>
-                        {% endwith %}
-                    </div>
-                    
-                    <!-- 操作按鈕 -->
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-success check-button" 
-                                onclick="runCheck('all')"
-                                data-check-type="all">
-                            <span class="loading-spinner spinner-border spinner-border-sm me-2"></span>
-                            <span class="check-button-text">
-                                <i class="fas fa-play"></i> 執行全部檢查
-                            </span>
-                        </button>
-                        <a href="{% url 'workorder:consistency_check_detail' %}?type=all&fixed=false" 
-                           class="btn btn-outline-success btn-sm">
-                            <i class="fas fa-list"></i> 查看所有結果
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- 檢查說明 -->
@@ -324,8 +242,7 @@
                         <div class="col-md-6">
                             <h6>比對條件說明：</h6>
                             <ul class="list-unstyled">
-                                <li><i class="fas fa-check text-success"></i> <strong>缺失填報紀錄：</strong>公司代號+工單號碼+產品編號</li>
-                                <li><i class="fas fa-check text-success"></i> <strong>缺失派工單：</strong>公司代號+工單號碼+產品編號</li>
+                                <li><i class="fas fa-check text-success"></i> <strong>填報異常：</strong>公司代號+工單號碼+產品編號</li>
                                 <li><i class="fas fa-check text-success"></i> <strong>產品編號錯誤：</strong>公司代號+工單號碼相同，產品編號不同</li>
                                 <li><i class="fas fa-check text-success"></i> <strong>公司代號錯誤：</strong>工單號碼+產品編號相同，公司代號不同</li>
                                 <li><i class="fas fa-check text-success"></i> <strong>工單號碼錯誤：</strong>公司代號+產品編號相同，工單號碼不同</li>
