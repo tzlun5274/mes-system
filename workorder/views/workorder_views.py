@@ -209,12 +209,11 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
 
         # 取得所有報工記錄（填報記錄 + 現場報工）
         
-        # 取得已核准的填報記錄
-        approved_fillwork = FillWork.objects.filter(
+        # 取得所有填報記錄（包括已核准和待核准）
+        all_fillwork = FillWork.objects.filter(
             workorder=workorder.order_number,
             product_id=workorder.product_code,
-            company_name=company_name,
-            approval_status='approved'
+            company_name=company_name
         ).order_by('work_date', 'start_time')
         
         # 取得現場報工記錄
@@ -228,7 +227,7 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
         all_production_reports = []
         
         # 處理填報記錄
-        for fillwork in approved_fillwork:
+        for fillwork in all_fillwork:
             all_production_reports.append({
                 'report_date': fillwork.work_date,
                 'process_name': fillwork.operation or fillwork.process.name if fillwork.process else '未知工序',
@@ -239,7 +238,9 @@ class WorkOrderDetailView(LoginRequiredMixin, DetailView):
                 'work_hours': float(fillwork.work_hours_calculated or 0),
                 'overtime_hours': float(fillwork.overtime_hours_calculated or 0),
                 'report_source': '填報記錄',
-                'report_type': 'fillwork'
+                'report_type': 'fillwork',
+                'approval_status': fillwork.approval_status,  # 添加核准狀態
+                'fillwork_id': fillwork.id  # 添加填報記錄ID
             })
         
         # 處理現場報工記錄

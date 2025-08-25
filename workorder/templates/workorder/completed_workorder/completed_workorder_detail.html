@@ -409,6 +409,20 @@
                 <div class="info-value">{{ completed_workorder.completed_at|date:"Y-m-d H:i" }}</div>
             </div>
         </div>
+        
+        <!-- 回朔操作按鈕 -->
+        <div class="mt-4 text-center">
+            <a href="{% url 'workorder:rollback_confirm' completed_workorder.id %}" class="btn btn-danger btn-lg">
+                <i class="fas fa-undo me-2"></i>
+                回朔到生產中
+            </a>
+            <div class="mt-2">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    將工單狀態從「已完工」回朔到「生產中」，並回寫相關資料
+                </small>
+            </div>
+        </div>
     </div>
 
     <!-- 整體進度 -->

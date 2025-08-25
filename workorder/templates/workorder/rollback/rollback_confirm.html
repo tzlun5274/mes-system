@@ -1,0 +1,522 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}工單回朔確認 - {{ completed_workorder.order_number }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .rollback-confirm-container {
+        padding: 20px;
+        background-color: #f8f9fa;
+        min-height: 100vh;
+    }
+    
+    .page-header {
+        background: white;
+        border-radius: 8px;
+        padding: 20px 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #dc3545;
+    }
+    
+    .page-header h1 {
+        font-size: 1.8rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .workorder-number {
+        font-size: 1.2rem;
+        color: #666;
+        font-weight: 500;
+    }
+    
+    .breadcrumb {
+        background: transparent;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .breadcrumb-item a {
+        color: #007bff;
+        text-decoration: none;
+    }
+    
+    .breadcrumb-item.active {
+        color: #6c757d;
+    }
+    
+    .rollback-warning-card {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .rollback-warning-card h3 {
+        color: #856404;
+        font-size: 1.3rem;
+        margin-bottom: 15px;
+    }
+    
+    .rollback-warning-card ul {
+        color: #856404;
+        margin-bottom: 0;
+    }
+    
+    .rollback-warning-card li {
+        margin-bottom: 8px;
+    }
+    
+    .workorder-info-card {
+        background: white;
+        border-radius: 8px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+    }
+    
+    .workorder-info-card h2 {
+        font-size: 1.4rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+    
+    .info-item {
+        padding: 15px;
+        border-radius: 6px;
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+    }
+    
+    .info-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 5px;
+    }
+    
+    .info-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #333;
+    }
+    
+    .stats-card {
+        background: white;
+        border-radius: 8px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+    }
+    
+    .stats-card h2 {
+        font-size: 1.4rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+    }
+    
+    .stat-item {
+        text-align: center;
+        padding: 20px;
+        border-radius: 6px;
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #007bff;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .action-buttons {
+        background: white;
+        border-radius: 8px;
+        padding: 25px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+        text-align: center;
+    }
+    
+    .btn-rollback {
+        background-color: #dc3545;
+        border-color: #dc3545;
+        color: white;
+        padding: 12px 30px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 6px;
+        margin-right: 15px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-rollback:hover {
+        background-color: #c82333;
+        border-color: #bd2130;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+    }
+    
+    .btn-cancel {
+        background-color: #6c757d;
+        border-color: #6c757d;
+        color: white;
+        padding: 12px 30px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-cancel:hover {
+        background-color: #5a6268;
+        border-color: #545b62;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+    }
+    
+    .btn-disabled {
+        background-color: #6c757d !important;
+        border-color: #6c757d !important;
+        color: white !important;
+        cursor: not-allowed !important;
+        opacity: 0.6;
+    }
+    
+    .btn-disabled:hover {
+        transform: none !important;
+        box-shadow: none !important;
+    }
+    
+    .status-badge {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .status-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .loading-spinner {
+        display: none;
+        margin-right: 8px;
+    }
+    
+    .spinner-border-sm {
+        width: 1rem;
+        height: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="rollback-confirm-container">
+    <!-- 頁面標題 -->
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="{% url 'home' %}">
+                        <i class="fas fa-home me-1"></i>首頁
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="{% url 'workorder:index' %}">
+                        <i class="fas fa-clipboard-list me-1"></i>工單管理功能入口
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="{% url 'workorder:completed_workorder_list' %}">
+                        <i class="fas fa-check-circle me-1"></i>已完工工單
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="{% url 'workorder:completed_workorder_detail' completed_workorder.id %}">
+                        <i class="fas fa-eye me-1"></i>工單詳情
+                    </a>
+                </li>
+                <li class="breadcrumb-item active">
+                    <i class="fas fa-undo me-1"></i>回朔確認
+                </li>
+            </ol>
+        </nav>
+        <h1>
+            <i class="fas fa-undo text-danger me-2"></i>
+            工單回朔確認
+        </h1>
+        <div class="workorder-number">{{ completed_workorder.order_number }}</div>
+    </div>
+
+    <!-- 回朔警告 -->
+    <div class="rollback-warning-card">
+        <h3>
+            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+            重要警告
+        </h3>
+        <ul>
+            <li><strong>此操作不可逆轉</strong>：回朔後，工單將從「已完工」狀態變更為「生產中」狀態</li>
+            <li><strong>資料回寫</strong>：所有相關的工序資料、報工記錄將被回寫到生產中工單</li>
+            <li><strong>已完工記錄刪除</strong>：已完工工單記錄將被刪除，但原始資料會保留在生產中工單</li>
+            <li><strong>影響範圍</strong>：此操作可能影響報表統計、生產進度追蹤等相關功能</li>
+        </ul>
+    </div>
+
+    <!-- 工單基本資訊 -->
+    <div class="workorder-info-card">
+        <h2>
+            <i class="fas fa-info-circle text-primary me-2"></i>
+            工單基本資訊
+        </h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">公司名稱</div>
+                <div class="info-value">{{ company_name }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">產品編號</div>
+                <div class="info-value">{{ completed_workorder.product_code }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">計劃數量</div>
+                <div class="info-value">{{ completed_workorder.planned_quantity|floatformat:0 }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">完成數量</div>
+                <div class="info-value">{{ completed_workorder.completed_quantity|floatformat:0 }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">完工時間</div>
+                <div class="info-value">{{ completed_workorder.completed_at|date:"Y-m-d H:i" }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">回朔狀態</div>
+                <div class="info-value">
+                    {% if can_rollback %}
+                        <span class="status-badge status-success">
+                            <i class="fas fa-check me-1"></i>可以回朔
+                        </span>
+                    {% else %}
+                        <span class="status-badge status-danger">
+                            <i class="fas fa-times me-1"></i>無法回朔
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計資料 -->
+    <div class="stats-card">
+        <h2>
+            <i class="fas fa-chart-bar text-success me-2"></i>
+            生產統計資料
+        </h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value">{{ total_processes }}</div>
+                <div class="stat-label">報工次數</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ total_work_hours|floatformat:1 }}</div>
+                <div class="stat-label">總工作時數</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ total_good_quantity }}</div>
+                <div class="stat-label">合格品數量</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ total_defect_quantity }}</div>
+                <div class="stat-label">不良品數量</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="action-buttons">
+        <h3 class="mb-4">
+            <i class="fas fa-cogs text-primary me-2"></i>
+            確認操作
+        </h3>
+        
+        {% if can_rollback %}
+            <p class="text-muted mb-4">請確認您要將此工單回朔到生產中狀態</p>
+            
+            <!-- 回朔選項 -->
+            <div class="rollback-options mb-4">
+                <h5 class="mb-3">
+                    <i class="fas fa-cog text-primary me-2"></i>
+                    回朔選項
+                </h5>
+                
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="keepApprovalStatus" checked>
+                    <label class="form-check-label" for="keepApprovalStatus">
+                        <strong>保持填報記錄核准狀態</strong>
+                    </label>
+                    <div class="form-text">
+                        <i class="fas fa-info-circle me-1"></i>
+                        勾選：保持原有核准狀態，避免重複核准<br>
+                        取消：改為待核准狀態，需要重新核准
+                    </div>
+                </div>
+            </div>
+            
+            <button type="button" class="btn btn-rollback" id="rollbackBtn" data-workorder-id="{{ completed_workorder.id }}">
+                <span class="loading-spinner">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                </span>
+                <i class="fas fa-undo me-2"></i>
+                確認回朔
+            </button>
+            
+            <a href="{% url 'workorder:completed_workorder_detail' completed_workorder.id %}" class="btn btn-cancel">
+                <i class="fas fa-times me-2"></i>
+                取消
+            </a>
+        {% else %}
+            <div class="alert alert-warning" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>無法回朔：</strong>{{ rollback_reason }}
+            </div>
+            
+            <a href="{% url 'workorder:completed_workorder_detail' completed_workorder.id %}" class="btn btn-cancel">
+                <i class="fas fa-arrow-left me-2"></i>
+                返回詳情
+            </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 回朔按鈕點擊事件
+    $('#rollbackBtn').click(function() {
+        const workorderId = $(this).data('workorder-id');
+        const keepApprovalStatus = $('#keepApprovalStatus').is(':checked');
+        const $btn = $(this);
+        const $spinner = $btn.find('.loading-spinner');
+        const $icon = $btn.find('i.fas');
+        const originalText = $btn.html();
+        
+        // 顯示確認對話框
+        const approvalText = keepApprovalStatus ? '保持核准狀態' : '改為待核准狀態';
+        if (!confirm(`確定要將此工單回朔到生產中狀態嗎？\n填報記錄將${approvalText}。\n此操作不可逆轉！`)) {
+            return;
+        }
+        
+        // 禁用按鈕並顯示載入狀態
+        $btn.prop('disabled', true).addClass('btn-disabled');
+        $spinner.show();
+        $icon.hide();
+        $btn.html('<span class="loading-spinner"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>處理中...');
+        
+        // 發送回朔請求
+        $.ajax({
+            url: `/workorder/rollback/${workorderId}/execute/`,
+            method: 'POST',
+            data: {
+                keep_approval_status: keepApprovalStatus
+            },
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    // 顯示成功訊息
+                    showAlert('success', response.message);
+                    
+                    // 延遲重定向
+                    setTimeout(function() {
+                        window.location.href = response.redirect_url;
+                    }, 2000);
+                } else {
+                    showAlert('error', response.error || '回朔失敗');
+                    resetButton();
+                }
+            },
+            error: function(xhr) {
+                let errorMessage = '回朔失敗';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMessage = xhr.responseJSON.error;
+                }
+                showAlert('error', errorMessage);
+                resetButton();
+            }
+        });
+        
+        function resetButton() {
+            $btn.prop('disabled', false).removeClass('btn-disabled');
+            $spinner.hide();
+            $icon.show();
+            $btn.html(originalText);
+        }
+    });
+    
+    // 顯示訊息函數
+    function showAlert(type, message) {
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        const icon = type === 'success' ? 'check-circle' : 'exclamation-triangle';
+        
+        const alertHtml = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="fas fa-${icon} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        $('.rollback-confirm-container').prepend(alertHtml);
+    }
+});
+</script>
+{% endblock %}

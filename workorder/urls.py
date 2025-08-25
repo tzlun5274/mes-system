@@ -23,6 +23,10 @@ from .views.completed_workorder_views import (
     CompletedWorkOrderListView, CompletedWorkOrderDetailView,
     transfer_workorder_to_completed, batch_transfer_completed_workorders
 )
+from .views.rollback_views import (
+    WorkOrderRollbackConfirmView, rollback_completed_workorder,
+    batch_rollback_completed_workorders, check_rollback_status
+)
 from .views import api_views
 # 自動分配功能已移除
 from .views.auto_management_views import (
@@ -100,6 +104,12 @@ urlpatterns = [
     path('completed/<int:pk>/', CompletedWorkOrderDetailView.as_view(), name='completed_workorder_detail'),
     path('completed/transfer/<int:workorder_id>/', transfer_workorder_to_completed, name='transfer_workorder_to_completed'),
     path('completed/batch-transfer/', batch_transfer_completed_workorders, name='batch_transfer_completed_workorders'),
+    
+    # 工單回朔相關 URL
+    path('rollback/<int:pk>/', WorkOrderRollbackConfirmView.as_view(), name='rollback_confirm'),
+    path('rollback/<int:pk>/execute/', rollback_completed_workorder, name='rollback_execute'),
+    path('rollback/batch/', batch_rollback_completed_workorders, name='batch_rollback'),
+    path('rollback/<int:pk>/check/', check_rollback_status, name='rollback_status_check'),
     
     # 公司製令單管理 - 使用類別視圖
     path("company/", CompanyOrderListView.as_view(), name="company_orders"),

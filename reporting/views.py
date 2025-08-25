@@ -916,7 +916,8 @@ def work_hour_report_index(request):
 def daily_report(request):
     """日報表預覽"""
     if request.method == 'POST':
-        operator = request.POST.get('operator')
+        company = request.POST.get('company', 'all')
+        operator = request.POST.get('operator', 'all')
         date_str = request.POST.get('date')
         
         try:
@@ -927,8 +928,13 @@ def daily_report(request):
             service = WorkHourReportService()
             
             # 取得報表資料
-            data = service.get_daily_report_by_operator(operator, date)
-            summary = service.get_daily_summary_by_operator(operator, date)
+            data = service.get_daily_report_by_company_operator(company, operator, date)
+            summary = service.get_daily_summary_by_company_operator(company, operator, date)
+            
+            # 取得公司選項
+            companies = WorkOrderReportData.objects.exclude(
+                company__isnull=True
+            ).values_list('company', flat=True).distinct().order_by('company')
             
             # 取得作業員選項
             operators = WorkOrderReportData.objects.exclude(
@@ -938,11 +944,13 @@ def daily_report(request):
             # 顯示預覽報表
             context = {
                 'report_type': '日報表',
+                'company': company,
                 'operator': operator,
                 'date': date,
                 'summary': summary,
                 'data': data,
                 'generated_at': timezone.now(),
+                'companies': companies,
                 'operators': operators,
             }
             return render(request, 'reporting/reporting/daily_report.html', context)
@@ -959,10 +967,15 @@ def daily_report(request):
     else:
         current_date = timezone.now().date()
     
-    # 取得預設資料（最近有資料的日期全部作業員）
+    # 取得預設資料（最近有資料的日期全部公司和作業員）
     service = WorkHourReportService()
-    data = service.get_daily_report_by_operator('all', current_date)
-    summary = service.get_daily_summary_by_operator('all', current_date)
+    data = service.get_daily_report_by_company_operator('all', 'all', current_date)
+    summary = service.get_daily_summary_by_company_operator('all', 'all', current_date)
+    
+    # 取得公司選項
+    companies = WorkOrderReportData.objects.exclude(
+        company__isnull=True
+    ).values_list('company', flat=True).distinct().order_by('company')
     
     # 取得作業員選項
     operators = WorkOrderReportData.objects.exclude(
@@ -971,14 +984,365 @@ def daily_report(request):
     
     context = {
         'report_type': '日報表',
+        'company': 'all',
         'operator': 'all',
         'date': current_date,
         'summary': summary,
         'data': data,
         'generated_at': timezone.now(),
+        'companies': companies,
         'operators': operators,
     }
     return render(request, 'reporting/reporting/daily_report.html', context)
+
+
+@login_required
+def custom_report(request):
+    """自訂報表預覽"""
+    if request.method == 'POST':
+        company = request.POST.get('company', 'all')
+        operator = request.POST.get('operator', 'all')
+        start_date_str = request.POST.get('start_date')
+        end_date_str = request.POST.get('end_date')
+        
+        try:
+            # 解析日期
+            from datetime import datetime
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            
+            service = WorkHourReportService()
+            
+            # 取得報表資料
+            data = service.get_custom_report_by_company_operator(company, operator, start_date, end_date)
+            summary = service.get_custom_summary_by_company_operator(company, operator, start_date, end_date)
+            
+            # 取得公司選項
+            companies = WorkOrderReportData.objects.exclude(
+                company__isnull=True
+            ).values_list('company', flat=True).distinct().order_by('company')
+            
+            # 取得作業員選項
+            operators = WorkOrderReportData.objects.exclude(
+                operator_name__isnull=True
+            ).values_list('operator_name', flat=True).distinct().order_by('operator_name')
+            
+            # 顯示預覽報表
+            context = {
+                'report_type': '自訂報表',
+                'company': company,
+                'operator': operator,
+                'start_date': start_date,
+                'end_date': end_date,
+                'summary': summary,
+                'data': data,
+                'generated_at': timezone.now(),
+                'companies': companies,
+                'operators': operators,
+            }
+            return render(request, 'reporting/reporting/custom_report.html', context)
+                
+        except Exception as e:
+            messages.error(request, f'生成自訂報表失敗: {str(e)}')
+            return redirect('reporting:work_hour_report_index')
+    
+    # GET 請求顯示預設頁面
+    # 取得最近30天的資料
+    end_date = timezone.now().date()
+    start_date = end_date - timedelta(days=30)
+    
+    # 取得預設資料
+    service = WorkHourReportService()
+    data = service.get_custom_report_by_company_operator('all', 'all', start_date, end_date)
+    summary = service.get_custom_summary_by_company_operator('all', 'all', start_date, end_date)
+    
+    # 取得公司選項
+    companies = WorkOrderReportData.objects.exclude(
+        company__isnull=True
+    ).values_list('company', flat=True).distinct().order_by('company')
+    
+    # 取得作業員選項
+    operators = WorkOrderReportData.objects.exclude(
+        operator_name__isnull=True
+    ).values_list('operator_name', flat=True).distinct().order_by('operator_name')
+    
+    context = {
+        'report_type': '自訂報表',
+        'company': 'all',
+        'operator': 'all',
+        'start_date': start_date,
+        'end_date': end_date,
+        'summary': summary,
+        'data': data,
+        'generated_at': timezone.now(),
+        'companies': companies,
+        'operators': operators,
+    }
+    return render(request, 'reporting/reporting/custom_report.html', context)
+
+
+@login_required
+def unified_report_form(request):
+    """統一報表生成器"""
+    if request.method == 'POST':
+        report_type = request.POST.get('report_type')
+        service = WorkHourReportService()
+        
+        try:
+            if report_type == 'daily':
+                company = request.POST.get('company', 'all')
+                operator = request.POST.get('operator', 'all')
+                date_str = request.POST.get('date')
+                
+                if date_str:
+                    date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    data = service.get_daily_report_by_company_operator(company, operator, date)
+                    summary = service.get_daily_summary_by_company_operator(company, operator, date)
+                    operator_stats = service.get_operator_statistics(data)
+                    
+                    context = {
+                        'report_type': '日報表',
+                        'report_data': data,
+                        'summary': summary,
+                        'operator_stats': operator_stats,
+                        'company': company,
+                        'operator': operator,
+                        'date': date,
+                        'current_year': timezone.now().year,
+                        'current_month': timezone.now().month,
+                        'current_week': timezone.now().isocalendar()[1],
+                        'years': range(timezone.now().year - 5, timezone.now().year + 2),
+                        'months': range(1, 13),
+                        'weeks': range(1, 54),
+                        'current_date': timezone.now().date(),
+                        'start_date': timezone.now().date() - timedelta(days=30),
+                        'end_date': timezone.now().date(),
+                    }
+                    return render(request, 'reporting/reporting/unified_report_form.html', context)
+                    
+            elif report_type == 'weekly':
+                company = request.POST.get('company', 'all')
+                operator = request.POST.get('operator', 'all')
+                year = int(request.POST.get('year_weekly', timezone.now().year))
+                week = int(request.POST.get('week', timezone.now().isocalendar()[1]))
+                
+                # 計算該週的起始和結束日期
+                start_of_year = datetime(year, 1, 1)
+                start_of_week = start_of_year + timedelta(weeks=week-1)
+                end_of_week = start_of_week + timedelta(days=6)
+                
+                data = service.get_custom_report_by_company_operator(company, operator, start_of_week.date(), end_of_week.date())
+                summary = service.get_custom_summary_by_company_operator(company, operator, start_of_week.date(), end_of_week.date())
+                operator_stats = service.get_operator_statistics(data)
+                
+                context = {
+                    'report_type': '週報表',
+                    'report_data': data,
+                    'summary': summary,
+                    'operator_stats': operator_stats,
+                    'company': company,
+                    'operator': operator,
+                    'year': year,
+                    'week': week,
+                    'current_year': timezone.now().year,
+                    'current_month': timezone.now().month,
+                    'current_week': timezone.now().isocalendar()[1],
+                    'years': range(timezone.now().year - 5, timezone.now().year + 2),
+                    'months': range(1, 13),
+                    'weeks': range(1, 54),
+                    'current_date': timezone.now().date(),
+                    'start_date': timezone.now().date() - timedelta(days=30),
+                    'end_date': timezone.now().date(),
+                }
+                return render(request, 'reporting/reporting/unified_report_form.html', context)
+                
+            elif report_type == 'monthly':
+                company = request.POST.get('company', 'all')
+                operator = request.POST.get('operator', 'all')
+                year = int(request.POST.get('year_monthly', timezone.now().year))
+                month = int(request.POST.get('month', timezone.now().month))
+                
+                # 計算該月的起始和結束日期
+                start_of_month = datetime(year, month, 1)
+                if month == 12:
+                    end_of_month = datetime(year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    end_of_month = datetime(year, month + 1, 1) - timedelta(days=1)
+                
+                data = service.get_custom_report_by_company_operator(company, operator, start_of_month.date(), end_of_month.date())
+                summary = service.get_custom_summary_by_company_operator(company, operator, start_of_month.date(), end_of_month.date())
+                operator_stats = service.get_operator_statistics(data)
+                
+                context = {
+                    'report_type': '月報表',
+                    'report_data': data,
+                    'summary': summary,
+                    'operator_stats': operator_stats,
+                    'company': company,
+                    'operator': operator,
+                    'year': year,
+                    'month': month,
+                    'current_year': timezone.now().year,
+                    'current_month': timezone.now().month,
+                    'current_week': timezone.now().isocalendar()[1],
+                    'years': range(timezone.now().year - 5, timezone.now().year + 2),
+                    'months': range(1, 13),
+                    'weeks': range(1, 54),
+                    'current_date': timezone.now().date(),
+                    'start_date': timezone.now().date() - timedelta(days=30),
+                    'end_date': timezone.now().date(),
+                }
+                return render(request, 'reporting/reporting/unified_report_form.html', context)
+                
+            elif report_type == 'yearly':
+                company = request.POST.get('company', 'all')
+                operator = request.POST.get('operator', 'all')
+                year = int(request.POST.get('year_yearly', timezone.now().year))
+                
+                # 計算該年的起始和結束日期
+                from datetime import datetime
+                start_of_year = datetime(year, 1, 1)
+                end_of_year = datetime(year, 12, 31)
+                
+                data = service.get_custom_report_by_company_operator(company, operator, start_of_year.date(), end_of_year.date())
+                summary = service.get_custom_summary_by_company_operator(company, operator, start_of_year.date(), end_of_year.date())
+                operator_stats = service.get_operator_statistics(data)
+                
+                context = {
+                    'report_type': '年報表',
+                    'report_data': data,
+                    'summary': summary,
+                    'operator_stats': operator_stats,
+                    'company': company,
+                    'operator': operator,
+                    'year': year,
+                    'current_year': timezone.now().year,
+                    'current_month': timezone.now().month,
+                    'current_week': timezone.now().isocalendar()[1],
+                    'years': range(timezone.now().year - 5, timezone.now().year + 2),
+                    'months': range(1, 13),
+                    'weeks': range(1, 54),
+                    'current_date': timezone.now().date(),
+                    'start_date': timezone.now().date() - timedelta(days=30),
+                    'end_date': timezone.now().date(),
+                }
+                return render(request, 'reporting/reporting/unified_report_form.html', context)
+                
+            elif report_type == 'custom':
+                company = request.POST.get('company', 'all')
+                operator = request.POST.get('operator', 'all')
+                start_date_str = request.POST.get('start_date')
+                end_date_str = request.POST.get('end_date')
+                
+                if start_date_str and end_date_str:
+                    from datetime import datetime
+                    start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                    end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    
+                    data = service.get_custom_report_by_company_operator(company, operator, start_date, end_date)
+                    summary = service.get_custom_summary_by_company_operator(company, operator, start_date, end_date)
+                    operator_stats = service.get_operator_statistics(data)
+                    
+                    context = {
+                        'report_type': '自訂報表',
+                        'report_data': data,
+                        'summary': summary,
+                        'operator_stats': operator_stats,
+                        'company': company,
+                        'operator': operator,
+                        'start_date': start_date,
+                        'end_date': end_date,
+                        'current_year': timezone.now().year,
+                        'current_month': timezone.now().month,
+                        'current_week': timezone.now().isocalendar()[1],
+                        'years': range(timezone.now().year - 5, timezone.now().year + 2),
+                        'months': range(1, 13),
+                        'weeks': range(1, 54),
+                        'current_date': timezone.now().date(),
+                        'start_date': start_date,
+                        'end_date': end_date,
+                    }
+                    return render(request, 'reporting/reporting/unified_report_form.html', context)
+            
+            messages.error(request, '請選擇有效的報表類型')
+            
+        except Exception as e:
+            messages.error(request, f'生成報表失敗: {str(e)}')
+    
+    # GET 請求顯示統一報表選擇頁面
+    # 準備年度、月份、週數選項
+    current_year = timezone.now().year
+    current_month = timezone.now().month
+    current_week = timezone.now().isocalendar()[1]
+    
+    years = range(current_year - 5, current_year + 2)
+    months = range(1, 13)
+    weeks = range(1, 54)  # 一年最多53週
+    
+    # 準備自訂報表的預設日期範圍（最近30天）
+    end_date = timezone.now().date()
+    start_date = end_date - timedelta(days=30)
+    
+    context = {
+        'current_year': current_year,
+        'current_month': current_month,
+        'current_week': current_week,
+        'years': years,
+        'months': months,
+        'weeks': weeks,
+        'current_date': timezone.now().date(),
+        'start_date': start_date,
+        'end_date': end_date,
+        # 初始化報表相關變數，確保模板能正常顯示
+        'report_data': None,
+        'summary': None,
+        'operator_stats': None,
+        'report_type': None,
+        # 添加 timezone 到上下文
+        'timezone': timezone,
+    }
+    
+    return render(request, 'reporting/reporting/unified_report_form.html', context)
+
+
+@login_required
+def custom_report_export(request):
+    """自訂報表匯出"""
+    company = request.GET.get('company', 'all')
+    operator = request.GET.get('operator', 'all')
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    format = request.GET.get('format', 'excel')
+    
+    try:
+        # 解析日期
+        from datetime import datetime
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        
+        service = WorkHourReportService()
+        generator = ReportGeneratorService()
+        
+        # 生成檔案
+        result = generator.generate_custom_report_by_company_operator(company, operator, start_date, end_date, format)
+        
+        # 下載檔案
+        with open(result['file_path'], 'rb') as f:
+            response = HttpResponse(f.read(), content_type='application/octet-stream')
+            # 設定檔案名稱，支援中文
+            filename = result["filename"]
+            import urllib.parse
+            # 使用 URL 編碼處理中文檔案名稱
+            encoded_filename = urllib.parse.quote(filename)
+            response['Content-Disposition'] = f'attachment; filename="{encoded_filename}"; filename*=UTF-8\'\'{encoded_filename}'
+            # 添加安全標頭
+            response['X-Content-Type-Options'] = 'nosniff'
+            response['X-Frame-Options'] = 'DENY'
+            return response
+            
+    except Exception as e:
+        messages.error(request, f'匯出自訂報表失敗: {str(e)}')
+        return redirect('reporting:custom_report')
 
 
 @login_required
@@ -1902,6 +2266,142 @@ def score_period_management(request):
     }
     
     return render(request, 'reporting/score_period_management.html', context)
+
+@login_required
+def score_period_detail(request, period_type):
+    """評分週期詳情"""
+    from .services import ScorePeriodService
+    
+    company_code = request.GET.get('company_code', '')
+    if not company_code:
+        messages.error(request, '請選擇公司代號')
+        return redirect('reporting:score_period_management')
+    
+    # 取得週期摘要
+    summary = ScorePeriodService.get_period_summary(company_code, period_type)
+    if not summary:
+        messages.error(request, f'找不到{period_type}評分資料')
+        return redirect('reporting:score_period_management')
+    
+    # 取得詳細記錄
+    start_date, end_date = ScorePeriodService.get_current_period_dates(period_type)
+    records = OperatorProcessCapacityScore.objects.filter(
+        company_code=company_code,
+        score_period=period_type,
+        period_start_date=start_date,
+        period_end_date=end_date
+    ).order_by('-work_date')
+    
+    # 分頁
+    paginator = Paginator(records, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'summary': summary,
+        'page_obj': page_obj,
+        'period_type': period_type,
+        'company_code': company_code,
+    }
+    
+    return render(request, 'reporting/score_period_detail.html', context)
+
+@login_required
+def work_hour_stats(request):
+    """提供工作時數統計資料的 API"""
+    from django.http import JsonResponse
+    
+    try:
+        # 基本統計資料
+        total_records = WorkOrderReportData.objects.count()
+        
+        # 總工作時數
+        total_hours = WorkOrderReportData.objects.aggregate(
+            total=Sum('daily_work_hours')
+        )['total'] or 0
+        
+        # 作業員數量（去重）
+        total_operators = WorkOrderReportData.objects.exclude(
+            operator_name__isnull=True
+        ).values('operator_name').distinct().count()
+        
+        # 平均日工作時數
+        avg_daily_hours = WorkOrderReportData.objects.aggregate(
+            avg=Avg('daily_work_hours')
+        )['avg'] or 0
+        
+        return JsonResponse({
+            'total_records': total_records,
+            'total_hours': float(total_hours),
+            'total_operators': total_operators,
+            'avg_daily_hours': float(avg_daily_hours),
+        })
+    except Exception as e:
+        logger.error(f"取得工作時數統計資料失敗: {str(e)}")
+        return JsonResponse({
+            'total_records': 0,
+            'total_hours': 0,
+            'total_operators': 0,
+            'avg_daily_hours': 0,
+        })
+
+
+@login_required
+def detailed_stats(request):
+    """提供詳細統計資料的 API"""
+    from django.http import JsonResponse
+    from datetime import datetime, timedelta
+    
+    try:
+        # 按月份統計
+        monthly_stats = WorkOrderReportData.objects.annotate(
+            year_month=ExtractYear('work_date') * 100 + ExtractMonth('work_date')
+        ).values('year_month').annotate(
+            total_hours=Sum('daily_work_hours'),
+            record_count=Count('id')
+        ).order_by('year_month')
+        
+        monthly_data = {
+            'labels': [],
+            'hours': [],
+            'counts': []
+        }
+        
+        for item in monthly_stats:
+            year = item['year_month'] // 100
+            month = item['year_month'] % 100
+            monthly_data['labels'].append(f"{year}-{month:02d}")
+            monthly_data['hours'].append(float(item['total_hours'] or 0))
+            monthly_data['counts'].append(item['record_count'])
+        
+        # 按公司統計
+        company_stats = WorkOrderReportData.objects.values('company').annotate(
+            total_hours=Sum('daily_work_hours'),
+            record_count=Count('id')
+        ).order_by('-total_hours')
+        
+        company_data = {
+            'labels': [],
+            'hours': [],
+            'counts': []
+        }
+        
+        for item in company_stats:
+            company_name = item['company'] or '未指定'
+            company_data['labels'].append(company_name)
+            company_data['hours'].append(float(item['total_hours'] or 0))
+            company_data['counts'].append(item['record_count'])
+        
+        return JsonResponse({
+            'monthly': monthly_data,
+            'company': company_data
+        })
+    except Exception as e:
+        logger.error(f"取得詳細統計資料失敗: {str(e)}")
+        return JsonResponse({
+            'monthly': {'labels': [], 'hours': [], 'counts': []},
+            'company': {'labels': [], 'hours': [], 'counts': []}
+        })
 
 @login_required
 def score_period_detail(request, period_type):

@@ -1,0 +1,894 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}工作時數報表{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'reporting:work_hour_report_index' %}">工作時數報表</a></li>
+            <li class="breadcrumb-item active" aria-current="page">報表生成</li>
+        </ol>
+    </nav>
+
+    <!-- 訊息顯示區塊 -->
+    {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3"><i class="fas fa-chart-line text-info"></i> 工作時數報表生成</h2>
+        </div>
+    </div>
+
+    <!-- 報表設定區塊 -->
+    <div class="row">
+        <div class="col-md-10 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cog"></i> 報表設定</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="reportForm">
+                        {% csrf_token %}
+                        
+                        <!-- 報表類型選擇 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <label class="form-label">報表類型 <span class="text-danger">*</span></label>
+                                <div class="btn-group w-100" role="group" aria-label="報表類型選擇">
+                                    <input type="radio" class="btn-check" name="report_type" id="daily" value="daily" checked>
+                                    <label class="btn btn-outline-primary" for="daily">
+                                        <i class="fas fa-calendar-day"></i> 日報表
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="report_type" id="weekly" value="weekly">
+                                    <label class="btn btn-outline-primary" for="weekly">
+                                        <i class="fas fa-calendar-week"></i> 週報表
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="report_type" id="monthly" value="monthly">
+                                    <label class="btn btn-outline-primary" for="monthly">
+                                        <i class="fas fa-calendar-alt"></i> 月報表
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="report_type" id="yearly" value="yearly">
+                                    <label class="btn btn-outline-primary" for="yearly">
+                                        <i class="fas fa-calendar"></i> 年報表
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="report_type" id="custom" value="custom">
+                                    <label class="btn btn-outline-primary" for="custom">
+                                        <i class="fas fa-cogs"></i> 自訂
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 日報表設定 -->
+                        <div id="dailySettings" class="report-settings">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="company" class="form-label">公司名稱 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="company" name="company" required>
+                                        <option value="all" selected>全部公司</option>
+                                        <option value="中儀科技">中儀科技</option>
+                                        <option value="其他公司">其他公司</option>
+                                    </select>
+                                    <div class="form-text">請選擇要查詢的公司，或選擇全部公司</div>
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="operator" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="operator" name="operator" required>
+                                        <option value="all" selected>全部作業員</option>
+                                        <option value="張小明">張小明</option>
+                                        <option value="李小華">李小華</option>
+                                        <option value="王小美">王小美</option>
+                                        <option value="陳大強">陳大強</option>
+                                        <option value="林小芳">林小芳</option>
+                                    </select>
+                                    <div class="form-text">請選擇要查詢的作業員，或選擇全部作業員</div>
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="date" class="form-label">報表日期 <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" id="date" name="date" value="{{ current_date|date:'Y-m-d' }}" required>
+                                    <div class="form-text">請選擇要生成報表的日期</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 週報表設定 -->
+                        <div id="weeklySettings" class="report-settings" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <label for="company_weekly" class="form-label">公司名稱 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="company_weekly" name="company_weekly" required>
+                                        <option value="all" selected>全部公司</option>
+                                        <option value="中儀科技">中儀科技</option>
+                                        <option value="其他公司">其他公司</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-3 mb-3">
+                                    <label for="operator_weekly" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="operator_weekly" name="operator_weekly" required>
+                                        <option value="all" selected>全部作業員</option>
+                                        <option value="張小明">張小明</option>
+                                        <option value="李小華">李小華</option>
+                                        <option value="王小美">王小美</option>
+                                        <option value="陳大強">陳大強</option>
+                                        <option value="林小芳">林小芳</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-3 mb-3">
+                                    <label for="year_weekly" class="form-label">年度 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="year_weekly" name="year_weekly" required>
+                                        {% for year in years %}
+                                            <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-3 mb-3">
+                                    <label for="week" class="form-label">週數 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="week" name="week" required>
+                                        {% for week in weeks %}
+                                            <option value="{{ week }}" {% if week == current_week %}selected{% endif %}>第{{ week }}週</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 月報表設定 -->
+                        <div id="monthlySettings" class="report-settings" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <label for="company_monthly" class="form-label">公司名稱 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="company_monthly" name="company_monthly" required>
+                                        <option value="all" selected>全部公司</option>
+                                        <option value="中儀科技">中儀科技</option>
+                                        <option value="其他公司">其他公司</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-3 mb-3">
+                                    <label for="operator_monthly" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="operator_monthly" name="operator_monthly" required>
+                                        <option value="all" selected>全部作業員</option>
+                                        <option value="張小明">張小明</option>
+                                        <option value="李小華">李小華</option>
+                                        <option value="王小美">王小美</option>
+                                        <option value="陳大強">陳大強</option>
+                                        <option value="林小芳">林小芳</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-3 mb-3">
+                                    <label for="year_monthly" class="form-label">年度 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="year_monthly" name="year_monthly" required>
+                                        {% for year in years %}
+                                            <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-3 mb-3">
+                                    <label for="month" class="form-label">月份 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="month" name="month" required>
+                                        {% for month in months %}
+                                            <option value="{{ month }}" {% if month == current_month %}selected{% endif %}>{{ month }}月</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                                                 <!-- 年報表設定 -->
+                         <div id="yearlySettings" class="report-settings" style="display: none;">
+                             <div class="row">
+                                 <div class="col-md-6 mb-3">
+                                     <label for="company_yearly" class="form-label">公司名稱 <span class="text-danger">*</span></label>
+                                     <select class="form-select" id="company_yearly" name="company_yearly" required>
+                                         <option value="all" selected>全部公司</option>
+                                         <option value="中儀科技">中儀科技</option>
+                                         <option value="其他公司">其他公司</option>
+                                     </select>
+                                 </div>
+                                 
+                                 <div class="col-md-6 mb-3">
+                                     <label for="operator_yearly" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                     <select class="form-select" id="operator_yearly" name="operator_yearly" required>
+                                         <option value="all" selected>全部作業員</option>
+                                         <option value="張小明">張小明</option>
+                                         <option value="李小華">李小華</option>
+                                         <option value="王小美">王小美</option>
+                                         <option value="陳大強">陳大強</option>
+                                         <option value="林小芳">林小芳</option>
+                                     </select>
+                                 </div>
+                                 
+                                 <div class="col-md-6 mb-3">
+                                     <label for="year_yearly" class="form-label">年度 <span class="text-danger">*</span></label>
+                                     <select class="form-select" id="year_yearly" name="year_yearly" required>
+                                         {% for year in years %}
+                                             <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                                         {% endfor %}
+                                     </select>
+                                 </div>
+                             </div>
+                         </div>
+
+                         <!-- 自訂報表設定 -->
+                         <div id="customSettings" class="report-settings" style="display: none;">
+                             <div class="row">
+                                 <div class="col-md-6 mb-3">
+                                     <label for="company_custom" class="form-label">公司名稱 <span class="text-danger">*</span></label>
+                                     <select class="form-select" id="company_custom" name="company_custom" required>
+                                         <option value="all" selected>全部公司</option>
+                                         <option value="中儀科技">中儀科技</option>
+                                         <option value="其他公司">其他公司</option>
+                                     </select>
+                                     <div class="form-text">請選擇要查詢的公司，或選擇全部公司</div>
+                                 </div>
+                                 
+                                 <div class="col-md-6 mb-3">
+                                     <label for="operator_custom" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                     <select class="form-select" id="operator_custom" name="operator_custom" required>
+                                         <option value="all" selected>全部作業員</option>
+                                         <option value="張小明">張小明</option>
+                                         <option value="李小華">李小華</option>
+                                         <option value="王小美">王小美</option>
+                                         <option value="陳大強">陳大強</option>
+                                         <option value="林小芳">林小芳</option>
+                                     </select>
+                                     <div class="form-text">請選擇要查詢的作業員，或選擇全部作業員</div>
+                                 </div>
+                                 
+                                 <div class="col-md-6 mb-3">
+                                     <label for="start_date" class="form-label">起始日期 <span class="text-danger">*</span></label>
+                                     <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" required>
+                                     <div class="form-text">請選擇查詢的起始日期</div>
+                                 </div>
+                                 
+                                 <div class="col-md-6 mb-3">
+                                     <label for="end_date" class="form-label">終止日期 <span class="text-danger">*</span></label>
+                                     <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" required>
+                                     <div class="form-text">請選擇查詢的終止日期</div>
+                                 </div>
+                             </div>
+                         </div>
+
+
+                     </form>
+                 </div>
+             </div>
+         </div>
+     </div>
+
+     <!-- 統計摘要區塊 -->
+     <div class="row mt-4">
+         <div class="col-12">
+             <div class="card">
+                 <div class="card-header">
+                     <h5 class="mb-0"><i class="fas fa-chart-pie"></i> 統計摘要</h5>
+                 </div>
+                 <div class="card-body">
+                     <div class="row">
+                         <div class="col-md-3 text-center">
+                             <div class="stat-item">
+                                 <h4 class="text-primary">{% if summary %}{{ summary.total_work_hours|floatformat:2 }}{% else %}0.00{% endif %}</h4>
+                                 <p class="text-muted">總工作時數</p>
+                             </div>
+                         </div>
+                         <div class="col-md-3 text-center">
+                             <div class="stat-item">
+                                 <h4 class="text-success">{% if summary %}{{ summary.total_operators }}{% else %}0{% endif %}</h4>
+                                 <p class="text-muted">總作業員數</p>
+                             </div>
+                         </div>
+                         <div class="col-md-3 text-center">
+                             <div class="stat-item">
+                                 <h4 class="text-info">{% if summary %}{{ summary.total_equipment_hours|floatformat:2 }}{% else %}0.00{% endif %}</h4>
+                                 <p class="text-muted">總設備使用時數</p>
+                             </div>
+                         </div>
+                         <div class="col-md-3 text-center">
+                             <div class="stat-item">
+                                 <h4 class="text-warning">{% if summary %}{{ summary.workorder_count }}{% else %}0{% endif %}</h4>
+                                 <p class="text-muted">工單數量</p>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+         </div>
+     </div>
+
+     <!-- 工作列表區塊 -->
+     <div class="row mt-4">
+         <div class="col-12">
+             <div class="card">
+                 <div class="card-header">
+                     <h5 class="mb-0"><i class="fas fa-list"></i> 工作列表</h5>
+                 </div>
+                 <div class="card-body">
+
+                     <!-- 標籤切換 -->
+                     <ul class="nav nav-tabs" id="reportTabs" role="tablist">
+                         <li class="nav-item" role="presentation">
+                             <button class="nav-link active" id="detail-tab" data-bs-toggle="tab" data-bs-target="#detail" type="button" role="tab" aria-controls="detail" aria-selected="true">
+                                 <i class="fas fa-table"></i> 明細
+                             </button>
+                         </li>
+                         <li class="nav-item" role="presentation">
+                             <button class="nav-link" id="statistics-tab" data-bs-toggle="tab" data-bs-target="#statistics" type="button" role="tab" aria-controls="statistics" aria-selected="false">
+                                 <i class="fas fa-chart-bar"></i> 統計
+                             </button>
+                         </li>
+                     </ul>
+                     
+                     <!-- 標籤內容 -->
+                     <div class="tab-content" id="reportTabContent">
+                         <!-- 明細標籤 -->
+                         <div class="tab-pane fade show active" id="detail" role="tabpanel" aria-labelledby="detail-tab">
+                             <div class="table-responsive mt-3">
+                                 <table class="table table-striped table-hover">
+                                     <thead class="table-dark">
+                                         <tr>
+                                             <th>作業員</th>
+                                             <th>公司名稱</th>
+                                             <th>工單編號</th>
+                                             <th>產品編號</th>
+                                             <th>工序</th>
+                                             <th>工作日期</th>
+                                             <th>開始時間</th>
+                                             <th>結束時間</th>
+                                             <th>工作時數</th>
+                                             <th>加班時數</th>
+                                             <th>合計時數</th>
+                                         </tr>
+                                     </thead>
+                                     <tbody>
+                                         {% if report_data %}
+                                             {% for item in report_data %}
+                                             <tr>
+                                                 <td>{{ item.operator_name|default:"-" }}</td>
+                                                 <td>{{ item.company|default:"-" }}</td>
+                                                 <td>{{ item.workorder_id }}</td>
+                                                 <td>{{ item.product_code|default:"-" }}</td>
+                                                 <td>{{ item.process_name|default:"-" }}</td>
+                                                 <td>{{ item.work_date|date:"Y-m-d" }}</td>
+                                                 <td>{{ item.start_time|default:"-" }}</td>
+                                                 <td>{{ item.end_time|default:"-" }}</td>
+                                                 <td>{{ item.work_hours|floatformat:2|default:"0.00" }}</td>
+                                                 <td>{{ item.overtime_hours|floatformat:2|default:"0.00" }}</td>
+                                                 <td>{{ item.total_hours|floatformat:2|default:"0.00" }}</td>
+                                             </tr>
+                                             {% endfor %}
+                                         {% else %}
+                                             <tr>
+                                                 <td colspan="11" class="text-center py-4">
+                                                     <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                                                     <h6 class="text-muted">暫無資料</h6>
+                                                     <p class="text-muted mb-0">請選擇條件並點擊「查詢報表」按鈕</p>
+                                                 </td>
+                                             </tr>
+                                         {% endif %}
+                                     </tbody>
+                                 </table>
+                             </div>
+                         </div>
+                         
+                         <!-- 統計標籤 -->
+                         <div class="tab-pane fade" id="statistics" role="tabpanel" aria-labelledby="statistics-tab">
+                             <div class="row mt-3">
+                                 <div class="col-12">
+                                     <div class="card">
+                                         <div class="card-header">
+                                             <h6 class="mb-0"><i class="fas fa-table"></i> 作業員統計摘要</h6>
+                                         </div>
+                                         <div class="card-body">
+                                             <div class="table-responsive">
+                                                 <table class="table table-striped table-hover">
+                                                     <thead class="table-dark">
+                                                         <tr>
+                                                             <th>排名</th>
+                                                             <th>作業員</th>
+                                                             <th>工作時數</th>
+                                                             <th>加班時數</th>
+                                                             <th>合計時數</th>
+                                                         </tr>
+                                                     </thead>
+                                                     <tbody id="operatorStatsTable">
+                                                         {% if operator_stats %}
+                                                             {% for stat in operator_stats %}
+                                                             <tr>
+                                                                 <td>{{ stat.rank }}</td>
+                                                                 <td>{{ stat.operator_name }}</td>
+                                                                 <td>{{ stat.work_hours|floatformat:2 }}</td>
+                                                                 <td>{{ stat.overtime_hours|floatformat:2 }}</td>
+                                                                 <td>{{ stat.total_hours|floatformat:2 }}</td>
+                                                             </tr>
+                                                             {% endfor %}
+                                                         {% else %}
+                                                             <tr>
+                                                                 <td colspan="5" class="text-center text-muted">暫無統計資料</td>
+                                                             </tr>
+                                                         {% endif %}
+                                                     </tbody>
+                                                 </table>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+         </div>
+     </div>
+
+     <!-- 匯出報表區塊 -->
+     <div class="row mt-4">
+         <div class="col-12">
+             <div class="card">
+                 <div class="card-header bg-secondary text-white">
+                     <h5 class="mb-0">
+                         <i class="fas fa-download"></i> 匯出報表
+                     </h5>
+                 </div>
+                 <div class="card-body text-center">
+                     <div class="row">
+                         <div class="col-md-4 mb-2">
+                             <a href="{% url 'reporting:daily_report_export' %}?company={{ company }}&operator={{ operator }}&date={{ date }}&format=excel" class="btn btn-success btn-lg w-100" id="exportExcelBtn">
+                                 <i class="fas fa-file-excel me-2"></i> 匯出 EXCEL
+                             </a>
+                         </div>
+                         <div class="col-md-4 mb-2">
+                             <a href="{% url 'reporting:daily_report_export' %}?company={{ company }}&operator={{ operator }}&date={{ date }}&format=csv" class="btn btn-info btn-lg w-100" id="exportCsvBtn">
+                                 <i class="fas fa-file-csv me-2"></i> 匯出 CSV
+                             </a>
+                         </div>
+                         <div class="col-md-4 mb-2">
+                             <button type="button" class="btn btn-warning btn-lg w-100" onclick="window.print()">
+                                 <i class="fas fa-print me-2"></i> 列印報表
+                             </button>
+                         </div>
+                     </div>
+                     <div class="mt-3">
+                         <small class="text-muted">
+                             <i class="fas fa-info-circle me-1"></i>
+                             選擇您需要的匯出格式，Excel 格式包含完整格式和圖表，CSV 格式適合匯入其他系統
+                         </small>
+                     </div>
+                 </div>
+             </div>
+         </div>
+     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表說明 -->
+    <div class="row mt-4">
+        <div class="col-md-10 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> 報表說明</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-list-ul text-primary"></i> 報表內容</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> 工作時數統計與分析</li>
+                                <li><i class="fas fa-check text-success"></i> 作業員工作時數排名</li>
+                                <li><i class="fas fa-check text-success"></i> 設備使用時數分析</li>
+                                <li><i class="fas fa-check text-success"></i> 工單完成情況統計</li>
+                                <li><i class="fas fa-check text-success"></i> 詳細工作記錄查詢</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-download text-primary"></i> 輸出格式</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-file-excel text-success"></i> Excel：完整格式，包含圖表</li>
+                                <li><i class="fas fa-file-csv text-info"></i> CSV：純文字格式，適合匯入</li>
+                                <li><i class="fas fa-globe text-warning"></i> 網頁：即時預覽，互動式顯示</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 8px;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.form-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.btn {
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+
+.btn-outline-primary {
+    border-color: #007bff;
+    color: #007bff;
+}
+
+.btn-outline-primary:hover,
+.btn-check:checked + .btn-outline-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+    color: white;
+}
+
+.form-select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.breadcrumb {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+}
+
+.breadcrumb-item a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.alert {
+    border-radius: 6px;
+    border: none;
+}
+
+.messages-container {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.btn-group .btn {
+    border-radius: 6px;
+}
+
+.report-settings {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* 統計摘要卡片樣式 */
+.stat-item {
+    padding: 1.5rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
+    transition: transform 0.2s ease-in-out;
+}
+
+.stat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.stat-item h4 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.stat-item p {
+    font-size: 0.9rem;
+    margin-bottom: 0;
+    color: #6c757d;
+}
+
+/* 工作列表表格樣式 */
+.table-dark {
+    background-color: #343a40;
+    color: white;
+}
+
+.table-dark th {
+    border-color: #454d55;
+    font-weight: 600;
+}
+
+/* 匯出報表按鈕樣式 */
+.btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+/* 卡片間距 */
+.card {
+    margin-bottom: 1.5rem;
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+</style>
+
+<script>
+// 日期計算輔助函數
+function getWeekStartDate(year, week) {
+    const januaryFirst = new Date(year, 0, 1);
+    const daysToAdd = (week - 1) * 7;
+    const weekStart = new Date(januaryFirst.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+    const dayOfWeek = weekStart.getDay();
+    const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const monday = new Date(weekStart.getTime() - daysToSubtract * 24 * 60 * 60 * 1000);
+    return monday.toISOString().split('T')[0];
+}
+
+function getWeekEndDate(year, week) {
+    const monday = new Date(getWeekStartDate(year, week));
+    const sunday = new Date(monday.getTime() + 6 * 24 * 60 * 60 * 1000);
+    return sunday.toISOString().split('T')[0];
+}
+
+function getMonthStartDate(year, month) {
+    return year + '-' + month.toString().padStart(2, '0') + '-01';
+}
+
+function getMonthEndDate(year, month) {
+    const lastDay = new Date(year, month, 0).getDate();
+    return year + '-' + month.toString().padStart(2, '0') + '-' + lastDay.toString().padStart(2, '0');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 報表類型切換
+    const reportTypeRadios = document.querySelectorAll('input[name="report_type"]');
+    const reportSettings = document.querySelectorAll('.report-settings');
+    
+    function showReportSettings(type) {
+        // 隱藏所有設定區塊
+        reportSettings.forEach(setting => {
+            setting.style.display = 'none';
+        });
+        
+        // 顯示對應的設定區塊
+        const targetSetting = document.getElementById(type + 'Settings');
+        if (targetSetting) {
+            targetSetting.style.display = 'block';
+        }
+        
+        // 更新表單驗證
+        updateFormValidation(type);
+    }
+    
+    function updateFormValidation(type) {
+        // 移除所有必填驗證
+        const allRequiredFields = document.querySelectorAll('[required]');
+        allRequiredFields.forEach(field => {
+            field.removeAttribute('required');
+        });
+        
+                 // 根據報表類型設定必填欄位
+         if (type === 'daily') {
+             document.getElementById('company').setAttribute('required', 'required');
+             document.getElementById('operator').setAttribute('required', 'required');
+             document.getElementById('date').setAttribute('required', 'required');
+         } else if (type === 'weekly') {
+             document.getElementById('company_weekly').setAttribute('required', 'required');
+             document.getElementById('operator_weekly').setAttribute('required', 'required');
+             document.getElementById('year_weekly').setAttribute('required', 'required');
+             document.getElementById('week').setAttribute('required', 'required');
+         } else if (type === 'monthly') {
+             document.getElementById('company_monthly').setAttribute('required', 'required');
+             document.getElementById('operator_monthly').setAttribute('required', 'required');
+             document.getElementById('year_monthly').setAttribute('required', 'required');
+             document.getElementById('month').setAttribute('required', 'required');
+         } else if (type === 'yearly') {
+             document.getElementById('company_yearly').setAttribute('required', 'required');
+             document.getElementById('operator_yearly').setAttribute('required', 'required');
+             document.getElementById('year_yearly').setAttribute('required', 'required');
+         } else if (type === 'custom') {
+             document.getElementById('company_custom').setAttribute('required', 'required');
+             document.getElementById('operator_custom').setAttribute('required', 'required');
+             document.getElementById('start_date').setAttribute('required', 'required');
+             document.getElementById('end_date').setAttribute('required', 'required');
+         }
+    }
+    
+    // 監聽報表類型變更
+    reportTypeRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            showReportSettings(this.value);
+        });
+    });
+    
+    // 初始化顯示日報表設定
+    showReportSettings('daily');
+    
+         // 表單提交處理
+     const form = document.getElementById('reportForm');
+     form.addEventListener('submit', function(e) {
+         const selectedType = document.querySelector('input[name="report_type"]:checked').value;
+         
+         // 設定表單提交到當前頁面
+         form.action = "{% url 'reporting:unified_report_form' %}";
+         
+         // 根據報表類型複製欄位名稱
+         if (selectedType === 'daily') {
+             // 日報表欄位名稱保持不變
+         } else if (selectedType === 'weekly') {
+             // 複製公司名稱和作業員到主要欄位
+             document.getElementById('company_weekly').name = 'company';
+             document.getElementById('operator_weekly').name = 'operator';
+         } else if (selectedType === 'monthly') {
+             // 複製公司名稱和作業員到主要欄位
+             document.getElementById('company_monthly').name = 'company';
+             document.getElementById('operator_monthly').name = 'operator';
+         } else if (selectedType === 'yearly') {
+             // 複製公司名稱和作業員到主要欄位
+             document.getElementById('company_yearly').name = 'company';
+             document.getElementById('operator_yearly').name = 'operator';
+         } else if (selectedType === 'custom') {
+             // 複製公司名稱和作業員到主要欄位
+             document.getElementById('company_custom').name = 'company';
+             document.getElementById('operator_custom').name = 'operator';
+         }
+        
+        // 驗證必填欄位
+        const requiredFields = document.querySelectorAll('[required]');
+        let isValid = true;
+        
+        requiredFields.forEach(field => {
+            if (!field.value.trim()) {
+                field.classList.add('is-invalid');
+                isValid = false;
+            } else {
+                field.classList.remove('is-invalid');
+                field.classList.add('is-valid');
+            }
+        });
+        
+        if (!isValid) {
+            e.preventDefault();
+            alert('請填寫所有必填欄位');
+            return false;
+        }
+    });
+    
+    // 即時驗證
+    const allInputs = document.querySelectorAll('input, select');
+    allInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            if (this.hasAttribute('required')) {
+                if (this.value.trim()) {
+                    this.classList.remove('is-invalid');
+                    this.classList.add('is-valid');
+                } else {
+                    this.classList.remove('is-valid');
+                    this.classList.add('is-invalid');
+                }
+            }
+                 });
+     });
+     
+     // 動態更新匯出按鈕
+     function updateExportButtons() {
+         const exportExcelBtn = document.getElementById('exportExcelBtn');
+         const exportCsvBtn = document.getElementById('exportCsvBtn');
+         
+         if (exportExcelBtn && exportCsvBtn) {
+             // 檢查是否有報表資料
+             const hasReportData = {% if report_data %}true{% else %}false{% endif %};
+             
+             if (hasReportData) {
+                 const selectedType = document.querySelector('input[name="report_type"]:checked');
+                 if (selectedType) {
+                     const reportType = selectedType.value;
+                     
+                     // 根據報表類型設定匯出URL
+                     if (reportType === 'daily') {
+                         exportExcelBtn.href = "{% url 'reporting:daily_report_export' %}?company={{ company }}&operator={{ operator }}&date={{ date }}&format=excel";
+                         exportCsvBtn.href = "{% url 'reporting:daily_report_export' %}?company={{ company }}&operator={{ operator }}&date={{ date }}&format=csv";
+                     } else if (reportType === 'weekly') {
+                         // 週報表使用自訂報表匯出，計算週的起始和結束日期
+                         const year = {{ year|default:timezone.now.year }};
+                         const week = {{ week|default:timezone.now.isocalendar.1 }};
+                         const startDate = getWeekStartDate(year, week);
+                         const endDate = getWeekEndDate(year, week);
+                         exportExcelBtn.href = "{% url 'reporting:custom_report_export' %}?company={{ company }}&operator={{ operator }}&start_date=" + startDate + "&end_date=" + endDate + "&format=excel";
+                         exportCsvBtn.href = "{% url 'reporting:custom_report_export' %}?company={{ company }}&operator={{ operator }}&start_date=" + startDate + "&end_date=" + endDate + "&format=csv";
+                     } else if (reportType === 'monthly') {
+                         // 月報表使用自訂報表匯出，計算月的起始和結束日期
+                         const year = {{ year|default:timezone.now.year }};
+                         const month = {{ month|default:timezone.now.month }};
+                         const startDate = getMonthStartDate(year, month);
+                         const endDate = getMonthEndDate(year, month);
+                         exportExcelBtn.href = "{% url 'reporting:custom_report_export' %}?company={{ company }}&operator={{ operator }}&start_date=" + startDate + "&end_date=" + endDate + "&format=excel";
+                         exportCsvBtn.href = "{% url 'reporting:custom_report_export' %}?company={{ company }}&operator={{ operator }}&start_date=" + startDate + "&end_date=" + endDate + "&format=csv";
+                     } else if (reportType === 'yearly') {
+                         // 年報表使用自訂報表匯出，計算年的起始和結束日期
+                         const year = {{ year|default:timezone.now.year }};
+                         const startDate = year + "-01-01";
+                         const endDate = year + "-12-31";
+                         exportExcelBtn.href = "{% url 'reporting:custom_report_export' %}?company={{ company }}&operator={{ operator }}&start_date=" + startDate + "&end_date=" + endDate + "&format=excel";
+                         exportCsvBtn.href = "{% url 'reporting:custom_report_export' %}?company={{ company }}&operator={{ operator }}&start_date=" + startDate + "&end_date=" + endDate + "&format=csv";
+                     } else if (reportType === 'custom') {
+                         exportExcelBtn.href = "{% url 'reporting:custom_report_export' %}?company={{ company }}&operator={{ operator }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&format=excel";
+                         exportCsvBtn.href = "{% url 'reporting:custom_report_export' %}?company={{ company }}&operator={{ operator }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&format=csv";
+                     }
+                     
+                     // 顯示匯出按鈕
+                     exportExcelBtn.style.display = 'inline-block';
+                     exportCsvBtn.style.display = 'inline-block';
+                 }
+             } else {
+                 // 沒有資料時隱藏匯出按鈕
+                 exportExcelBtn.style.display = 'none';
+                 exportCsvBtn.style.display = 'none';
+             }
+         }
+     }
+     
+     // 頁面載入時更新匯出按鈕
+     document.addEventListener('DOMContentLoaded', function() {
+         updateExportButtons();
+     });
+ });
+ </script>
+{% endblock %}

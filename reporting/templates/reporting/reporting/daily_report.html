@@ -24,7 +24,16 @@
                     <form method="post" id="reportForm">
                         {% csrf_token %}
                         <div class="row">
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-3 mb-3">
+                                <label for="company" class="form-label">公司名稱</label>
+                                <select class="form-select" id="company" name="company" required>
+                                    <option value="all" {% if company == 'all' %}selected{% endif %}>全部公司</option>
+                                    {% for comp in companies %}
+                                    <option value="{{ comp }}" {% if company == comp %}selected{% endif %}>{{ comp }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
                                 <label for="operator" class="form-label">作業員</label>
                                 <select class="form-select" id="operator" name="operator" required>
                                     <option value="all" {% if operator == 'all' %}selected{% endif %}>全部作業員</option>
@@ -33,11 +42,11 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-3 mb-3">
                                 <label for="date" class="form-label">報表日期</label>
                                 <input type="date" class="form-control" id="date" name="date" value="{{ date|date:'Y-m-d' }}" required>
                             </div>
-                            <div class="col-md-4 mb-3 d-flex align-items-end">
+                            <div class="col-md-3 mb-3 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary me-2">
                                     <i class="fas fa-search"></i> 查詢
                                 </button>
@@ -80,16 +89,19 @@
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
+                            <strong>公司名稱：</strong> {{ company }}
+                        </div>
+                        <div class="col-md-2">
                             <strong>作業員：</strong> {{ operator }}
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <strong>報表日期：</strong> {{ date|date:"Y-m-d" }}
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <strong>報表類型：</strong> {{ report_type }}
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <strong>生成時間：</strong> {{ generated_at|date:"Y-m-d H:i:s" }}
                         </div>
                     </div>

@@ -31,8 +31,11 @@ urlpatterns = [
     
     # 工作時數報表
     path('work-hour/', views.work_hour_report_index, name='work_hour_report_index'),
+    path('work-hour/unified/', views.unified_report_form, name='unified_report_form'),
     path('work-hour/daily/', views.daily_report, name='daily_report'),
     path('work-hour/daily/export/', views.daily_report_export, name='daily_report_export'),
+    path('work-hour/custom/', views.custom_report, name='custom_report'),
+    path('work-hour/custom/export/', views.custom_report_export, name='custom_report_export'),
     path('work-hour/weekly/', views.weekly_report, name='weekly_report'),
     path('work-hour/monthly/', views.monthly_report, name='monthly_report'),
     path('work-hour/quarterly/', views.quarterly_report, name='quarterly_report'),
