@@ -410,6 +410,41 @@ class ReportGeneratorService:
             logger.error(f"生成年報表失敗: {str(e)}")
             raise
     
+    def generate_custom_report_by_company_operator(self, company, operator, start_date, end_date, format='excel'):
+        """按公司和作業員生成自訂報表"""
+        try:
+            data = self.work_hour_service.get_custom_report_by_company_operator(company, operator, start_date, end_date)
+            summary = self.work_hour_service.get_custom_summary_by_company_operator(company, operator, start_date, end_date)
+            operator_stats = self.work_hour_service.get_operator_statistics(data)
+            
+            report_data = {
+                'report_type': '自訂報表',
+                'company': company,
+                'operator': operator,
+                'start_date': start_date,
+                'end_date': end_date,
+                'generated_at': timezone.now(),
+                'summary': summary,
+                'details': list(data.values()),
+                'operator_stats': operator_stats,
+            }
+            
+            # 生成檔案名稱
+            company_name = company if company != 'all' else '全部公司'
+            operator_name = operator if operator != 'all' else '全部作業員'
+            filename = f'{company_name}_{operator_name}_{start_date}_{end_date}'
+            
+            if format == 'excel':
+                return self._export_to_excel(report_data, filename)
+            elif format == 'csv':
+                return self._export_to_csv(report_data, filename)
+            else:
+                return report_data
+                
+        except Exception as e:
+            logger.error(f"生成自訂報表失敗: {str(e)}")
+            raise
+    
     def _export_to_excel(self, report_data, filename):
         """匯出為Excel格式（包含三個活頁簿：統計摘要、詳細、統計）"""
         try:
@@ -465,10 +500,27 @@ class ReportGeneratorService:
         ws.merge_cells('A1:D1')
         
         # 基本資訊
-        ws['A3'] = "作業員"
-        ws['B3'] = report_data.get('operator', '全部')
-        ws['C3'] = "報表日期"
-        ws['D3'] = report_data.get('date', '').strftime('%Y-%m-%d') if hasattr(report_data.get('date', ''), 'strftime') else str(report_data.get('date', ''))
+        if report_data['report_type'] == '自訂報表':
+            ws['A3'] = "公司"
+            ws['B3'] = report_data.get('company', '全部')
+            ws['C3'] = "作業員"
+            ws['D3'] = report_data.get('operator', '全部')
+            
+            ws['A4'] = "起始日期"
+            ws['B4'] = report_data.get('start_date', '').strftime('%Y-%m-%d') if hasattr(report_data.get('start_date', ''), 'strftime') else str(report_data.get('start_date', ''))
+            ws['C4'] = "結束日期"
+            ws['D4'] = report_data.get('end_date', '').strftime('%Y-%m-%d') if hasattr(report_data.get('end_date', ''), 'strftime') else str(report_data.get('end_date', ''))
+            
+            ws['A5'] = "生成時間"
+            ws['B5'] = report_data['generated_at'].strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            ws['A3'] = "作業員"
+            ws['B3'] = report_data.get('operator', '全部')
+            ws['C3'] = "報表日期"
+            ws['D3'] = report_data.get('date', '').strftime('%Y-%m-%d') if hasattr(report_data.get('date', ''), 'strftime') else str(report_data.get('date', ''))
+            
+            ws['A4'] = "生成時間"
+            ws['B4'] = report_data['generated_at'].strftime('%Y-%m-%d %H:%M:%S')
         
         ws['A4'] = "生成時間"
         ws['B4'] = report_data['generated_at'].strftime('%Y-%m-%d %H:%M:%S')

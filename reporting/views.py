@@ -13,7 +13,6 @@ from django.core.paginator import Paginator
 from django.db.models import Q, Avg, Count, Sum
 from django.db.models.functions import ExtractYear, ExtractMonth
 from django.utils import timezone
-from datetime import datetime, timedelta
 import json
 from django.core.serializers.json import DjangoJSONEncoder
 
@@ -922,7 +921,6 @@ def daily_report(request):
         
         try:
             # 解析日期
-            from datetime import datetime
             date = datetime.strptime(date_str, '%Y-%m-%d').date()
             
             service = WorkHourReportService()
@@ -1007,7 +1005,6 @@ def custom_report(request):
         
         try:
             # 解析日期
-            from datetime import datetime
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
             end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
             
@@ -1083,194 +1080,10 @@ def custom_report(request):
 
 @login_required
 def unified_report_form(request):
-    """統一報表生成器"""
-    if request.method == 'POST':
-        report_type = request.POST.get('report_type')
-        service = WorkHourReportService()
-        
-        try:
-            if report_type == 'daily':
-                company = request.POST.get('company', 'all')
-                operator = request.POST.get('operator', 'all')
-                date_str = request.POST.get('date')
-                
-                if date_str:
-                    date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                    data = service.get_daily_report_by_company_operator(company, operator, date)
-                    summary = service.get_daily_summary_by_company_operator(company, operator, date)
-                    operator_stats = service.get_operator_statistics(data)
-                    
-                    context = {
-                        'report_type': '日報表',
-                        'report_data': data,
-                        'summary': summary,
-                        'operator_stats': operator_stats,
-                        'company': company,
-                        'operator': operator,
-                        'date': date,
-                        'current_year': timezone.now().year,
-                        'current_month': timezone.now().month,
-                        'current_week': timezone.now().isocalendar()[1],
-                        'years': range(timezone.now().year - 5, timezone.now().year + 2),
-                        'months': range(1, 13),
-                        'weeks': range(1, 54),
-                        'current_date': timezone.now().date(),
-                        'start_date': timezone.now().date() - timedelta(days=30),
-                        'end_date': timezone.now().date(),
-                    }
-                    return render(request, 'reporting/reporting/unified_report_form.html', context)
-                    
-            elif report_type == 'weekly':
-                company = request.POST.get('company', 'all')
-                operator = request.POST.get('operator', 'all')
-                year = int(request.POST.get('year_weekly', timezone.now().year))
-                week = int(request.POST.get('week', timezone.now().isocalendar()[1]))
-                
-                # 計算該週的起始和結束日期
-                start_of_year = datetime(year, 1, 1)
-                start_of_week = start_of_year + timedelta(weeks=week-1)
-                end_of_week = start_of_week + timedelta(days=6)
-                
-                data = service.get_custom_report_by_company_operator(company, operator, start_of_week.date(), end_of_week.date())
-                summary = service.get_custom_summary_by_company_operator(company, operator, start_of_week.date(), end_of_week.date())
-                operator_stats = service.get_operator_statistics(data)
-                
-                context = {
-                    'report_type': '週報表',
-                    'report_data': data,
-                    'summary': summary,
-                    'operator_stats': operator_stats,
-                    'company': company,
-                    'operator': operator,
-                    'year': year,
-                    'week': week,
-                    'current_year': timezone.now().year,
-                    'current_month': timezone.now().month,
-                    'current_week': timezone.now().isocalendar()[1],
-                    'years': range(timezone.now().year - 5, timezone.now().year + 2),
-                    'months': range(1, 13),
-                    'weeks': range(1, 54),
-                    'current_date': timezone.now().date(),
-                    'start_date': timezone.now().date() - timedelta(days=30),
-                    'end_date': timezone.now().date(),
-                }
-                return render(request, 'reporting/reporting/unified_report_form.html', context)
-                
-            elif report_type == 'monthly':
-                company = request.POST.get('company', 'all')
-                operator = request.POST.get('operator', 'all')
-                year = int(request.POST.get('year_monthly', timezone.now().year))
-                month = int(request.POST.get('month', timezone.now().month))
-                
-                # 計算該月的起始和結束日期
-                start_of_month = datetime(year, month, 1)
-                if month == 12:
-                    end_of_month = datetime(year + 1, 1, 1) - timedelta(days=1)
-                else:
-                    end_of_month = datetime(year, month + 1, 1) - timedelta(days=1)
-                
-                data = service.get_custom_report_by_company_operator(company, operator, start_of_month.date(), end_of_month.date())
-                summary = service.get_custom_summary_by_company_operator(company, operator, start_of_month.date(), end_of_month.date())
-                operator_stats = service.get_operator_statistics(data)
-                
-                context = {
-                    'report_type': '月報表',
-                    'report_data': data,
-                    'summary': summary,
-                    'operator_stats': operator_stats,
-                    'company': company,
-                    'operator': operator,
-                    'year': year,
-                    'month': month,
-                    'current_year': timezone.now().year,
-                    'current_month': timezone.now().month,
-                    'current_week': timezone.now().isocalendar()[1],
-                    'years': range(timezone.now().year - 5, timezone.now().year + 2),
-                    'months': range(1, 13),
-                    'weeks': range(1, 54),
-                    'current_date': timezone.now().date(),
-                    'start_date': timezone.now().date() - timedelta(days=30),
-                    'end_date': timezone.now().date(),
-                }
-                return render(request, 'reporting/reporting/unified_report_form.html', context)
-                
-            elif report_type == 'yearly':
-                company = request.POST.get('company', 'all')
-                operator = request.POST.get('operator', 'all')
-                year = int(request.POST.get('year_yearly', timezone.now().year))
-                
-                # 計算該年的起始和結束日期
-                from datetime import datetime
-                start_of_year = datetime(year, 1, 1)
-                end_of_year = datetime(year, 12, 31)
-                
-                data = service.get_custom_report_by_company_operator(company, operator, start_of_year.date(), end_of_year.date())
-                summary = service.get_custom_summary_by_company_operator(company, operator, start_of_year.date(), end_of_year.date())
-                operator_stats = service.get_operator_statistics(data)
-                
-                context = {
-                    'report_type': '年報表',
-                    'report_data': data,
-                    'summary': summary,
-                    'operator_stats': operator_stats,
-                    'company': company,
-                    'operator': operator,
-                    'year': year,
-                    'current_year': timezone.now().year,
-                    'current_month': timezone.now().month,
-                    'current_week': timezone.now().isocalendar()[1],
-                    'years': range(timezone.now().year - 5, timezone.now().year + 2),
-                    'months': range(1, 13),
-                    'weeks': range(1, 54),
-                    'current_date': timezone.now().date(),
-                    'start_date': timezone.now().date() - timedelta(days=30),
-                    'end_date': timezone.now().date(),
-                }
-                return render(request, 'reporting/reporting/unified_report_form.html', context)
-                
-            elif report_type == 'custom':
-                company = request.POST.get('company', 'all')
-                operator = request.POST.get('operator', 'all')
-                start_date_str = request.POST.get('start_date')
-                end_date_str = request.POST.get('end_date')
-                
-                if start_date_str and end_date_str:
-                    from datetime import datetime
-                    start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-                    end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-                    
-                    data = service.get_custom_report_by_company_operator(company, operator, start_date, end_date)
-                    summary = service.get_custom_summary_by_company_operator(company, operator, start_date, end_date)
-                    operator_stats = service.get_operator_statistics(data)
-                    
-                    context = {
-                        'report_type': '自訂報表',
-                        'report_data': data,
-                        'summary': summary,
-                        'operator_stats': operator_stats,
-                        'company': company,
-                        'operator': operator,
-                        'start_date': start_date,
-                        'end_date': end_date,
-                        'current_year': timezone.now().year,
-                        'current_month': timezone.now().month,
-                        'current_week': timezone.now().isocalendar()[1],
-                        'years': range(timezone.now().year - 5, timezone.now().year + 2),
-                        'months': range(1, 13),
-                        'weeks': range(1, 54),
-                        'current_date': timezone.now().date(),
-                        'start_date': start_date,
-                        'end_date': end_date,
-                    }
-                    return render(request, 'reporting/reporting/unified_report_form.html', context)
-            
-            messages.error(request, '請選擇有效的報表類型')
-            
-        except Exception as e:
-            messages.error(request, f'生成報表失敗: {str(e)}')
+    """統一報表生成器 - 簡化為自訂日期範圍報表"""
+    from django.core.paginator import Paginator
     
-    # GET 請求顯示統一報表選擇頁面
-    # 準備年度、月份、週數選項
+    # 準備通用上下文資料
     current_year = timezone.now().year
     current_month = timezone.now().month
     current_week = timezone.now().isocalendar()[1]
@@ -1283,6 +1096,98 @@ def unified_report_form(request):
     end_date = timezone.now().date()
     start_date = end_date - timedelta(days=30)
     
+    # 獲取真實的公司資料
+    try:
+        from erp_integration.models import CompanyConfig
+        companies = CompanyConfig.objects.all().order_by('company_name')
+    except ImportError:
+        companies = []
+    
+    # 獲取真實的作業員資料
+    try:
+        from process.models import Operator
+        operators = Operator.objects.all().order_by('name')
+    except ImportError:
+        operators = []
+    
+    # 如果沒有作業員資料，嘗試從填報記錄中獲取
+    if not operators:
+        try:
+            from workorder.fill_work.models import FillWork
+            from django.db.models import Q
+            operators_data = FillWork.objects.values_list('operator', flat=True).distinct().exclude(
+                Q(operator__isnull=True) | Q(operator='')
+            ).order_by('operator')
+            operators = [{'name': op} for op in operators_data]
+        except ImportError:
+            operators = []
+    
+    # 如果還是沒有作業員資料，嘗試從現場報工記錄中獲取
+    if not operators:
+        try:
+            from workorder.onsite_reporting.models import OnsiteReport
+            from django.db.models import Q
+            operators_data = OnsiteReport.objects.values_list('operator', flat=True).distinct().exclude(
+                Q(operator__isnull=True) | Q(operator='')
+            ).order_by('operator')
+            operators = [{'name': op} for op in operators_data]
+        except ImportError:
+            operators = []
+    
+    # 處理查詢請求
+    if request.method == 'POST':
+        company = request.POST.get('company', 'all')
+        operator = request.POST.get('operator', 'all')
+        start_date_str = request.POST.get('start_date')
+        end_date_str = request.POST.get('end_date')
+        
+        try:
+            if start_date_str and end_date_str:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                
+                service = WorkHourReportService()
+                data = service.get_custom_report_by_company_operator(company, operator, start_date, end_date)
+                summary = service.get_custom_summary_by_company_operator(company, operator, start_date, end_date)
+                operator_stats = service.get_operator_statistics(data)
+                
+                # 分頁處理 - 每頁20行
+                paginator = Paginator(data, 20)
+                page_number = request.GET.get('page', 1)
+                report_data = paginator.get_page(page_number)
+                
+                # 統計資料分頁
+                stats_paginator = Paginator(operator_stats, 20)
+                stats_page_number = request.GET.get('page', 1)
+                operator_stats_paginated = stats_paginator.get_page(stats_page_number)
+                
+                context = {
+                    'current_year': current_year,
+                    'current_month': current_month,
+                    'current_week': current_week,
+                    'years': years,
+                    'months': months,
+                    'weeks': weeks,
+                    'current_date': timezone.now().date(),
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'report_data': report_data,
+                    'summary': summary,
+                    'operator_stats': operator_stats_paginated,
+                    'company': company,
+                    'operator': operator,
+                    'companies': companies,
+                    'operators': operators,
+                    'timezone': timezone,
+                }
+                return render(request, 'reporting/reporting/unified_report_form.html', context)
+            else:
+                messages.error(request, '請選擇起始日期和結束日期')
+                
+        except Exception as e:
+            messages.error(request, f'生成報表失敗: {str(e)}')
+    
+    # GET 請求或查詢失敗時的預設上下文
     context = {
         'current_year': current_year,
         'current_month': current_month,
@@ -1295,9 +1200,18 @@ def unified_report_form(request):
         'end_date': end_date,
         # 初始化報表相關變數，確保模板能正常顯示
         'report_data': None,
-        'summary': None,
+        'summary': {
+            'total_work_hours': 0,
+            'total_operators': 0,
+            'total_equipment_hours': 0,
+            'workorder_count': 0,
+            'avg_daily_hours': 0,
+        },
         'operator_stats': None,
         'report_type': None,
+        # 添加真實資料到上下文
+        'companies': companies,
+        'operators': operators,
         # 添加 timezone 到上下文
         'timezone': timezone,
     }
@@ -1315,15 +1229,24 @@ def custom_report_export(request):
     format = request.GET.get('format', 'excel')
     
     try:
+        # 驗證必要條件
+        if not start_date_str or not end_date_str:
+            messages.error(request, '請選擇起始日期和結束日期')
+            return redirect('reporting:unified_report')
+        
         # 解析日期
-        from datetime import datetime
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        
+        # 驗證日期範圍
+        if start_date > end_date:
+            messages.error(request, '起始日期不能大於結束日期')
+            return redirect('reporting:unified_report')
         
         service = WorkHourReportService()
         generator = ReportGeneratorService()
         
-        # 生成檔案
+        # 使用與查詢相同的條件生成檔案
         result = generator.generate_custom_report_by_company_operator(company, operator, start_date, end_date, format)
         
         # 下載檔案
@@ -1340,9 +1263,12 @@ def custom_report_export(request):
             response['X-Frame-Options'] = 'DENY'
             return response
             
+    except ValueError as e:
+        messages.error(request, f'日期格式錯誤: {str(e)}')
+        return redirect('reporting:unified_report')
     except Exception as e:
         messages.error(request, f'匯出自訂報表失敗: {str(e)}')
-        return redirect('reporting:custom_report')
+        return redirect('reporting:unified_report')
 
 
 @login_required
@@ -1354,7 +1280,6 @@ def daily_report_export(request):
     
     try:
         # 解析日期
-        from datetime import datetime
         date = datetime.strptime(date_str, '%Y-%m-%d').date()
         
         service = WorkHourReportService()
@@ -1739,7 +1664,6 @@ def sync_report_data(request):
 def chart_data(request):
     """提供圖表資料的 API"""
     from django.http import JsonResponse
-    from datetime import datetime, timedelta
     
     chart_type = request.GET.get('chart_type')
     
@@ -1804,7 +1728,6 @@ def report_data_list(request):
     """提供報表資料列表的 API"""
     from django.http import JsonResponse
     from django.core.paginator import Paginator
-    from datetime import datetime, timedelta
     
     # 取得分頁參數
     page = request.GET.get('page', 1)
@@ -2350,7 +2273,6 @@ def work_hour_stats(request):
 def detailed_stats(request):
     """提供詳細統計資料的 API"""
     from django.http import JsonResponse
-    from datetime import datetime, timedelta
     
     try:
         # 按月份統計
@@ -2486,7 +2408,6 @@ def work_hour_stats(request):
 def detailed_stats(request):
     """提供詳細統計資料的 API"""
     from django.http import JsonResponse
-    from datetime import datetime, timedelta
     
     try:
         # 按月份統計
