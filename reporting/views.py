@@ -11,9 +11,11 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.core.paginator import Paginator
 from django.db.models import Q, Avg, Count, Sum
+from django.db.models.functions import ExtractYear, ExtractMonth
 from django.utils import timezone
 from datetime import datetime, timedelta
 import json
+from django.core.serializers.json import DjangoJSONEncoder
 
 from .models import (
     WorkOrderReportData, ReportSchedule, ReportExecutionLog, CompletedWorkOrderReportData,
@@ -33,46 +35,68 @@ def is_report_user(user):
     return user.is_authenticated and (user.is_staff or user.is_superuser)
 
 
+@login_required
 def index(request):
     """報表首頁"""
     try:
-        # 統計資料
+        # 統計資料 - 只使用存在的模型
         total_workorders = WorkOrderReportData.objects.count()
-        active_workorders = WorkOrderReportData.objects.filter(status='active').count()
-        total_operators = OperatorProcessCapacityScore.objects.count()
-        total_equipment = 0  # 暫時設為0，因為OperatorCapacityReport模型不存在
         
-        # 報表統計
-        total_reports = WorkOrderReportData.objects.count()
+        # 今日報表統計
+        today = timezone.now().date()
         today_reports = WorkOrderReportData.objects.filter(
-            created_at__date=timezone.now().date()
+            work_date=today
         ).count()
         
-        # 排程統計
-        active_schedules = ReportSchedule.objects.filter(status='active').count()
-        completed_executions = ReportExecutionLog.objects.filter(status='success').count()
+        # 本週報表統計
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        weekly_reports = WorkOrderReportData.objects.filter(
+            work_date__range=[start_of_week, end_of_week]
+        ).count()
+        
+        # 本月報表統計
+        start_of_month = today.replace(day=1)
+        monthly_reports = WorkOrderReportData.objects.filter(
+            work_date__gte=start_of_month
+        ).count()
+        
+        # 計算總工作時數
+        total_work_hours = WorkOrderReportData.objects.aggregate(
+            total=Sum('daily_work_hours')
+        )['total'] or 0
+        
+        # 計算今日工作時數
+        today_work_hours = WorkOrderReportData.objects.filter(
+            work_date=today
+        ).aggregate(
+            total=Sum('daily_work_hours')
+        )['total'] or 0
+        
+        # 計算作業員數量（去重）
+        operator_count = WorkOrderReportData.objects.exclude(
+            operator_name__isnull=True
+        ).values('operator_name').distinct().count()
         
         context = {
-            'total_workorders': total_workorders,
-            'active_workorders': active_workorders,
-            'total_operators': total_operators,
-            'total_equipment': total_equipment,
-            'total_reports': total_reports,
+            'total_reports': total_workorders,
             'today_reports': today_reports,
-            'pending_reports': active_schedules,
-            'completed_reports': completed_executions,
+            'pending_reports': weekly_reports,  # 使用週報表數量作為待處理
+            'completed_reports': monthly_reports,  # 使用月報表數量作為已完成
+            'total_work_hours': total_work_hours,
+            'today_work_hours': today_work_hours,
+            'operator_count': operator_count,
         }
     except Exception as e:
         logger.error(f"取得報表首頁統計資料失敗: {str(e)}")
         context = {
-            'total_workorders': 0,
-            'active_workorders': 0,
-            'total_operators': 0,
-            'total_equipment': 0,
             'total_reports': 0,
             'today_reports': 0,
             'pending_reports': 0,
             'completed_reports': 0,
+            'total_work_hours': 0,
+            'today_work_hours': 0,
+            'operator_count': 0,
         }
     
     return render(request, 'reporting/index.html', context)
@@ -906,6 +930,11 @@ def daily_report(request):
             data = service.get_daily_report_by_operator(operator, date)
             summary = service.get_daily_summary_by_operator(operator, date)
             
+            # 取得作業員選項
+            operators = WorkOrderReportData.objects.exclude(
+                operator_name__isnull=True
+            ).values_list('operator_name', flat=True).distinct().order_by('operator_name')
+            
             # 顯示預覽報表
             context = {
                 'report_type': '日報表',
@@ -914,6 +943,7 @@ def daily_report(request):
                 'summary': summary,
                 'data': data,
                 'generated_at': timezone.now(),
+                'operators': operators,
             }
             return render(request, 'reporting/reporting/daily_report.html', context)
                 
@@ -921,13 +951,34 @@ def daily_report(request):
             messages.error(request, f'生成日報表失敗: {str(e)}')
             return redirect('reporting:work_hour_report_index')
     
-    # GET 請求顯示表單
-    current_date = timezone.now().date()
+    # GET 請求顯示預設頁面
+    # 取得最近有資料的日期，如果沒有則使用今天
+    latest_date = WorkOrderReportData.objects.order_by('-work_date').first()
+    if latest_date:
+        current_date = latest_date.work_date
+    else:
+        current_date = timezone.now().date()
+    
+    # 取得預設資料（最近有資料的日期全部作業員）
+    service = WorkHourReportService()
+    data = service.get_daily_report_by_operator('all', current_date)
+    summary = service.get_daily_summary_by_operator('all', current_date)
+    
+    # 取得作業員選項
+    operators = WorkOrderReportData.objects.exclude(
+        operator_name__isnull=True
+    ).values_list('operator_name', flat=True).distinct().order_by('operator_name')
     
     context = {
-        'current_date': current_date,
+        'report_type': '日報表',
+        'operator': 'all',
+        'date': current_date,
+        'summary': summary,
+        'data': data,
+        'generated_at': timezone.now(),
+        'operators': operators,
     }
-    return render(request, 'reporting/reporting/daily_report_form.html', context)
+    return render(request, 'reporting/reporting/daily_report.html', context)
 
 
 @login_required
@@ -1380,13 +1431,26 @@ def chart_data(request):
 def report_data_list(request):
     """提供報表資料列表的 API"""
     from django.http import JsonResponse
+    from django.core.paginator import Paginator
     from datetime import datetime, timedelta
     
+    # 取得分頁參數
+    page = request.GET.get('page', 1)
+    per_page = 20  # 每頁顯示20筆
+    
     # 取得所有資料，按日期排序
-    report_data = WorkOrderReportData.objects.all().order_by('-work_date')[:20]  # 限制20筆
+    queryset = WorkOrderReportData.objects.all().order_by('-work_date')
+    
+    # 建立分頁器
+    paginator = Paginator(queryset, per_page)
+    
+    try:
+        page_obj = paginator.page(page)
+    except:
+        page_obj = paginator.page(1)
     
     data = []
-    for item in report_data:
+    for item in page_obj:
         data.append({
             'workorder_id': item.workorder_id,
             'company': item.company or '未指定',
@@ -1397,7 +1461,21 @@ def report_data_list(request):
             'operator_count': item.operator_count or 0,
         })
     
-    return JsonResponse(data, safe=False) 
+    # 返回分頁資訊
+    response_data = {
+        'data': data,
+        'pagination': {
+            'current_page': page_obj.number,
+            'total_pages': paginator.num_pages,
+            'total_count': paginator.count,
+            'has_previous': page_obj.has_previous(),
+            'has_next': page_obj.has_next(),
+            'previous_page': page_obj.previous_page_number() if page_obj.has_previous() else None,
+            'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
+        }
+    }
+    
+    return JsonResponse(response_data)
 
 @login_required
 def dashboard_stats(request):
@@ -1405,21 +1483,33 @@ def dashboard_stats(request):
     from django.http import JsonResponse
     
     try:
-        # 統計資料
+        # 統計資料 - 只使用存在的模型
         total_reports = WorkOrderReportData.objects.count()
+        
+        # 今日報表統計
+        today = timezone.now().date()
         today_reports = WorkOrderReportData.objects.filter(
-            created_at__date=timezone.now().date()
+            work_date=today
         ).count()
         
-        # 排程統計
-        active_schedules = ReportSchedule.objects.filter(status='active').count()
-        completed_executions = ReportExecutionLog.objects.filter(status='success').count()
+        # 本週報表統計
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        weekly_reports = WorkOrderReportData.objects.filter(
+            work_date__range=[start_of_week, end_of_week]
+        ).count()
+        
+        # 本月報表統計
+        start_of_month = today.replace(day=1)
+        monthly_reports = WorkOrderReportData.objects.filter(
+            work_date__gte=start_of_month
+        ).count()
         
         return JsonResponse({
             'total_reports': total_reports,
             'today_reports': today_reports,
-            'pending_reports': active_schedules,
-            'completed_reports': completed_executions,
+            'pending_reports': weekly_reports,  # 使用週報表數量作為待處理
+            'completed_reports': monthly_reports,  # 使用月報表數量作為已完成
         })
     except Exception as e:
         logger.error(f"取得儀表板統計資料失敗: {str(e)}")
@@ -1428,7 +1518,7 @@ def dashboard_stats(request):
             'today_reports': 0,
             'pending_reports': 0,
             'completed_reports': 0,
-        }) 
+        })
 
 @login_required
 def completed_workorder_report_index(request):
@@ -1843,3 +1933,100 @@ def score_period_detail(request, period_type):
     }
     
     return render(request, 'reporting/score_period_detail.html', context)
+
+@login_required
+def work_hour_stats(request):
+    """提供工作時數統計資料的 API"""
+    from django.http import JsonResponse
+    
+    try:
+        # 基本統計資料
+        total_records = WorkOrderReportData.objects.count()
+        
+        # 總工作時數
+        total_hours = WorkOrderReportData.objects.aggregate(
+            total=Sum('daily_work_hours')
+        )['total'] or 0
+        
+        # 作業員數量（去重）
+        total_operators = WorkOrderReportData.objects.exclude(
+            operator_name__isnull=True
+        ).values('operator_name').distinct().count()
+        
+        # 平均日工作時數
+        avg_daily_hours = WorkOrderReportData.objects.aggregate(
+            avg=Avg('daily_work_hours')
+        )['avg'] or 0
+        
+        return JsonResponse({
+            'total_records': total_records,
+            'total_hours': float(total_hours),
+            'total_operators': total_operators,
+            'avg_daily_hours': float(avg_daily_hours),
+        })
+    except Exception as e:
+        logger.error(f"取得工作時數統計資料失敗: {str(e)}")
+        return JsonResponse({
+            'total_records': 0,
+            'total_hours': 0,
+            'total_operators': 0,
+            'avg_daily_hours': 0,
+        })
+
+
+@login_required
+def detailed_stats(request):
+    """提供詳細統計資料的 API"""
+    from django.http import JsonResponse
+    from datetime import datetime, timedelta
+    
+    try:
+        # 按月份統計
+        monthly_stats = WorkOrderReportData.objects.annotate(
+            year_month=ExtractYear('work_date') * 100 + ExtractMonth('work_date')
+        ).values('year_month').annotate(
+            total_hours=Sum('daily_work_hours'),
+            record_count=Count('id')
+        ).order_by('year_month')
+        
+        monthly_data = {
+            'labels': [],
+            'hours': [],
+            'counts': []
+        }
+        
+        for item in monthly_stats:
+            year = item['year_month'] // 100
+            month = item['year_month'] % 100
+            monthly_data['labels'].append(f"{year}-{month:02d}")
+            monthly_data['hours'].append(float(item['total_hours'] or 0))
+            monthly_data['counts'].append(item['record_count'])
+        
+        # 按公司統計
+        company_stats = WorkOrderReportData.objects.values('company').annotate(
+            total_hours=Sum('daily_work_hours'),
+            record_count=Count('id')
+        ).order_by('-total_hours')
+        
+        company_data = {
+            'labels': [],
+            'hours': [],
+            'counts': []
+        }
+        
+        for item in company_stats:
+            company_name = item['company'] or '未指定'
+            company_data['labels'].append(company_name)
+            company_data['hours'].append(float(item['total_hours'] or 0))
+            company_data['counts'].append(item['record_count'])
+        
+        return JsonResponse({
+            'monthly': monthly_data,
+            'company': company_data
+        })
+    except Exception as e:
+        logger.error(f"取得詳細統計資料失敗: {str(e)}")
+        return JsonResponse({
+            'monthly': {'labels': [], 'hours': [], 'counts': []},
+            'company': {'labels': [], 'hours': [], 'counts': []}
+        })

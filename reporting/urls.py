@@ -58,4 +58,6 @@ urlpatterns = [
     path('api/chart-data/', views.chart_data, name='chart_data'),
     path('api/report-data/', views.report_data_list, name='report_data_list'),
     path('api/dashboard-stats/', views.dashboard_stats, name='dashboard_stats'),
+    path('api/work-hour-stats/', views.work_hour_stats, name='work_hour_stats'),
+    path('api/detailed-stats/', views.detailed_stats, name='detailed_stats'),
 ] 

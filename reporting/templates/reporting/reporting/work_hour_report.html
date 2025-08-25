@@ -223,6 +223,10 @@
 }
 </style>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // 載入快速統計
 document.addEventListener('DOMContentLoaded', function() {
@@ -231,7 +235,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function loadQuickStats() {
     // 透過AJAX載入實際的統計資料
-    fetch('/reporting/api/work-hour-stats/')
+    fetch('{% url "reporting:work_hour_stats" %}')
         .then(response => response.json())
         .then(data => {
             document.getElementById('totalRecords').textContent = data.total_records || '0';
@@ -260,19 +264,171 @@ function showDataStats() {
 function loadDetailedStats() {
     const statsContent = document.getElementById('statsContent');
     statsContent.innerHTML = `
-        <div class="row">
-            <div class="col-md-6">
-                <h6>按月份統計</h6>
-                <canvas id="monthlyChart" width="400" height="200"></canvas>
-            </div>
-            <div class="col-md-6">
-                <h6>按公司統計</h6>
-                <canvas id="companyChart" width="400" height="200"></canvas>
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">載入中...</span>
             </div>
         </div>
     `;
     
-    // 這裡可以加入Chart.js來繪製圖表
+    // 載入詳細統計資料
+    fetch('{% url "reporting:detailed_stats" %}')
+        .then(response => response.json())
+        .then(data => {
+            statsContent.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-chart-bar"></i> 按月份統計</h6>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="monthlyChart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-chart-pie"></i> 按公司統計</h6>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="companyChart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="fas fa-table"></i> 統計摘要</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3 text-center">
+                                        <h4 class="text-primary">${data.monthly.labels.length}</h4>
+                                        <p class="text-muted">統計月份數</p>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <h4 class="text-success">${data.company.labels.length}</h4>
+                                        <p class="text-muted">統計公司數</p>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <h4 class="text-info">${data.monthly.hours.reduce((a, b) => a + b, 0).toFixed(2)}</h4>
+                                        <p class="text-muted">總工作時數</p>
+                                    </div>
+                                    <div class="col-md-3 text-center">
+                                        <h4 class="text-warning">${data.monthly.counts.reduce((a, b) => a + b, 0)}</h4>
+                                        <p class="text-muted">總記錄數</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 建立月份統計圖表
+            createMonthlyChart(data.monthly);
+            
+            // 建立公司統計圖表
+            createCompanyChart(data.company);
+        })
+        .catch(error => {
+            console.error('載入詳細統計資料失敗:', error);
+            statsContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> 載入統計資料失敗，請稍後再試。
+                </div>
+            `;
+        });
+}
+
+function createMonthlyChart(data) {
+    const ctx = document.getElementById('monthlyChart');
+    if (!ctx) return;
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: '工作時數',
+                data: data.hours,
+                backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '工作時數'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '月份'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+function createCompanyChart(data) {
+    const ctx = document.getElementById('companyChart');
+    if (!ctx) return;
+    
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.hours,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 205, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(153, 102, 255, 0.8)',
+                    'rgba(255, 159, 64, 0.8)'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.parsed / total) * 100).toFixed(1);
+                            return `${context.label}: ${context.parsed} 小時 (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 </script>
 {% endblock %} 

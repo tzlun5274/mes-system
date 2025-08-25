@@ -264,6 +264,18 @@
                                             </tbody>
                                         </table>
                                     </div>
+                                    
+                                    <!-- 分頁控制 -->
+                                    <div class="d-flex justify-content-between align-items-center mt-3">
+                                        <div class="text-muted">
+                                            <small>顯示第 <span id="currentPageInfo">1</span> 頁，共 <span id="totalPagesInfo">1</span> 頁，總計 <span id="totalCountInfo">0</span> 筆資料</small>
+                                        </div>
+                                        <nav aria-label="報表資料分頁">
+                                            <ul class="pagination pagination-sm mb-0" id="paginationControls">
+                                                <!-- 分頁按鈕將由 JavaScript 動態生成 -->
+                                            </ul>
+                                        </nav>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -282,7 +294,7 @@
                                             <i class="fas fa-sync-alt fa-2x text-primary mb-2"></i>
                                             <h6>同步資料</h6>
                                             <p class="small text-muted">同步填報和現場報工資料</p>
-                                            <button class="btn btn-sm btn-outline-primary" onclick="syncData()">
+                                            <button class="btn btn-sm btn-outline-primary" onclick="syncData(event)">
                                                 <i class="fas fa-sync"></i> 立即同步
                                             </button>
                                         </div>
@@ -361,7 +373,7 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 載入圖表資料
     loadChartData();
     // 載入資料列表
@@ -375,34 +387,33 @@ $(document).ready(function() {
 
 function loadChartData() {
     // 工作時數趨勢圖
-    $.ajax({
-        url: '{% url "reporting:chart_data" %}',
-        method: 'GET',
-        data: { chart_type: 'work_hours_trend' },
-        success: function(data) {
+    fetch('{% url "reporting:chart_data" %}?chart_type=work_hours_trend')
+        .then(response => response.json())
+        .then(data => {
             createWorkHoursChart(data);
-        },
-        error: function() {
-            console.log('載入工作時數趨勢圖失敗');
-        }
-    });
+        })
+        .catch(error => {
+            console.log('載入工作時數趨勢圖失敗:', error);
+        });
 
     // 公司分布圖
-    $.ajax({
-        url: '{% url "reporting:chart_data" %}',
-        method: 'GET',
-        data: { chart_type: 'company_distribution' },
-        success: function(data) {
+    fetch('{% url "reporting:chart_data" %}?chart_type=company_distribution')
+        .then(response => response.json())
+        .then(data => {
             createCompanyChart(data);
-        },
-        error: function() {
-            console.log('載入公司分布圖失敗');
-        }
-    });
+        })
+        .catch(error => {
+            console.log('載入公司分布圖失敗:', error);
+        });
 }
 
 function createWorkHoursChart(data) {
-    const ctx = document.getElementById('workHoursChart').getContext('2d');
+    const ctx = document.getElementById('workHoursChart');
+    if (!ctx) {
+        console.log('找不到工作時數趨勢圖畫布');
+        return;
+    }
+    
     new Chart(ctx, {
         type: 'line',
         data: {
@@ -438,7 +449,12 @@ function createWorkHoursChart(data) {
 }
 
 function createCompanyChart(data) {
-    const ctx = document.getElementById('companyChart').getContext('2d');
+    const ctx = document.getElementById('companyChart');
+    if (!ctx) {
+        console.log('找不到公司分布圖畫布');
+        return;
+    }
+    
     new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -466,15 +482,21 @@ function createCompanyChart(data) {
     });
 }
 
-function loadReportData() {
-    $.ajax({
-        url: '{% url "reporting:report_data_list" %}',
-        method: 'GET',
-        success: function(data) {
-            const tbody = $('#reportDataTable');
-            tbody.empty();
+function loadReportData(page = 1) {
+    fetch(`{% url "reporting:report_data_list" %}?page=${page}`)
+        .then(response => response.json())
+        .then(responseData => {
+            const tbody = document.getElementById('reportDataTable');
+            if (!tbody) {
+                console.log('找不到報表資料表格');
+                return;
+            }
             
-            data.forEach(function(item) {
+            // 清空表格
+            tbody.innerHTML = '';
+            
+            // 載入資料
+            responseData.data.forEach(function(item) {
                 const row = `
                     <tr>
                         <td>${item.workorder_id}</td>
@@ -486,32 +508,111 @@ function loadReportData() {
                         <td>${item.operator_count}</td>
                     </tr>
                 `;
-                tbody.append(row);
+                tbody.insertAdjacentHTML('beforeend', row);
             });
-        },
-        error: function() {
-            $('#reportDataTable').html('<tr><td colspan="7" class="text-center text-muted">載入資料失敗</td></tr>');
-        }
-    });
+            
+            // 更新分頁資訊
+            updatePaginationInfo(responseData.pagination);
+            
+            // 更新分頁控制按鈕
+            updatePaginationControls(responseData.pagination);
+        })
+        .catch(error => {
+            const tbody = document.getElementById('reportDataTable');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">載入資料失敗</td></tr>';
+            }
+        });
+}
+
+function updatePaginationInfo(pagination) {
+    const currentPageElement = document.getElementById('currentPageInfo');
+    const totalPagesElement = document.getElementById('totalPagesInfo');
+    const totalCountElement = document.getElementById('totalCountInfo');
+    
+    if (currentPageElement) currentPageElement.textContent = pagination.current_page;
+    if (totalPagesElement) totalPagesElement.textContent = pagination.total_pages;
+    if (totalCountElement) totalCountElement.textContent = pagination.total_count;
+}
+
+function updatePaginationControls(pagination) {
+    const paginationContainer = document.getElementById('paginationControls');
+    if (!paginationContainer) return;
+    
+    paginationContainer.innerHTML = '';
+    
+    // 上一頁按鈕
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${pagination.has_previous ? '' : 'disabled'}`;
+    const prevLink = document.createElement('a');
+    prevLink.className = 'page-link';
+    prevLink.href = '#';
+    prevLink.innerHTML = '&laquo; 上一頁';
+    if (pagination.has_previous) {
+        prevLink.onclick = function(e) {
+            e.preventDefault();
+            loadReportData(pagination.previous_page);
+        };
+    }
+    prevLi.appendChild(prevLink);
+    paginationContainer.appendChild(prevLi);
+    
+    // 頁碼按鈕
+    const startPage = Math.max(1, pagination.current_page - 2);
+    const endPage = Math.min(pagination.total_pages, pagination.current_page + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const pageLi = document.createElement('li');
+        pageLi.className = `page-item ${i === pagination.current_page ? 'active' : ''}`;
+        const pageLink = document.createElement('a');
+        pageLink.className = 'page-link';
+        pageLink.href = '#';
+        pageLink.textContent = i;
+        pageLink.onclick = function(e) {
+            e.preventDefault();
+            loadReportData(i);
+        };
+        pageLi.appendChild(pageLink);
+        paginationContainer.appendChild(pageLi);
+    }
+    
+    // 下一頁按鈕
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${pagination.has_next ? '' : 'disabled'}`;
+    const nextLink = document.createElement('a');
+    nextLink.className = 'page-link';
+    nextLink.href = '#';
+    nextLink.innerHTML = '下一頁 &raquo;';
+    if (pagination.has_next) {
+        nextLink.onclick = function(e) {
+            e.preventDefault();
+            loadReportData(pagination.next_page);
+        };
+    }
+    nextLi.appendChild(nextLink);
+    paginationContainer.appendChild(nextLi);
 }
 
 function loadDashboardStats() {
-    $.ajax({
-        url: '{% url "reporting:dashboard_stats" %}',
-        method: 'GET',
-        success: function(data) {
-            $('#totalReportsCount').text(data.total_reports);
-            $('#todayReportsCount').text(data.today_reports);
-            $('#pendingReportsCount').text(data.pending_reports);
-            $('#completedReportsCount').text(data.completed_reports);
-        },
-        error: function() {
-            console.log('載入統計資料失敗');
-        }
-    });
+    fetch('{% url "reporting:dashboard_stats" %}')
+        .then(response => response.json())
+        .then(data => {
+            const totalElement = document.getElementById('totalReportsCount');
+            const todayElement = document.getElementById('todayReportsCount');
+            const pendingElement = document.getElementById('pendingReportsCount');
+            const completedElement = document.getElementById('completedReportsCount');
+            
+            if (totalElement) totalElement.textContent = data.total_reports;
+            if (todayElement) todayElement.textContent = data.today_reports;
+            if (pendingElement) pendingElement.textContent = data.pending_reports;
+            if (completedElement) completedElement.textContent = data.completed_reports;
+        })
+        .catch(error => {
+            console.log('載入統計資料失敗:', error);
+        });
 }
 
-function syncData() {
+function syncData(event) {
     const button = event.target;
     const originalText = button.innerHTML;
     
@@ -519,40 +620,44 @@ function syncData() {
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 同步中...';
     button.disabled = true;
     
-    $.ajax({
-        url: '{% url "reporting:sync_report_data" %}',
+    // 取得 CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('{% url "reporting:sync_report_data" %}', {
         method: 'POST',
         headers: {
-            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
-        },
-        success: function(response) {
-            // 顯示成功訊息
-            button.innerHTML = '<i class="fas fa-check"></i> 同步完成';
-            button.className = 'btn btn-sm btn-success';
-            
-            // 更新統計資料
-            loadDashboardStats();
-            loadReportData();
-            
-            // 3秒後恢復原狀
-            setTimeout(function() {
-                button.innerHTML = originalText;
-                button.className = 'btn btn-sm btn-outline-primary';
-                button.disabled = false;
-            }, 3000);
-        },
-        error: function() {
-            // 顯示錯誤訊息
-            button.innerHTML = '<i class="fas fa-times"></i> 同步失敗';
-            button.className = 'btn btn-sm btn-danger';
-            
-            // 3秒後恢復原狀
-            setTimeout(function() {
-                button.innerHTML = originalText;
-                button.className = 'btn btn-sm btn-outline-primary';
-                button.disabled = false;
-            }, 3000);
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/json'
         }
+    })
+    .then(response => response.json())
+    .then(data => {
+        // 顯示成功訊息
+        button.innerHTML = '<i class="fas fa-check"></i> 同步完成';
+        button.className = 'btn btn-sm btn-success';
+        
+        // 更新統計資料
+        loadDashboardStats();
+        loadReportData();
+        
+        // 3秒後恢復原狀
+        setTimeout(function() {
+            button.innerHTML = originalText;
+            button.className = 'btn btn-sm btn-outline-primary';
+            button.disabled = false;
+        }, 3000);
+    })
+    .catch(error => {
+        // 顯示錯誤訊息
+        button.innerHTML = '<i class="fas fa-times"></i> 同步失敗';
+        button.className = 'btn btn-sm btn-danger';
+        
+        // 3秒後恢復原狀
+        setTimeout(function() {
+            button.innerHTML = originalText;
+            button.className = 'btn btn-sm btn-outline-primary';
+            button.disabled = false;
+        }, 3000);
     });
 }
 </script>

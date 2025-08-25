@@ -16,6 +16,10 @@ class WorkOrderReportData(models.Model):
     company = models.CharField(max_length=10, verbose_name="公司代號")
     operator_name = models.CharField(max_length=100, verbose_name="作業員姓名", null=True, blank=True)
     
+    # 產品和工序資料
+    product_code = models.CharField(max_length=100, verbose_name="產品編號", null=True, blank=True)
+    process_name = models.CharField(max_length=100, verbose_name="工序名稱", null=True, blank=True)
+    
     # 時間維度資料
     work_date = models.DateField(verbose_name="工作日期")
     work_week = models.IntegerField(verbose_name="工作週數")
@@ -23,7 +27,14 @@ class WorkOrderReportData(models.Model):
     work_quarter = models.IntegerField(verbose_name="工作季度")
     work_year = models.IntegerField(verbose_name="工作年度")
     
+    # 時間詳細資料
+    start_time = models.TimeField(verbose_name="開始時間", null=True, blank=True)
+    end_time = models.TimeField(verbose_name="結束時間", null=True, blank=True)
+    
     # 工作時數資料
+    work_hours = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="工作時數", default=0)
+    overtime_hours = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="加班時數", default=0)
+    total_hours = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="合計時數", default=0)
     daily_work_hours = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="日工作時數")
     weekly_work_hours = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="週工作時數")
     monthly_work_hours = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="月工作時數")
@@ -74,6 +85,11 @@ class WorkOrderReportData(models.Model):
         # 計算工作時數
         daily_work_hours = fill_work.work_hours_calculated or Decimal('0')
         
+        # 計算詳細時數
+        work_hours = fill_work.work_hours_calculated or Decimal('0')
+        overtime_hours = fill_work.overtime_hours_calculated or Decimal('0')
+        total_hours = work_hours + overtime_hours
+        
         # 建立或更新報表資料
         report_data, created = cls.objects.get_or_create(
             workorder_id=fill_work.workorder,
@@ -81,6 +97,13 @@ class WorkOrderReportData(models.Model):
             work_date=work_date,
             defaults={
                 'operator_name': fill_work.operator,
+                'product_code': fill_work.product_id,
+                'process_name': fill_work.operation or (fill_work.process.name if fill_work.process else ''),
+                'start_time': fill_work.start_time,
+                'end_time': fill_work.end_time,
+                'work_hours': work_hours,
+                'overtime_hours': overtime_hours,
+                'total_hours': total_hours,
                 'work_week': week_num,
                 'work_month': work_month,
                 'work_quarter': work_quarter,
@@ -96,6 +119,13 @@ class WorkOrderReportData(models.Model):
         if not created:
             # 更新現有記錄
             report_data.operator_name = fill_work.operator
+            report_data.product_code = fill_work.product_id
+            report_data.process_name = fill_work.operation or (fill_work.process.name if fill_work.process else '')
+            report_data.start_time = fill_work.start_time
+            report_data.end_time = fill_work.end_time
+            report_data.work_hours = work_hours
+            report_data.overtime_hours = overtime_hours
+            report_data.total_hours = total_hours
             report_data.daily_work_hours = daily_work_hours
             report_data.weekly_work_hours += daily_work_hours
             report_data.monthly_work_hours += daily_work_hours
@@ -131,13 +161,25 @@ class WorkOrderReportData(models.Model):
         work_minutes = onsite_report.work_minutes or 0
         daily_work_hours = Decimal(str(work_minutes / 60)).quantize(Decimal('0.01'))
         
+        # 計算詳細時數
+        work_hours = daily_work_hours
+        overtime_hours = Decimal('0')  # 現場報工暫時不計算加班時數
+        total_hours = work_hours + overtime_hours
+        
         # 建立或更新報表資料
         report_data, created = cls.objects.get_or_create(
-            workorder_id=onsite_report.order_number,
-            company=onsite_report.company_code or '',
+            workorder_id=onsite_report.workorder,
+            company=onsite_report.company_name,
             work_date=work_date,
             defaults={
                 'operator_name': onsite_report.operator,
+                'product_code': onsite_report.product_id,
+                'process_name': onsite_report.process,
+                'start_time': onsite_report.start_datetime.time(),
+                'end_time': onsite_report.end_datetime.time() if onsite_report.end_datetime else None,
+                'work_hours': work_hours,
+                'overtime_hours': overtime_hours,
+                'total_hours': total_hours,
                 'work_week': week_num,
                 'work_month': work_month,
                 'work_quarter': work_quarter,
@@ -153,6 +195,13 @@ class WorkOrderReportData(models.Model):
         if not created:
             # 更新現有記錄
             report_data.operator_name = onsite_report.operator
+            report_data.product_code = onsite_report.product_id
+            report_data.process_name = onsite_report.process
+            report_data.start_time = onsite_report.start_datetime.time()
+            report_data.end_time = onsite_report.end_datetime.time() if onsite_report.end_datetime else None
+            report_data.work_hours = work_hours
+            report_data.overtime_hours = overtime_hours
+            report_data.total_hours = total_hours
             report_data.daily_work_hours = daily_work_hours
             report_data.weekly_work_hours += daily_work_hours
             report_data.monthly_work_hours += daily_work_hours

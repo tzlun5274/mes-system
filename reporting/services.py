@@ -46,12 +46,30 @@ class WorkHourReportService:
         """按作業員查詢日報表摘要"""
         data = self.get_daily_report_by_operator(operator, date)
         
+        # 計算總工作時數
+        total_work_hours = data.aggregate(total=Sum('daily_work_hours'))['total'] or Decimal('0')
+        
+        # 計算作業員數量（去重）
+        if operator == 'all':
+            total_operators = data.exclude(operator_name__isnull=True).values('operator_name').distinct().count()
+        else:
+            total_operators = 1  # 特定作業員
+        
+        # 計算總設備使用時數
+        total_equipment_hours = data.aggregate(total=Sum('equipment_hours'))['total'] or Decimal('0')
+        
+        # 計算工單數量
+        workorder_count = data.count()
+        
+        # 計算平均日工作時數
+        avg_daily_hours = data.aggregate(avg=Avg('daily_work_hours'))['avg'] or Decimal('0')
+        
         summary = {
-            'total_work_hours': data.aggregate(total=Sum('daily_work_hours'))['total'] or Decimal('0'),
-            'total_operators': data.aggregate(total=Sum('operator_count'))['total'] or 0,
-            'total_equipment_hours': data.aggregate(total=Sum('equipment_hours'))['total'] or Decimal('0'),
-            'workorder_count': data.count(),
-            'avg_daily_hours': data.aggregate(avg=Avg('daily_work_hours'))['avg'] or Decimal('0'),
+            'total_work_hours': total_work_hours,
+            'total_operators': total_operators,
+            'total_equipment_hours': total_equipment_hours,
+            'workorder_count': workorder_count,
+            'avg_daily_hours': avg_daily_hours,
         }
         
         return summary
