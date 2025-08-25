@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if schedule %}編輯報表排程{% else %}新增報表排程{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'reporting:report_schedule_list' %}">報表排程管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">
+                {% if schedule %}編輯排程{% else %}新增排程{% endif %}
+            </li>
+        </ol>
+    </nav>
+
+    <!-- 訊息顯示區塊 -->
+    {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-0">
+                <i class="fas fa-clock text-primary"></i> 
+                {% if schedule %}編輯報表排程{% else %}新增報表排程{% endif %}
+            </h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit"></i> 
+                        {% if schedule %}編輯排程設定{% else %}新增排程設定{% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="scheduleForm">
+                        {% csrf_token %}
+                        
+                        <!-- 基本資訊 -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="name" class="form-label">
+                                    <i class="fas fa-tag text-primary"></i> 排程名稱 <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" id="name" name="name" 
+                                       value="{{ schedule.name|default:'' }}" required
+                                       placeholder="請輸入排程名稱">
+                                <div class="form-text">例如：週報表自動發送、月報表統計等</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="report_type" class="form-label">
+                                    <i class="fas fa-chart-line text-primary"></i> 報表類型 <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select" id="report_type" name="report_type" required>
+                                    <option value="">請選擇報表類型</option>
+                                    {% for value, label in report_types %}
+                                        <option value="{{ value }}" 
+                                                {% if schedule.report_type == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="company" class="form-label">
+                                    <i class="fas fa-building text-primary"></i> 公司代號 <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" id="company" name="company" 
+                                       value="{{ schedule.company|default:'' }}" required
+                                       placeholder="請輸入公司代號">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="status" class="form-label">
+                                    <i class="fas fa-toggle-on text-primary"></i> 狀態
+                                </label>
+                                <select class="form-select" id="status" name="status">
+                                    {% for value, label in status_choices %}
+                                        <option value="{{ value }}" 
+                                                {% if schedule.status == value or not schedule and value == 'active' %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 排程設定 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="fas fa-calendar-alt text-primary"></i> 排程設定</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="schedule_time" class="form-label">
+                                            <i class="fas fa-clock text-primary"></i> 執行時間 <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="time" class="form-control" id="schedule_time" name="schedule_time" 
+                                               value="{{ schedule.schedule_time|time:'H:i'|default:'' }}" required>
+                                        <div class="form-text">設定每日執行時間</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="schedule_day" class="form-label">
+                                            <i class="fas fa-calendar-day text-primary"></i> 執行日期
+                                        </label>
+                                        <input type="number" class="form-control" id="schedule_day" name="schedule_day" 
+                                               value="{{ schedule.schedule_day|default:'' }}" 
+                                               min="1" max="31"
+                                               placeholder="週報表：1-7，月報表：1-31">
+                                        <div class="form-text">
+                                            <span id="schedule_day_help">週報表：週幾(1-7)，月報表：每月幾號(1-31)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 收件人設定 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="fas fa-envelope text-primary"></i> 收件人設定</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="email_recipients" class="form-label">
+                                        <i class="fas fa-users text-primary"></i> 收件人信箱
+                                    </label>
+                                    <textarea class="form-control" id="email_recipients" name="email_recipients" 
+                                              rows="3" placeholder="請輸入收件人信箱，多個信箱用逗號分隔">{{ schedule.email_recipients|default:'' }}</textarea>
+                                    <div class="form-text">例如：user1@example.com, user2@example.com</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 按鈕區域 -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'reporting:report_schedule_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> 返回列表
+                            </a>
+                            <div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> 
+                                    {% if schedule %}更新排程{% else %}建立排程{% endif %}
+                                </button>
+                                {% if schedule %}
+                                    <a href="{% url 'reporting:report_schedule_delete' schedule.id %}" 
+                                       class="btn btn-danger ms-2"
+                                       onclick="return confirm('確定要刪除此排程嗎？')">
+                                        <i class="fas fa-trash"></i> 刪除排程
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 側邊說明 -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-info-circle text-info"></i> 說明</h6>
+                </div>
+                <div class="card-body">
+                    <h6><i class="fas fa-lightbulb text-warning"></i> 排程設定說明</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>週報表：</strong>每週指定星期幾執行</li>
+                        <li><strong>月報表：</strong>每月指定日期執行</li>
+                        <li><strong>季報表：</strong>每季指定日期執行</li>
+                        <li><strong>年報表：</strong>每年指定日期執行</li>
+                    </ul>
+                    
+                    <hr>
+                    
+                    <h6><i class="fas fa-exclamation-triangle text-warning"></i> 注意事項</h6>
+                    <ul class="list-unstyled">
+                        <li>• 排程名稱必須唯一</li>
+                        <li>• 執行時間為24小時制</li>
+                        <li>• 收件人信箱格式必須正確</li>
+                        <li>• 停用的排程不會自動執行</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const reportTypeSelect = document.getElementById('report_type');
+    const scheduleDayInput = document.getElementById('schedule_day');
+    const scheduleDayHelp = document.getElementById('schedule_day_help');
+    
+    // 根據報表類型更新執行日期的說明
+    function updateScheduleDayHelp() {
+        const reportType = reportTypeSelect.value;
+        if (reportType === 'weekly') {
+            scheduleDayHelp.textContent = '週報表：週幾(1-7，1=週一，7=週日)';
+            scheduleDayInput.max = '7';
+            scheduleDayInput.placeholder = '1-7';
+        } else if (reportType === 'monthly') {
+            scheduleDayHelp.textContent = '月報表：每月幾號(1-31)';
+            scheduleDayInput.max = '31';
+            scheduleDayInput.placeholder = '1-31';
+        } else if (reportType === 'quarterly') {
+            scheduleDayHelp.textContent = '季報表：每季幾號(1-31)';
+            scheduleDayInput.max = '31';
+            scheduleDayInput.placeholder = '1-31';
+        } else if (reportType === 'yearly') {
+            scheduleDayHelp.textContent = '年報表：每年幾號(1-31)';
+            scheduleDayInput.max = '31';
+            scheduleDayInput.placeholder = '1-31';
+        }
+    }
+    
+    // 監聽報表類型變更
+    reportTypeSelect.addEventListener('change', updateScheduleDayHelp);
+    
+    // 初始化說明
+    updateScheduleDayHelp();
+    
+    // 表單驗證
+    const form = document.getElementById('scheduleForm');
+    form.addEventListener('submit', function(e) {
+        const name = document.getElementById('name').value.trim();
+        const reportType = document.getElementById('report_type').value;
+        const company = document.getElementById('company').value.trim();
+        const scheduleTime = document.getElementById('schedule_time').value;
+        
+        if (!name) {
+            e.preventDefault();
+            alert('請輸入排程名稱');
+            return false;
+        }
+        
+        if (!reportType) {
+            e.preventDefault();
+            alert('請選擇報表類型');
+            return false;
+        }
+        
+        if (!company) {
+            e.preventDefault();
+            alert('請輸入公司代號');
+            return false;
+        }
+        
+        if (!scheduleTime) {
+            e.preventDefault();
+            alert('請設定執行時間');
+            return false;
+        }
+        
+        // 驗證收件人信箱格式
+        const emailRecipients = document.getElementById('email_recipients').value.trim();
+        if (emailRecipients) {
+            const emails = emailRecipients.split(',').map(email => email.trim());
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            
+            for (let email of emails) {
+                if (email && !emailRegex.test(email)) {
+                    e.preventDefault();
+                    alert(`信箱格式錯誤: ${email}`);
+                    return false;
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

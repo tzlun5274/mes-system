@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}工作日曆服務測試{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">工作日曆服務測試</li>
+        </ol>
+    </nav>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-0">
+                <i class="fas fa-calendar-alt text-primary"></i> 工作日曆服務測試
+            </h2>
+        </div>
+    </div>
+
+    <!-- 當前狀態 -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-calendar-day"></i> 當前日期</h6>
+                </div>
+                <div class="card-body">
+                    <h4>{{ test_results.current_date|date:"Y-m-d" }}</h4>
+                    <p class="text-muted mb-0">{{ test_results.current_date|date:"l" }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-check-circle"></i> 工作日狀態</h6>
+                </div>
+                <div class="card-body">
+                    {% if test_results.is_current_workday %}
+                        <h4 class="text-success">工作日</h4>
+                        <span class="badge bg-success">是</span>
+                    {% else %}
+                        <h4 class="text-danger">非工作日</h4>
+                        <span class="badge bg-danger">否</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-arrow-left"></i> 前一個工作日</h6>
+                </div>
+                <div class="card-body">
+                    <h4>{{ test_results.previous_workday|date:"Y-m-d" }}</h4>
+                    <p class="text-muted mb-0">{{ test_results.previous_workday|date:"l" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 未來5天 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-arrow-right"></i> 未來5天工作日判斷</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>星期</th>
+                                    <th>工作日狀態</th>
+                                    <th>狀態標籤</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for day in test_results.next_5_days %}
+                                <tr>
+                                    <td>{{ day.date|date:"Y-m-d" }}</td>
+                                    <td>{{ day.weekday }}</td>
+                                    <td>
+                                        {% if day.is_workday %}
+                                            <span class="text-success">工作日</span>
+                                        {% else %}
+                                            <span class="text-danger">非工作日</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if day.is_workday %}
+                                            <span class="badge bg-success">工作日</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">非工作日</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 過去5天 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-arrow-left"></i> 過去5天工作日判斷</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>星期</th>
+                                    <th>工作日狀態</th>
+                                    <th>狀態標籤</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for day in test_results.previous_5_days %}
+                                <tr>
+                                    <td>{{ day.date|date:"Y-m-d" }}</td>
+                                    <td>{{ day.weekday }}</td>
+                                    <td>
+                                        {% if day.is_workday %}
+                                            <span class="text-success">工作日</span>
+                                        {% else %}
+                                            <span class="text-danger">非工作日</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if day.is_workday %}
+                                            <span class="badge bg-success">工作日</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">非工作日</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-tools"></i> 測試操作</h6>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'scheduling:calendar' %}" class="btn btn-primary">
+                        <i class="fas fa-calendar"></i> 查看行事曆
+                    </a>
+                    <a href="{% url 'reporting:index' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回報表管理
+                    </a>
+                    <button class="btn btn-success" onclick="location.reload()">
+                        <i class="fas fa-sync-alt"></i> 重新測試
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

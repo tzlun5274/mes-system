@@ -1,0 +1,388 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}報表執行日誌{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">報表執行日誌</li>
+        </ol>
+    </nav>
+
+    <!-- 訊息顯示區塊 -->
+    {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        <div class="col-12 d-flex justify-content-between align-items-center">
+            <h2 class="mb-0"><i class="fas fa-history text-primary"></i> 報表執行日誌</h2>
+            <div>
+                <a href="{% url 'reporting:report_schedule_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> 返回排程管理
+                </a>
+                <button class="btn btn-success" onclick="location.reload()">
+                    <i class="fas fa-sync-alt"></i> 重新整理
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ page_obj.paginator.count }}</h4>
+                            <small>總執行記錄</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-list fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">
+                                {% for log in logs %}
+                                    {% if log.status == 'success' %}
+                                        {% if forloop.first %}
+                                            {% with success_count=0 %}
+                                                {% for log2 in logs %}
+                                                    {% if log2.status == 'success' %}
+                                                        {% with success_count=success_count|add:1 %}{% endwith %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {{ success_count }}
+                                            {% endwith %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </h4>
+                            <small>成功執行</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-check-circle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">
+                                {% for log in logs %}
+                                    {% if log.status == 'failed' %}
+                                        {% if forloop.first %}
+                                            {% with failed_count=0 %}
+                                                {% for log2 in logs %}
+                                                    {% if log2.status == 'failed' %}
+                                                        {% with failed_count=failed_count|add:1 %}{% endwith %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {{ failed_count }}
+                                            {% endwith %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </h4>
+                            <small>執行失敗</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-times-circle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">
+                                {% for log in logs %}
+                                    {% if log.status == 'running' %}
+                                        {% if forloop.first %}
+                                            {% with running_count=0 %}
+                                                {% for log2 in logs %}
+                                                    {% if log2.status == 'running' %}
+                                                        {% with running_count=running_count|add:1 %}{% endwith %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {{ running_count }}
+                                            {% endwith %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </h4>
+                            <small>執行中</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-spinner fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 執行日誌列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-list"></i> 執行記錄</h5>
+        </div>
+        <div class="card-body">
+            {% if logs %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>排程名稱</th>
+                                <th>執行時間</th>
+                                <th>狀態</th>
+                                <th>執行訊息</th>
+                                <th>檔案路徑</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                            <tr>
+                                <td>
+                                    <strong>{{ log.report_schedule.name }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ log.report_schedule.get_report_type_display }}</small>
+                                </td>
+                                <td>
+                                    <div>{{ log.execution_time|date:"Y-m-d" }}</div>
+                                    <small class="text-muted">{{ log.execution_time|time:"H:i:s" }}</small>
+                                </td>
+                                <td>
+                                    {% if log.status == 'success' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> 成功
+                                        </span>
+                                    {% elif log.status == 'failed' %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times"></i> 失敗
+                                        </span>
+                                    {% elif log.status == 'running' %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-spinner fa-spin"></i> 執行中
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.message %}
+                                        <div class="text-truncate" style="max-width: 200px;" title="{{ log.message }}">
+                                            {{ log.message }}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">無訊息</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.file_path %}
+                                        <div class="text-truncate" style="max-width: 150px;" title="{{ log.file_path }}">
+                                            <i class="fas fa-file"></i> 
+                                            {{ log.file_path|slice:":20" }}...
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">無檔案</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-outline-info" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#logDetailModal{{ log.id }}">
+                                            <i class="fas fa-eye"></i> 詳情
+                                        </button>
+                                        {% if log.file_path %}
+                                            <a href="#" class="btn btn-sm btn-outline-success" 
+                                               onclick="downloadFile('{{ log.file_path }}')">
+                                                <i class="fas fa-download"></i> 下載
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            
+                            <!-- 詳情 Modal -->
+                            <div class="modal fade" id="logDetailModal{{ log.id }}" tabindex="-1" aria-labelledby="logDetailModalLabel{{ log.id }}" aria-hidden="true">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="logDetailModalLabel{{ log.id }}">
+                                                <i class="fas fa-info-circle"></i> 執行記錄詳情
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <h6><i class="fas fa-tag"></i> 排程資訊</h6>
+                                                    <table class="table table-sm">
+                                                        <tr>
+                                                            <td><strong>排程名稱：</strong></td>
+                                                            <td>{{ log.report_schedule.name }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>報表類型：</strong></td>
+                                                            <td>{{ log.report_schedule.get_report_type_display }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>公司代號：</strong></td>
+                                                            <td>{{ log.report_schedule.company }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>執行時間：</strong></td>
+                                                            <td>{{ log.report_schedule.schedule_time|time:"H:i" }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <h6><i class="fas fa-clock"></i> 執行資訊</h6>
+                                                    <table class="table table-sm">
+                                                        <tr>
+                                                            <td><strong>執行時間：</strong></td>
+                                                            <td>{{ log.execution_time|date:"Y-m-d H:i:s" }}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>執行狀態：</strong></td>
+                                                            <td>
+                                                                {% if log.status == 'success' %}
+                                                                    <span class="badge bg-success">成功</span>
+                                                                {% elif log.status == 'failed' %}
+                                                                    <span class="badge bg-danger">失敗</span>
+                                                                {% elif log.status == 'running' %}
+                                                                    <span class="badge bg-warning">執行中</span>
+                                                                {% endif %}
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td><strong>檔案路徑：</strong></td>
+                                                            <td>{{ log.file_path|default:"無檔案" }}</td>
+                                                        </tr>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                            
+                                            {% if log.message %}
+                                                <div class="mt-3">
+                                                    <h6><i class="fas fa-comment"></i> 執行訊息</h6>
+                                                    <div class="alert alert-info">
+                                                        <pre class="mb-0">{{ log.message }}</pre>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+                                            {% if log.file_path %}
+                                                <a href="#" class="btn btn-success" onclick="downloadFile('{{ log.file_path }}')">
+                                                    <i class="fas fa-download"></i> 下載檔案
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分頁 -->
+                {% if page_obj.has_other_pages %}
+                    <nav aria-label="執行日誌分頁">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=1">
+                                        <i class="fas fa-angle-double-left"></i> 第一頁
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                                        <i class="fas fa-angle-left"></i> 上一頁
+                                    </a>
+                                </li>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                                        下一頁 <i class="fas fa-angle-right"></i>
+                                    </a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">
+                                        最後頁 <i class="fas fa-angle-double-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">尚無執行記錄</h5>
+                    <p class="text-muted">當報表排程執行後，相關記錄會顯示在這裡</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function downloadFile(filePath) {
+    // 這裡可以實作檔案下載功能
+    // 實際實作需要根據檔案路徑和權限來處理
+    alert('檔案下載功能：' + filePath);
+}
+
+// 自動重新整理（每30秒）
+setInterval(function() {
+    // 只在頁面可見時重新整理
+    if (!document.hidden) {
+        location.reload();
+    }
+}, 30000);
+</script>
+{% endblock %}

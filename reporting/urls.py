@@ -45,6 +45,7 @@ urlpatterns = [
     path('schedule/', views.report_schedule_list, name='report_schedule_list'),
     path('schedule/add/', views.report_schedule_form, name='report_schedule_add'),
     path('schedule/<int:schedule_id>/edit/', views.report_schedule_form, name='report_schedule_edit'),
+    path('schedule/<int:schedule_id>/delete/', views.delete_report_schedule, name='report_schedule_delete'),
     path('schedule/<int:schedule_id>/execute/', views.execute_report_schedule, name='execute_report_schedule'),
     path('schedule/logs/', views.report_execution_log, name='report_execution_log'),
     
@@ -63,4 +64,21 @@ urlpatterns = [
     path('api/dashboard-stats/', views.dashboard_stats, name='dashboard_stats'),
     path('api/work-hour-stats/', views.work_hour_stats, name='work_hour_stats'),
     path('api/detailed-stats/', views.detailed_stats, name='detailed_stats'),
+    
+    # 工作日曆測試
+    path('test-workday-calendar/', views.test_workday_calendar, name='test_workday_calendar'),
+    
+    # 假期設定管理
+    path('holiday-setup/', views.holiday_setup_management, name='holiday_setup_management'),
+    
+    # 前一個工作日報表
+    path('execute-previous-workday-report/', views.execute_previous_workday_report, name='execute_previous_workday_report'),
+    path('test-previous-workday-report/', views.test_previous_workday_report, name='test_previous_workday_report'),
+    path('previous-workday-report-management/', views.previous_workday_report_management, name='previous_workday_report_management'),
+    
+    # 政府行事曆 API 同步
+    path('government-calendar-sync/', views.government_calendar_sync, name='government_calendar_sync'),
+    
+    # CSV 國定假日匯入
+    path('csv-holiday-import/', views.csv_holiday_import, name='csv_holiday_import'),
 ] 

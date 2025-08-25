@@ -103,6 +103,18 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-calendar-day fa-3x text-primary mb-3"></i>
+                                    <h5 class="card-title">前一個工作日報表</h5>
+                                    <p class="card-text">自動生成前一個工作日的填報和現場報工統計報表</p>
+                                    <a href="{% url 'reporting:previous_workday_report_management' %}" class="btn btn-primary">
+                                        <i class="fas fa-file-alt"></i> 前一個工作日報表
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- 報表類型 -->
@@ -195,6 +207,22 @@
                                         <li><i class="fas fa-check text-success"></i> 完工統計分析</li>
                                         <li><i class="fas fa-check text-success"></i> 趨勢圖表</li>
                                         <li><i class="fas fa-check text-success"></i> 效率分析</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0"><i class="fas fa-calendar-day"></i> 前一個工作日報表</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-unstyled mb-0">
+                                        <li><i class="fas fa-check text-success"></i> 智能工作日判斷</li>
+                                        <li><i class="fas fa-check text-success"></i> 自動假期處理</li>
+                                        <li><i class="fas fa-check text-success"></i> 填報資料統計</li>
+                                        <li><i class="fas fa-check text-success"></i> 現場報工統計</li>
+                                        <li><i class="fas fa-check text-success"></i> 自動執行排程</li>
                                     </ul>
                                 </div>
                             </div>
@@ -356,6 +384,30 @@
                                             <p class="small text-muted">查看已完工工單報表</p>
                                             <a href="{% url 'reporting:completed_workorder_report_index' %}" class="btn btn-sm btn-outline-danger">
                                                 <i class="fas fa-check"></i> 完工報表
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <div class="card border-primary">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-calendar-day fa-2x text-primary mb-2"></i>
+                                            <h6>前一個工作日報表</h6>
+                                            <p class="small text-muted">自動生成前一個工作日報表</p>
+                                            <a href="{% url 'reporting:previous_workday_report_management' %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-file-alt"></i> 管理報表
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <div class="card border-success">
+                                        <div class="card-body text-center">
+                                            <i class="fas fa-calendar-alt fa-2x text-success mb-2"></i>
+                                            <h6>假期設定</h6>
+                                            <p class="small text-muted">管理國定假日和補班日</p>
+                                            <a href="{% url 'reporting:holiday_setup_management' %}" class="btn btn-sm btn-outline-success">
+                                                <i class="fas fa-cog"></i> 假期管理
                                             </a>
                                         </div>
                                     </div>

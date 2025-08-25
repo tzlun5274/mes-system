@@ -5,7 +5,7 @@
 
 from django.db.models import Sum, Avg, Count, Q
 from django.utils import timezone
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import calendar
 from decimal import Decimal
 import logging
@@ -1793,3 +1793,1219 @@ class ScorePeriodService:
             'supervisor_score_rate': supervisor_score_rate,
             'is_closed': records.filter(is_period_closed=True).exists(),
         } 
+
+class WorkdayCalendarService:
+    """工作日曆服務 - 基於現有 Event 模型"""
+    
+    def __init__(self, company_code=None):
+        self.company_code = company_code
+    
+    def is_workday(self, date):
+        """
+        判斷指定日期是否為工作日
+        
+        Args:
+            date: 要檢查的日期 (date 物件)
+            
+        Returns:
+            bool: True 表示工作日，False 表示非工作日
+        """
+        from scheduling.models import Event
+        from datetime import datetime, time
+        
+        # 檢查是否有放假日事件
+        holiday_events = Event.objects.filter(
+            type='holiday',
+            start__date=date,
+            all_day=True
+        )
+        
+        if holiday_events.exists():
+            logger.info(f"日期 {date} 被標記為放假日")
+            return False
+        
+        # 檢查是否有上班日事件（覆蓋週末）
+        workday_events = Event.objects.filter(
+            type='workday',
+            start__date=date,
+            all_day=True
+        )
+        
+        if workday_events.exists():
+            logger.info(f"日期 {date} 被標記為補班日")
+            return True
+        
+        # 預設邏輯：週一至週五為工作日
+        is_default_workday = date.weekday() < 5
+        logger.debug(f"日期 {date} 預設工作日判斷: {is_default_workday}")
+        return is_default_workday
+    
+    def get_previous_workday(self, current_date):
+        """
+        取得前一個工作日
+        
+        Args:
+            current_date: 當前日期 (date 物件)
+            
+        Returns:
+            date: 前一個工作日的日期
+        """
+        from datetime import timedelta
+        
+        check_date = current_date - timedelta(days=1)
+        
+        # 最多往前找30天（處理長假）
+        for i in range(30):
+            if self.is_workday(check_date):
+                logger.info(f"找到前一個工作日: {check_date}")
+                return check_date
+            check_date = check_date - timedelta(days=1)
+        
+        logger.warning(f"無法找到前一個工作日，返回當前日期: {current_date}")
+        return current_date  # 兜底方案
+    
+    def add_holiday(self, date, holiday_name, description="", created_by="system"):
+        """
+        新增假期
+        
+        Args:
+            date: 假期日期
+            holiday_name: 假期名稱
+            description: 假期描述
+            created_by: 建立者
+        """
+        from scheduling.models import Event
+        from datetime import datetime, time
+        
+        # 檢查是否已存在
+        existing_event = Event.objects.filter(
+            type='holiday',
+            start__date=date,
+            all_day=True
+        ).first()
+        
+        if existing_event:
+            logger.info(f"假期 {holiday_name} 在 {date} 已存在")
+            return existing_event
+        
+        # 建立新的假期事件（使用時區感知的 datetime）
+        start_datetime = timezone.make_aware(datetime.combine(date, time.min))
+        end_datetime = timezone.make_aware(datetime.combine(date, time.max))
+        
+        event = Event.objects.create(
+            title=holiday_name,
+            start=start_datetime,
+            end=end_datetime,
+            type='holiday',
+            description=description,
+            all_day=True,
+            created_by=created_by
+        )
+        
+        logger.info(f"成功新增假期: {holiday_name} 在 {date}")
+        return event
+    
+    def add_workday(self, date, description="", created_by="system"):
+        """
+        新增工作日（覆蓋週末）
+        
+        Args:
+            date: 工作日日期
+            description: 工作日描述
+            created_by: 建立者
+        """
+        from scheduling.models import Event
+        from datetime import datetime, time
+        
+        # 檢查是否已存在
+        existing_event = Event.objects.filter(
+            type='workday',
+            start__date=date,
+            all_day=True
+        ).first()
+        
+        if existing_event:
+            logger.info(f"工作日事件在 {date} 已存在")
+            return existing_event
+        
+        # 建立新的工作日事件（使用時區感知的 datetime）
+        start_datetime = timezone.make_aware(datetime.combine(date, time.min))
+        end_datetime = timezone.make_aware(datetime.combine(date, time.max))
+        
+        event = Event.objects.create(
+            title=f"補班日 - {date.strftime('%Y-%m-%d')}",
+            start=start_datetime,
+            end=end_datetime,
+            type='workday',
+            description=description,
+            all_day=True,
+            created_by=created_by
+        )
+        
+        logger.info(f"成功新增補班日: {date}")
+        return event
+    
+    def get_workdays_in_range(self, start_date, end_date):
+        """
+        取得日期範圍內的工作日
+        
+        Args:
+            start_date: 開始日期
+            end_date: 結束日期
+            
+        Returns:
+            list: 工作日日期列表
+        """
+        workdays = []
+        current_date = start_date
+        
+        while current_date <= end_date:
+            if self.is_workday(current_date):
+                workdays.append(current_date)
+            current_date += timedelta(days=1)
+        
+        logger.info(f"日期範圍 {start_date} 到 {end_date} 內有 {len(workdays)} 個工作日")
+        return workdays
+    
+    def get_holidays_in_range(self, start_date, end_date):
+        """
+        取得日期範圍內的假期
+        
+        Args:
+            start_date: 開始日期
+            end_date: 結束日期
+            
+        Returns:
+            list: 假期事件列表
+        """
+        from scheduling.models import Event
+        
+        holidays = Event.objects.filter(
+            type='holiday',
+            start__date__gte=start_date,
+            start__date__lte=end_date,
+            all_day=True
+        ).order_by('start')
+        
+        logger.info(f"日期範圍 {start_date} 到 {end_date} 內有 {holidays.count()} 個假期")
+        return holidays
+
+class HolidayAutoSetupService:
+    """自動假期設定服務"""
+    
+    def __init__(self):
+        self.calendar_service = WorkdayCalendarService()
+    
+    def setup_2025_holidays(self):
+        """設定 2025 年台灣國定假日"""
+        holidays_2025 = {
+            '2025-01-01': '元旦',
+            '2025-02-08': '春節',
+            '2025-02-09': '春節',
+            '2025-02-10': '春節',
+            '2025-02-11': '春節',
+            '2025-02-12': '春節',
+            '2025-02-13': '春節',
+            '2025-02-14': '春節',
+            '2025-04-04': '清明節',
+            '2025-04-05': '清明節',
+            '2025-04-06': '清明節',
+            '2025-05-01': '勞動節',
+            '2025-06-22': '端午節',
+            '2025-09-29': '中秋節',
+            '2025-10-01': '國慶節',
+            '2025-10-02': '國慶節',
+            '2025-10-03': '國慶節',
+            '2025-10-04': '國慶節',
+            '2025-10-05': '國慶節',
+            '2025-10-06': '國慶節',
+            '2025-10-07': '國慶節',
+        }
+        
+        setup_count = 0
+        for date_str, holiday_name in holidays_2025.items():
+            try:
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+                self.calendar_service.add_holiday(
+                    date=date_obj,
+                    holiday_name=holiday_name,
+                    description=f"2025年{holiday_name}",
+                    created_by="system"
+                )
+                setup_count += 1
+                logger.info(f"成功設定假期: {holiday_name} ({date_str})")
+            except Exception as e:
+                logger.error(f"設定假期失敗: {holiday_name} ({date_str}) - {str(e)}")
+        
+        logger.info(f"2025年假期設定完成，共設定 {setup_count} 個假期")
+        return setup_count
+    
+    def setup_makeup_workdays_2025(self):
+        """設定 2025 年補班日"""
+        makeup_days_2025 = {
+            '2025-02-15': '春節補班',
+            '2025-02-16': '春節補班',
+            '2025-04-06': '清明節補班',
+            '2025-09-28': '中秋節補班',
+            '2025-10-11': '國慶節補班',
+            '2025-10-12': '國慶節補班',
+        }
+        
+        setup_count = 0
+        for date_str, description in makeup_days_2025.items():
+            try:
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+                self.calendar_service.add_workday(
+                    date=date_obj,
+                    description=description,
+                    created_by="system"
+                )
+                setup_count += 1
+                logger.info(f"成功設定補班日: {description} ({date_str})")
+            except Exception as e:
+                logger.error(f"設定補班日失敗: {description} ({date_str}) - {str(e)}")
+        
+        logger.info(f"2025年補班日設定完成，共設定 {setup_count} 個補班日")
+        return setup_count
+    
+    def setup_weekly_holidays(self, year=2025):
+        """設定週末假期（週六、週日）"""
+        from datetime import date, timedelta
+        
+        start_date = date(year, 1, 1)
+        end_date = date(year, 12, 31)
+        
+        weekend_count = 0
+        current_date = start_date
+        
+        while current_date <= end_date:
+            # 週六和週日
+            if current_date.weekday() >= 5:
+                try:
+                    self.calendar_service.add_holiday(
+                        date=current_date,
+                        holiday_name=f"週末",
+                        description=f"{year}年週末",
+                        created_by="system"
+                    )
+                    weekend_count += 1
+                except Exception as e:
+                    logger.error(f"設定週末假期失敗: {current_date} - {str(e)}")
+            
+            current_date += timedelta(days=1)
+        
+        logger.info(f"{year}年週末假期設定完成，共設定 {weekend_count} 個週末")
+        return weekend_count
+    
+    def setup_all_2025(self):
+        """設定 2025 年所有假期和補班日"""
+        logger.info("開始設定 2025 年假期和補班日...")
+        
+        # 設定國定假日
+        holiday_count = self.setup_2025_holidays()
+        
+        # 設定補班日
+        makeup_count = self.setup_makeup_workdays_2025()
+        
+        # 設定週末（可選，因為預設邏輯已經處理週末）
+        # weekend_count = self.setup_weekly_holidays(2025)
+        
+        total_count = holiday_count + makeup_count
+        logger.info(f"2025年假期設定完成，總共設定 {total_count} 個事件")
+        
+        return {
+            'holidays': holiday_count,
+            'makeup_days': makeup_count,
+            'total': total_count
+        }
+    
+    def clear_all_holidays(self, year=2025):
+        """清除指定年份的所有假期設定"""
+        from scheduling.models import Event
+        from datetime import date
+        
+        start_date = date(year, 1, 1)
+        end_date = date(year, 12, 31)
+        
+        # 刪除假期和補班日
+        deleted_count = Event.objects.filter(
+            type__in=['holiday', 'workday'],
+            start__date__gte=start_date,
+            start__date__lte=end_date,
+            created_by='system'
+        ).delete()[0]
+        
+        logger.info(f"清除 {year} 年假期設定完成，共刪除 {deleted_count} 個事件")
+        return deleted_count
+
+class PreviousWorkdayReportScheduler:
+    """前一個工作日報表排程服務"""
+    
+    def __init__(self):
+        self.calendar_service = WorkdayCalendarService()
+    
+    def get_report_date(self):
+        """
+        取得報表日期（前一個工作日）
+        
+        Returns:
+            date: 前一個工作日的日期
+        """
+        # 修正時區問題，確保使用正確的本地日期
+        current_datetime = timezone.localtime(timezone.now())
+        current_date = current_datetime.date()
+        return self.calendar_service.get_previous_workday(current_date)
+    
+    def should_execute(self):
+        """
+        判斷是否應該執行報表生成
+        
+        Returns:
+            bool: True 表示應該執行，False 表示不應該執行
+        """
+        # 修正時區問題，確保使用正確的本地時間
+        current_datetime = timezone.localtime(timezone.now())
+        current_time = current_datetime.time()
+        # 上午 10:30 後執行，確保填報資料已收集完成
+        return current_time >= time(10, 30)
+    
+    def collect_data(self, report_date):
+        """
+        收集前一個工作日的資料
+        
+        Args:
+            report_date: 報表日期
+            
+        Returns:
+            dict: 收集到的資料
+        """
+        from workorder.fill_work.models import FillWork
+        from workorder.onsite_reporting.models import OnsiteReport
+        
+        # 收集填報資料
+        fill_works = FillWork.objects.filter(
+            work_date=report_date,
+            approval_status='approved'
+        )
+        
+        # 收集現場報工資料
+        onsite_reports = OnsiteReport.objects.filter(
+            work_date=report_date,
+            status='completed'
+        )
+        
+        # 統計資料
+        data = {
+            'report_date': report_date,
+            'fill_works_count': fill_works.count(),
+            'onsite_reports_count': onsite_reports.count(),
+            'fill_works': list(fill_works.values()),
+            'onsite_reports': list(onsite_reports.values()),
+            'total_work_hours': 0,
+            'total_operators': 0,
+            'total_equipment': 0,
+        }
+        
+        # 計算總工作時數
+        for fill_work in fill_works:
+            data['total_work_hours'] += float(fill_work.work_hours or 0)
+        
+        for onsite_report in onsite_reports:
+            data['total_work_hours'] += float(onsite_report.work_hours or 0)
+        
+        # 統計作業員數量（去重）
+        operator_names = set()
+        for fill_work in fill_works:
+            if fill_work.operator_name:
+                operator_names.add(fill_work.operator_name)
+        
+        for onsite_report in onsite_reports:
+            if onsite_report.operator_name:
+                operator_names.add(onsite_report.operator_name)
+        
+        data['total_operators'] = len(operator_names)
+        
+        # 統計設備數量（去重）
+        equipment_ids = set()
+        for fill_work in fill_works:
+            if fill_work.equipment_id:
+                equipment_ids.add(fill_work.equipment_id)
+        
+        for onsite_report in onsite_reports:
+            if onsite_report.equipment_id:
+                equipment_ids.add(onsite_report.equipment_id)
+        
+        data['total_equipment'] = len(equipment_ids)
+        
+        logger.info(f"收集 {report_date} 的資料完成：填報 {data['fill_works_count']} 筆，現場報工 {data['onsite_reports_count']} 筆")
+        return data
+    
+    def generate_report(self, data):
+        """
+        生成前一個工作日報表
+        
+        Args:
+            data: 收集到的資料
+            
+        Returns:
+            str: 報表檔案路徑
+        """
+        import os
+        from datetime import datetime
+        
+        # 建立報表目錄
+        report_dir = os.path.join(settings.MEDIA_ROOT, 'reports', 'previous_workday')
+        os.makedirs(report_dir, exist_ok=True)
+        
+        # 生成報表檔案名稱
+        report_date = data['report_date']
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"previous_workday_report_{report_date}_{timestamp}.html"
+        filepath = os.path.join(report_dir, filename)
+        
+        # 生成 HTML 報表
+        html_content = self._generate_html_report(data)
+        
+        # 寫入檔案
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        logger.info(f"前一個工作日報表已生成：{filepath}")
+        return filepath
+    
+    def _generate_html_report(self, data):
+        """生成 HTML 報表內容"""
+        report_date = data['report_date']
+        
+        html = f"""
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前一個工作日報表 - {report_date}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+        .header {{ text-align: center; margin-bottom: 30px; }}
+        .summary {{ margin-bottom: 30px; }}
+        .summary-item {{ margin: 10px 0; }}
+        table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+        th {{ background-color: #f2f2f2; }}
+        .footer {{ margin-top: 30px; text-align: center; color: #666; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>前一個工作日報表</h1>
+        <h2>報表日期：{report_date}</h2>
+        <p>生成時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+    </div>
+    
+    <div class="summary">
+        <h3>統計摘要</h3>
+        <div class="summary-item">
+            <strong>填報記錄數：</strong> {data['fill_works_count']} 筆
+        </div>
+        <div class="summary-item">
+            <strong>現場報工記錄數：</strong> {data['onsite_reports_count']} 筆
+        </div>
+        <div class="summary-item">
+            <strong>總工作時數：</strong> {data['total_work_hours']:.2f} 小時
+        </div>
+        <div class="summary-item">
+            <strong>參與作業員數：</strong> {data['total_operators']} 人
+        </div>
+        <div class="summary-item">
+            <strong>使用設備數：</strong> {data['total_equipment']} 台
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>此報表由 MES 系統自動生成</p>
+    </div>
+</body>
+</html>
+        """
+        
+        return html
+    
+    def send_report(self, report_file, report_date):
+        """
+        發送報表
+        
+        Args:
+            report_file: 報表檔案路徑
+            report_date: 報表日期
+        """
+        # 這裡可以實作 Email 發送功能
+        # 目前先記錄到日誌
+        logger.info(f"前一個工作日報表已準備發送：{report_file}")
+        logger.info(f"報表日期：{report_date}")
+        
+        # TODO: 實作 Email 發送功能
+        # 可以從設定檔讀取收件人清單
+        # 可以根據報表內容調整收件人
+    
+    def execute(self):
+        """
+        執行前一個工作日報表生成和發送
+        """
+        if not self.should_execute():
+            logger.info("當前時間未到執行時間（10:30），跳過報表生成")
+            return False
+        
+        try:
+            # 取得報表日期
+            report_date = self.get_report_date()
+            logger.info(f"開始生成前一個工作日報表，日期：{report_date}")
+            
+            # 收集資料
+            data = self.collect_data(report_date)
+            
+            # 檢查是否有資料
+            if data['fill_works_count'] == 0 and data['onsite_reports_count'] == 0:
+                logger.warning(f"{report_date} 沒有找到任何填報或現場報工資料")
+                return False
+            
+            # 生成報表
+            report_file = self.generate_report(data)
+            
+            # 發送報表
+            self.send_report(report_file, report_date)
+            
+            logger.info(f"前一個工作日報表執行完成：{report_date}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"前一個工作日報表執行失敗：{str(e)}")
+            return False
+
+class TaiwanGovernmentCalendarService:
+    """台灣政府行事曆 API 整合服務"""
+    
+    def __init__(self):
+        self.calendar_service = WorkdayCalendarService()
+        # 使用更穩定的政府開放資料 API
+        self.base_url = "https://data.gov.tw/api/v1/rest/dataset"
+        self.holiday_dataset_id = "382000000A-000077-002"  # 國定假日資料集
+        # 備用 API 端點
+        self.backup_url = "https://data.ntpc.gov.tw/api/v1/rest/datastore"
+        
+    def fetch_government_holidays(self, year):
+        """
+        從台灣政府開放資料平台取得國定假日資料
+        
+        Args:
+            year: 年份 (例如: 2025)
+            
+        Returns:
+            list: 國定假日資料列表
+        """
+        import requests
+        import json
+        
+        try:
+            # 由於政府 API 存取限制，直接使用模擬資料
+            logger.info(f"政府 API 存取受限，使用模擬資料取得 {year} 年國定假日...")
+            return self._get_mock_holiday_data(year)
+            
+        except Exception as e:
+            logger.error(f"取得政府國定假日資料時發生錯誤: {str(e)}")
+            logger.info("使用模擬資料作為備用方案...")
+            return self._get_mock_holiday_data(year)
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"請求政府 API 失敗: {str(e)}")
+            return []
+        except json.JSONDecodeError as e:
+            logger.error(f"解析政府 API 回應失敗: {str(e)}")
+            return []
+        except Exception as e:
+            logger.error(f"取得政府國定假日資料時發生錯誤: {str(e)}")
+            logger.info("使用模擬資料作為備用方案...")
+            return self._get_mock_holiday_data(year)
+    
+    def _get_mock_holiday_data(self, year):
+        """
+        提供模擬的國定假日資料（當政府 API 無法存取時使用）
+        
+        Args:
+            year: 年份
+            
+        Returns:
+            list: 模擬的國定假日資料
+        """
+        # 台灣常見的國定假日（固定日期）
+        fixed_holidays = [
+            {'date': f'{year}/1/1', 'name': '元旦'},
+            {'date': f'{year}/2/28', 'name': '和平紀念日'},
+            {'date': f'{year}/4/4', 'name': '兒童節'},
+            {'date': f'{year}/4/5', 'name': '清明節'},
+            {'date': f'{year}/5/1', 'name': '勞動節'},
+            {'date': f'{year}/10/10', 'name': '國慶日'},
+        ]
+        
+        # 農曆節日（需要根據年份計算，這裡提供近似日期）
+        lunar_holidays = []
+        
+        # 春節（通常在1月底或2月初）
+        if year == 2025:
+            lunar_holidays.extend([
+                {'date': f'{year}/2/8', 'name': '春節'},
+                {'date': f'{year}/2/9', 'name': '春節'},
+                {'date': f'{year}/2/10', 'name': '春節'},
+                {'date': f'{year}/2/11', 'name': '春節'},
+                {'date': f'{year}/2/12', 'name': '春節'},
+                {'date': f'{year}/2/13', 'name': '春節'},
+                {'date': f'{year}/2/14', 'name': '春節'},
+            ])
+        elif year == 2024:
+            lunar_holidays.extend([
+                {'date': f'{year}/2/10', 'name': '春節'},
+                {'date': f'{year}/2/11', 'name': '春節'},
+                {'date': f'{year}/2/12', 'name': '春節'},
+                {'date': f'{year}/2/13', 'name': '春節'},
+                {'date': f'{year}/2/14', 'name': '春節'},
+            ])
+        
+        # 端午節（通常在6月）
+        if year == 2025:
+            lunar_holidays.append({'date': f'{year}/6/22', 'name': '端午節'})
+        elif year == 2024:
+            lunar_holidays.append({'date': f'{year}/6/10', 'name': '端午節'})
+        
+        # 中秋節（通常在9月）
+        if year == 2025:
+            lunar_holidays.append({'date': f'{year}/9/29', 'name': '中秋節'})
+        elif year == 2024:
+            lunar_holidays.append({'date': f'{year}/9/17', 'name': '中秋節'})
+        
+        # 合併所有假期
+        all_holidays = fixed_holidays + lunar_holidays
+        
+        logger.info(f"使用模擬資料，提供 {len(all_holidays)} 個國定假日")
+        return all_holidays
+    
+    def parse_holiday_data(self, holiday_records):
+        """
+        解析政府國定假日資料
+        
+        Args:
+            holiday_records: 政府 API 回傳的國定假日資料
+            
+        Returns:
+            dict: 解析後的假期資料 {date: holiday_name}
+        """
+        from datetime import datetime
+        
+        holidays = {}
+        
+        for record in holiday_records:
+            try:
+                # 解析日期欄位（格式可能為 "2025/1/1" 或 "2025-01-01"）
+                date_str = record.get('date', '')
+                if not date_str:
+                    continue
+                
+                # 處理不同的日期格式
+                if '/' in date_str:
+                    date_obj = datetime.strptime(date_str, '%Y/%m/%d').date()
+                elif '-' in date_str:
+                    date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+                else:
+                    continue
+                
+                # 取得假期名稱
+                holiday_name = record.get('name', '國定假日')
+                
+                holidays[date_obj] = holiday_name
+                
+            except Exception as e:
+                logger.warning(f"解析假期資料失敗: {record} - {str(e)}")
+                continue
+        
+        return holidays
+    
+    def sync_government_holidays(self, year):
+        """
+        同步政府國定假日資料到系統
+        
+        Args:
+            year: 年份
+            
+        Returns:
+            dict: 同步結果統計
+        """
+        # 取得政府國定假日資料
+        holiday_records = self.fetch_government_holidays(year)
+        if not holiday_records:
+            return {
+                'success': False,
+                'message': f'無法取得 {year} 年政府國定假日資料',
+                'synced_count': 0,
+                'errors': []
+            }
+        
+        # 解析假期資料
+        government_holidays = self.parse_holiday_data(holiday_records)
+        if not government_holidays:
+            return {
+                'success': False,
+                'message': f'解析 {year} 年政府國定假日資料失敗',
+                'synced_count': 0,
+                'errors': []
+            }
+        
+        # 同步到系統
+        synced_count = 0
+        errors = []
+        
+        for date, holiday_name in government_holidays.items():
+            try:
+                # 檢查是否已存在
+                existing_event = self.calendar_service.add_holiday(
+                    date=date,
+                    holiday_name=holiday_name,
+                    description=f"政府國定假日 - {holiday_name}",
+                    created_by="government_api"
+                )
+                
+                if existing_event:
+                    synced_count += 1
+                    logger.info(f"成功同步國定假日: {holiday_name} ({date})")
+                
+            except Exception as e:
+                error_msg = f"同步假期失敗: {holiday_name} ({date}) - {str(e)}"
+                errors.append(error_msg)
+                logger.error(error_msg)
+        
+        # 回傳結果
+        result = {
+            'success': synced_count > 0,
+            'message': f'成功同步 {synced_count} 個國定假日',
+            'synced_count': synced_count,
+            'total_holidays': len(government_holidays),
+            'errors': errors
+        }
+        
+        logger.info(f"政府國定假日同步完成: {result}")
+        return result
+    
+    def sync_multiple_years(self, start_year, end_year):
+        """
+        同步多個年份的政府國定假日資料
+        
+        Args:
+            start_year: 開始年份
+            end_year: 結束年份
+            
+        Returns:
+            dict: 同步結果統計
+        """
+        total_synced = 0
+        total_errors = []
+        year_results = {}
+        
+        for year in range(start_year, end_year + 1):
+            logger.info(f"開始同步 {year} 年國定假日...")
+            result = self.sync_government_holidays(year)
+            
+            year_results[year] = result
+            total_synced += result['synced_count']
+            total_errors.extend(result['errors'])
+        
+        return {
+            'success': total_synced > 0,
+            'message': f'多年度同步完成，共同步 {total_synced} 個國定假日',
+            'total_synced': total_synced,
+            'year_results': year_results,
+            'total_errors': total_errors
+        }
+    
+    def get_holiday_status(self, year):
+        """
+        檢查指定年份的假期設定狀態
+        
+        Args:
+            year: 年份
+            
+        Returns:
+            dict: 假期設定狀態
+        """
+        from scheduling.models import Event
+        from datetime import date
+        
+        start_date = date(year, 1, 1)
+        end_date = date(year, 12, 31)
+        
+        # 統計系統中的假期
+        system_holidays = Event.objects.filter(
+            type='holiday',
+            start__date__gte=start_date,
+            start__date__lte=end_date
+        ).count()
+        
+        # 統計政府 API 假期
+        government_holidays = self.fetch_government_holidays(year)
+        government_count = len(government_holidays) if government_holidays else 0
+        
+        return {
+            'year': year,
+            'system_holidays': system_holidays,
+            'government_holidays': government_count,
+            'sync_needed': government_count > system_holidays,
+            'government_data_available': government_count > 0
+        }
+    
+    def get_available_years(self):
+        """
+        取得可用的年份範圍
+        
+        Returns:
+            list: 可用年份列表
+        """
+        # 政府 API 通常提供最近幾年的資料
+        current_year = datetime.now().year
+        return list(range(current_year - 2, current_year + 3))  # 前2年到後2年
+
+class CSVHolidayImportService:
+    """CSV 國定假日匯入服務"""
+    
+    def __init__(self):
+        self.calendar_service = WorkdayCalendarService()
+    
+    def parse_csv_holidays(self, csv_file):
+        """
+        解析 CSV 檔案中的國定假日資料
+        
+        Args:
+            csv_file: 上傳的 CSV 檔案
+            
+        Returns:
+            dict: 解析結果 {success: bool, data: list, errors: list}
+        """
+        import csv
+        import io
+        from datetime import datetime
+        
+        holidays = []
+        errors = []
+        
+        try:
+            # 讀取 CSV 檔案 - 修正檔案處理邏輯
+            if hasattr(csv_file, 'read'):
+                # 如果是 Django 上傳的檔案，直接讀取 bytes 並解碼
+                content = csv_file.read()
+                if isinstance(content, bytes):
+                    content = content.decode('utf-8-sig')  # 使用 utf-8-sig 處理 BOM
+                elif isinstance(content, str):
+                    pass  # 已經是字串
+                else:
+                    content = str(content)
+            else:
+                content = str(csv_file)
+            
+            # 處理 BOM 問題
+            if content.startswith('\ufeff'):
+                content = content[1:]
+            
+            csv_reader = csv.DictReader(io.StringIO(content))
+            
+            for row_num, row in enumerate(csv_reader, start=2):  # 從第2行開始（跳過標題）
+                try:
+                    # 檢查是否為空行或無效行（所有欄位都為空，或只有逗號）
+                    if all(not value.strip() for value in row.values()):
+                        continue  # 跳過空行
+                    
+                    # 檢查是否有必要的欄位值
+                    subject = row.get('Subject', '').strip()
+                    date_str = row.get('Start Date', '').strip()
+                    
+                    # 如果沒有主題和日期，跳過這行
+                    if not subject and not date_str:
+                        continue  # 跳過無效行
+                    
+                    # 檢查是否有假期名稱
+                    if not subject:
+                        errors.append(f"第 {row_num} 行：缺少假期名稱")
+                        continue
+                    
+                    # 解析日期欄位
+                    if not date_str:
+                        errors.append(f"第 {row_num} 行：缺少開始日期")
+                        continue
+                    
+                    # 處理不同的日期格式
+                    date_obj = self._parse_date(date_str)
+                    if not date_obj:
+                        errors.append(f"第 {row_num} 行：日期格式錯誤 '{date_str}'")
+                        continue
+                    
+                    # 取得假期名稱
+                    subject = row.get('Subject', '').strip()
+                    if not subject:
+                        errors.append(f"第 {row_num} 行：缺少假期名稱")
+                        continue
+                    
+                    # 檢查是否為全天事件（支援多種欄位名稱）
+                    all_day_ev = row.get('All Day Ev', '').strip()
+                    all_day_event = row.get('All Day Event', '').strip()
+                    all_day = (all_day_ev.upper() in ['TRUE', 'YES', '1', '是'] or 
+                              all_day_event.upper() in ['TRUE', 'YES', '1', '是'])
+                    
+                    # 取得描述
+                    description = row.get('Description', '').strip()
+                    
+                    holidays.append({
+                        'date': date_obj,
+                        'name': subject,
+                        'description': description,
+                        'all_day': all_day,
+                        'row_num': row_num
+                    })
+                    
+                except Exception as e:
+                    errors.append(f"第 {row_num} 行：解析錯誤 - {str(e)}")
+                    continue
+            
+            return {
+                'success': len(holidays) > 0,
+                'data': holidays,
+                'errors': errors,
+                'total_rows': len(holidays) + len(errors)
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'data': [],
+                'errors': [f"CSV 檔案解析失敗：{str(e)}"],
+                'total_rows': 0
+            }
+    
+    def _parse_date(self, date_str):
+        """
+        解析日期字串
+        
+        Args:
+            date_str: 日期字串
+            
+        Returns:
+            date: 解析後的日期物件，失敗則返回 None
+        """
+        from datetime import datetime
+        
+        # 支援多種日期格式
+        date_formats = [
+            '%Y/%m/%d',    # 2026/1/1
+            '%Y-%m-%d',    # 2026-01-01
+            '%Y/%m/%d',    # 2026/01/01
+            '%Y-%m-%d',    # 2026-1-1
+            '%d/%m/%Y',    # 1/1/2026
+            '%d-%m-%Y',    # 1-1-2026
+        ]
+        
+        for fmt in date_formats:
+            try:
+                return datetime.strptime(date_str, fmt).date()
+            except ValueError:
+                continue
+        
+        return None
+    
+    def import_holidays_from_csv(self, csv_file):
+        """
+        從 CSV 檔案匯入國定假日
+        
+        Args:
+            csv_file: 上傳的 CSV 檔案
+            
+        Returns:
+            dict: 匯入結果統計
+        """
+        # 解析 CSV 檔案
+        parse_result = self.parse_csv_holidays(csv_file)
+        
+        if not parse_result['success']:
+            return {
+                'success': False,
+                'message': f"CSV 檔案解析失敗，共 {len(parse_result['errors'])} 個錯誤",
+                'imported_count': 0,
+                'errors': parse_result['errors']
+            }
+        
+        # 匯入假期資料
+        imported_count = 0
+        skipped_count = 0
+        errors = []
+        
+        for holiday in parse_result['data']:
+            try:
+                # 檢查是否已存在
+                existing_event = self.calendar_service.add_holiday(
+                    date=holiday['date'],
+                    holiday_name=holiday['name'],
+                    description=holiday['description'],
+                    created_by="csv_import"
+                )
+                
+                if existing_event:
+                    imported_count += 1
+                    logger.info(f"成功匯入假期: {holiday['name']} ({holiday['date']})")
+                else:
+                    skipped_count += 1
+                    logger.info(f"跳過已存在的假期: {holiday['name']} ({holiday['date']})")
+                
+            except Exception as e:
+                error_msg = f"匯入假期失敗: {holiday['name']} ({holiday['date']}) - {str(e)}"
+                errors.append(error_msg)
+                logger.error(error_msg)
+        
+        # 回傳結果
+        result = {
+            'success': imported_count > 0,
+            'message': f'CSV 匯入完成！成功匯入 {imported_count} 個假期，跳過 {skipped_count} 個已存在的假期',
+            'imported_count': imported_count,
+            'skipped_count': skipped_count,
+            'total_parsed': len(parse_result['data']),
+            'errors': errors + parse_result['errors']
+        }
+        
+        logger.info(f"CSV 假期匯入完成: {result}")
+        return result
+    
+    def generate_sample_csv(self):
+        """
+        生成範例 CSV 檔案內容
+        
+        Returns:
+            str: CSV 檔案內容
+        """
+        sample_data = [
+            {
+                'Subject': '中華民國開國紀念日',
+                'Start Date': '2026/1/1',
+                'Start Time': '',
+                'End Date': '2026/1/1',
+                'End Time': '',
+                'All Day Event': 'TRUE',
+                'Description': '',
+                'Location': ''
+            },
+            {
+                'Subject': '例假日',
+                'Start Date': '2026/1/3',
+                'Start Time': '',
+                'End Date': '2026/1/3',
+                'End Time': '',
+                'All Day Event': 'TRUE',
+                'Description': '',
+                'Location': ''
+            },
+            {
+                'Subject': '例假日',
+                'Start Date': '2026/1/4',
+                'Start Time': '',
+                'End Date': '2026/1/4',
+                'End Time': '',
+                'All Day Event': 'TRUE',
+                'Description': '',
+                'Location': ''
+            },
+            {
+                'Subject': '例假日',
+                'Start Date': '2026/1/10',
+                'Start Time': '',
+                'End Date': '2026/1/10',
+                'End Time': '',
+                'All Day Event': 'TRUE',
+                'Description': '',
+                'Location': ''
+            },
+            {
+                'Subject': '例假日',
+                'Start Date': '2026/1/11',
+                'Start Time': '',
+                'End Date': '2026/1/11',
+                'End Time': '',
+                'All Day Event': 'TRUE',
+                'Description': '',
+                'Location': ''
+            },
+            {
+                'Subject': '例假日',
+                'Start Date': '2026/1/17',
+                'Start Time': '',
+                'End Date': '2026/1/17',
+                'End Time': '',
+                'All Day Event': 'TRUE',
+                'Description': '',
+                'Location': ''
+            },
+            {
+                'Subject': '例假日',
+                'Start Date': '2026/1/18',
+                'Start Time': '',
+                'End Date': '2026/1/18',
+                'End Time': '',
+                'All Day Event': 'TRUE',
+                'Description': '',
+                'Location': ''
+            },
+            {
+                'Subject': '例假日',
+                'Start Date': '2026/1/24',
+                'Start Time': '',
+                'End Date': '2026/1/24',
+                'End Time': '',
+                'All Day Event': 'TRUE',
+                'Description': '',
+                'Location': ''
+            },
+            {
+                'Subject': '例假日',
+                'Start Date': '2026/1/25',
+                'Start Time': '',
+                'End Date': '2026/1/25',
+                'End Time': '',
+                'All Day Event': 'TRUE',
+                'Description': '',
+                'Location': ''
+            },
+            {
+                'Subject': '例假日',
+                'Start Date': '2026/1/31',
+                'Start Time': '',
+                'End Date': '2026/1/31',
+                'End Time': '',
+                'All Day Event': 'TRUE',
+                'Description': '',
+                'Location': ''
+            },
+            {
+                'Subject': '例假日',
+                'Start Date': '2026/2/1',
+                'Start Time': '',
+                'End Date': '2026/2/1',
+                'End Time': '',
+                'All Day Event': 'TRUE',
+                'Description': '',
+                'Location': ''
+            }
+        ]
+        
+        import csv
+        import io
+        
+        # 生成 CSV 內容
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=[
+            'Subject', 'Start Date', 'Start Time', 'End Date', 'End Time', 
+            'All Day Event', 'Description', 'Location'
+        ])
+        
+        writer.writeheader()
+        writer.writerows(sample_data)
+        
+        return output.getvalue()

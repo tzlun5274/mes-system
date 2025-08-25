@@ -15,6 +15,7 @@ from django.db.models.functions import ExtractYear, ExtractMonth
 from django.utils import timezone
 import json
 from django.core.serializers.json import DjangoJSONEncoder
+from django.conf import settings
 
 from .models import (
     WorkOrderReportData, ReportSchedule, ReportExecutionLog, CompletedWorkOrderReportData,
@@ -1626,6 +1627,34 @@ def execute_report_schedule(request, schedule_id):
 
 
 @login_required
+def delete_report_schedule(request, schedule_id):
+    """刪除報表排程"""
+    try:
+        schedule = get_object_or_404(ReportSchedule, id=schedule_id)
+        schedule_name = schedule.name
+        
+        # 檢查是否有相關的執行記錄
+        execution_count = ReportExecutionLog.objects.filter(report_schedule=schedule).count()
+        
+        if request.method == 'POST':
+            # 確認刪除
+            schedule.delete()
+            messages.success(request, f'報表排程「{schedule_name}」已成功刪除')
+            return redirect('reporting:report_schedule_list')
+        else:
+            # 顯示確認頁面
+            context = {
+                'schedule': schedule,
+                'execution_count': execution_count,
+            }
+            return render(request, 'reporting/reporting/report_schedule_delete_confirm.html', context)
+            
+    except Exception as e:
+        messages.error(request, f'刪除報表排程失敗: {str(e)}')
+    return redirect('reporting:report_schedule_list')
+
+
+@login_required
 def sync_report_data(request):
     """同步報表資料"""
     try:
@@ -2326,136 +2355,457 @@ def detailed_stats(request):
         })
 
 @login_required
-def score_period_detail(request, period_type):
-    """評分週期詳情"""
-    from .services import ScorePeriodService
+def test_workday_calendar(request):
+    """測試工作日曆服務"""
+    from .services import WorkdayCalendarService
+    from datetime import date, timedelta
     
-    company_code = request.GET.get('company_code', '')
-    if not company_code:
-        messages.error(request, '請選擇公司代號')
-        return redirect('reporting:score_period_management')
+    calendar_service = WorkdayCalendarService()
+    current_date = date.today()
     
-    # 取得週期摘要
-    summary = ScorePeriodService.get_period_summary(company_code, period_type)
-    if not summary:
-        messages.error(request, f'找不到{period_type}評分資料')
-        return redirect('reporting:score_period_management')
-    
-    # 取得詳細記錄
-    start_date, end_date = ScorePeriodService.get_current_period_dates(period_type)
-    records = OperatorProcessCapacityScore.objects.filter(
-        company_code=company_code,
-        score_period=period_type,
-        period_start_date=start_date,
-        period_end_date=end_date
-    ).order_by('-work_date')
-    
-    # 分頁
-    paginator = Paginator(records, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    context = {
-        'summary': summary,
-        'page_obj': page_obj,
-        'period_type': period_type,
-        'company_code': company_code,
+    # 測試資料
+    test_results = {
+        'current_date': current_date,
+        'is_current_workday': calendar_service.is_workday(current_date),
+        'previous_workday': calendar_service.get_previous_workday(current_date),
+        'next_5_days': [],
+        'previous_5_days': [],
     }
     
-    return render(request, 'reporting/score_period_detail.html', context)
+    # 繁體中文星期對應
+    weekday_names = {
+        0: '星期一',
+        1: '星期二', 
+        2: '星期三',
+        3: '星期四',
+        4: '星期五',
+        5: '星期六',
+        6: '星期日'
+    }
+    
+    # 測試未來5天
+    for i in range(1, 6):
+        test_date = current_date + timedelta(days=i)
+        test_results['next_5_days'].append({
+            'date': test_date,
+            'is_workday': calendar_service.is_workday(test_date),
+            'weekday': weekday_names[test_date.weekday()]
+        })
+    
+    # 測試過去5天
+    for i in range(1, 6):
+        test_date = current_date - timedelta(days=i)
+        test_results['previous_5_days'].append({
+            'date': test_date,
+            'is_workday': calendar_service.is_workday(test_date),
+            'weekday': weekday_names[test_date.weekday()]
+        })
+    
+    context = {
+        'test_results': test_results,
+    }
+    return render(request, 'reporting/reporting/test_workday_calendar.html', context)
 
 @login_required
-def work_hour_stats(request):
-    """提供工作時數統計資料的 API"""
-    from django.http import JsonResponse
+def holiday_setup_management(request):
+    """假期設定管理"""
+    from .services import HolidayAutoSetupService, WorkdayCalendarService
+    from datetime import date, timedelta
     
-    try:
-        # 基本統計資料
-        total_records = WorkOrderReportData.objects.count()
+    setup_service = HolidayAutoSetupService()
+    calendar_service = WorkdayCalendarService()
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
         
-        # 總工作時數
-        total_hours = WorkOrderReportData.objects.aggregate(
-            total=Sum('daily_work_hours')
-        )['total'] or 0
-        
-        # 作業員數量（去重）
-        total_operators = WorkOrderReportData.objects.exclude(
-            operator_name__isnull=True
-        ).values('operator_name').distinct().count()
-        
-        # 平均日工作時數
-        avg_daily_hours = WorkOrderReportData.objects.aggregate(
-            avg=Avg('daily_work_hours')
-        )['avg'] or 0
-        
-        return JsonResponse({
-            'total_records': total_records,
-            'total_hours': float(total_hours),
-            'total_operators': total_operators,
-            'avg_daily_hours': float(avg_daily_hours),
+        if action == 'setup_2025':
+            # 設定 2025 年假期
+            result = setup_service.setup_all_2025()
+            messages.success(request, f'2025年假期設定完成！國定假日：{result["holidays"]}個，補班日：{result["makeup_days"]}個')
+            
+        elif action == 'clear_2025':
+            # 清除 2025 年假期
+            deleted_count = setup_service.clear_all_holidays(2025)
+            messages.success(request, f'2025年假期設定已清除，共刪除 {deleted_count} 個事件')
+            
+        elif action == 'add_holiday':
+            # 手動新增假期
+            holiday_date = request.POST.get('holiday_date')
+            holiday_name = request.POST.get('holiday_name')
+            description = request.POST.get('description', '')
+            
+            if holiday_date and holiday_name:
+                try:
+                    date_obj = datetime.strptime(holiday_date, '%Y-%m-%d').date()
+                    calendar_service.add_holiday(
+                        date=date_obj,
+                        holiday_name=holiday_name,
+                        description=description,
+                        created_by=request.user.username
+                    )
+                    messages.success(request, f'成功新增假期：{holiday_name} ({holiday_date})')
+                except Exception as e:
+                    messages.error(request, f'新增假期失敗：{str(e)}')
+            else:
+                messages.error(request, '請填寫假期日期和名稱')
+                
+        elif action == 'add_workday':
+            # 手動新增補班日
+            workday_date = request.POST.get('workday_date')
+            description = request.POST.get('description', '')
+            
+            if workday_date:
+                try:
+                    date_obj = datetime.strptime(workday_date, '%Y-%m-%d').date()
+                    calendar_service.add_workday(
+                        date=date_obj,
+                        description=description,
+                        created_by=request.user.username
+                    )
+                    messages.success(request, f'成功新增補班日：{workday_date}')
+                except Exception as e:
+                    messages.error(request, f'新增補班日失敗：{str(e)}')
+            else:
+                messages.error(request, '請填寫補班日期')
+    
+    # 取得當前假期統計
+    current_date = date.today()
+    next_30_days = []
+    
+    for i in range(30):
+        check_date = current_date + timedelta(days=i)
+        next_30_days.append({
+            'date': check_date,
+            'is_workday': calendar_service.is_workday(check_date),
+            'weekday': check_date.strftime('%A'),
+            'holiday_name': ''
         })
-    except Exception as e:
-        logger.error(f"取得工作時數統計資料失敗: {str(e)}")
-        return JsonResponse({
-            'total_records': 0,
-            'total_hours': 0,
-            'total_operators': 0,
-            'avg_daily_hours': 0,
-        })
+    
+    # 檢查是否有假期事件
+    from scheduling.models import Event
+    holiday_events = Event.objects.filter(
+        type='holiday',
+        start__date__gte=current_date,
+        start__date__lt=current_date + timedelta(days=30)
+    )
+    
+    for event in holiday_events:
+        event_date = event.start.date()
+        for day_info in next_30_days:
+            if day_info['date'] == event_date:
+                day_info['holiday_name'] = event.title
+                break
+    
+    context = {
+        'next_30_days': next_30_days,
+        'current_date': current_date,
+    }
+    return render(request, 'reporting/reporting/holiday_setup_management.html', context)
+
+@login_required
+def execute_previous_workday_report(request):
+    """手動執行前一個工作日報表"""
+    from .services import PreviousWorkdayReportScheduler
+    
+    if request.method == 'POST':
+        try:
+            scheduler = PreviousWorkdayReportScheduler()
+            
+            # 強制執行（忽略時間限制）
+            report_date = scheduler.get_report_date()
+            
+            # 收集資料
+            data = scheduler.collect_data(report_date)
+            
+            # 檢查是否有資料
+            if data['fill_works_count'] == 0 and data['onsite_reports_count'] == 0:
+                messages.warning(request, f'{report_date} 沒有找到任何填報或現場報工資料')
+                return redirect('reporting:index')
+            
+            # 生成報表
+            report_file = scheduler.generate_report(data)
+            
+            # 發送報表
+            scheduler.send_report(report_file, report_date)
+            
+            messages.success(request, f'前一個工作日報表執行成功！報表日期：{report_date}')
+            
+        except Exception as e:
+            messages.error(request, f'執行前一個工作日報表失敗：{str(e)}')
+    
+    return redirect('reporting:index')
 
 
 @login_required
-def detailed_stats(request):
-    """提供詳細統計資料的 API"""
-    from django.http import JsonResponse
+def test_previous_workday_report(request):
+    """測試前一個工作日報表功能"""
+    from .services import PreviousWorkdayReportScheduler
+    from datetime import date, timedelta
     
+    scheduler = PreviousWorkdayReportScheduler()
+    
+    # 測試資料
+    test_results = {
+        'current_date': date.today(),
+        'current_time': timezone.now().time(),
+        'should_execute': scheduler.should_execute(),
+        'report_date': scheduler.get_report_date(),
+        'next_5_days': [],
+    }
+    
+    # 測試未來5天的報表日期
+    for i in range(5):
+        test_date = date.today() + timedelta(days=i)
+        test_results['next_5_days'].append({
+            'date': test_date,
+            'report_date': scheduler.calendar_service.get_previous_workday(test_date),
+            'is_workday': scheduler.calendar_service.is_workday(test_date),
+        })
+    
+    # 測試資料收集
     try:
-        # 按月份統計
-        monthly_stats = WorkOrderReportData.objects.annotate(
-            year_month=ExtractYear('work_date') * 100 + ExtractMonth('work_date')
-        ).values('year_month').annotate(
-            total_hours=Sum('daily_work_hours'),
-            record_count=Count('id')
-        ).order_by('year_month')
-        
-        monthly_data = {
-            'labels': [],
-            'hours': [],
-            'counts': []
+        data = scheduler.collect_data(test_results['report_date'])
+        test_results['data_collection'] = {
+            'success': True,
+            'fill_works_count': data['fill_works_count'],
+            'onsite_reports_count': data['onsite_reports_count'],
+            'total_work_hours': data['total_work_hours'],
+            'total_operators': data['total_operators'],
+            'total_equipment': data['total_equipment'],
         }
-        
-        for item in monthly_stats:
-            year = item['year_month'] // 100
-            month = item['year_month'] % 100
-            monthly_data['labels'].append(f"{year}-{month:02d}")
-            monthly_data['hours'].append(float(item['total_hours'] or 0))
-            monthly_data['counts'].append(item['record_count'])
-        
-        # 按公司統計
-        company_stats = WorkOrderReportData.objects.values('company').annotate(
-            total_hours=Sum('daily_work_hours'),
-            record_count=Count('id')
-        ).order_by('-total_hours')
-        
-        company_data = {
-            'labels': [],
-            'hours': [],
-            'counts': []
-        }
-        
-        for item in company_stats:
-            company_name = item['company'] or '未指定'
-            company_data['labels'].append(company_name)
-            company_data['hours'].append(float(item['total_hours'] or 0))
-            company_data['counts'].append(item['record_count'])
-        
-        return JsonResponse({
-            'monthly': monthly_data,
-            'company': company_data
-        })
     except Exception as e:
-        logger.error(f"取得詳細統計資料失敗: {str(e)}")
-        return JsonResponse({
-            'monthly': {'labels': [], 'hours': [], 'counts': []},
-            'company': {'labels': [], 'hours': [], 'counts': []}
+        test_results['data_collection'] = {
+            'success': False,
+            'error': str(e)
+        }
+    
+    context = {
+        'test_results': test_results,
+    }
+    return render(request, 'reporting/reporting/test_previous_workday_report.html', context)
+
+@login_required
+def previous_workday_report_management(request):
+    """前一個工作日報表管理"""
+    from .services import PreviousWorkdayReportScheduler, WorkdayCalendarService
+    from datetime import date, timedelta
+    import os
+    
+    scheduler = PreviousWorkdayReportScheduler()
+    calendar_service = WorkdayCalendarService()
+    
+    # 取得當前狀態
+    current_date = date.today()
+    # 修正時區問題，確保使用正確的本地時間
+    current_datetime = timezone.localtime(timezone.now())
+    current_time = current_datetime.time()
+    report_date = scheduler.get_report_date()
+    should_execute = scheduler.should_execute()
+    
+    # 檢查報表檔案
+    report_dir = os.path.join(settings.MEDIA_ROOT, 'reports', 'previous_workday')
+    report_files = []
+    if os.path.exists(report_dir):
+        files = os.listdir(report_dir)
+        files.sort(reverse=True)  # 最新的檔案在前
+        for file in files[:10]:  # 只顯示最近10個檔案
+            file_path = os.path.join(report_dir, file)
+            file_stat = os.stat(file_path)
+            report_files.append({
+                'filename': file,
+                'filepath': file_path,
+                'size': file_stat.st_size,
+                'created_time': datetime.fromtimestamp(file_stat.st_ctime),
+                'modified_time': datetime.fromtimestamp(file_stat.st_mtime),
+            })
+    
+    # 取得未來7天的報表日期預測
+    next_7_days = []
+    for i in range(7):
+        test_date = current_date + timedelta(days=i)
+        next_7_days.append({
+            'date': test_date,
+            'report_date': calendar_service.get_previous_workday(test_date),
+            'is_workday': calendar_service.is_workday(test_date),
         })
+    
+    # 取得最近7天的報表日期
+    past_7_days = []
+    for i in range(7):
+        test_date = current_date - timedelta(days=i)
+        past_7_days.append({
+            'date': test_date,
+            'report_date': calendar_service.get_previous_workday(test_date),
+            'is_workday': calendar_service.is_workday(test_date),
+        })
+    
+    # 測試資料收集
+    try:
+        data = scheduler.collect_data(report_date)
+        data_collection = {
+            'success': True,
+            'fill_works_count': data['fill_works_count'],
+            'onsite_reports_count': data['onsite_reports_count'],
+            'total_work_hours': data['total_work_hours'],
+            'total_operators': data['total_operators'],
+            'total_equipment': data['total_equipment'],
+        }
+    except Exception as e:
+        data_collection = {
+            'success': False,
+            'error': str(e)
+        }
+    
+    context = {
+        'current_date': current_date,
+        'current_time': current_time,
+        'report_date': report_date,
+        'should_execute': should_execute,
+        'report_files': report_files,
+        'next_7_days': next_7_days,
+        'past_7_days': past_7_days,
+        'data_collection': data_collection,
+    }
+    
+    return render(request, 'reporting/reporting/previous_workday_report_management.html', context)
+
+@login_required
+def government_calendar_sync(request):
+    """政府行事曆 API 同步管理"""
+    from .services import TaiwanGovernmentCalendarService
+    from datetime import datetime
+    
+    gov_service = TaiwanGovernmentCalendarService()
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'sync_single_year':
+            # 同步單一年份
+            year = int(request.POST.get('year', datetime.now().year))
+            result = gov_service.sync_government_holidays(year)
+            
+            if result['success']:
+                messages.success(request, result['message'])
+            else:
+                messages.error(request, result['message'])
+                
+        elif action == 'sync_multiple_years':
+            # 同步多個年份
+            start_year = int(request.POST.get('start_year', datetime.now().year))
+            end_year = int(request.POST.get('end_year', datetime.now().year + 1))
+            result = gov_service.sync_multiple_years(start_year, end_year)
+            
+            if result['success']:
+                messages.success(request, result['message'])
+            else:
+                messages.error(request, result['message'])
+                
+        elif action == 'check_status':
+            # 檢查狀態（不執行同步，只檢查）
+            year = int(request.POST.get('year', datetime.now().year))
+            status = gov_service.get_holiday_status(year)
+            
+            if status['government_data_available']:
+                if status['sync_needed']:
+                    messages.info(request, f"{year}年政府資料可用，建議同步（系統: {status['system_holidays']}個，政府: {status['government_holidays']}個）")
+                else:
+                    messages.success(request, f"{year}年假期資料已是最新（系統: {status['system_holidays']}個）")
+            else:
+                messages.warning(request, f"{year}年政府資料不可用")
+    
+    # 取得可用年份
+    available_years = gov_service.get_available_years()
+    current_year = datetime.now().year
+    
+    # 檢查當前年份狀態
+    current_status = gov_service.get_holiday_status(current_year)
+    
+    # 檢查未來幾年狀態
+    future_status = {}
+    for year in range(current_year, current_year + 3):
+        future_status[year] = gov_service.get_holiday_status(year)
+    
+    context = {
+        'available_years': available_years,
+        'current_year': current_year,
+        'current_status': current_status,
+        'future_status': future_status,
+    }
+    
+    return render(request, 'reporting/reporting/government_calendar_sync.html', context)
+
+@login_required
+def csv_holiday_import(request):
+    """CSV 國定假日匯入管理"""
+    from .services import CSVHolidayImportService
+    from django.http import HttpResponse
+    
+    csv_service = CSVHolidayImportService()
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'import_csv':
+            # 處理 CSV 檔案匯入
+            if 'csv_file' in request.FILES:
+                csv_file = request.FILES['csv_file']
+                
+                # 檢查檔案類型
+                if not csv_file.name.endswith('.csv'):
+                    messages.error(request, '請上傳 CSV 格式的檔案')
+                    return redirect('reporting:csv_holiday_import')
+                
+                # 檢查檔案大小（限制 5MB）
+                if csv_file.size > 5 * 1024 * 1024:
+                    messages.error(request, '檔案大小不能超過 5MB')
+                    return redirect('reporting:csv_holiday_import')
+                
+                # 匯入 CSV 檔案
+                result = csv_service.import_holidays_from_csv(csv_file)
+                
+                if result['success']:
+                    messages.success(request, result['message'])
+                else:
+                    messages.error(request, result['message'])
+                
+                # 如果有錯誤，顯示詳細錯誤訊息
+                if result.get('errors'):
+                    for error in result['errors'][:5]:  # 只顯示前5個錯誤
+                        messages.warning(request, error)
+                    if len(result['errors']) > 5:
+                        messages.warning(request, f"... 還有 {len(result['errors']) - 5} 個錯誤")
+                
+            else:
+                messages.error(request, '請選擇要匯入的 CSV 檔案')
+                
+        elif action == 'download_sample':
+            # 下載範例 CSV 檔案
+            sample_content = csv_service.generate_sample_csv()
+            response = HttpResponse(sample_content, content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = 'attachment; filename="holiday_sample.csv"'
+            return response
+    
+    # 取得匯入統計
+    from scheduling.models import Event
+    from datetime import datetime
+    
+    current_year = datetime.now().year
+    csv_imported_holidays = Event.objects.filter(
+        type='holiday',
+        created_by='csv_import',
+        start__year=current_year
+    ).count()
+    
+    total_holidays = Event.objects.filter(
+        type='holiday',
+        start__year=current_year
+    ).count()
+    
+    context = {
+        'current_year': current_year,
+        'csv_imported_holidays': csv_imported_holidays,
+        'total_holidays': total_holidays,
+    }
+    
+    return render(request, 'reporting/reporting/csv_holiday_import.html', context)

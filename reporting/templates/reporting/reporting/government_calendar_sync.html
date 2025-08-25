@@ -1,0 +1,333 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}政府行事曆 API 同步管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'reporting:holiday_setup_management' %}">假期設定管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">政府行事曆 API 同步</li>
+        </ol>
+    </nav>
+
+    <!-- 訊息顯示區塊 -->
+    {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-0">
+                <i class="fas fa-sync-alt text-primary"></i> 政府行事曆 API 同步管理
+            </h2>
+        </div>
+    </div>
+
+    <!-- 當前狀態概覽 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-calendar-day"></i> 當前年份</h6>
+                </div>
+                <div class="card-body">
+                    <h4>{{ current_year }}</h4>
+                    <p class="text-muted mb-0">系統年份</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-database"></i> 系統假期</h6>
+                </div>
+                <div class="card-body">
+                    <h4>{{ current_status.system_holidays }}</h4>
+                    <p class="text-muted mb-0">已設定假期數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-cloud"></i> 政府假期</h6>
+                </div>
+                <div class="card-body">
+                    <h4>{{ current_status.government_holidays }}</h4>
+                    <p class="text-muted mb-0">政府 API 假期數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-sync"></i> 同步狀態</h6>
+                </div>
+                <div class="card-body">
+                    {% if current_status.government_data_available %}
+                        {% if current_status.sync_needed %}
+                            <h4 class="text-warning">需要同步</h4>
+                            <span class="badge bg-warning">建議更新</span>
+                        {% else %}
+                            <h4 class="text-success">已同步</h4>
+                            <span class="badge bg-success">資料最新</span>
+                        {% endif %}
+                    {% else %}
+                        <h4 class="text-danger">無法取得</h4>
+                        <span class="badge bg-danger">API 不可用</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 單年度同步 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-calendar-plus"></i> 單年度同步</h6>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="sync_single_year">
+                        <div class="mb-3">
+                            <label for="year" class="form-label">選擇年份</label>
+                            <select class="form-select" id="year" name="year" required>
+                                {% for year in available_years %}
+                                <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }} 年</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary" onclick="return confirm('確定要同步選定年份的政府國定假日嗎？')">
+                            <i class="fas fa-sync"></i> 同步單年度
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-calendar-check"></i> 檢查狀態</h6>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="check_status">
+                        <div class="mb-3">
+                            <label for="check_year" class="form-label">選擇年份</label>
+                            <select class="form-select" id="check_year" name="year" required>
+                                {% for year in available_years %}
+                                <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }} 年</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-info">
+                            <i class="fas fa-search"></i> 檢查狀態
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 多年度同步 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-calendar-week"></i> 多年度同步</h6>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="sync_multiple_years">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="start_year" class="form-label">開始年份</label>
+                                    <select class="form-select" id="start_year" name="start_year" required>
+                                        {% for year in available_years %}
+                                        <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }} 年</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="end_year" class="form-label">結束年份</label>
+                                    <select class="form-select" id="end_year" name="end_year" required>
+                                        {% for year in available_years %}
+                                        <option value="{{ year }}" {% if year == current_year|add:1 %}selected{% endif %}>{{ year }} 年</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <div>
+                                        <button type="submit" class="btn btn-success" onclick="return confirm('確定要同步選定年份範圍的政府國定假日嗎？這可能需要一些時間。')">
+                                            <i class="fas fa-sync-alt"></i> 同步多年度
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 未來幾年狀態 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-chart-line"></i> 未來幾年假期狀態</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>年份</th>
+                                    <th>系統假期數</th>
+                                    <th>政府假期數</th>
+                                    <th>同步狀態</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for year, status in future_status.items %}
+                                <tr>
+                                    <td>{{ year }} 年</td>
+                                    <td>{{ status.system_holidays }}</td>
+                                    <td>{{ status.government_holidays }}</td>
+                                    <td>
+                                        {% if status.government_data_available %}
+                                            {% if status.sync_needed %}
+                                                <span class="badge bg-warning">需要同步</span>
+                                            {% else %}
+                                                <span class="badge bg-success">已同步</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-danger">無法取得</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <form method="post" style="display: inline;">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="sync_single_year">
+                                            <input type="hidden" name="year" value="{{ year }}">
+                                            <button type="submit" class="btn btn-sm btn-primary" {% if not status.government_data_available %}disabled{% endif %}>
+                                                <i class="fas fa-sync"></i> 同步
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 系統說明 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> 系統說明</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-cloud"></i> 政府 API 說明</h6>
+                            <ul>
+                                <li>資料來源：台灣政府開放資料平台</li>
+                                <li>API 端點：新北市國定假日資料集</li>
+                                <li>更新頻率：政府定期更新</li>
+                                <li>資料格式：JSON</li>
+                                <li>包含內容：國定假日名稱和日期</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-sync"></i> 同步功能</h6>
+                            <ul>
+                                <li>自動解析政府 API 資料</li>
+                                <li>智能日期格式處理</li>
+                                <li>避免重複假期設定</li>
+                                <li>支援單年度和多年度同步</li>
+                                <li>詳細的同步結果報告</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-exclamation-triangle"></i> 注意事項</h6>
+                            <ul>
+                                <li>需要網路連線才能同步</li>
+                                <li>政府 API 可能有存取限制</li>
+                                <li>同步過程可能需要一些時間</li>
+                                <li>建議在非尖峰時間執行</li>
+                                <li>同步後請檢查結果</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-tools"></i> 操作建議</h6>
+                            <ul>
+                                <li>首次使用建議先檢查狀態</li>
+                                <li>定期同步確保資料最新</li>
+                                <li>可配合手動設定補班日</li>
+                                <li>同步後可查看工作日曆測試</li>
+                                <li>如有問題可查看系統日誌</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-tools"></i> 其他操作</h6>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'reporting:holiday_setup_management' %}" class="btn btn-primary">
+                        <i class="fas fa-calendar-alt"></i> 返回假期設定
+                    </a>
+                    <a href="{% url 'reporting:test_workday_calendar' %}" class="btn btn-info">
+                        <i class="fas fa-calendar-check"></i> 工作日曆測試
+                    </a>
+                    <a href="{% url 'reporting:previous_workday_report_management' %}" class="btn btn-success">
+                        <i class="fas fa-file-alt"></i> 前一個工作日報表
+                    </a>
+                    <a href="{% url 'reporting:index' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回報表管理
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

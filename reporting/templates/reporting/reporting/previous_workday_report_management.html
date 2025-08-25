@@ -1,0 +1,359 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}前一個工作日報表管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">前一個工作日報表管理</li>
+        </ol>
+    </nav>
+
+    <!-- 訊息顯示區塊 -->
+    {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-0">
+                <i class="fas fa-calendar-day text-primary"></i> 前一個工作日報表管理
+            </h2>
+        </div>
+    </div>
+
+    <!-- 當前狀態概覽 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-calendar-day"></i> 當前日期</h6>
+                </div>
+                <div class="card-body">
+                    <h4>{{ current_date|date:"Y-m-d" }}</h4>
+                    <p class="text-muted mb-0">{{ current_date|date:"l" }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-clock"></i> 當前時間</h6>
+                </div>
+                <div class="card-body">
+                    <h4>{{ current_time|time:"H:i:s" }}</h4>
+                    <p class="text-muted mb-0">24小時制</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-file-alt"></i> 報表日期</h6>
+                </div>
+                <div class="card-body">
+                    <h4>{{ report_date|date:"Y-m-d" }}</h4>
+                    <p class="text-muted mb-0">{{ report_date|date:"l" }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-play-circle"></i> 執行狀態</h6>
+                </div>
+                <div class="card-body">
+                    {% if should_execute %}
+                        <h4 class="text-success">可執行</h4>
+                        <span class="badge bg-success">已過 10:30</span>
+                    {% else %}
+                        <h4 class="text-warning">等待中</h4>
+                        <span class="badge bg-warning">未到 10:30</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-tools"></i> 報表操作</h6>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'reporting:execute_previous_workday_report' %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success" onclick="return confirm('確定要執行前一個工作日報表嗎？')">
+                            <i class="fas fa-play"></i> 立即執行報表
+                        </button>
+                    </form>
+                    <a href="{% url 'reporting:holiday_setup_management' %}" class="btn btn-primary">
+                        <i class="fas fa-calendar-alt"></i> 假期設定管理
+                    </a>
+                    <a href="{% url 'reporting:test_workday_calendar' %}" class="btn btn-info">
+                        <i class="fas fa-calendar-check"></i> 工作日曆測試
+                    </a>
+                    <a href="{% url 'reporting:test_previous_workday_report' %}" class="btn btn-warning">
+                        <i class="fas fa-test-tube"></i> 功能測試
+                    </a>
+                    <a href="{% url 'reporting:index' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回報表管理
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 資料收集狀態 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-database"></i> 資料收集狀態</h6>
+                </div>
+                <div class="card-body">
+                    {% if data_collection.success %}
+                        <div class="row">
+                            <div class="col-md-2">
+                                <div class="text-center">
+                                    <h4 class="text-primary">{{ data_collection.fill_works_count }}</h4>
+                                    <p class="text-muted">填報記錄</p>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-center">
+                                    <h4 class="text-info">{{ data_collection.onsite_reports_count }}</h4>
+                                    <p class="text-muted">現場報工</p>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-center">
+                                    <h4 class="text-success">{{ data_collection.total_work_hours|floatformat:2 }}</h4>
+                                    <p class="text-muted">總工作時數</p>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-center">
+                                    <h4 class="text-warning">{{ data_collection.total_operators }}</h4>
+                                    <p class="text-muted">作業員數</p>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-center">
+                                    <h4 class="text-danger">{{ data_collection.total_equipment }}</h4>
+                                    <p class="text-muted">設備數</p>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-center">
+                                    <span class="badge bg-success fs-6">資料收集成功</span>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-danger">
+                            <h6><i class="fas fa-exclamation-triangle"></i> 資料收集失敗</h6>
+                            <p class="mb-0">錯誤訊息：{{ data_collection.error }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表檔案列表 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-file-alt"></i> 最近生成的報表檔案</h6>
+                </div>
+                <div class="card-body">
+                    {% if report_files %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>檔案名稱</th>
+                                        <th>檔案大小</th>
+                                        <th>建立時間</th>
+                                        <th>修改時間</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for file in report_files %}
+                                    <tr>
+                                        <td>{{ file.filename }}</td>
+                                        <td>{{ file.size|filesizeformat }}</td>
+                                        <td>{{ file.created_time|date:"Y-m-d H:i:s" }}</td>
+                                        <td>{{ file.modified_time|date:"Y-m-d H:i:s" }}</td>
+                                        <td>
+                                            <a href="/media/reports/previous_workday/{{ file.filename }}" target="_blank" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-eye"></i> 查看
+                                            </a>
+                                            <a href="/media/reports/previous_workday/{{ file.filename }}" download class="btn btn-sm btn-success">
+                                                <i class="fas fa-download"></i> 下載
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="fas fa-file-alt fa-3x mb-3"></i>
+                            <p>尚未生成任何報表檔案</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 未來7天報表日期預測 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-calendar-week"></i> 未來7天報表日期預測</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>星期</th>
+                                    <th>工作日狀態</th>
+                                    <th>報表日期</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for day in next_7_days %}
+                                <tr>
+                                    <td>{{ day.date|date:"Y-m-d" }}</td>
+                                    <td>{{ day.date|date:"l" }}</td>
+                                    <td>
+                                        {% if day.is_workday %}
+                                            <span class="badge bg-success">工作日</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">非工作日</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ day.report_date|date:"Y-m-d" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-calendar-week"></i> 過去7天報表日期</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>星期</th>
+                                    <th>工作日狀態</th>
+                                    <th>報表日期</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for day in past_7_days %}
+                                <tr>
+                                    <td>{{ day.date|date:"Y-m-d" }}</td>
+                                    <td>{{ day.date|date:"l" }}</td>
+                                    <td>
+                                        {% if day.is_workday %}
+                                            <span class="badge bg-success">工作日</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">非工作日</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ day.report_date|date:"Y-m-d" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 系統說明 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-info-circle"></i> 系統說明</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-calendar-check"></i> 工作日判斷邏輯</h6>
+                            <ul>
+                                <li>預設週一至週五為工作日</li>
+                                <li>週六、週日為非工作日</li>
+                                <li>國定假日設為非工作日</li>
+                                <li>補班日設為工作日</li>
+                                <li>支援連續假期處理</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-clock"></i> 執行時間設定</h6>
+                            <ul>
+                                <li>每日上午 10:30 後自動執行</li>
+                                <li>確保填報資料已收集完成</li>
+                                <li>可手動立即執行</li>
+                                <li>支援強制執行（忽略時間限制）</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-database"></i> 資料來源</h6>
+                            <ul>
+                                <li>填報系統（已核准狀態）</li>
+                                <li>現場報工系統（已完成狀態）</li>
+                                <li>自動統計工作時數</li>
+                                <li>統計作業員和設備數量</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-file-alt"></i> 報表輸出</h6>
+                            <ul>
+                                <li>HTML 格式報表</li>
+                                <li>自動儲存到 media/reports/previous_workday/</li>
+                                <li>支援線上查看和下載</li>
+                                <li>保留最近10個檔案</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
