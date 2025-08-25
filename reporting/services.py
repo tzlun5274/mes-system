@@ -198,9 +198,9 @@ class ReportGeneratorService:
             }
             
             if format == 'excel':
-                return self._export_to_excel(report_data, f'日報表_{operator}_{date}')
+                return self._export_to_excel(report_data, f'作業員日報表_{date}')
             elif format == 'csv':
-                return self._export_to_csv(report_data, f'日報表_{operator}_{date}')
+                return self._export_to_csv(report_data, f'作業員日報表_{date}')
             else:
                 return report_data
                 
@@ -342,51 +342,28 @@ class ReportGeneratorService:
             raise
     
     def _export_to_excel(self, report_data, filename):
-        """匯出為Excel格式"""
+        """匯出為Excel格式（包含三個活頁簿：統計摘要、詳細、統計）"""
         try:
             import openpyxl
-            from openpyxl.styles import Font, Alignment, PatternFill
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            from openpyxl.utils import get_column_letter
             
             wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "報表摘要"
             
-            # 設定標題
-            title_font = Font(bold=True, size=14)
-            header_font = Font(bold=True)
-            header_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+            # 移除預設的工作表
+            wb.remove(wb.active)
             
-            # 報表標題
-            ws['A1'] = f"{report_data['report_type']}"
-            ws['A1'].font = title_font
-            ws.merge_cells('A1:D1')
+            # 1. 統計摘要活頁簿
+            ws_summary = wb.create_sheet("統計摘要")
+            self._create_summary_sheet(ws_summary, report_data)
             
-            # 基本資訊
-            ws['A3'] = "公司代號"
-            ws['B3'] = report_data['company_code']
-            ws['C3'] = "生成時間"
-            ws['D3'] = report_data['generated_at'].strftime('%Y-%m-%d %H:%M:%S')
+            # 2. 詳細活頁簿
+            ws_detail = wb.create_sheet("詳細")
+            self._create_detail_sheet(ws_detail, report_data)
             
-            # 摘要資料
-            summary = report_data['summary']
-            ws['A5'] = "總工作時數"
-            ws['B5'] = float(summary['total_work_hours'])
-            ws['C5'] = "總作業員數"
-            ws['D5'] = summary['total_operators']
-            
-            ws['A6'] = "總設備時數"
-            ws['B6'] = float(summary['total_equipment_hours'])
-            ws['C6'] = "工單數量"
-            ws['D6'] = summary['workorder_count']
-            
-            ws['A7'] = "平均日工作時數"
-            ws['B7'] = float(summary['avg_daily_hours'])
-            
-            # 設定欄寬
-            ws.column_dimensions['A'].width = 15
-            ws.column_dimensions['B'].width = 15
-            ws.column_dimensions['C'].width = 15
-            ws.column_dimensions['D'].width = 20
+            # 3. 統計活頁簿
+            ws_stats = wb.create_sheet("統計")
+            self._create_stats_sheet(ws_stats, report_data)
             
             # 儲存檔案
             file_path = f"/tmp/{filename}.xlsx"
@@ -404,6 +381,146 @@ class ReportGeneratorService:
         except Exception as e:
             logger.error(f"生成Excel檔案失敗: {str(e)}")
             raise
+    
+    def _create_summary_sheet(self, ws, report_data):
+        """建立統計摘要活頁簿"""
+        # 設定樣式
+        from openpyxl.styles import Font, PatternFill
+        title_font = Font(bold=True, size=14)
+        header_font = Font(bold=True)
+        header_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+        
+        # 報表標題
+        ws['A1'] = f"{report_data['report_type']} - 統計摘要"
+        ws['A1'].font = title_font
+        ws.merge_cells('A1:D1')
+        
+        # 基本資訊
+        ws['A3'] = "作業員"
+        ws['B3'] = report_data.get('operator', '全部')
+        ws['C3'] = "報表日期"
+        ws['D3'] = report_data.get('date', '').strftime('%Y-%m-%d') if hasattr(report_data.get('date', ''), 'strftime') else str(report_data.get('date', ''))
+        
+        ws['A4'] = "生成時間"
+        ws['B4'] = report_data['generated_at'].strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 摘要資料
+        summary = report_data['summary']
+        ws['A6'] = "總工作時數"
+        ws['B6'] = float(summary['total_work_hours'])
+        ws['C6'] = "總作業員數"
+        ws['D6'] = summary['total_operators']
+        
+        ws['A7'] = "總設備使用時數"
+        ws['B7'] = float(summary['total_equipment_hours'])
+        ws['C7'] = "工單數量"
+        ws['D7'] = summary['workorder_count']
+        
+        ws['A8'] = "平均日工作時數"
+        ws['B8'] = float(summary['avg_daily_hours'])
+        
+        # 設定欄寬
+        ws.column_dimensions['A'].width = 20
+        ws.column_dimensions['B'].width = 15
+        ws.column_dimensions['C'].width = 20
+        ws.column_dimensions['D'].width = 15
+    
+    def _create_detail_sheet(self, ws, report_data):
+        """建立詳細活頁簿"""
+        # 設定樣式
+        from openpyxl.styles import Font, PatternFill, Border, Side
+        header_font = Font(bold=True)
+        header_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+        border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                       top=Side(style='thin'), bottom=Side(style='thin'))
+        
+        # 標題
+        ws['A1'] = f"{report_data['report_type']} - 詳細資料"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws.merge_cells('A1:K1')
+        
+        # 表頭
+        headers = ['作業員', '公司名稱', '工單編號', '產品編號', '工序', '工作日期', '開始時間', '結束時間', '工作時數', '加班時數', '合計時數']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = border
+        
+        # 資料行
+        details = report_data['details']
+        for row, detail in enumerate(details, 4):
+            ws.cell(row=row, column=1, value=detail.get('operator_name', '-')).border = border
+            ws.cell(row=row, column=2, value=detail.get('company', '-')).border = border
+            ws.cell(row=row, column=3, value=detail.get('workorder_id', '-')).border = border
+            ws.cell(row=row, column=4, value=detail.get('product_code', '-')).border = border
+            ws.cell(row=row, column=5, value=detail.get('process_name', '-')).border = border
+            ws.cell(row=row, column=6, value=detail.get('work_date', '-')).border = border
+            ws.cell(row=row, column=7, value=detail.get('start_time', '-')).border = border
+            ws.cell(row=row, column=8, value=detail.get('end_time', '-')).border = border
+            ws.cell(row=row, column=9, value=float(detail.get('work_hours', 0))).border = border
+            ws.cell(row=row, column=10, value=float(detail.get('overtime_hours', 0))).border = border
+            ws.cell(row=row, column=11, value=float(detail.get('total_hours', 0))).border = border
+        
+        # 設定欄寬
+        from openpyxl.utils import get_column_letter
+        column_widths = [15, 15, 15, 20, 15, 12, 10, 10, 12, 12, 12]
+        for col, width in enumerate(column_widths, 1):
+            ws.column_dimensions[get_column_letter(col)].width = width
+    
+    def _create_stats_sheet(self, ws, report_data):
+        """建立統計活頁簿"""
+        # 設定樣式
+        from openpyxl.styles import Font, PatternFill, Border, Side
+        header_font = Font(bold=True)
+        header_fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+        border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                       top=Side(style='thin'), bottom=Side(style='thin'))
+        
+        # 標題
+        ws['A1'] = f"{report_data['report_type']} - 作業員統計"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws.merge_cells('A1:E1')
+        
+        # 表頭
+        headers = ['排名', '作業員', '工作時數', '加班時數', '合計時數']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = border
+        
+        # 計算作業員統計
+        details = report_data['details']
+        operator_stats = {}
+        
+        for detail in details:
+            operator = detail.get('operator_name', '未指定')
+            if operator not in operator_stats:
+                operator_stats[operator] = {
+                    'work_hours': 0,
+                    'overtime_hours': 0,
+                    'total_hours': 0
+                }
+            operator_stats[operator]['work_hours'] += float(detail.get('work_hours', 0))
+            operator_stats[operator]['overtime_hours'] += float(detail.get('overtime_hours', 0))
+            operator_stats[operator]['total_hours'] += float(detail.get('total_hours', 0))
+        
+        # 排序並寫入資料
+        sorted_operators = sorted(operator_stats.items(), key=lambda x: x[1]['total_hours'], reverse=True)
+        
+        for row, (operator, stats) in enumerate(sorted_operators, 4):
+            ws.cell(row=row, column=1, value=row-3).border = border  # 排名
+            ws.cell(row=row, column=2, value=operator).border = border  # 作業員
+            ws.cell(row=row, column=3, value=stats['work_hours']).border = border  # 工作時數
+            ws.cell(row=row, column=4, value=stats['overtime_hours']).border = border  # 加班時數
+            ws.cell(row=row, column=5, value=stats['total_hours']).border = border  # 合計時數
+        
+        # 設定欄寬
+        from openpyxl.utils import get_column_letter
+        column_widths = [8, 20, 12, 12, 12]
+        for col, width in enumerate(column_widths, 1):
+            ws.column_dimensions[get_column_letter(col)].width = width
     
     def _export_to_csv(self, report_data, filename):
         """匯出為CSV格式"""

@@ -1002,7 +1002,15 @@ def daily_report_export(request):
         # 下載檔案
         with open(result['file_path'], 'rb') as f:
             response = HttpResponse(f.read(), content_type='application/octet-stream')
-            response['Content-Disposition'] = f'attachment; filename="{result["filename"]}"'
+            # 設定檔案名稱，支援中文
+            filename = result["filename"]
+            import urllib.parse
+            # 使用 URL 編碼處理中文檔案名稱
+            encoded_filename = urllib.parse.quote(filename)
+            response['Content-Disposition'] = f'attachment; filename="{encoded_filename}"; filename*=UTF-8\'\'{encoded_filename}'
+            # 添加安全標頭
+            response['X-Content-Type-Options'] = 'nosniff'
+            response['X-Frame-Options'] = 'DENY'
             return response
             
     except Exception as e:

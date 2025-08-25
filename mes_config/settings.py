@@ -77,6 +77,11 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True  # 允許傳遞 cookie（如 sessionid）
 
+# 安全設定（開發環境）
+SECURE_CONTENT_TYPE_NOSNIFF = False
+SECURE_BROWSER_XSS_FILTER = False
+SECURE_REFERRER_POLICY = 'no-referrer-when-downgrade'
+
 # URL 配置
 ROOT_URLCONF = "mes_config.urls"
 

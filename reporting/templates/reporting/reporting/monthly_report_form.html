@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}月報表{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'reporting:work_hour_report_index' %}">工作時數報表</a></li>
+            <li class="breadcrumb-item active" aria-current="page">月報表</li>
+        </ol>
+    </nav>
+
+    <!-- 訊息顯示區塊 -->
+    {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3"><i class="fas fa-calendar-alt text-info"></i> 月報表</h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cog"></i> 報表設定</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'reporting:monthly_report' %}">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="company_code" class="form-label">公司代號 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="company_code" name="company_code" required>
+                                    <option value="">請選擇公司</option>
+                                    <option value="01">中儀科技</option>
+                                    <option value="02">其他公司</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-3 mb-3">
+                                <label for="year" class="form-label">年度 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="year" name="year" required>
+                                    {% for year in years %}
+                                        <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-3 mb-3">
+                                <label for="month" class="form-label">月份 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="month" name="month" required>
+                                    {% for month in months %}
+                                        <option value="{{ month }}" {% if month == current_month %}selected{% endif %}>{{ month }}月</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="format" class="form-label">輸出格式</label>
+                                <select class="form-select" id="format" name="format">
+                                    <option value="excel">Excel (.xlsx)</option>
+                                    <option value="csv">CSV (.csv)</option>
+                                    <option value="web">網頁顯示</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-chart-line"></i> 生成月報表
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表說明 -->
+    <div class="row mt-4">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> 報表說明</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-list-ul text-primary"></i> 報表內容</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> 月度工作時數統計</li>
+                                <li><i class="fas fa-check text-success"></i> 作業員工作時數排名</li>
+                                <li><i class="fas fa-check text-success"></i> 設備使用時數分析</li>
+                                <li><i class="fas fa-check text-success"></i> 工單完成情況統計</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-download text-primary"></i> 輸出格式</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-file-excel text-success"></i> Excel：完整格式，包含圖表</li>
+                                <li><i class="fas fa-file-csv text-info"></i> CSV：純文字格式，適合匯入</li>
+                                <li><i class="fas fa-globe text-warning"></i> 網頁：即時預覽，互動式顯示</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 8px;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.form-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.btn {
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+
+.form-select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.breadcrumb {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+}
+
+.breadcrumb-item a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.alert {
+    border-radius: 6px;
+    border: none;
+}
+
+.messages-container {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 自動聚焦到第一個輸入欄位
+    document.getElementById('company_code').focus();
+    
+    // 表單驗證
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        const companyCode = document.getElementById('company_code').value;
+        const year = document.getElementById('year').value;
+        const month = document.getElementById('month').value;
+        
+        if (!companyCode || !year || !month) {
+            e.preventDefault();
+            alert('請填寫所有必填欄位');
+            return false;
+        }
+    });
+    
+    // 即時驗證
+    const requiredFields = ['company_code', 'year', 'month'];
+    requiredFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        field.addEventListener('change', function() {
+            if (this.value) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

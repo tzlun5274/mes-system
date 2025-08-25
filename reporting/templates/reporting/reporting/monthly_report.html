@@ -1,0 +1,384 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}月報表 - {{ year }}年{{ month }}月{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'reporting:work_hour_report_index' %}">工作時數報表</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'reporting:monthly_report' %}">月報表</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ year }}年{{ month }}月</li>
+        </ol>
+    </nav>
+
+    <!-- 訊息顯示區塊 -->
+    {% if messages %}
+        <div class="messages-container mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- 報表標題和匯出按鈕 -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2 class="mb-2">
+                <i class="fas fa-calendar-alt text-info"></i> 
+                {{ report_type }} - {{ year }}年{{ month }}月
+            </h2>
+            <p class="text-muted mb-0">
+                <i class="fas fa-building"></i> 公司代號：{{ company_code }} | 
+                <i class="fas fa-clock"></i> 生成時間：{{ generated_at|date:"Y-m-d H:i:s" }}
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <a href="{% url 'reporting:monthly_report_export' %}?company_code={{ company_code }}&year={{ year }}&month={{ month }}&format=excel" 
+                   class="btn btn-success">
+                    <i class="fas fa-file-excel"></i> 匯出 Excel
+                </a>
+                <a href="{% url 'reporting:monthly_report_export' %}?company_code={{ company_code }}&year={{ year }}&month={{ month }}&format=csv" 
+                   class="btn btn-info">
+                    <i class="fas fa-file-csv"></i> 匯出 CSV
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計摘要卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">{{ summary.total_hours|default:0|floatformat:1 }}</h4>
+                            <p class="card-text">總工作時數</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">{{ summary.total_operators|default:0 }}</h4>
+                            <p class="card-text">作業員人數</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">{{ summary.avg_daily_hours|default:0|floatformat:1 }}</h4>
+                            <p class="card-text">平均日工作時數</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-chart-line fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title">{{ summary.total_workorders|default:0 }}</h4>
+                            <p class="card-text">工單數量</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clipboard-list fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表內容 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" id="reportTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab" aria-controls="summary" aria-selected="true">
+                                <i class="fas fa-chart-pie"></i> 統計摘要
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button" role="tab" aria-controls="details" aria-selected="false">
+                                <i class="fas fa-list"></i> 詳細資料
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="charts-tab" data-bs-toggle="tab" data-bs-target="#charts" type="button" role="tab" aria-controls="charts" aria-selected="false">
+                                <i class="fas fa-chart-bar"></i> 圖表分析
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content" id="reportTabsContent">
+                        <!-- 統計摘要 -->
+                        <div class="tab-pane fade show active" id="summary" role="tabpanel" aria-labelledby="summary-tab">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-list-ul text-primary"></i> 月度統計</h5>
+                                    <table class="table table-striped">
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>總工作時數</strong></td>
+                                                <td>{{ summary.total_hours|default:0|floatformat:1 }} 小時</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>作業員人數</strong></td>
+                                                <td>{{ summary.total_operators|default:0 }} 人</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>平均日工作時數</strong></td>
+                                                <td>{{ summary.avg_daily_hours|default:0|floatformat:1 }} 小時</td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>工單數量</strong></td>
+                                                <td>{{ summary.total_workorders|default:0 }} 張</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-trophy text-warning"></i> 作業員排名</h5>
+                                    {% if data.operator_stats %}
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>排名</th>
+                                                        <th>作業員</th>
+                                                        <th>工作時數</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for stat in data.operator_stats|slice:":10" %}
+                                                    <tr>
+                                                        <td>{{ forloop.counter }}</td>
+                                                        <td>{{ stat.operator_name }}</td>
+                                                        <td>{{ stat.total_hours|floatformat:1 }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-muted">暫無資料</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 詳細資料 -->
+                        <div class="tab-pane fade" id="details" role="tabpanel" aria-labelledby="details-tab">
+                            <h5><i class="fas fa-table text-primary"></i> 詳細工作記錄</h5>
+                            {% if data.work_records %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>日期</th>
+                                                <th>作業員</th>
+                                                <th>工單編號</th>
+                                                <th>產品編號</th>
+                                                <th>工序</th>
+                                                <th>工作時數</th>
+                                                <th>加班時數</th>
+                                                <th>合計時數</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for record in data.work_records %}
+                                            <tr>
+                                                <td>{{ record.work_date|date:"Y-m-d" }}</td>
+                                                <td>{{ record.operator_name }}</td>
+                                                <td>{{ record.workorder_id }}</td>
+                                                <td>{{ record.product_code|default:"-" }}</td>
+                                                <td>{{ record.process_name|default:"-" }}</td>
+                                                <td>{{ record.work_hours|floatformat:1 }}</td>
+                                                <td>{{ record.overtime_hours|floatformat:1 }}</td>
+                                                <td>{{ record.total_hours|floatformat:1 }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">暫無詳細資料</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- 圖表分析 -->
+                        <div class="tab-pane fade" id="charts" role="tabpanel" aria-labelledby="charts-tab">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-chart-pie text-primary"></i> 作業員工作時數分布</h5>
+                                    <canvas id="operatorChart" width="400" height="300"></canvas>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-chart-line text-success"></i> 每日工作時數趨勢</h5>
+                                    <canvas id="dailyTrendChart" width="400" height="300"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 8px;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.nav-tabs .nav-link.active {
+    color: #007bff;
+    background-color: transparent;
+    border-bottom: 2px solid #007bff;
+}
+
+.table th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.btn-group .btn {
+    border-radius: 6px;
+    margin-left: 5px;
+}
+
+.breadcrumb {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+}
+
+.breadcrumb-item a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.alert {
+    border-radius: 6px;
+    border: none;
+}
+
+.messages-container {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 作業員工作時數分布圖
+    const operatorCtx = document.getElementById('operatorChart');
+    if (operatorCtx) {
+        const operatorData = {{ data.operator_stats|safe }};
+        if (operatorData && operatorData.length > 0) {
+            new Chart(operatorCtx, {
+                type: 'pie',
+                data: {
+                    labels: operatorData.slice(0, 10).map(item => item.operator_name),
+                    datasets: [{
+                        data: operatorData.slice(0, 10).map(item => item.total_hours),
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                            '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    // 每日工作時數趨勢圖
+    const dailyCtx = document.getElementById('dailyTrendChart');
+    if (dailyCtx) {
+        const dailyData = {{ data.daily_stats|safe }};
+        if (dailyData && dailyData.length > 0) {
+            new Chart(dailyCtx, {
+                type: 'line',
+                data: {
+                    labels: dailyData.map(item => item.date),
+                    datasets: [{
+                        label: '工作時數',
+                        data: dailyData.map(item => item.total_hours),
+                        borderColor: '#36A2EB',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    }
+});
+</script>
+{% endblock %}
