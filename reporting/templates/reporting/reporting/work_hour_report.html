@@ -26,13 +26,7 @@
 
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="report-main-title">
-                        <i class="fas fa-clock"></i> 工作時數報表
-                    </h3>
-                </div>
-            </div>
+            <h2 class="mb-3"><i class="fas fa-clock text-primary"></i> 工作時數報表</h2>
         </div>
     </div>
 
@@ -152,22 +146,28 @@
                 </div>
                 <div class="card-body">
                     <div class="row" id="quickStats">
-                        <div class="col-md-4 text-center">
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-primary" id="totalRecords">-</h3>
+                                <p class="text-muted">總記錄數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-success" id="totalHours">-</h3>
+                                <p class="text-muted">總工作時數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
                             <div class="stat-item">
                                 <h3 class="text-info" id="totalOperators">-</h3>
                                 <p class="text-muted">總作業員數</p>
                             </div>
                         </div>
-                        <div class="col-md-4 text-center">
+                        <div class="col-md-3 text-center">
                             <div class="stat-item">
                                 <h3 class="text-warning" id="avgDailyHours">-</h3>
                                 <p class="text-muted">平均日工作時數</p>
-                            </div>
-                        </div>
-                        <div class="col-md-4 text-center">
-                            <div class="stat-item">
-                                <h3 class="text-success" id="lastWeekHours">-</h3>
-                                <p class="text-muted">上周工作時數</p>
                             </div>
                         </div>
                     </div>
@@ -234,16 +234,18 @@ function loadQuickStats() {
     fetch('/reporting/api/work-hour-stats/')
         .then(response => response.json())
         .then(data => {
+            document.getElementById('totalRecords').textContent = data.total_records || '0';
+            document.getElementById('totalHours').textContent = data.total_hours || '0';
             document.getElementById('totalOperators').textContent = data.total_operators || '0';
             document.getElementById('avgDailyHours').textContent = data.avg_daily_hours || '0';
-            document.getElementById('lastWeekHours').textContent = data.last_week_hours || '0';
         })
         .catch(error => {
             console.error('載入統計資料失敗:', error);
             // 如果API失敗，顯示預設值
+            document.getElementById('totalRecords').textContent = '0';
+            document.getElementById('totalHours').textContent = '0';
             document.getElementById('totalOperators').textContent = '0';
             document.getElementById('avgDailyHours').textContent = '0';
-            document.getElementById('lastWeekHours').textContent = '0';
         });
 }
 
@@ -261,84 +263,16 @@ function loadDetailedStats() {
         <div class="row">
             <div class="col-md-6">
                 <h6>按月份統計</h6>
-                <div id="monthlyStats" class="mt-3">
-                    <div class="text-center">
-                        <div class="spinner-border spinner-border-sm" role="status">
-                            <span class="visually-hidden">載入中...</span>
-                        </div>
-                    </div>
-                </div>
+                <canvas id="monthlyChart" width="400" height="200"></canvas>
             </div>
             <div class="col-md-6">
                 <h6>按公司統計</h6>
-                <div id="companyStats" class="mt-3">
-                    <div class="text-center">
-                        <div class="spinner-border spinner-border-sm" role="status">
-                            <span class="visually-hidden">載入中...</span>
-                        </div>
-                    </div>
-                </div>
+                <canvas id="companyChart" width="400" height="200"></canvas>
             </div>
         </div>
     `;
     
-    // 載入詳細統計資料
-    loadMonthlyStats();
-    loadCompanyStats();
-}
-
-function loadMonthlyStats() {
-    fetch('/reporting/api/chart-data/?chart_type=work_hours_trend')
-        .then(response => response.json())
-        .then(data => {
-            const monthlyStats = document.getElementById('monthlyStats');
-            if (data.labels && data.labels.length > 0) {
-                let html = '<div class="table-responsive"><table class="table table-sm">';
-                html += '<thead><tr><th>日期</th><th>工作時數</th></tr></thead><tbody>';
-                
-                // 顯示最近10筆數據
-                const recentData = data.labels.slice(-10);
-                const recentValues = data.values.slice(-10);
-                
-                for (let i = 0; i < recentData.length; i++) {
-                    html += `<tr><td>${recentData[i]}</td><td>${recentValues[i].toFixed(2)}</td></tr>`;
-                }
-                
-                html += '</tbody></table></div>';
-                monthlyStats.innerHTML = html;
-            } else {
-                monthlyStats.innerHTML = '<div class="alert alert-info">目前沒有月份統計資料</div>';
-            }
-        })
-        .catch(error => {
-            console.error('載入月份統計失敗:', error);
-            document.getElementById('monthlyStats').innerHTML = '<div class="alert alert-warning">載入月份統計失敗</div>';
-        });
-}
-
-function loadCompanyStats() {
-    fetch('/reporting/api/chart-data/?chart_type=company_distribution')
-        .then(response => response.json())
-        .then(data => {
-            const companyStats = document.getElementById('companyStats');
-            if (data.labels && data.labels.length > 0) {
-                let html = '<div class="table-responsive"><table class="table table-sm">';
-                html += '<thead><tr><th>公司</th><th>工作時數</th></tr></thead><tbody>';
-                
-                for (let i = 0; i < data.labels.length; i++) {
-                    html += `<tr><td>${data.labels[i]}</td><td>${data.values[i].toFixed(2)}</td></tr>`;
-                }
-                
-                html += '</tbody></table></div>';
-                companyStats.innerHTML = html;
-            } else {
-                companyStats.innerHTML = '<div class="alert alert-info">目前沒有公司統計資料</div>';
-            }
-        })
-        .catch(error => {
-            console.error('載入公司統計失敗:', error);
-            document.getElementById('companyStats').innerHTML = '<div class="alert alert-warning">載入公司統計失敗</div>';
-        });
+    // 這裡可以加入Chart.js來繪製圖表
 }
 </script>
 {% endblock %} 

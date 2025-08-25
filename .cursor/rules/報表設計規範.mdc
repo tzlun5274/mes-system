@@ -1,12 +1,11 @@
----
-description:
-globs:
-alwaysApply: false
----
+# 報表設計規範
 
-1. 建立報表專用資料表
-- class WorkOrderReportData(models.Model):
-    """工單報表專用資料表 - 支援週月季年度統計"""
+## 1. 資料模型設計
+
+### WorkOrderReportData 模型
+```python
+class WorkOrderReportData(models.Model):
+    """工單報表專用資料表 - 支援日週月季年度統計"""
     workorder_id = models.CharField(max_length=50, verbose_name="工單編號")
     company = models.CharField(max_length=10, verbose_name="公司代號")
     
@@ -37,39 +36,75 @@ alwaysApply: false
             models.Index(fields=['company', 'work_year', 'work_quarter']),
             models.Index(fields=['company', 'work_year']),
         ]
-		
-2. 報表功能架構
-- class WorkHourReportService:
-    """工作時數報表服務"""
-    
-    def get_weekly_report(self, company_code, year, week):
-        """週報表"""
-        return WorkOrderReportData.objects.filter(
-            company=company_code,
-            work_year=year,
-            work_week=week
-        )
-    
-    def get_monthly_report(self, company_code, year, month):
-        """月報表"""
-        return WorkOrderReportData.objects.filter(
-            company=company_code,
-            work_year=year,
-            work_month=month
-        )
-    
-    def get_quarterly_report(self, company_code, year, quarter):
-        """季報表"""
-        return WorkOrderReportData.objects.filter(
-            company=company_code,
-            work_year=year,
-            work_quarter=quarter
-        )
-    
-    def get_yearly_report(self, company_code, year):
-        """年報表"""
-        return WorkOrderReportData.objects.filter(
-            company=company_code,
-            work_year=year
-        )
-		
+```
+
+## 2. 報表類型支援
+
+### 日報表 (Daily Report)
+- **功能**：按日統計工作時數和作業員資料
+- **URL**：`/reporting/work-hour/daily/`
+- **匯出URL**：`/reporting/work-hour/daily/export/`
+- **視圖**：`daily_report`（預覽）, `daily_report_export`（匯出）
+- **模板**：`daily_report_form.html`, `daily_report.html`
+- **服務方法**：`get_daily_report_by_operator()`, `get_daily_summary_by_operator()`, `generate_daily_report_by_operator()`
+- **查詢方式**：按作業員姓名查詢（支援全部作業員或特定作業員）
+- **流程**：先預覽報表 → 選擇匯出格式
+- **支援格式**：Excel (.xlsx)、CSV (.csv)、列印
+
+### 週報表 (Weekly Report)
+- **功能**：按週統計工作時數和作業員資料
+- **URL**：`/reporting/work-hour/weekly/`
+- **視圖**：`weekly_report`
+- **模板**：`weekly_report_form.html`, `weekly_report.html`
+- **服務方法**：`get_weekly_report()`, `get_weekly_summary()`, `generate_weekly_report()`
+
+### 月報表 (Monthly Report)
+- **功能**：按月統計工作時數和作業員資料
+- **URL**：`/reporting/work-hour/monthly/`
+- **視圖**：`monthly_report`
+- **模板**：`monthly_report_form.html`, `monthly_report.html`
+- **服務方法**：`get_monthly_report()`, `get_monthly_summary()`, `generate_monthly_report()`
+
+### 季報表 (Quarterly Report)
+- **功能**：按季統計工作時數和作業員資料
+- **URL**：`/reporting/work-hour/quarterly/`
+- **視圖**：`quarterly_report`
+- **模板**：`quarterly_report_form.html`, `quarterly_report.html`
+- **服務方法**：`get_quarterly_report()`, `get_quarterly_summary()`, `generate_quarterly_report()`
+
+### 年報表 (Yearly Report)
+- **功能**：按年統計工作時數和作業員資料
+- **URL**：`/reporting/work-hour/yearly/`
+- **視圖**：`yearly_report`
+- **模板**：`yearly_report_form.html`, `yearly_report.html`
+- **服務方法**：`get_yearly_report()`, `get_yearly_summary()`, `generate_yearly_report()`
+
+## 3. 報表功能特性
+
+### 通用功能
+- **多格式支援**：Excel (.xlsx)、CSV (.csv)、網頁格式
+- **統計摘要**：總工作時數、總作業員數、總設備使用時數、工單數量
+- **詳細資料**：完整的工單工作記錄
+- **列印功能**：支援瀏覽器列印
+- **表單驗證**：完整的輸入驗證和錯誤處理
+
+### 日報表特殊功能
+- **日期選擇**：支援選擇特定日期生成報表
+- **即時統計**：當日工作時數和作業員統計
+- **資料驗證**：防止選擇未來日期
+
+### 資料來源
+- **填報作業資料**：來自 `workorder.fill_work.models.FillWork`
+- **現場報工資料**：來自 `workorder.onsite_reporting.models.OnsiteReport`
+- **作業員資料**：來自 `process.models.Operator`
+
+### 技術架構
+- **服務層**：`WorkHourReportService` 處理業務邏輯
+- **生成服務**：`ReportGeneratorService` 處理報表生成
+- **視圖層**：處理 HTTP 請求和回應
+- **模板層**：提供使用者介面
+
+### 安全與權限
+- **登入驗證**：所有報表功能需要登入
+- **資料隔離**：按公司代號隔離資料
+- **錯誤處理**：完整的異常處理和日誌記錄

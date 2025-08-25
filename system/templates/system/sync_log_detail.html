@@ -217,7 +217,7 @@
                             {% if sync_log.duration_seconds %}
                                 {{ sync_log.duration_seconds }} 秒
                                 {% if sync_log.duration_seconds > 60 %}
-                                    ({{ sync_log.duration_seconds|floatformat:0|div:60|floatformat:1 }} 分鐘)
+                                    ({{ sync_log.duration_seconds|floatformat:0 }} 秒)
                                 {% endif %}
                             {% else %}
                                 <span class="text-muted">-</span>
@@ -229,7 +229,7 @@
                         <span class="info-label">處理效率</span>
                         <span class="info-value">
                             {% if sync_log.duration_seconds and sync_log.records_processed %}
-                                {{ sync_log.records_processed|div:sync_log.duration_seconds|floatformat:1 }} 記錄/秒
+                                {{ sync_log.records_processed|floatformat:0 }} 記錄
                             {% else %}
                                 <span class="text-muted">-</span>
                             {% endif %}

@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}日報表 - {{ operator }} - {{ date }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}"><i class="fas fa-chart-bar"></i> 報表管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'reporting:work_hour_report_index' %}">工作時數報表</a></li>
+            <li class="breadcrumb-item active" aria-current="page">日報表</li>
+        </ol>
+    </nav>
+
+    <!-- 報表標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-calendar-day text-primary"></i> 日報表
+                </h2>
+                <div>
+                    <a href="{% url 'reporting:daily_report' %}" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-arrow-left"></i> 返回
+                    </a>
+                    <button type="button" class="btn btn-outline-primary" onclick="window.print()">
+                        <i class="fas fa-print"></i> 列印
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 報表資訊 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> 報表資訊</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>作業員：</strong> {{ operator }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>報表日期：</strong> {{ date|date:"Y-m-d" }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>報表類型：</strong> {{ report_type }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>生成時間：</strong> {{ generated_at|date:"Y-m-d H:i:s" }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計摘要 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie"></i> 統計摘要</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-primary">{{ summary.total_work_hours|floatformat:2 }}</h3>
+                                <p class="text-muted">總工作時數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-success">{{ summary.total_operators }}</h3>
+                                <p class="text-muted">總作業員數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-info">{{ summary.total_equipment_hours|floatformat:2 }}</h3>
+                                <p class="text-muted">總設備使用時數</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="stat-item">
+                                <h3 class="text-warning">{{ summary.workorder_count }}</h3>
+                                <p class="text-muted">工單數量</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細資料 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-table"></i> 詳細資料</h5>
+                </div>
+                <div class="card-body">
+                    {% if data %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>作業員</th>
+                                        <th>工單編號</th>
+                                        <th>工作日期</th>
+                                        <th>日工作時數</th>
+                                        <th>作業員人數</th>
+                                        <th>設備使用時數</th>
+                                        <th>建立時間</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in data %}
+                                    <tr>
+                                        <td>{{ item.operator_name|default:"-" }}</td>
+                                        <td>{{ item.workorder_id }}</td>
+                                        <td>{{ item.work_date|date:"Y-m-d" }}</td>
+                                        <td>{{ item.daily_work_hours|floatformat:2 }}</td>
+                                        <td>{{ item.operator_count }}</td>
+                                        <td>{{ item.equipment_hours|floatformat:2 }}</td>
+                                        <td>{{ item.created_at|date:"Y-m-d H:i:s" }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">暫無資料</h5>
+                            <p class="text-muted">所選日期沒有工作時數資料</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 匯出選項 -->
+    {% if data %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-download"></i> 匯出報表</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="d-grid">
+                                <a href="{% url 'reporting:daily_report_export' %}?operator={{ operator }}&date={{ date|date:'Y-m-d' }}&format=excel" class="btn btn-success">
+                                    <i class="fas fa-file-excel"></i> 匯出 Excel 格式
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="d-grid">
+                                <a href="{% url 'reporting:daily_report_export' %}?operator={{ operator }}&date={{ date|date:'Y-m-d' }}&format=csv" class="btn btn-info">
+                                    <i class="fas fa-file-csv"></i> 匯出 CSV 格式
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-warning" onclick="window.print()">
+                                    <i class="fas fa-print"></i> 列印報表
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.stat-item {
+    padding: 20px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    margin-bottom: 15px;
+}
+
+.stat-item h3 {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.table th {
+    font-weight: 600;
+}
+
+@media print {
+    .btn, .breadcrumb {
+        display: none !important;
+    }
+    
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #dee2e6 !important;
+    }
+    
+    .container-fluid {
+        max-width: 100% !important;
+    }
+}
+</style>
+{% endblock %}

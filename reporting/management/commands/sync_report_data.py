@@ -100,7 +100,7 @@ class Command(BaseCommand):
             if not force:
                 # 只同步尚未同步的資料
                 synced_onsite_workorders = WorkOrderReportData.objects.values_list('workorder_id', flat=True).distinct()
-                onsite_reports = onsite_reports.exclude(order_number__in=synced_onsite_workorders)
+                onsite_reports = onsite_reports.exclude(workorder__in=synced_onsite_workorders)
             
             onsite_reports_count = onsite_reports.count()
             self.stdout.write(f'找到 {onsite_reports_count} 筆已完成的現場報工資料')
@@ -121,7 +121,7 @@ class Command(BaseCommand):
                     onsite_errors += 1
                     logger.error(f"同步現場報工資料失敗: {onsite_report.id} - {str(e)}")
                     self.stdout.write(
-                        self.style.ERROR(f'同步現場報工失敗: 工單 {onsite_report.order_number} - {str(e)}')
+                        self.style.ERROR(f'同步現場報工失敗: 工單 {onsite_report.workorder} - {str(e)}')
                     )
             
             # 輸出總結果

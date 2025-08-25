@@ -1,812 +1,962 @@
 """
 報表模組視圖
-提供各種報表功能的網頁介面
+提供各種報表的查詢和匯出功能
 """
 
-from django.shortcuts import render, redirect, get_object_or_404
+import logging
+from datetime import datetime, timedelta
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import HttpResponse, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse, HttpResponse
+from django.core.paginator import Paginator
+from django.db.models import Q, Avg, Count, Sum
 from django.utils import timezone
-from django.db.models import Sum, Avg, Count, Q
 from datetime import datetime, timedelta
-import calendar
-from decimal import Decimal
-import logging
+import json
 
-from .models import WorkTimeReportSummary, WorkTimeReportDetail, ReportSchedule, ReportExecutionLog
-from .services import WorkTimeReportService, WorkHourReportService, ReportGeneratorService
+from .models import (
+    WorkOrderReportData, ReportSchedule, ReportExecutionLog, CompletedWorkOrderReportData,
+    OperatorProcessCapacityScore
+)
+from .forms import (
+    GenerateScoringReportForm, 
+    SupervisorScoreForm, OperatorScoreFilterForm
+)
+from .services import WorkHourReportService, ReportGeneratorService, ReportSchedulerService, CompletedWorkOrderReportService, ScoringService, OperatorCapacityService
 
 logger = logging.getLogger(__name__)
 
 
-@login_required
+def is_report_user(user):
+    """檢查使用者是否有報表權限"""
+    return user.is_authenticated and (user.is_staff or user.is_superuser)
+
+
 def index(request):
     """報表首頁"""
-    context = {
-        'page_title': '報表管理',
-        'current_page': 'reporting',
-    }
+    try:
+        # 統計資料
+        total_workorders = WorkOrderReportData.objects.count()
+        active_workorders = WorkOrderReportData.objects.filter(status='active').count()
+        total_operators = OperatorProcessCapacityScore.objects.count()
+        total_equipment = 0  # 暫時設為0，因為OperatorCapacityReport模型不存在
+        
+        # 報表統計
+        total_reports = WorkOrderReportData.objects.count()
+        today_reports = WorkOrderReportData.objects.filter(
+            created_at__date=timezone.now().date()
+        ).count()
+        
+        # 排程統計
+        active_schedules = ReportSchedule.objects.filter(status='active').count()
+        completed_executions = ReportExecutionLog.objects.filter(status='success').count()
+        
+        context = {
+            'total_workorders': total_workorders,
+            'active_workorders': active_workorders,
+            'total_operators': total_operators,
+            'total_equipment': total_equipment,
+            'total_reports': total_reports,
+            'today_reports': today_reports,
+            'pending_reports': active_schedules,
+            'completed_reports': completed_executions,
+        }
+    except Exception as e:
+        logger.error(f"取得報表首頁統計資料失敗: {str(e)}")
+        context = {
+            'total_workorders': 0,
+            'active_workorders': 0,
+            'total_operators': 0,
+            'total_equipment': 0,
+            'total_reports': 0,
+            'today_reports': 0,
+            'pending_reports': 0,
+            'completed_reports': 0,
+        }
+    
     return render(request, 'reporting/index.html', context)
 
-
-@login_required
-def work_time_report_index(request):
-    """工作時數報表首頁"""
-    context = {
-        'page_title': '工作時數報表',
-        'current_page': 'work_time_report',
-    }
-    return render(request, 'reporting/work_time_report.html', context)
-
-
-@login_required
-def work_time_daily_report(request):
-    """工作時數日報表"""
-    if request.method == 'POST':
-        company_code = request.POST.get('company_code')
-        report_date = request.POST.get('report_date')
-        format = request.POST.get('format', 'excel')
+def get_date_range(date_range):
+    """
+    根據日期範圍獲取開始和結束日期
+    
+    Args:
+        date_range: 日期範圍字串
         
-        try:
-            # 解析日期
-            report_date = datetime.strptime(report_date, '%Y-%m-%d').date()
-            
-            # 生成日報表
-            service = WorkTimeReportService()
-            summary = service.generate_daily_work_time_report(report_date, company_code)
-            
-            # 獲取詳細資料
-            detail = WorkTimeReportDetail.objects.filter(summary=summary).first()
-            
-            if format in ['excel', 'csv']:
-                # 生成檔案
-                generator = ReportGeneratorService()
-                result = generator.generate_work_time_report(
-                    company_code, report_date, report_date, 'daily', format
-                )
-                
-                # 下載檔案
-                with open(result['file_path'], 'rb') as f:
-                    response = HttpResponse(f.read(), content_type='application/octet-stream')
-                    response['Content-Disposition'] = f'attachment; filename="{result["filename"]}"'
-                    return response
-            else:
-                # 顯示網頁報表
-                context = {
-                    'report_type': '工作時數日報表',
-                    'company_code': company_code,
-                    'report_date': report_date,
-                    'summary': summary,
-                    'detail': detail,
-                    'generated_at': timezone.now(),
-                }
-                return render(request, 'reporting/work_time_daily_report.html', context)
-                
-        except Exception as e:
-            messages.error(request, f'生成工作時數日報表失敗: {str(e)}')
-            return redirect('reporting:work_time_report_index')
+    Returns:
+        tuple: (開始日期, 結束日期)
+    """
+    today = timezone.now().date()
     
-    # GET 請求顯示表單
-    current_date = timezone.now().date()
+    if date_range == 'today':
+        return today, today
+    elif date_range == 'yesterday':
+        yesterday = today - timedelta(days=1)
+        return yesterday, yesterday
+    elif date_range == 'this_week':
+        # 週一到週日
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        return start_of_week, end_of_week
+    elif date_range == 'last_week':
+        # 上週一到上週日
+        start_of_week = today - timedelta(days=today.weekday())
+        start_of_last_week = start_of_week - timedelta(days=7)
+        end_of_last_week = start_of_last_week + timedelta(days=6)
+        return start_of_last_week, end_of_last_week
+    elif date_range == 'this_month':
+        start_of_month = today.replace(day=1)
+        if today.month == 12:
+            end_of_month = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            end_of_month = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+        return start_of_month, end_of_month
+    elif date_range == 'last_month':
+        if today.month == 1:
+            start_of_last_month = today.replace(year=today.year - 1, month=12, day=1)
+        else:
+            start_of_last_month = today.replace(month=today.month - 1, day=1)
+        end_of_last_month = today.replace(day=1) - timedelta(days=1)
+        return start_of_last_month, end_of_last_month
+    else:
+        # 預設為今天
+        return today, today
+
+def get_report_types():
+    """
+    獲取報表類型選項
+    """
+    return [
+        ('daily_work', '日工作報表'),
+        ('weekly_work', '週工作報表'),
+        ('monthly_work', '月工作報表'),
+        ('daily_work_hour_operator', '日工時報表 (作業員)'),
+        ('weekly_work_hour_operator', '週工時報表 (作業員)'),
+        ('monthly_work_hour_operator', '月工時報表 (作業員)'),
+        ('daily_work_hour_smt', '日工時報表 (SMT設備)'),
+        ('weekly_work_hour_smt', '週工時報表 (SMT設備)'),
+        ('monthly_work_hour_smt', '月工時報表 (SMT設備)'),
+        ('operator_performance', '作業員績效報表'),
+        ('smt_equipment', 'SMT設備效率報表'),
+        ('abnormal_report', '異常報工報表'),
+        ('efficiency_analysis', '效率分析報表'),
+    ]
+
+def get_date_ranges():
+    """
+    獲取日期範圍選項
+    """
+    return [
+        ('today', '今天'),
+        ('yesterday', '昨天'),
+        ('this_week', '本週'),
+        ('last_week', '上週'),
+        ('this_month', '本月'),
+        ('last_month', '上月'),
+        ('custom', '自訂範圍'),
+    ]
+
+def get_daily_work_report_data(start_date, end_date):
+    """
+    獲取日工作報表資料
     
-    context = {
-        'current_date': current_date,
-        'page_title': '工作時數日報表',
-    }
-    return render(request, 'reporting/work_time_daily_report_form.html', context)
-
-
-@login_required
-def work_time_weekly_report(request):
-    """工作時數週報表"""
-    if request.method == 'POST':
-        company_code = request.POST.get('company_code')
-        week_start = request.POST.get('week_start')
-        format = request.POST.get('format', 'excel')
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
         
-        try:
-            # 解析日期
-            week_start = datetime.strptime(week_start, '%Y-%m-%d').date()
-            
-            # 生成週報表
-            service = WorkTimeReportService()
-            summary = service.generate_weekly_work_time_report(week_start, company_code)
-            
-            # 計算週結束日期
-            week_end = week_start + timedelta(days=6)
-            
-            if format in ['excel', 'csv']:
-                # 生成檔案
-                generator = ReportGeneratorService()
-                result = generator.generate_work_time_report(
-                    company_code, week_start, week_end, 'weekly', format
-                )
-                
-                # 下載檔案
-                with open(result['file_path'], 'rb') as f:
-                    response = HttpResponse(f.read(), content_type='application/octet-stream')
-                    response['Content-Disposition'] = f'attachment; filename="{result["filename"]}"'
-                    return response
-            else:
-                # 顯示網頁報表
-                context = {
-                    'report_type': '工作時數週報表',
-                    'company_code': company_code,
-                    'week_start': week_start,
-                    'week_end': week_end,
-                    'summary': summary,
-                    'generated_at': timezone.now(),
-                }
-                return render(request, 'reporting/work_time_weekly_report.html', context)
-                
-        except Exception as e:
-            messages.error(request, f'生成工作時數週報表失敗: {str(e)}')
-            return redirect('reporting:work_time_report_index')
+    Returns:
+        list: 報表資料
+    """
+    data = []
     
-    # GET 請求顯示表單
-    current_date = timezone.now().date()
-    # 計算本週開始日期（週一）
-    week_start = current_date - timedelta(days=current_date.weekday())
+    # 從填報記錄中獲取資料
+    fill_work_reports = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).select_related('process')
     
-    context = {
-        'current_date': current_date,
-        'week_start': week_start,
-        'page_title': '工作時數週報表',
-    }
-    return render(request, 'reporting/work_time_weekly_report_form.html', context)
+    for report in fill_work_reports:
+        data.append({
+            'operator': report.operator,
+            'work_date': report.work_date.strftime('%Y-%m-%d'),
+            'workorder': report.workorder,
+            'product_id': report.product_id,
+            'start_time': report.start_time,
+            'end_time': report.end_time,
+            'process': report.process.name if report.process else '',
+            'work_quantity': report.work_quantity,
+            'defect_quantity': report.defect_quantity,
+        })
+    
+    return data
 
-
-@login_required
-def work_time_monthly_report(request):
-    """工作時數月報表"""
-    if request.method == 'POST':
-        company_code = request.POST.get('company_code')
-        year = int(request.POST.get('year'))
-        month = int(request.POST.get('month'))
-        format = request.POST.get('format', 'excel')
+def get_weekly_work_report_data(start_date, end_date):
+    """
+    獲取週工作報表資料
+    
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
         
-        try:
-            # 生成月報表
-            service = WorkTimeReportService()
-            summary = service.generate_monthly_work_time_report(year, month, company_code)
-            
-            # 計算月份開始和結束日期
-            month_start = datetime(year, month, 1).date()
-            if month == 12:
-                month_end = datetime(year + 1, 1, 1).date() - timedelta(days=1)
-            else:
-                month_end = datetime(year, month + 1, 1).date() - timedelta(days=1)
-            
-            if format in ['excel', 'csv']:
-                # 生成檔案
-                generator = ReportGeneratorService()
-                result = generator.generate_work_time_report(
-                    company_code, month_start, month_end, 'monthly', format
-                )
-                
-                # 下載檔案
-                with open(result['file_path'], 'rb') as f:
-                    response = HttpResponse(f.read(), content_type='application/octet-stream')
-                    response['Content-Disposition'] = f'attachment; filename="{result["filename"]}"'
-                    return response
-            else:
-                # 顯示網頁報表
-                context = {
-                    'report_type': '工作時數月報表',
-                    'company_code': company_code,
-                    'year': year,
-                    'month': month,
-                    'month_start': month_start,
-                    'month_end': month_end,
-                    'summary': summary,
-                    'generated_at': timezone.now(),
-                }
-                return render(request, 'reporting/work_time_monthly_report.html', context)
-                
-        except Exception as e:
-            messages.error(request, f'生成工作時數月報表失敗: {str(e)}')
-            return redirect('reporting:work_time_report_index')
+    Returns:
+        list: 報表資料
+    """
+    data = []
     
-    # GET 請求顯示表單
-    current_year = timezone.now().year
-    current_month = timezone.now().month
+    # 按作業員分組統計
+    operator_stats = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).values('operator').annotate(
+        total_work_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity')
+    )
     
-    context = {
-        'current_year': current_year,
-        'current_month': current_month,
-        'years': range(current_year - 5, current_year + 1),
-        'months': range(1, 13),
-        'page_title': '工作時數月報表',
-    }
-    return render(request, 'reporting/work_time_monthly_report_form.html', context)
+    for stat in operator_stats:
+        data.append({
+            'operator': stat['operator'],
+            'total_work_quantity': stat['total_work_quantity'] or 0,
+            'total_defect_quantity': stat['total_defect_quantity'] or 0,
+        })
+    
+    return data
 
-
-@login_required
-def work_time_report_list(request):
-    """工作時數報表列表"""
-    # 獲取查詢參數
-    company_code = request.GET.get('company_code', '')
-    report_type = request.GET.get('report_type', 'work_time')
-    time_dimension = request.GET.get('time_dimension', 'daily')
-    start_date = request.GET.get('start_date', '')
-    end_date = request.GET.get('end_date', '')
+def get_monthly_work_report_data(start_date, end_date):
+    """
+    獲取月工作報表資料
     
-    # 構建查詢條件
-    filters = Q(report_type=report_type)
-    
-    if company_code:
-        filters &= Q(company_code=company_code)
-    
-    if start_date and end_date:
-        try:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-            filters &= Q(report_date__range=[start_date, end_date])
-        except ValueError:
-            pass
-    
-    # 查詢報表資料
-    reports = WorkTimeReportSummary.objects.filter(filters).order_by('-report_date')
-    
-    # 分頁
-    from django.core.paginator import Paginator
-    paginator = Paginator(reports, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    context = {
-        'page_obj': page_obj,
-        'company_code': company_code,
-        'report_type': report_type,
-        'time_dimension': time_dimension,
-        'start_date': start_date,
-        'end_date': end_date,
-        'page_title': '工作時數報表列表',
-    }
-    return render(request, 'reporting/work_time_report_list.html', context)
-
-
-@login_required
-def work_time_report_detail(request, report_id):
-    """工作時數報表詳情"""
-    report = get_object_or_404(WorkTimeReportSummary, id=report_id)
-    detail = WorkTimeReportDetail.objects.filter(summary=report).first()
-    
-    context = {
-        'report': report,
-        'detail': detail,
-        'page_title': f'工作時數報表詳情 - {report.report_date}',
-    }
-    return render(request, 'reporting/work_time_report_detail.html', context)
-
-
-@login_required
-def work_time_report_export(request):
-    """工作時數報表匯出"""
-    if request.method == 'POST':
-        company_code = request.POST.get('company_code')
-        start_date = request.POST.get('start_date')
-        end_date = request.POST.get('end_date')
-        time_dimension = request.POST.get('time_dimension', 'daily')
-        format = request.POST.get('format', 'excel')
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
         
-        try:
-            # 解析日期
-            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
-            
-            # 生成報表
-            generator = ReportGeneratorService()
-            result = generator.generate_work_time_report(
-                company_code, start_date, end_date, time_dimension, format
-            )
-            
-            # 下載檔案
-            with open(result['file_path'], 'rb') as f:
-                response = HttpResponse(f.read(), content_type='application/octet-stream')
-                response['Content-Disposition'] = f'attachment; filename="{result["filename"]}"'
-                return response
-                
-        except Exception as e:
-            messages.error(request, f'匯出工作時數報表失敗: {str(e)}')
-            return redirect('reporting:work_time_report_index')
+    Returns:
+        list: 報表資料
+    """
+    data = []
     
-    # GET 請求顯示表單
-    current_date = timezone.now().date()
+    # 按作業員分組統計
+    operator_stats = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).values('operator').annotate(
+        total_work_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity')
+    )
     
-    context = {
-        'current_date': current_date,
-        'page_title': '工作時數報表匯出',
+    for stat in operator_stats:
+        data.append({
+            'operator': stat['operator'],
+            'total_work_quantity': stat['total_work_quantity'] or 0,
+            'total_defect_quantity': stat['total_defect_quantity'] or 0,
+        })
+    
+    return data
+
+def get_daily_work_hour_operator_report_data(start_date, end_date):
+    """
+    獲取日工時報表 (作業員) 資料
+    
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
+        
+    Returns:
+        list: 報表資料
+    """
+    data = []
+    
+    # 從填報記錄中獲取作業員工時資料
+    operator_stats = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).exclude(
+        Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+    ).values('operator', 'work_date').annotate(
+        total_work_hours=Sum('work_hours_calculated'),
+        total_good_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity')
+    )
+    
+    for stat in operator_stats:
+        data.append({
+            'operator': stat['operator'],
+            'work_date': stat['work_date'].strftime('%Y-%m-%d'),
+            'work_hours': round(stat['total_work_hours'] or 0, 2),
+            'good_quantity': stat['total_good_quantity'] or 0,
+            'defect_quantity': stat['total_defect_quantity'] or 0,
+        })
+    
+    return data
+
+def get_weekly_work_hour_operator_report_data(start_date, end_date):
+    """
+    獲取週工時報表 (作業員) 資料
+    
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
+        
+    Returns:
+        list: 報表資料
+    """
+    data = []
+    
+    # 按作業員分組統計週工時
+    operator_stats = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).exclude(
+        Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+    ).values('operator').annotate(
+        total_work_hours=Sum('work_hours_calculated'),
+        total_good_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity')
+    )
+    
+    for stat in operator_stats:
+        data.append({
+            'operator': stat['operator'],
+            'work_hours': round(stat['total_work_hours'] or 0, 2),
+            'good_quantity': stat['total_good_quantity'] or 0,
+            'defect_quantity': stat['total_defect_quantity'] or 0,
+        })
+    
+    return data
+
+def get_monthly_work_hour_operator_report_data(start_date, end_date):
+    """
+    獲取月工時報表 (作業員) 資料
+    
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
+        
+    Returns:
+        list: 報表資料
+    """
+    data = []
+    
+    # 按作業員分組統計月工時
+    operator_stats = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).exclude(
+        Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+    ).values('operator').annotate(
+        total_work_hours=Sum('work_hours_calculated'),
+        total_good_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity')
+    )
+    
+    for stat in operator_stats:
+        data.append({
+            'operator': stat['operator'],
+            'work_hours': round(stat['total_work_hours'] or 0, 2),
+            'good_quantity': stat['total_good_quantity'] or 0,
+            'defect_quantity': stat['total_defect_quantity'] or 0,
+        })
+    
+    return data
+
+def get_daily_work_hour_smt_report_data(start_date, end_date):
+    """
+    獲取日工時報表 (SMT設備) 資料
+    
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
+        
+    Returns:
+        list: 報表資料
+    """
+    data = []
+    
+    # 從填報記錄中獲取SMT設備工時資料
+    smt_stats = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).filter(
+        Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+    ).values('equipment__name', 'work_date').annotate(
+        total_work_hours=Sum('work_hours_calculated'),
+        total_good_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity')
+    )
+    
+    for stat in smt_stats:
+        data.append({
+            'equipment': stat['equipment__name'] or 'SMT設備',
+            'work_date': stat['work_date'].strftime('%Y-%m-%d'),
+            'work_hours': round(stat['total_work_hours'] or 0, 2),
+            'good_quantity': stat['total_good_quantity'] or 0,
+            'defect_quantity': stat['total_defect_quantity'] or 0,
+        })
+    
+    return data
+
+def get_weekly_work_hour_smt_report_data(start_date, end_date):
+    """
+    獲取週工時報表 (SMT設備) 資料
+    
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
+        
+    Returns:
+        list: 報表資料
+    """
+    data = []
+    
+    # 按SMT設備分組統計週工時
+    smt_stats = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).filter(
+        Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+    ).values('equipment__name').annotate(
+        total_work_hours=Sum('work_hours_calculated'),
+        total_good_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity')
+    )
+    
+    for stat in smt_stats:
+        data.append({
+            'equipment': stat['equipment__name'] or 'SMT設備',
+            'work_hours': round(stat['total_work_hours'] or 0, 2),
+            'good_quantity': stat['total_good_quantity'] or 0,
+            'defect_quantity': stat['total_defect_quantity'] or 0,
+        })
+    
+    return data
+
+def get_monthly_work_hour_smt_report_data(start_date, end_date):
+    """
+    獲取月工時報表 (SMT設備) 資料
+    
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
+        
+    Returns:
+        list: 報表資料
+    """
+    data = []
+    
+    # 按SMT設備分組統計月工時
+    smt_stats = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).filter(
+        Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+    ).values('equipment__name').annotate(
+        total_work_hours=Sum('work_hours_calculated'),
+        total_good_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity')
+    )
+    
+    for stat in smt_stats:
+        data.append({
+            'equipment': stat['equipment__name'] or 'SMT設備',
+            'work_hours': round(stat['total_work_hours'] or 0, 2),
+            'good_quantity': stat['total_good_quantity'] or 0,
+            'defect_quantity': stat['total_defect_quantity'] or 0,
+        })
+    
+    return data
+
+def get_operator_performance_report_data(start_date, end_date):
+    """
+    獲取作業員績效報表資料
+    
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
+        
+    Returns:
+        list: 報表資料
+    """
+    data = []
+    
+    # 從填報記錄中獲取作業員績效資料
+    operator_stats = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).exclude(
+        Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+    ).values('operator').annotate(
+        total_good_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity'),
+        total_work_hours=Sum('work_hours_calculated')
+    )
+    
+    for stat in operator_stats:
+        total_quantity = (stat['total_good_quantity'] or 0) + (stat['total_defect_quantity'] or 0)
+        defect_rate = 0
+        if total_quantity > 0:
+            defect_rate = round((stat['total_defect_quantity'] or 0) / total_quantity * 100, 2)
+        
+        efficiency = 0
+        if stat['total_work_hours'] and stat['total_work_hours'] > 0:
+            efficiency = round((stat['total_good_quantity'] or 0) / stat['total_work_hours'], 2)
+        
+        data.append({
+            'operator': stat['operator'],
+            'good_quantity': stat['total_good_quantity'] or 0,
+            'defect_quantity': stat['total_defect_quantity'] or 0,
+            'defect_rate': defect_rate,
+            'efficiency': efficiency,
+        })
+    
+    return data
+
+def get_smt_equipment_report_data(start_date, end_date):
+    """
+    獲取SMT設備效率報表資料
+    
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
+        
+    Returns:
+        list: 報表資料
+    """
+    data = []
+    
+    # 從填報記錄中獲取SMT設備效率資料
+    smt_stats = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).filter(
+        Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+    ).values('equipment__name').annotate(
+        total_good_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity'),
+        total_work_hours=Sum('work_hours_calculated')
+    )
+    
+    for stat in smt_stats:
+        total_quantity = (stat['total_good_quantity'] or 0) + (stat['total_defect_quantity'] or 0)
+        defect_rate = 0
+        if total_quantity > 0:
+            defect_rate = round((stat['total_defect_quantity'] or 0) / total_quantity * 100, 2)
+        
+        efficiency = 0
+        if stat['total_work_hours'] and stat['total_work_hours'] > 0:
+            efficiency = round((stat['total_good_quantity'] or 0) / stat['total_work_hours'], 2)
+        
+        data.append({
+            'equipment': stat['equipment__name'] or 'SMT設備',
+            'good_quantity': stat['total_good_quantity'] or 0,
+            'defect_quantity': stat['total_defect_quantity'] or 0,
+            'defect_rate': defect_rate,
+            'efficiency': efficiency,
+        })
+    
+    return data
+
+def get_abnormal_report_data(start_date, end_date):
+    """
+    獲取異常報工報表資料
+    
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
+        
+    Returns:
+        list: 報表資料
+    """
+    data = []
+    
+    # 從填報記錄中獲取異常報工資料
+    abnormal_reports = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).exclude(
+        abnormal_notes__isnull=True
+    ).exclude(
+        abnormal_notes__exact=''
+    )
+    
+    for report in abnormal_reports:
+        data.append({
+            'operator': report.operator,
+            'work_date': report.work_date.strftime('%Y-%m-%d'),
+            'workorder': report.workorder,
+            'process': report.process.name if report.process else '',
+            'abnormal_notes': report.abnormal_notes,
+            'good_quantity': report.work_quantity,
+            'defect_quantity': report.defect_quantity,
+        })
+    
+    return data
+
+def get_efficiency_analysis_report_data(start_date, end_date):
+    """
+    獲取效率分析報表資料
+    
+    Args:
+        start_date: 開始日期
+        end_date: 結束日期
+        
+    Returns:
+        list: 報表資料
+    """
+    data = []
+    
+    # 從填報記錄中獲取效率分析資料
+    efficiency_stats = FillWork.objects.filter(
+        work_date__range=[start_date, end_date],
+        approval_status='approved'
+    ).values('operator', 'process__name').annotate(
+        total_good_quantity=Sum('work_quantity'),
+        total_defect_quantity=Sum('defect_quantity'),
+        total_work_hours=Sum('work_hours_calculated')
+    )
+    
+    for stat in efficiency_stats:
+        total_quantity = (stat['total_good_quantity'] or 0) + (stat['total_defect_quantity'] or 0)
+        defect_rate = 0
+        if total_quantity > 0:
+            defect_rate = round((stat['total_defect_quantity'] or 0) / total_quantity * 100, 2)
+        
+        efficiency = 0
+        if stat['total_work_hours'] and stat['total_work_hours'] > 0:
+            efficiency = round((stat['total_good_quantity'] or 0) / stat['total_work_hours'], 2)
+        
+        data.append({
+            'operator': stat['operator'],
+            'process': stat['process__name'] or '',
+            'good_quantity': stat['total_good_quantity'] or 0,
+            'defect_quantity': stat['total_defect_quantity'] or 0,
+            'defect_rate': defect_rate,
+            'efficiency': efficiency,
+        })
+    
+    return data
+
+def get_report_title(report_type):
+    """
+    獲取報表標題
+    """
+    titles = {
+        'daily_work': '日工作報表',
+        'weekly_work': '週工作報表',
+        'monthly_work': '月工作報表',
+        'daily_work_hour_operator': '日工時報表 (作業員)',
+        'weekly_work_hour_operator': '週工時報表 (作業員)',
+        'monthly_work_hour_operator': '月工時報表 (作業員)',
+        'daily_work_hour_smt': '日工時報表 (SMT設備)',
+        'weekly_work_hour_smt': '週工時報表 (SMT設備)',
+        'monthly_work_hour_smt': '月工時報表 (SMT設備)',
+        'operator_performance': '作業員績效報表',
+        'smt_equipment': 'SMT設備效率報表',
+        'abnormal_report': '異常報工報表',
+        'efficiency_analysis': '效率分析報表',
     }
-    return render(request, 'reporting/work_time_report_export.html', context)
+    return titles.get(report_type, '未知報表')
+
+def get_report_headers(report_type):
+    """
+    獲取報表表頭
+    """
+    headers = {
+        'daily_work': ['作業員', '報工日期', '工單號', '產品編號', '開始時間', '結束時間', '工序', '工作數量', '不良品數量'],
+        'weekly_work': ['作業員', '週工作數量', '週不良品數量'],
+        'monthly_work': ['作業員', '月工作數量', '月不良品數量'],
+        'daily_work_hour_operator': ['作業員', '報工日期', '工時(小時)', '良品數量', '不良品數量'],
+        'weekly_work_hour_operator': ['作業員', '週工時(小時)', '週良品數量', '週不良品數量'],
+        'monthly_work_hour_operator': ['作業員', '月工時(小時)', '月良品數量', '月不良品數量'],
+        'daily_work_hour_smt': ['設備', '報工日期', '運行時間(小時)', '良品數量', '不良品數量'],
+        'weekly_work_hour_smt': ['設備', '週運行時間(小時)', '週良品數量', '週不良品數量'],
+        'monthly_work_hour_smt': ['設備', '月運行時間(小時)', '月良品數量', '月不良品數量'],
+        'operator_performance': ['作業員', '良品數量', '不良品數量', '不良率(%)', '平均效率(%)'],
+        'smt_equipment': ['設備', '良品數量', '不良品數量', '不良率(%)', '平均效率(%)'],
+        'abnormal_report': ['作業員', '報工日期', '工單號', '工序', '異常紀錄', '良品數量', '不良品數量'],
+        'efficiency_analysis': ['作業員', '工序', '良品數量', '不良品數量', '不良率(%)', '平均效率(%)'],
+    }
+    return headers.get(report_type, [])
+
+def get_report_filename(report_type, start_date, end_date):
+    """
+    獲取報表檔案名稱
+    """
+    title = get_report_title(report_type)
+    start_str = start_date.strftime('%Y%m%d')
+    end_str = end_date.strftime('%Y%m%d')
+    
+    if start_date == end_date:
+        return f"{title}_{start_str}.xlsx"
+    else:
+        return f"{title}_{start_str}_{end_str}.xlsx"
+
+def export_to_excel(data, headers, filename):
+    """
+    匯出Excel檔案
+    
+    Args:
+        data: 報表資料
+        headers: 表頭
+        filename: 檔案名稱
+        
+    Returns:
+        HttpResponse: Excel檔案回應
+    """
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill
+        
+        # 建立工作簿
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "報表"
+        
+        # 設定表頭樣式
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        
+        # 寫入表頭
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+        
+        # 寫入資料
+        for row, record in enumerate(data, 2):
+            for col, header in enumerate(headers, 1):
+                value = record.get(header, '')
+                ws.cell(row=row, column=col, value=value)
+        
+        # 調整欄寬
+        for col in range(1, len(headers) + 1):
+            ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 15
+        
+        # 建立回應
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # 儲存檔案
+        wb.save(response)
+        return response
+        
+    except ImportError:
+        # 如果沒有 openpyxl，回退到 CSV
+        return export_to_csv(data, headers, filename.replace('.xlsx', '.csv'))
+
+def export_to_csv(data, headers, filename):
+    """
+    匯出CSV檔案
+    
+    Args:
+        data: 報表資料
+        headers: 表頭
+        filename: 檔案名稱
+        
+    Returns:
+        HttpResponse: CSV檔案回應
+    """
+    import csv
+    from io import StringIO
+    
+    # 建立CSV檔案
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # 寫入表頭
+    writer.writerow(headers)
+    
+    # 寫入資料
+    for record in data:
+        row = [record.get(header, '') for header in headers]
+        writer.writerow(row)
+    
+    # 建立回應
+    response = HttpResponse(output.getvalue(), content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response
+
+@login_required
+def report_export(request):
+    """
+    報表匯出頁面
+    """
+    context = {
+        'report_types': get_report_types(),
+        'date_ranges': get_date_ranges(),
+    }
+    return render(request, 'reporting/report_export.html', context)
+
+@login_required
+def execute_report_export(request):
+    """
+    執行報表匯出
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': '只支援 POST 請求'}, status=405)
+    
+    try:
+        # 取得參數
+        report_type = request.POST.get('report_type')
+        date_range = request.POST.get('date_range')
+        start_date_str = request.POST.get('start_date')
+        end_date_str = request.POST.get('end_date')
+        export_format = request.POST.get('export_format', 'excel')
+        
+        # 驗證參數
+        if not report_type:
+            return JsonResponse({'error': '請選擇報表類型'}, status=400)
+        
+        # 取得日期範圍
+        if date_range == 'custom':
+            if not start_date_str or not end_date_str:
+                return JsonResponse({'error': '請選擇自訂日期範圍'}, status=400)
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        else:
+            start_date, end_date = get_date_range(date_range)
+        
+        # 驗證日期範圍（最多4個月）
+        date_diff = (end_date - start_date).days
+        if date_diff > 120:  # 4個月 = 120天
+            return JsonResponse({'error': '查詢期間不能超過4個月'}, status=400)
+        
+        # 根據報表類型獲取資料
+        data = []
+        if report_type == 'daily_work':
+            data = get_daily_work_report_data(start_date, end_date)
+        elif report_type == 'weekly_work':
+            data = get_weekly_work_report_data(start_date, end_date)
+        elif report_type == 'monthly_work':
+            data = get_monthly_work_report_data(start_date, end_date)
+        elif report_type == 'daily_work_hour_operator':
+            data = get_daily_work_hour_operator_report_data(start_date, end_date)
+        elif report_type == 'weekly_work_hour_operator':
+            data = get_weekly_work_hour_operator_report_data(start_date, end_date)
+        elif report_type == 'monthly_work_hour_operator':
+            data = get_monthly_work_hour_operator_report_data(start_date, end_date)
+        elif report_type == 'daily_work_hour_smt':
+            data = get_daily_work_hour_smt_report_data(start_date, end_date)
+        elif report_type == 'weekly_work_hour_smt':
+            data = get_weekly_work_hour_smt_report_data(start_date, end_date)
+        elif report_type == 'monthly_work_hour_smt':
+            data = get_monthly_work_hour_smt_report_data(start_date, end_date)
+        elif report_type == 'operator_performance':
+            data = get_operator_performance_report_data(start_date, end_date)
+        elif report_type == 'smt_equipment':
+            data = get_smt_equipment_report_data(start_date, end_date)
+        elif report_type == 'abnormal_report':
+            data = get_abnormal_report_data(start_date, end_date)
+        elif report_type == 'efficiency_analysis':
+            data = get_efficiency_analysis_report_data(start_date, end_date)
+        else:
+            return JsonResponse({'error': '不支援的報表類型'}, status=400)
+        
+        # 獲取表頭和檔案名稱
+        headers = get_report_headers(report_type)
+        filename = get_report_filename(report_type, start_date, end_date)
+        
+        # 根據格式匯出
+        if export_format == 'csv':
+            filename = filename.replace('.xlsx', '.csv')
+            return export_to_csv(data, headers, filename)
+        else:
+            return export_to_excel(data, headers, filename)
+        
+    except Exception as e:
+        logger.error(f"匯出報表時發生錯誤: {str(e)}")
+        return JsonResponse({'error': f'匯出失敗: {str(e)}'}, status=500) 
+
+def placeholder_view(request, function_name):
+    """
+    通用佔位符視圖 - 用於所有未實現的功能
+    """
+    context = {
+        'function_name': function_name,
+        'message': f'功能 "{function_name}" 正在開發中，敬請期待！'
+    }
+    return render(request, 'reporting/placeholder.html', context) 
 
 
-# 保留原有的視圖函數
 @login_required
 def work_hour_report_index(request):
-    """工作時數報表首頁 - 保留原有功能"""
-    return render(request, 'reporting/work_hour_report.html')
+    """工作時數報表首頁"""
+    return render(request, 'reporting/reporting/work_hour_report.html')
 
 
 @login_required
 def daily_report(request):
-    """日報表 - 保留原有功能"""
+    """日報表預覽"""
     if request.method == 'POST':
-        company_code = request.POST.get('company_code')
-        year = int(request.POST.get('year'))
-        month = int(request.POST.get('month'))
-        day = int(request.POST.get('day'))
-        format = request.POST.get('format', 'excel')
+        operator = request.POST.get('operator')
+        date_str = request.POST.get('date')
         
         try:
+            # 解析日期
+            from datetime import datetime
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            
             service = WorkHourReportService()
-            generator = ReportGeneratorService()
             
             # 取得報表資料
-            data = service.get_daily_report(company_code, year, month, day)
-            summary = service.get_daily_summary(company_code, year, month, day)
+            data = service.get_daily_report_by_operator(operator, date)
+            summary = service.get_daily_summary_by_operator(operator, date)
             
-            if format in ['excel', 'csv']:
-                # 生成檔案
-                result = generator.generate_daily_report(company_code, year, month, day, format)
-                
-                # 下載檔案
-                with open(result['file_path'], 'rb') as f:
-                    response = HttpResponse(f.read(), content_type='application/octet-stream')
-                    response['Content-Disposition'] = f'attachment; filename="{result["filename"]}"'
-                    return response
-            else:
-                # 顯示網頁報表
-                context = {
-                    'report_type': '日報表',
-                    'company_code': company_code,
-                    'year': year,
-                    'month': month,
-                    'day': day,
-                    'work_date': datetime(year, month, day).date(),
-                    'summary': summary,
-                    'data': data,
-                    'generated_at': timezone.now(),
-                }
-                return render(request, 'reporting/daily_report.html', context)
+            # 顯示預覽報表
+            context = {
+                'report_type': '日報表',
+                'operator': operator,
+                'date': date,
+                'summary': summary,
+                'data': data,
+                'generated_at': timezone.now(),
+            }
+            return render(request, 'reporting/reporting/daily_report.html', context)
                 
         except Exception as e:
             messages.error(request, f'生成日報表失敗: {str(e)}')
             return redirect('reporting:work_hour_report_index')
     
     # GET 請求顯示表單
-    current_year = timezone.now().year
-    current_month = timezone.now().month
-    current_day = timezone.now().day
-    
-    context = {
-        'current_year': current_year,
-        'current_month': current_month,
-        'current_day': current_day,
-        'years': range(current_year - 5, current_year + 1),
-        'months': range(1, 13),
-        'days': range(1, 32),
-    }
-    return render(request, 'reporting/daily_report_form.html', context)
-
-
-@csrf_exempt
-def operator_daily_report(request):
-    """作業員日工作時數報表"""
-    if request.method == 'POST':
-        operator = request.POST.get('operator')
-        date = request.POST.get('date')
-        format = request.POST.get('format', 'excel')
-        
-        try:
-            from workorder.fill_work.models import FillWork
-            from workorder.onsite_reporting.models import OnsiteReport
-            from django.db.models import Sum, Count, Avg, Q
-            from decimal import Decimal
-            
-            # 解析日期
-            report_date = datetime.strptime(date, '%Y-%m-%d').date()
-            
-            # 查詢該日期的所有作業員工作記錄（填報作業）
-            fill_works = FillWork.objects.filter(
-                work_date=report_date
-            )
-            
-            # 查詢該日期的所有作業員工作記錄（現場作業）
-            onsite_reports = OnsiteReport.objects.filter(
-                work_date=report_date
-            )
-            
-            # 如果選擇了特定作業員，則過濾資料
-            if operator and operator != 'all':
-                fill_works = fill_works.filter(operator=operator)
-                onsite_reports = onsite_reports.filter(operator=operator)
-            
-            # 合併所有作業員
-            all_operators = set()
-            all_operators.update(fill_works.values_list('operator', flat=True))
-            all_operators.update(onsite_reports.values_list('operator', flat=True))
-            
-            # 按作業員分組統計
-            detailed_data = []
-            total_work_hours = Decimal('0.00')
-            total_overtime_hours = Decimal('0.00')
-            total_onsite_hours = Decimal('0.00')
-            total_work_quantity = 0
-            total_defect_quantity = 0
-            total_fill_work_records = 0
-            total_onsite_records = 0
-            
-            for operator in sorted(all_operators):
-                # 填報作業統計 - 使用實際的工作時數和加班時數欄位
-                operator_fill_works = fill_works.filter(operator=operator)
-                fill_work_stats = operator_fill_works.aggregate(
-                    total_work_hours=Sum('work_hours_calculated'),
-                    total_overtime_hours=Sum('overtime_hours_calculated'),
-                    total_work_quantity=Sum('work_quantity'),
-                    total_defect_quantity=Sum('defect_quantity'),
-                    work_records_count=Count('id')
-                )
-                
-                # 處理None值
-                fill_work_stats = {
-                    'total_work_hours': fill_work_stats['total_work_hours'] or Decimal('0.00'),
-                    'total_overtime_hours': fill_work_stats['total_overtime_hours'] or Decimal('0.00'),
-                    'total_work_quantity': fill_work_stats['total_work_quantity'] or 0,
-                    'total_defect_quantity': fill_work_stats['total_defect_quantity'] or 0,
-                    'work_records_count': fill_work_stats['work_records_count'] or 0
-                }
-                
-                # 現場作業統計 - 使用實際的工作分鐘數欄位
-                operator_onsite_reports = onsite_reports.filter(operator=operator)
-                onsite_stats = operator_onsite_reports.aggregate(
-                    total_work_minutes=Sum('work_minutes'),
-                    total_work_quantity=Sum('work_quantity'),
-                    total_defect_quantity=Sum('defect_quantity'),
-                    work_records_count=Count('id')
-                )
-                
-                # 處理None值
-                onsite_stats = {
-                    'total_work_minutes': onsite_stats['total_work_minutes'] or 0,
-                    'total_work_quantity': onsite_stats['total_work_quantity'] or 0,
-                    'total_defect_quantity': onsite_stats['total_defect_quantity'] or 0,
-                    'work_records_count': onsite_stats['work_records_count'] or 0
-                }
-                
-                # 轉換現場作業分鐘為小時
-                onsite_hours = Decimal(str(onsite_stats['total_work_minutes'] / 60)).quantize(Decimal('0.01'))
-                
-                # 合計統計
-                operator_total_work_hours = fill_work_stats['total_work_hours'] + onsite_hours
-                operator_total_overtime_hours = fill_work_stats['total_overtime_hours']
-                operator_total_all_hours = operator_total_work_hours + operator_total_overtime_hours
-                operator_total_work_quantity = fill_work_stats['total_work_quantity'] + onsite_stats['total_work_quantity']
-                operator_total_defect_quantity = fill_work_stats['total_defect_quantity'] + onsite_stats['total_defect_quantity']
-                operator_total_records = fill_work_stats['work_records_count'] + onsite_stats['work_records_count']
-                
-                # 累計總統計
-                total_work_hours += fill_work_stats['total_work_hours']
-                total_overtime_hours += fill_work_stats['total_overtime_hours']
-                total_onsite_hours += onsite_hours
-                total_work_quantity += operator_total_work_quantity
-                total_defect_quantity += operator_total_defect_quantity
-                total_fill_work_records += fill_work_stats['work_records_count']
-                total_onsite_records += onsite_stats['work_records_count']
-                
-                # 獲取該作業員的詳細工作記錄
-                work_details = []
-                
-                # 填報作業詳細記錄
-                for work in operator_fill_works:
-                    work_details.append({
-                        'type': '填報作業',
-                        'workorder': work.workorder,
-                        'product_id': work.product_id,
-                        'process': work.process.name if work.process else '',
-                        'start_time': work.start_time,
-                        'end_time': work.end_time,
-                        'work_hours': work.work_hours_calculated,
-                        'overtime_hours': work.overtime_hours_calculated,
-                        'work_quantity': work.work_quantity,
-                        'defect_quantity': work.defect_quantity,
-                        'equipment': work.equipment,
-                        'status': work.get_approval_status_display(),
-                    })
-                
-                # 現場作業詳細記錄
-                for report in operator_onsite_reports:
-                    work_details.append({
-                        'type': '現場作業',
-                        'workorder': report.workorder,
-                        'product_id': report.product_id,
-                        'process': report.process,
-                        'start_time': report.start_datetime.time(),
-                        'end_time': report.end_datetime.time() if report.end_datetime else None,
-                        'work_hours': Decimal(str(report.work_minutes / 60)).quantize(Decimal('0.01')),
-                        'overtime_hours': Decimal('0.00'),
-                        'work_quantity': report.work_quantity,
-                        'defect_quantity': report.defect_quantity,
-                        'equipment': report.equipment,
-                        'status': report.get_status_display(),
-                    })
-                
-                # 按開始時間排序
-                work_details.sort(key=lambda x: x['start_time'])
-                
-                detailed_data.append({
-                    'operator': operator,
-                    'total_work_hours': operator_total_work_hours,
-                    'total_overtime_hours': operator_total_overtime_hours,
-                    'total_onsite_hours': onsite_hours,
-                    'total_all_hours': operator_total_all_hours,
-                    'total_work_quantity': operator_total_work_quantity,
-                    'total_defect_quantity': operator_total_defect_quantity,
-                    'fill_work_records_count': fill_work_stats['work_records_count'],
-                    'onsite_records_count': onsite_stats['work_records_count'],
-                    'total_records_count': operator_total_records,
-                    'defect_rate': (operator_total_defect_quantity / operator_total_work_quantity * 100) if operator_total_work_quantity > 0 else 0,
-                    'work_details': work_details,
-                })
-            
-            # 按總工作時數排序
-            detailed_data.sort(key=lambda x: x['total_all_hours'], reverse=True)
-            
-            summary = {
-                'total_work_hours': total_work_hours,
-                'total_overtime_hours': total_overtime_hours,
-                'total_onsite_hours': total_onsite_hours,
-                'total_all_hours': total_work_hours + total_overtime_hours + total_onsite_hours,
-                'total_operators': len(all_operators),
-                'total_work_quantity': total_work_quantity,
-                'total_defect_quantity': total_defect_quantity,
-                'total_fill_work_records': total_fill_work_records,
-                'total_onsite_records': total_onsite_records,
-                'total_records': total_fill_work_records + total_onsite_records,
-                'avg_work_hours_per_operator': (total_work_hours + total_overtime_hours + total_onsite_hours) / len(all_operators) if all_operators else 0,
-                'defect_rate': (total_defect_quantity / total_work_quantity * 100) if total_work_quantity > 0 else 0,
-            }
-            
-            if format in ['excel', 'csv']:
-                # 生成Excel檔案，包含統計和明細兩個工作表
-                try:
-                    import openpyxl
-                    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-                    from openpyxl.utils import get_column_letter
-                    
-                    # 建立工作簿
-                    wb = openpyxl.Workbook()
-                    
-                    # 設定樣式
-                    header_font = Font(bold=True, color="FFFFFF", size=12)
-                    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-                    header_alignment = Alignment(horizontal="center", vertical="center")
-                    border = Border(
-                        left=Side(style='thin'),
-                        right=Side(style='thin'),
-                        top=Side(style='thin'),
-                        bottom=Side(style='thin')
-                    )
-                    
-                    # 工作表1：統計摘要
-                    ws_summary = wb.active
-                    ws_summary.title = "統計摘要"
-                    
-                    # 寫入標題
-                    ws_summary.merge_cells('A1:I1')
-                    title_cell = ws_summary['A1']
-                    title_cell.value = f"作業員日工作時數報表 - {date}"
-                    title_cell.font = Font(bold=True, size=16)
-                    title_cell.alignment = Alignment(horizontal="center")
-                    
-                    # 寫入統計摘要
-                    summary_headers = [
-                        '總工作時數', '總作業員數', '總工作數量', '總記錄數', 
-                        '不良率', '平均時數', '填報作業時數', '現場作業時數', '加班時數'
-                    ]
-                    summary_values = [
-                         f"{float(summary['total_all_hours']):.1f}h",
-                         summary['total_operators'],
-                         summary['total_work_quantity'],
-                         summary['total_records'],
-                         f"{float(summary['defect_rate']):.1f}%",
-                         f"{float(summary['avg_work_hours_per_operator']):.1f}h",
-                         f"{float(summary['total_work_hours']):.1f}h",
-                         f"{float(summary['total_onsite_hours']):.1f}h",
-                         f"{float(summary['total_overtime_hours']):.1f}h"
-                     ]
-                    
-                    for col, (header, value) in enumerate(zip(summary_headers, summary_values), 1):
-                        # 寫入標題
-                        header_cell = ws_summary.cell(row=3, column=col, value=header)
-                        header_cell.font = header_font
-                        header_cell.fill = header_fill
-                        header_cell.alignment = header_alignment
-                        header_cell.border = border
-                        
-                        # 寫入數值
-                        value_cell = ws_summary.cell(row=4, column=col, value=value)
-                        value_cell.font = Font(bold=True, size=14)
-                        value_cell.alignment = Alignment(horizontal="center")
-                        value_cell.border = border
-                    
-                    # 工作表2：作業員統計
-                    ws_stats = wb.create_sheet("作業員統計")
-                    
-                    # 寫入標題
-                    ws_stats.merge_cells('A1:H1')
-                    stats_title_cell = ws_stats['A1']
-                    stats_title_cell.value = f"作業員統計 - {date}"
-                    stats_title_cell.font = Font(bold=True, size=16)
-                    stats_title_cell.alignment = Alignment(horizontal="center")
-                    
-                    # 統計表頭
-                    stats_headers = [
-                        '作業員', '總工作時數', '填報作業', '現場作業', 
-                        '加班時數', '工作數量', '不良品', '記錄數'
-                    ]
-                    
-                    for col, header in enumerate(stats_headers, 1):
-                        cell = ws_stats.cell(row=3, column=col, value=header)
-                        cell.font = header_font
-                        cell.fill = header_fill
-                        cell.alignment = header_alignment
-                        cell.border = border
-                    
-                    # 按作業員排序（英文在前，中文在後）
-                    sorted_stats_data = sorted(detailed_data, key=lambda x: (
-                         not x['operator'][0].isalpha(),  # 英文在前
-                         x['operator']  # 同類型按字母順序
-                     ))
-                     
-                    # 寫入統計資料
-                    for row, item in enumerate(sorted_stats_data, 4):
-                        ws_stats.cell(row=row, column=1, value=item['operator']).border = border
-                        ws_stats.cell(row=row, column=2, value=f"{float(item['total_all_hours']):.1f}h").border = border
-                        ws_stats.cell(row=row, column=3, value=f"{float(item['total_work_hours']):.1f}h").border = border
-                        ws_stats.cell(row=row, column=4, value=f"{float(item['total_onsite_hours']):.1f}h").border = border
-                        ws_stats.cell(row=row, column=5, value=f"{float(item['total_overtime_hours']):.1f}h").border = border
-                        ws_stats.cell(row=row, column=6, value=item['total_work_quantity']).border = border
-                        ws_stats.cell(row=row, column=7, value=item['total_defect_quantity']).border = border
-                        ws_stats.cell(row=row, column=8, value=item['fill_work_records_count'] + item['onsite_records_count']).border = border
-                    
-                    # 工作表3：明細記錄
-                    ws_detail = wb.create_sheet("明細記錄")
-                    
-                    # 寫入標題
-                    ws_detail.merge_cells('A1:K1')
-                    detail_title_cell = ws_detail['A1']
-                    detail_title_cell.value = f"明細記錄 - {date}"
-                    detail_title_cell.font = Font(bold=True, size=16)
-                    detail_title_cell.alignment = Alignment(horizontal="center")
-                    
-                    # 明細表頭
-                    detail_headers = [
-                        '作業員', '工序', '工作日期', '開始時間', '結束時間',
-                        '工作時數', '加班時數', '工作數量', '不良品', '工單號', '產品編號'
-                    ]
-                    
-                    for col, header in enumerate(detail_headers, 1):
-                        cell = ws_detail.cell(row=3, column=col, value=header)
-                        cell.font = header_font
-                        cell.fill = header_fill
-                        cell.alignment = header_alignment
-                        cell.border = border
-                    
-                    # 收集所有工作記錄
-                    allWorkRecords = []
-                    for item in detailed_data:
-                        for work in item['work_details']:
-                            allWorkRecords.append({
-                                'operator': item['operator'],
-                                'process': work['process'],
-                                'work_date': date,
-                                'start_time': work['start_time'],
-                                'end_time': work['end_time'],
-                                'work_hours': work['work_hours'],
-                                'overtime_hours': work['overtime_hours'],
-                                'work_quantity': work['work_quantity'],
-                                'defect_quantity': work['defect_quantity'],
-                                'workorder': work['workorder'],
-                                'product_id': work['product_id']
-                            })
-                    
-                    # 按作業員排序（英文在前，中文在後）
-                    allWorkRecords.sort(key=lambda x: (
-                        not x['operator'][0].isalpha(),  # 英文在前
-                        x['operator']  # 同類型按字母順序
-                    ))
-                    
-                    # 寫入明細資料
-                    for row, work in enumerate(allWorkRecords, 4):
-                         ws_detail.cell(row=row, column=1, value=work['operator']).border = border
-                         ws_detail.cell(row=row, column=2, value=work['process']).border = border
-                         ws_detail.cell(row=row, column=3, value=work['work_date']).border = border
-                         ws_detail.cell(row=row, column=4, value=str(work['start_time'])).border = border
-                         ws_detail.cell(row=row, column=5, value=str(work['end_time']) if work['end_time'] else '-').border = border
-                         ws_detail.cell(row=row, column=6, value=f"{float(work['work_hours']):.1f}h").border = border
-                         ws_detail.cell(row=row, column=7, value=f"{float(work['overtime_hours']):.1f}h").border = border
-                         ws_detail.cell(row=row, column=8, value=work['work_quantity']).border = border
-                         ws_detail.cell(row=row, column=9, value=work['defect_quantity']).border = border
-                         ws_detail.cell(row=row, column=10, value=work['workorder']).border = border
-                         ws_detail.cell(row=row, column=11, value=work['product_id']).border = border
-                    
-                    # 調整欄寬
-                    for ws in [ws_summary, ws_stats, ws_detail]:
-                        for col in range(1, max(len(summary_headers), len(stats_headers), len(detail_headers)) + 1):
-                            ws.column_dimensions[get_column_letter(col)].width = 15
-                    
-                    # 建立回應
-                    response = HttpResponse(
-                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                    )
-                    filename = f"作業員日工作時數報表_{date}_{operator or 'all'}.xlsx"
-                    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-                    
-                    # 儲存檔案
-                    wb.save(response)
-                    return response
-                    
-                except ImportError:
-                    messages.error(request, 'Excel匯出功能需要安裝openpyxl套件')
-                    return redirect('reporting:work_hour_report_index')
-                except Exception as e:
-                    messages.error(request, f'Excel匯出失敗: {str(e)}')
-                    return redirect('reporting:work_hour_report_index')
-            else:
-                # 檢查是否為AJAX請求
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    # 返回JSON資料
-                    return JsonResponse({
-                        'success': True,
-                        'summary': summary,
-                        'data': detailed_data,
-                        'generated_at': timezone.now().isoformat(),
-                    })
-                else:
-                    # 顯示網頁報表
-                    context = {
-                        'report_type': '作業員日工作時數報表',
-                        'operator': operator,
-                        'date': date,
-                        'summary': summary,
-                        'data': detailed_data,
-                        'generated_at': timezone.now(),
-                    }
-                    return render(request, 'reporting/daily_report_form.html', context)
-                
-        except Exception as e:
-            error_msg = f'生成日報表失敗: {str(e)}'
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': False,
-                    'error': error_msg
-                })
-            else:
-                messages.error(request, error_msg)
-                return redirect('reporting:work_hour_report_index')
-    
-    # GET 請求顯示表單
     current_date = timezone.now().date()
-    
-    # 獲取所有作業員列表
-    from workorder.fill_work.models import FillWork
-    from workorder.onsite_reporting.models import OnsiteReport
-    
-    # 從填報作業和現場作業中獲取所有作業員
-    fill_work_operators = FillWork.objects.values_list('operator', flat=True).distinct()
-    onsite_operators = OnsiteReport.objects.values_list('operator', flat=True).distinct()
-    
-    # 合併並去重
-    all_operators = sorted(set(list(fill_work_operators) + list(onsite_operators)))
     
     context = {
         'current_date': current_date,
-        'operators': all_operators,
     }
-    return render(request, 'reporting/daily_report_form.html', context)
+    return render(request, 'reporting/reporting/daily_report_form.html', context)
+
+
+@login_required
+def daily_report_export(request):
+    """日報表匯出"""
+    operator = request.GET.get('operator')
+    date_str = request.GET.get('date')
+    format = request.GET.get('format', 'excel')
+    
+    try:
+        # 解析日期
+        from datetime import datetime
+        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        service = WorkHourReportService()
+        generator = ReportGeneratorService()
+        
+        # 生成檔案
+        result = generator.generate_daily_report_by_operator(operator, date, format)
+        
+        # 下載檔案
+        with open(result['file_path'], 'rb') as f:
+            response = HttpResponse(f.read(), content_type='application/octet-stream')
+            response['Content-Disposition'] = f'attachment; filename="{result["filename"]}"'
+            return response
+            
+    except Exception as e:
+        messages.error(request, f'匯出日報表失敗: {str(e)}')
+        return redirect('reporting:daily_report')
 
 
 @login_required
@@ -846,7 +996,7 @@ def weekly_report(request):
                     'data': data,
                     'generated_at': timezone.now(),
                 }
-                return render(request, 'reporting/weekly_report.html', context)
+                return render(request, 'reporting/reporting/weekly_report.html', context)
                 
         except Exception as e:
             messages.error(request, f'生成週報表失敗: {str(e)}')
@@ -862,7 +1012,7 @@ def weekly_report(request):
         'years': range(current_year - 5, current_year + 1),
         'weeks': range(1, 53),
     }
-    return render(request, 'reporting/weekly_report_form.html', context)
+    return render(request, 'reporting/reporting/weekly_report_form.html', context)
 
 
 @login_required
@@ -902,7 +1052,7 @@ def monthly_report(request):
                     'data': data,
                     'generated_at': timezone.now(),
                 }
-                return render(request, 'reporting/monthly_report.html', context)
+                return render(request, 'reporting/reporting/monthly_report.html', context)
                 
         except Exception as e:
             messages.error(request, f'生成月報表失敗: {str(e)}')
@@ -918,7 +1068,7 @@ def monthly_report(request):
         'years': range(current_year - 5, current_year + 1),
         'months': range(1, 13),
     }
-    return render(request, 'reporting/monthly_report_form.html', context)
+    return render(request, 'reporting/reporting/monthly_report_form.html', context)
 
 
 @login_required
@@ -958,7 +1108,7 @@ def quarterly_report(request):
                     'data': data,
                     'generated_at': timezone.now(),
                 }
-                return render(request, 'reporting/quarterly_report.html', context)
+                return render(request, 'reporting/reporting/quarterly_report.html', context)
                 
         except Exception as e:
             messages.error(request, f'生成季報表失敗: {str(e)}')
@@ -974,7 +1124,7 @@ def quarterly_report(request):
         'years': range(current_year - 5, current_year + 1),
         'quarters': range(1, 5),
     }
-    return render(request, 'reporting/quarterly_report_form.html', context)
+    return render(request, 'reporting/reporting/quarterly_report_form.html', context)
 
 
 @login_required
@@ -1012,7 +1162,7 @@ def yearly_report(request):
                     'data': data,
                     'generated_at': timezone.now(),
                 }
-                return render(request, 'reporting/yearly_report.html', context)
+                return render(request, 'reporting/reporting/yearly_report.html', context)
                 
         except Exception as e:
             messages.error(request, f'生成年報表失敗: {str(e)}')
@@ -1025,7 +1175,7 @@ def yearly_report(request):
         'current_year': current_year,
         'years': range(current_year - 10, current_year + 1),
     }
-    return render(request, 'reporting/yearly_report_form.html', context)
+    return render(request, 'reporting/reporting/yearly_report_form.html', context)
 
 
 @login_required
@@ -1042,7 +1192,7 @@ def report_schedule_list(request):
         'page_obj': page_obj,
         'schedules': page_obj,
     }
-    return render(request, 'reporting/report_schedule_list.html', context)
+    return render(request, 'reporting/reporting/report_schedule_list.html', context)
 
 
 @login_required
@@ -1089,19 +1239,13 @@ def report_schedule_form(request, schedule_id=None):
         'report_types': ReportSchedule.REPORT_TYPES,
         'status_choices': ReportSchedule.STATUS_CHOICES,
     }
-    return render(request, 'reporting/report_schedule_form.html', context)
+    return render(request, 'reporting/reporting/report_schedule_form.html', context)
 
 
 @login_required
 def report_execution_log(request):
     """報表執行日誌"""
     logs = ReportExecutionLog.objects.all().order_by('-execution_time')
-    
-    # 計算統計數據
-    total_logs = logs.count()
-    completed_logs = logs.filter(status='completed').count()
-    running_logs = logs.filter(status='running').count()
-    failed_logs = logs.filter(status='failed').count()
     
     # 分頁
     paginator = Paginator(logs, 50)
@@ -1111,12 +1255,8 @@ def report_execution_log(request):
     context = {
         'page_obj': page_obj,
         'logs': page_obj,
-        'total_logs': total_logs,
-        'completed_logs': completed_logs,
-        'running_logs': running_logs,
-        'failed_logs': failed_logs,
     }
-    return render(request, 'reporting/report_execution_log.html', context)
+    return render(request, 'reporting/reporting/report_execution_log.html', context)
 
 
 @login_required
@@ -1172,15 +1312,13 @@ def sync_report_data(request):
     
     return redirect('reporting:work_hour_report_index') 
 
-@csrf_exempt
+@login_required
 def chart_data(request):
     """提供圖表資料的 API"""
     from django.http import JsonResponse
     from datetime import datetime, timedelta
-    from django.views.decorators.csrf import csrf_exempt
     
-    # 從請求參數中獲取圖表類型
-    chart_type = request.GET.get('chart_type', '')
+    chart_type = request.GET.get('chart_type')
     
     if chart_type == 'work_hours_trend':
         # 工作時數趨勢圖資料
@@ -1318,7 +1456,7 @@ def completed_workorder_report_index(request):
             'company_data': {},
         }
     
-    return render(request, 'reporting/completed_workorder_report.html', context)
+    return render(request, 'reporting/reporting/completed_workorder_report.html', context)
 
 
 @login_required
@@ -1373,7 +1511,7 @@ def completed_workorder_report_list(request):
             'selected_quarter': None,
         }
     
-    return render(request, 'reporting/completed_workorder_report_list.html', context)
+    return render(request, 'reporting/reporting/completed_workorder_report_list.html', context)
 
 
 @login_required
@@ -1390,30 +1528,31 @@ def completed_workorder_report_detail(request, report_id):
         messages.error(request, '取得報表詳情失敗')
         return redirect('reporting:completed_workorder_report_list')
     
-    return render(request, 'reporting/completed_workorder_report_detail.html', context) 
+    return render(request, 'reporting/reporting/completed_workorder_report_detail.html', context) 
 
 @login_required
 def sync_completed_workorder_data(request):
     """同步已完工工單資料"""
-    if request.method == 'POST':
-        try:
-            from .services import CompletedWorkOrderReportService
-            
-            # 使用服務類別進行同步
-            result = CompletedWorkOrderReportService.sync_completed_workorder_data()
-            
-            if result['success']:
-                messages.success(request, result['message'])
-            else:
-                messages.error(request, result['error'])
-            
-        except Exception as e:
-            messages.error(request, f'同步已完工工單資料失敗: {str(e)}')
+    try:
+        from workorder.models import CompletedWorkOrder
         
-        return redirect('reporting:completed_workorder_report_index')
-    else:
-        # GET 請求也重定向到報表首頁
-        return redirect('reporting:completed_workorder_report_index') 
+        # 取得所有已完工工單
+        completed_workorders = CompletedWorkOrder.objects.all()
+        
+        synced_count = 0
+        for completed_workorder in completed_workorders:
+            try:
+                CompletedWorkOrderReportData.create_from_completed_workorder(completed_workorder)
+                synced_count += 1
+            except Exception as e:
+                logger.error(f"同步已完工工單資料失敗: {completed_workorder.id} - {str(e)}")
+        
+        messages.success(request, f'已完工工單資料同步完成，共處理 {synced_count} 筆記錄')
+        
+    except Exception as e:
+        messages.error(request, f'同步已完工工單資料失敗: {str(e)}')
+    
+    return redirect('reporting:completed_workorder_report_index') 
 
 # ==================== 評分報表視圖 ====================
 
@@ -1704,57 +1843,3 @@ def score_period_detail(request, period_type):
     }
     
     return render(request, 'reporting/score_period_detail.html', context)
-
-
-@login_required
-def work_hour_stats(request):
-    """工作時數統計 API"""
-    from django.http import JsonResponse
-    from django.db.models import Sum, Avg, Count
-    from workorder.fill_work.models import FillWork
-    from datetime import datetime, timedelta
-    
-    try:
-        # 取得工作時數統計資料
-        stats = WorkOrderReportData.objects.aggregate(
-            total_records=Count('id'),
-            total_hours=Sum('daily_work_hours'),
-            avg_daily_hours=Avg('daily_work_hours')
-        )
-        
-        # 取得真實的獨立作業員數量（從填報資料中統計）
-        unique_operators = FillWork.objects.values('operator').distinct().count()
-        
-        # 計算上周工作時數
-        today = datetime.now().date()
-        # 計算上周一：今天是週一(0)時，上周一是7天前；今天是週二(1)時，上周一是8天前，以此類推
-        days_since_monday = today.weekday()  # 0=週一, 1=週二, ..., 6=週日
-        last_week_start = today - timedelta(days=days_since_monday + 7)  # 上周一
-        last_week_end = last_week_start + timedelta(days=6)  # 上周日
-        
-        last_week_stats = WorkOrderReportData.objects.filter(
-            work_date__range=[last_week_start, last_week_end]
-        ).aggregate(
-            last_week_hours=Sum('daily_work_hours')
-        )
-        
-        # 格式化數據
-        response_data = {
-            'total_records': stats['total_records'] or 0,
-            'total_hours': float(stats['total_hours'] or 0),
-            'total_operators': unique_operators,
-            'avg_daily_hours': float(stats['avg_daily_hours'] or 0),
-            'last_week_hours': float(last_week_stats['last_week_hours'] or 0)
-        }
-        
-        return JsonResponse(response_data)
-        
-    except Exception as e:
-        logger.error(f"取得工作時數統計失敗: {str(e)}")
-        return JsonResponse({
-            'total_records': 0,
-            'total_hours': 0,
-            'total_operators': 0,
-            'avg_daily_hours': 0,
-            'last_week_hours': 0
-        })
