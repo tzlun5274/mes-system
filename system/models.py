@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 User = get_user_model()
 
@@ -240,6 +241,7 @@ class ScheduledTask(models.Model):
     
     # 間隔設定
     interval_minutes = models.IntegerField(
+        default=30,
         verbose_name="間隔分鐘數",
         help_text="每多少分鐘執行一次"
     )
@@ -581,6 +583,160 @@ class CleanupLog(models.Model):
     
     def __str__(self):
         return f"{self.action} - {self.get_status_display()} - {self.execution_time.strftime('%Y-%m-%d %H:%M:%S')}"
+
+
+class AutoApprovalTask(models.Model):
+    """自動審核定時任務模型 - 支援多個執行間隔"""
+    
+    name = models.CharField(
+        max_length=100, 
+        verbose_name="任務名稱",
+        help_text="為此定時任務設定一個描述性名稱"
+    )
+    
+    interval_minutes = models.IntegerField(
+        verbose_name="執行間隔（分鐘）",
+        help_text="每多少分鐘執行一次自動審核",
+        validators=[MinValueValidator(1), MaxValueValidator(1440)],  # 1分鐘到24小時
+        default=30
+    )
+    
+    is_enabled = models.BooleanField(
+        default=True,
+        verbose_name="啟用狀態",
+        help_text="是否啟用此定時任務"
+    )
+    
+    description = models.TextField(
+        blank=True,
+        verbose_name="任務描述",
+        help_text="可選的任務描述"
+    )
+    
+    # 執行狀態追蹤
+    last_run_at = models.DateTimeField(
+        null=True, 
+        blank=True, 
+        verbose_name="最後執行時間"
+    )
+    
+    next_run_at = models.DateTimeField(
+        null=True, 
+        blank=True, 
+        verbose_name="下次執行時間"
+    )
+    
+    execution_count = models.IntegerField(
+        default=0,
+        verbose_name="執行次數",
+        help_text="此任務已執行的總次數"
+    )
+    
+    success_count = models.IntegerField(
+        default=0,
+        verbose_name="成功次數",
+        help_text="此任務成功執行的次數"
+    )
+    
+    error_count = models.IntegerField(
+        default=0,
+        verbose_name="錯誤次數",
+        help_text="此任務執行失敗的次數"
+    )
+    
+    last_error_message = models.TextField(
+        blank=True,
+        verbose_name="最後錯誤訊息",
+        help_text="記錄最後一次執行失敗的錯誤訊息"
+    )
+    
+    # 系統欄位
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        verbose_name="建立時間"
+    )
+    
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        verbose_name="更新時間"
+    )
+    
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="建立者",
+        related_name='created_auto_approval_tasks'
+    )
+    
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="更新者",
+        related_name='updated_auto_approval_tasks'
+    )
+
+    class Meta:
+        verbose_name = "自動審核定時任務"
+        verbose_name_plural = "自動審核定時任務"
+        db_table = 'system_auto_approval_task'
+        ordering = ['-created_at']
+        unique_together = ['name']  # 任務名稱必須唯一
+
+    def __str__(self):
+        status = "啟用" if self.is_enabled else "停用"
+        return f"{self.name} (每{self.interval_minutes}分鐘 - {status})"
+
+    def get_interval_display(self):
+        """取得間隔顯示文字"""
+        if self.interval_minutes < 60:
+            return f"每 {self.interval_minutes} 分鐘"
+        elif self.interval_minutes == 60:
+            return "每小時"
+        else:
+            hours = self.interval_minutes // 60
+            minutes = self.interval_minutes % 60
+            if minutes == 0:
+                return f"每 {hours} 小時"
+            else:
+                return f"每 {hours} 小時 {minutes} 分鐘"
+
+    def get_status_display(self):
+        """取得狀態顯示"""
+        if not self.is_enabled:
+            return "停用"
+        elif self.last_run_at:
+            return f"啟用 (最後執行: {self.last_run_at.strftime('%Y-%m-%d %H:%M')})"
+        else:
+            return "啟用 (尚未執行)"
+
+    def get_success_rate(self):
+        """取得成功率"""
+        if self.execution_count == 0:
+            return 0
+        return round((self.success_count / self.execution_count) * 100, 1)
+
+    def clean(self):
+        """驗證模型"""
+        from django.core.exceptions import ValidationError
+        
+        if not self.name:
+            raise ValidationError("任務名稱不能為空")
+        
+        if self.interval_minutes < 1:
+            raise ValidationError("執行間隔必須大於0分鐘")
+        
+        if self.interval_minutes > 1440:
+            raise ValidationError("執行間隔不能超過1440分鐘（24小時）")
+
+    def save(self, *args, **kwargs):
+        """儲存時自動設定描述"""
+        if not self.description:
+            self.description = f"自動審核定時任務 - {self.get_interval_display()}"
+        super().save(*args, **kwargs)
 
 
 

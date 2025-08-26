@@ -419,41 +419,84 @@
                     <div>
                         <div class="setting-title">自動審核定時任務</div>
                         <div class="setting-description">定期執行自動審核，處理待審核的報工記錄</div>
+                        <div class="mt-2">
+                            <a href="{% url 'system:auto_approval_tasks' %}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-cog mr-1"></i>管理多個任務
+                            </a>
+                        </div>
                     </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" name="auto_approval_task_enabled" {% if auto_approval_task.enabled %}checked{% endif %}>
-                        <span class="slider"></span>
-                    </label>
                 </div>
                 <div class="mt-3">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label class="form-label">執行間隔</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="auto_approval_task_interval" 
-                                       value="{{ auto_approval_task.interval_minutes }}" min="5" max="1440">
-                                <div class="input-group-append">
-                                    <span class="input-group-text">分鐘</span>
+                    <!-- 多個執行間隔管理 -->
+                    <div id="auto-approval-tasks">
+                        {% for task in auto_approval_tasks %}
+                        <div class="task-item mb-3 p-3 border rounded" data-task-id="{{ task.id }}">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label class="form-label">任務名稱</label>
+                                    <input type="text" class="form-control" name="task_name_{{ task.id }}" 
+                                           value="{{ task.name }}" placeholder="例如：快速審核">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">執行間隔</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" name="task_interval_{{ task.id }}" 
+                                               value="{{ task.interval_minutes }}" min="5" max="1440">
+                                        <div class="input-group-append">
+                                            <span class="input-group-text">分鐘</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">啟用狀態</label>
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" name="task_enabled_{{ task.id }}" 
+                                               {% if task.is_enabled %}checked{% endif %}>
+                                        <label class="form-check-label">啟用</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">任務狀態</label>
+                                    <div class="task-status">
+                                        <span class="badge {% if task.is_enabled %}badge-success{% else %}badge-secondary{% endif %}">
+                                            {{ task.status_display }}
+                                        </span>
+                                        {% if task.last_run_at %}
+                                        <br><small class="text-muted">最後執行：{{ task.last_run_at|date:"Y-m-d H:i" }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">操作</label>
+                                    <div class="btn-group-vertical w-100">
+                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteTask({{ task.id }})">
+                                            <i class="fas fa-trash"></i> 刪除
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="executeTask({{ task.id }})">
+                                            <i class="fas fa-play"></i> 執行
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <small class="form-text text-muted">建議設定：30-60分鐘</small>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">任務狀態</label>
-                            <div class="task-status">
-                                <span class="badge {% if auto_approval_task.enabled %}badge-success{% else %}badge-secondary{% endif %}">
-                                    {% if auto_approval_task.enabled %}啟用{% else %}停用{% endif %}
-                                </span>
-                                {% if auto_approval_task.last_run %}
-                                <br><small class="text-muted">最後執行：{{ auto_approval_task.last_run|date:"Y-m-d H:i" }}</small>
-                                {% endif %}
-                            </div>
-                        </div>
+                        {% endfor %}
                     </div>
+                    
+                    <!-- 新增任務按鈕 -->
                     <div class="row mt-3">
                         <div class="col-md-12">
-                            <button type="button" class="btn btn-primary" onclick="executeAutoApproval()">
-                                <i class="fas fa-play mr-2"></i>手動執行自動審核
+                            <button type="button" class="btn btn-success" onclick="addNewTask()">
+                                <i class="fas fa-plus mr-2"></i>新增執行間隔
+                            </button>
+                            <small class="form-text text-muted">建議設定：30-60分鐘，最少要有一條執行間隔</small>
+                        </div>
+                    </div>
+                    
+                    <!-- 手動執行按鈕 -->
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <button type="button" class="btn btn-primary" onclick="executeAllAutoApproval()">
+                                <i class="fas fa-play mr-2"></i>手動執行所有自動審核
                             </button>
                             <div id="auto-approval-result" class="mt-2"></div>
                         </div>
@@ -639,6 +682,141 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// 新增自動審核定時任務
+function addNewTask() {
+    const taskName = prompt('請輸入任務名稱：', '新自動審核任務');
+    if (!taskName) return;
+    
+    const intervalMinutes = prompt('請輸入執行間隔（分鐘）：', '30');
+    if (!intervalMinutes || isNaN(intervalMinutes)) {
+        alert('請輸入有效的執行間隔！');
+        return;
+    }
+    
+    const interval = parseInt(intervalMinutes);
+    if (interval < 5 || interval > 1440) {
+        alert('執行間隔必須在 5-1440 分鐘之間！');
+        return;
+    }
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:add_auto_approval_task" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `name=${encodeURIComponent(taskName)}&interval_minutes=${interval}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload(); // 重新載入頁面以顯示新任務
+        } else {
+            alert('新增失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('新增失敗：網路錯誤');
+    });
+}
+
+// 刪除自動審核定時任務
+function deleteTask(taskId) {
+    if (!confirm('確定要刪除此自動審核定時任務嗎？')) {
+        return;
+    }
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:delete_auto_approval_task" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `task_id=${taskId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload(); // 重新載入頁面
+        } else {
+            alert('刪除失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('刪除失敗：網路錯誤');
+    });
+}
+
+// 執行指定的自動審核定時任務
+function executeTask(taskId) {
+    if (!confirm('確定要執行此自動審核定時任務嗎？')) {
+        return;
+    }
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:execute_specific_auto_approval_task" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `task_id=${taskId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload(); // 重新載入頁面以更新執行狀態
+        } else {
+            alert('執行失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('執行失敗：網路錯誤');
+    });
+}
+
+// 執行所有自動審核定時任務
+function executeAllAutoApproval() {
+    if (!confirm('確定要執行所有自動審核定時任務嗎？')) {
+        return;
+    }
+    
+    const resultDiv = document.getElementById('auto-approval-result');
+    resultDiv.innerHTML = '<div class="alert alert-info">正在執行自動審核...</div>';
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:execute_all_auto_approval_tasks" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+            setTimeout(() => {
+                location.reload(); // 3秒後重新載入頁面以更新執行狀態
+            }, 3000);
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">執行失敗：${data.message}</div>`;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        resultDiv.innerHTML = '<div class="alert alert-danger">執行失敗：網路錯誤</div>';
+    });
+}
 
 // 手動執行自動分配
 function executeAutoAllocation() {
@@ -857,45 +1035,7 @@ function disableAutoCompletion() {
 
 // 手動執行自動審核
 function executeAutoApproval() {
-    const resultDiv = document.getElementById('auto-approval-result');
-    const button = event.target;
-    const originalText = button.innerHTML;
-    
-    // 顯示載入中
-    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>執行中...';
-    button.disabled = true;
-    resultDiv.innerHTML = '';
-    
-    // 發送 AJAX 請求
-    fetch('{% url "system:execute_auto_approval" %}', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.success) {
-            resultDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
-        } else {
-            resultDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
-        }
-    })
-    .catch(error => {
-        console.error('執行自動審核失敗:', error);
-        resultDiv.innerHTML = `<div class="alert alert-danger">執行失敗：${error.message}</div>`;
-    })
-    .finally(() => {
-        // 恢復按鈕狀態
-        button.innerHTML = originalText;
-        button.disabled = false;
-    });
+    executeAllAutoApproval();
 }
 </script>
 {% endblock %} 

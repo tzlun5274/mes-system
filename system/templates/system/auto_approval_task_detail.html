@@ -1,0 +1,327 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} - MES 系統{% endblock %}
+
+{% block extra_css %}
+<style>
+    .task-detail-card {
+        border: 1px solid #e3e6f0;
+        border-radius: 0.35rem;
+        margin-bottom: 1rem;
+    }
+    
+    .task-detail-header {
+        background-color: #f8f9fc;
+        padding: 1.5rem;
+        border-bottom: 1px solid #e3e6f0;
+    }
+    
+    .task-detail-body {
+        padding: 1.5rem;
+    }
+    
+    .form-group label {
+        font-weight: 600;
+        color: #5a5c69;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-control:focus {
+        border-color: #bac8f3;
+        box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+    }
+    
+    .status-toggle {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+    }
+    
+    .status-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+    }
+    
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+        background-color: #2196F3;
+    }
+    
+    input:checked + .slider:before {
+        transform: translateX(26px);
+    }
+    
+    .task-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        background-color: #f8f9fc;
+        border: 1px solid #e3e6f0;
+        border-radius: 0.35rem;
+        padding: 1rem;
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #5a5c69;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-label {
+        color: #858796;
+        font-size: 0.875rem;
+    }
+    
+    .success-rate {
+        font-weight: bold;
+    }
+    
+    .success-rate.high {
+        color: #28a745;
+    }
+    
+    .success-rate.medium {
+        color: #ffc107;
+    }
+    
+    .success-rate.low {
+        color: #dc3545;
+    }
+    
+    .btn-group {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .error-message {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+        padding: 0.75rem;
+        border-radius: 0.35rem;
+        margin-bottom: 1rem;
+    }
+    
+    .warning-message {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        color: #856404;
+        padding: 0.75rem;
+        border-radius: 0.35rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-cog mr-2"></i>{{ page_title }}
+        </h1>
+        <a href="{% url 'system:auto_approval_tasks' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left mr-2"></i>返回列表
+        </a>
+    </div>
+
+    <!-- 任務統計資訊 -->
+    <div class="task-stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{{ task.interval_minutes }}</div>
+            <div class="stat-label">執行間隔（分鐘）</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ task.execution_count }}</div>
+            <div class="stat-label">總執行次數</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ task.success_count }}</div>
+            <div class="stat-label">成功次數</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ task.error_count }}</div>
+            <div class="stat-label">錯誤次數</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value success-rate 
+                {% if task.get_success_rate >= 80 %}high
+                {% elif task.get_success_rate >= 60 %}medium
+                {% else %}low{% endif %}">
+                {{ task.get_success_rate }}%
+            </div>
+            <div class="stat-label">成功率</div>
+        </div>
+    </div>
+
+    <!-- 任務詳情卡片 -->
+    <div class="task-detail-card">
+        <div class="task-detail-header">
+            <h5 class="mb-0">
+                <i class="fas fa-edit mr-2"></i>編輯任務設定
+            </h5>
+        </div>
+        
+        <div class="task-detail-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="name">任務名稱 *</label>
+                            <input type="text" class="form-control" id="name" name="name" 
+                                   value="{{ task.name }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="interval_minutes">執行間隔（分鐘） *</label>
+                            <input type="number" class="form-control" id="interval_minutes" 
+                                   name="interval_minutes" value="{{ task.interval_minutes }}" 
+                                   min="1" max="1440" required>
+                            <small class="form-text text-muted">建議設定：30-60分鐘</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">任務描述</label>
+                    <textarea class="form-control" id="description" name="description" 
+                              rows="3" placeholder="可選的任務描述...">{{ task.description }}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>啟用狀態</label>
+                    <div class="mt-2">
+                        <label class="status-toggle">
+                            <input type="checkbox" name="is_enabled" 
+                                   {% if task.is_enabled %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                        <span class="ml-2">
+                            {% if task.is_enabled %}啟用{% else %}停用{% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save mr-2"></i>儲存變更
+                    </button>
+                    <a href="{% url 'system:auto_approval_tasks' %}" class="btn btn-secondary">
+                        <i class="fas fa-times mr-2"></i>取消
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 執行記錄 -->
+    <div class="task-detail-card">
+        <div class="task-detail-header">
+            <h5 class="mb-0">
+                <i class="fas fa-history mr-2"></i>執行記錄
+            </h5>
+        </div>
+        
+        <div class="task-detail-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>建立時間：</strong>{{ task.created_at|date:"Y-m-d H:i:s" }}</p>
+                    <p><strong>最後更新：</strong>{{ task.updated_at|date:"Y-m-d H:i:s" }}</p>
+                    {% if task.created_by %}
+                    <p><strong>建立者：</strong>{{ task.created_by.username }}</p>
+                    {% endif %}
+                    {% if task.updated_by %}
+                    <p><strong>最後更新者：</strong>{{ task.updated_by.username }}</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    {% if task.last_run_at %}
+                    <p><strong>最後執行時間：</strong>{{ task.last_run_at|date:"Y-m-d H:i:s" }}</p>
+                    {% else %}
+                    <p><strong>最後執行時間：</strong>尚未執行</p>
+                    {% endif %}
+                    {% if task.next_run_at %}
+                    <p><strong>下次執行時間：</strong>{{ task.next_run_at|date:"Y-m-d H:i:s" }}</p>
+                    {% else %}
+                    <p><strong>下次執行時間：</strong>未設定</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% if task.last_error_message %}
+            <div class="error-message">
+                <h6><i class="fas fa-exclamation-triangle mr-2"></i>最後錯誤訊息</h6>
+                <p class="mb-0">{{ task.last_error_message }}</p>
+            </div>
+            {% endif %}
+            
+            <div class="btn-group">
+                <form method="post" action="{% url 'system:auto_approval_tasks' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="execute">
+                    <input type="hidden" name="task_id" value="{{ task.id }}">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-play mr-2"></i>手動執行
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 切換開關的即時更新
+document.querySelector('input[name="is_enabled"]').addEventListener('change', function() {
+    const statusText = this.nextElementSibling.nextElementSibling;
+    if (this.checked) {
+        statusText.textContent = '啟用';
+    } else {
+        statusText.textContent = '停用';
+    }
+});
+
+// 自動隱藏成功訊息
+setTimeout(function() {
+    const alerts = document.querySelectorAll('.alert-success');
+    alerts.forEach(function(alert) {
+        alert.style.display = 'none';
+    });
+}, 5000);
+</script>
+{% endblock %}

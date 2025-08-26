@@ -43,6 +43,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, CreateView, DeleteView
 from .models import ScheduledTask
 from .forms import ScheduledTaskForm
+from system.models import AutoApprovalTask
 
 # 設定系統管理模組的日誌記錄器
 system_logger = logging.getLogger("system")
@@ -1718,8 +1719,24 @@ def workorder_settings(request):
         # 定時任務設定
         auto_allocation_enabled = request.POST.get('auto_allocation_enabled') == 'on'
         auto_allocation_interval = int(request.POST.get('auto_allocation_interval', 30))
-        auto_approval_task_enabled = request.POST.get('auto_approval_task_enabled') == 'on'
-        auto_approval_task_interval = int(request.POST.get('auto_approval_task_interval', 30))
+        
+        # 處理多個自動審核定時任務
+        from system.models import ScheduledTask
+        
+        # 取得所有自動審核定時任務
+        auto_approval_tasks = ScheduledTask.objects.filter(task_type='auto_approve')
+        
+        # 處理每個任務的更新
+        for task in auto_approval_tasks:
+            task_name = request.POST.get(f'task_name_{task.id}')
+            task_interval = request.POST.get(f'task_interval_{task.id}')
+            task_enabled = request.POST.get(f'task_enabled_{task.id}') == 'on'
+            
+            if task_name and task_interval:
+                task.name = task_name
+                task.interval_minutes = int(task_interval)
+                task.is_enabled = task_enabled
+                task.save()
         
         # 完工判斷設定
         completion_check_enabled = request.POST.get('completion_check_enabled') == 'on'
@@ -1968,16 +1985,21 @@ def workorder_settings(request):
             'last_run': None
         })
     
-    # 取得自動審核定時任務狀態
-    try:
-        auto_approval_task = PeriodicTask.objects.get(name='auto_approve_work_reports')
-        auto_approval_task.interval_minutes = auto_approval_task.interval.every
-    except PeriodicTask.DoesNotExist:
-        auto_approval_task = type('obj', (object,), {
-            'enabled': False,
-            'interval_minutes': 30,
-            'last_run': None
-        })
+    # 取得自動審核定時任務（使用 ScheduledTask 模型）
+    from system.models import ScheduledTask
+    auto_approval_tasks = ScheduledTask.objects.filter(task_type='auto_approve').order_by('created_at')
+    
+    # 如果沒有自動審核定時任務，建立一個預設的
+    if not auto_approval_tasks.exists():
+        default_task = ScheduledTask.objects.create(
+            name='預設自動審核',
+            task_type='auto_approve',
+            task_function='system.tasks.auto_approve_work_reports',
+            interval_minutes=30,
+            is_enabled=True,
+            description='預設的自動審核定時任務'
+        )
+        auto_approval_tasks = ScheduledTask.objects.filter(task_type='auto_approve').order_by('created_at')
     
     context = {
         'auto_approval': auto_approval,
@@ -1986,7 +2008,7 @@ def workorder_settings(request):
         'max_file_size': max_file_size,
         'session_timeout': session_timeout,
         'auto_allocation_task': auto_allocation_task,
-        'auto_approval_task': auto_approval_task,
+        'auto_approval_tasks': auto_approval_tasks,
         'completion_check_enabled': completion_check_enabled,
         'completion_check_interval': completion_check_interval,
         'packaging_process_name': packaging_process_name,
@@ -2652,6 +2674,430 @@ def test_cron_expression(request):
             })
     
     return JsonResponse({'success': False, 'error': '無效的請求方法'})
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def add_auto_approval_task(request):
+    """
+    新增自動審核定時任務 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from system.models import ScheduledTask
+        
+        name = request.POST.get('name', '新自動審核任務')
+        interval_minutes = int(request.POST.get('interval_minutes', 30))
+        
+        if interval_minutes < 5 or interval_minutes > 1440:
+            return JsonResponse({
+                'success': False,
+                'message': '執行間隔必須在 5-1440 分鐘之間'
+            })
+        
+        # 建立新任務
+        new_task = ScheduledTask.objects.create(
+            name=name,
+            task_type='auto_approve',
+            task_function='system.tasks.auto_approve_work_reports',
+            interval_minutes=interval_minutes,
+            is_enabled=True,
+            description=f'自動審核定時任務 - {name}'
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'成功新增自動審核定時任務：{name}',
+            'task_id': new_task.id
+        })
+        
+    except Exception as e:
+        logger.error(f"新增自動審核定時任務失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'新增失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def delete_auto_approval_task(request):
+    """
+    刪除自動審核定時任務 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from system.models import ScheduledTask
+        
+        task_id = request.POST.get('task_id')
+        if not task_id:
+            return JsonResponse({
+                'success': False,
+                'message': '缺少任務 ID'
+            })
+        
+        # 檢查是否是最後一個任務
+        total_tasks = ScheduledTask.objects.filter(task_type='auto_approve').count()
+        if total_tasks <= 1:
+            return JsonResponse({
+                'success': False,
+                'message': '至少需要保留一個自動審核定時任務'
+            })
+        
+        # 刪除任務
+        task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
+        task_name = task.name
+        task.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'成功刪除自動審核定時任務：{task_name}'
+        })
+        
+    except ScheduledTask.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的任務'
+        })
+    except Exception as e:
+        logger.error(f"刪除自動審核定時任務失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'刪除失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_specific_auto_approval_task(request):
+    """
+    執行指定的自動審核定時任務 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from system.models import ScheduledTask
+        from system.tasks import auto_approve_work_reports
+        from django.utils import timezone
+        
+        task_id = request.POST.get('task_id')
+        if not task_id:
+            return JsonResponse({
+                'success': False,
+                'message': '缺少任務 ID'
+            })
+        
+        # 取得任務
+        task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
+        
+        # 執行自動審核
+        result = auto_approve_work_reports()
+        
+        # 更新任務執行記錄
+        task.last_run_at = timezone.now()
+        task.execution_count += 1
+        
+        if result['success']:
+            task.success_count += 1
+            task.last_error_message = ''
+        else:
+            task.error_count += 1
+            task.last_error_message = result.get('error', '未知錯誤')
+        
+        task.save()
+        
+        if result['success']:
+            return JsonResponse({
+                'success': True,
+                'message': f"任務 {task.name} 執行完成：{result['message']}"
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': f"任務 {task.name} 執行失敗：{result.get('error', '未知錯誤')}"
+            })
+            
+    except ScheduledTask.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的任務'
+        })
+    except Exception as e:
+        logger.error(f"執行指定自動審核定時任務失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'執行失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_all_auto_approval_tasks(request):
+    """
+    執行所有自動審核定時任務 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from system.models import ScheduledTask
+        from system.tasks import auto_approve_work_reports
+        from django.utils import timezone
+        
+        # 取得所有啟用的自動審核定時任務
+        enabled_tasks = ScheduledTask.objects.filter(
+            task_type='auto_approve',
+            is_enabled=True
+        )
+        
+        if not enabled_tasks.exists():
+            return JsonResponse({
+                'success': False,
+                'message': '沒有啟用的自動審核定時任務'
+            })
+        
+        # 執行自動審核
+        result = auto_approve_work_reports()
+        
+        # 更新所有任務的執行記錄
+        for task in enabled_tasks:
+            task.last_run_at = timezone.now()
+            task.execution_count += 1
+            
+            if result['success']:
+                task.success_count += 1
+                task.last_error_message = ''
+            else:
+                task.error_count += 1
+                task.last_error_message = result.get('error', '未知錯誤')
+            
+            task.save()
+        
+        if result['success']:
+            return JsonResponse({
+                'success': True,
+                'message': f"所有自動審核定時任務執行完成：{result['message']}"
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': f"自動審核定時任務執行失敗：{result.get('error', '未知錯誤')}"
+            })
+            
+    except Exception as e:
+        logger.error(f"執行所有自動審核定時任務失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'執行失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def auto_approval_tasks(request):
+    """
+    自動審核定時任務管理頁面
+    管理多個自動審核定時任務
+    """
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'create':
+            # 建立新的定時任務
+            name = request.POST.get('name')
+            interval_minutes = request.POST.get('interval_minutes')
+            description = request.POST.get('description', '')
+            
+            if not name or not interval_minutes:
+                messages.error(request, "任務名稱和執行間隔為必填欄位")
+                return redirect('system:auto_approval_tasks')
+            
+            try:
+                interval_minutes = int(interval_minutes)
+                if interval_minutes < 1 or interval_minutes > 1440:
+                    messages.error(request, "執行間隔必須在1-1440分鐘之間")
+                    return redirect('system:auto_approval_tasks')
+                
+                # 檢查任務名稱是否重複
+                if AutoApprovalTask.objects.filter(name=name).exists():
+                    messages.error(request, f"任務名稱 '{name}' 已存在")
+                    return redirect('system:auto_approval_tasks')
+                
+                # 建立新任務
+                task = AutoApprovalTask.objects.create(
+                    name=name,
+                    interval_minutes=interval_minutes,
+                    description=description,
+                    created_by=request.user
+                )
+                
+                messages.success(request, f"定時任務 '{name}' 建立成功")
+                
+            except ValueError:
+                messages.error(request, "執行間隔必須是有效的數字")
+            except Exception as e:
+                messages.error(request, f"建立任務失敗：{str(e)}")
+                
+        elif action == 'update':
+            # 更新定時任務
+            task_id = request.POST.get('task_id')
+            name = request.POST.get('name')
+            interval_minutes = request.POST.get('interval_minutes')
+            description = request.POST.get('description', '')
+            is_enabled = request.POST.get('is_enabled') == 'on'
+            
+            try:
+                task = AutoApprovalTask.objects.get(id=task_id)
+                
+                # 檢查名稱是否重複（排除自己）
+                if AutoApprovalTask.objects.filter(name=name).exclude(id=task_id).exists():
+                    messages.error(request, f"任務名稱 '{name}' 已存在")
+                    return redirect('system:auto_approval_tasks')
+                
+                task.name = name
+                task.interval_minutes = int(interval_minutes)
+                task.description = description
+                task.is_enabled = is_enabled
+                task.updated_by = request.user
+                task.save()
+                
+                messages.success(request, f"定時任務 '{name}' 更新成功")
+                
+            except AutoApprovalTask.DoesNotExist:
+                messages.error(request, "找不到指定的定時任務")
+            except ValueError:
+                messages.error(request, "執行間隔必須是有效的數字")
+            except Exception as e:
+                messages.error(request, f"更新任務失敗：{str(e)}")
+                
+        elif action == 'delete':
+            # 刪除定時任務
+            task_id = request.POST.get('task_id')
+            
+            try:
+                task = AutoApprovalTask.objects.get(id=task_id)
+                task_name = task.name
+                task.delete()
+                messages.success(request, f"定時任務 '{task_name}' 刪除成功")
+                
+            except AutoApprovalTask.DoesNotExist:
+                messages.error(request, "找不到指定的定時任務")
+            except Exception as e:
+                messages.error(request, f"刪除任務失敗：{str(e)}")
+                
+        elif action == 'toggle':
+            # 切換任務啟用狀態
+            task_id = request.POST.get('task_id')
+            
+            try:
+                task = AutoApprovalTask.objects.get(id=task_id)
+                task.is_enabled = not task.is_enabled
+                task.updated_by = request.user
+                task.save()
+                
+                status = "啟用" if task.is_enabled else "停用"
+                messages.success(request, f"定時任務 '{task.name}' 已{status}")
+                
+            except AutoApprovalTask.DoesNotExist:
+                messages.error(request, "找不到指定的定時任務")
+            except Exception as e:
+                messages.error(request, f"切換狀態失敗：{str(e)}")
+                
+        elif action == 'execute':
+            # 手動執行定時任務
+            task_id = request.POST.get('task_id')
+            
+            try:
+                task = AutoApprovalTask.objects.get(id=task_id)
+                
+                # 執行自動審核任務
+                from system.tasks import auto_approve_work_reports
+                result = auto_approve_work_reports.delay()
+                
+                # 更新任務執行記錄
+                task.execution_count += 1
+                task.last_run_at = timezone.now()
+                task.updated_by = request.user
+                task.save()
+                
+                messages.success(request, f"定時任務 '{task.name}' 手動執行成功")
+                
+            except AutoApprovalTask.DoesNotExist:
+                messages.error(request, "找不到指定的定時任務")
+            except Exception as e:
+                messages.error(request, f"執行任務失敗：{str(e)}")
+        
+        return redirect('system:auto_approval_tasks')
+    
+    # 取得所有定時任務
+    tasks = AutoApprovalTask.objects.all().order_by('-created_at')
+    
+    context = {
+        'tasks': tasks,
+        'page_title': '自動審核定時任務管理',
+        'breadcrumb': [
+            {'name': '系統管理', 'url': 'system:index'},
+            {'name': '自動審核定時任務管理', 'url': 'system:auto_approval_tasks'},
+        ]
+    }
+    
+    return render(request, 'system/auto_approval_tasks.html', context)
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def auto_approval_task_detail(request, task_id):
+    """
+    自動審核定時任務詳情頁面
+    """
+    try:
+        task = AutoApprovalTask.objects.get(id=task_id)
+    except AutoApprovalTask.DoesNotExist:
+        messages.error(request, "找不到指定的定時任務")
+        return redirect('system:auto_approval_tasks')
+    
+    if request.method == 'POST':
+        # 更新任務
+        name = request.POST.get('name')
+        interval_minutes = request.POST.get('interval_minutes')
+        description = request.POST.get('description', '')
+        is_enabled = request.POST.get('is_enabled') == 'on'
+        
+        try:
+            # 檢查名稱是否重複
+            if AutoApprovalTask.objects.filter(name=name).exclude(id=task_id).exists():
+                messages.error(request, f"任務名稱 '{name}' 已存在")
+            else:
+                task.name = name
+                task.interval_minutes = int(interval_minutes)
+                task.description = description
+                task.is_enabled = is_enabled
+                task.updated_by = request.user
+                task.save()
+                
+                messages.success(request, f"定時任務 '{name}' 更新成功")
+                return redirect('system:auto_approval_tasks')
+                
+        except ValueError:
+            messages.error(request, "執行間隔必須是有效的數字")
+        except Exception as e:
+            messages.error(request, f"更新任務失敗：{str(e)}")
+    
+    context = {
+        'task': task,
+        'page_title': f'編輯定時任務 - {task.name}',
+        'breadcrumb': [
+            {'name': '系統管理', 'url': 'system:index'},
+            {'name': '自動審核定時任務管理', 'url': 'system:auto_approval_tasks'},
+            {'name': f'編輯 - {task.name}', 'url': 'system:auto_approval_task_detail', 'args': [task_id]},
+        ]
+    }
+    
+    return render(request, 'system/auto_approval_task_detail.html', context)
 
 
 

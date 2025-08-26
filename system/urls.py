@@ -75,6 +75,10 @@ urlpatterns = [
     path("execute_completion_check/", views.execute_completion_check, name="execute_completion_check"),
     path("execute_data_transfer/", views.execute_data_transfer, name="execute_data_transfer"),
     
+    # 自動審核定時任務管理
+    path("auto_approval_tasks/", views.auto_approval_tasks, name="auto_approval_tasks"),
+    path("auto_approval_tasks/<int:task_id>/", views.auto_approval_task_detail, name="auto_approval_task_detail"),
+    
     # 自動完工功能 API 端點
     path("enable_auto_completion/", views.enable_auto_completion, name="enable_auto_completion"),
     path("disable_auto_completion/", views.disable_auto_completion, name="disable_auto_completion"),
