@@ -703,6 +703,42 @@ class ReportSchedulerService:
     def __init__(self):
         self.report_generator = ReportGeneratorService()
     
+    def _get_previous_week(self, current_date):
+        """取得上週的年份和週數"""
+        from datetime import timedelta
+        
+        # 找到上週的週一
+        days_since_monday = current_date.weekday()
+        last_monday = current_date - timedelta(days=days_since_monday + 7)
+        
+        # 計算上週的年份和週數
+        year, week, _ = last_monday.isocalendar()
+        return year, week
+    
+    def _get_previous_month(self, current_date):
+        """取得上個月的年份和月份"""
+        if current_date.month == 1:
+            year = current_date.year - 1
+            month = 12
+        else:
+            year = current_date.year
+            month = current_date.month - 1
+        return year, month
+    
+    def _get_previous_quarter(self, current_date):
+        """取得上個季度的年份和季度"""
+        if current_date.month <= 3:
+            year = current_date.year - 1
+            quarter = 4
+        else:
+            year = current_date.year
+            quarter = ((current_date.month - 1) // 3)
+        return year, quarter
+    
+    def _get_previous_year(self, current_date):
+        """取得上個年度"""
+        return current_date.year - 1
+    
     def execute_scheduled_reports(self):
         """執行排程報表"""
         try:
@@ -723,88 +759,152 @@ class ReportSchedulerService:
             logger.error(f"執行排程報表失敗: {str(e)}")
     
     def _should_execute_schedule(self, schedule):
-        """檢查是否該執行排程"""
-        now = timezone.now()
+        """判斷是否應該執行排程"""
+        now = timezone.localtime(timezone.now())
         
-        if schedule.report_type == 'weekly':
-            # 週報表：檢查是否為指定的週幾和時間
-            if schedule.schedule_day and now.weekday() + 1 == schedule.schedule_day:
-                return now.time() >= schedule.schedule_time
+        if schedule.report_type == 'data_sync':
+            # 每小時執行一次
+            return True
+            
+        elif schedule.report_type == 'previous_workday':
+            # 每天早上10點後執行前一個工作日報表
+            return now.hour >= 10
+            
+        elif schedule.report_type in ['current_week', 'previous_week']:
+            # 週報表：可自訂週幾執行
+            if schedule.schedule_day:
+                # 如果設定了週幾，檢查今天是否是指定的週幾
+                target_weekday = schedule.schedule_day - 1  # 1=週一, 2=週二, ..., 7=週日
+                if target_weekday == 6:  # 週日
+                    target_weekday = 6
+                elif target_weekday == 0:  # 週一
+                    target_weekday = 0
+                else:
+                    target_weekday = target_weekday
                 
-        elif schedule.report_type == 'monthly':
-            # 月報表：檢查是否為指定的日期和時間
-            if schedule.schedule_day and now.day == schedule.schedule_day:
-                return now.time() >= schedule.schedule_time
-                
-        elif schedule.report_type == 'quarterly':
-            # 季報表：每季第一天
-            if now.day == 1 and now.month in [1, 4, 7, 10]:
-                return now.time() >= schedule.schedule_time
-                
-        elif schedule.report_type == 'yearly':
-            # 年報表：每年第一天
-            if now.day == 1 and now.month == 1:
-                return now.time() >= schedule.schedule_time
-        
-        return False
+                if now.weekday() == target_weekday:
+                    if schedule.schedule_time:
+                        # 如果用戶設定了時間，檢查是否到了執行時間
+                        schedule_hour = schedule.schedule_time.hour
+                        schedule_minute = schedule.schedule_time.minute
+                        return now.hour > schedule_hour or (now.hour == schedule_hour and now.minute >= schedule_minute)
+                    else:
+                        # 預設早上9點後執行
+                        return now.hour >= 9
+            else:
+                # 預設每週一執行
+                if now.weekday() == 0:  # 週一
+                    if schedule.schedule_time:
+                        schedule_hour = schedule.schedule_time.hour
+                        schedule_minute = schedule.schedule_time.minute
+                        return now.hour > schedule_hour or (now.hour == schedule_hour and now.minute >= schedule_minute)
+                    else:
+                        return now.hour >= 9
+            return False
+            
+        elif schedule.report_type in ['current_month', 'previous_month']:
+            # 月報表：可自訂每月幾號執行
+            if schedule.schedule_day:
+                # 如果設定了日期，檢查今天是否是指定的日期
+                if now.day == schedule.schedule_day:
+                    if schedule.schedule_time:
+                        # 如果用戶設定了時間，檢查是否到了執行時間
+                        schedule_hour = schedule.schedule_time.hour
+                        schedule_minute = schedule.schedule_time.minute
+                        return now.hour > schedule_hour or (now.hour == schedule_hour and now.minute >= schedule_minute)
+                    else:
+                        # 預設早上9點後執行
+                        return now.hour >= 9
+            else:
+                # 預設每月1號執行
+                if now.day == 1:
+                    if schedule.schedule_time:
+                        schedule_hour = schedule.schedule_time.hour
+                        schedule_minute = schedule.schedule_time.minute
+                        return now.hour > schedule_hour or (now.hour == schedule_hour and now.minute >= schedule_minute)
+                    else:
+                        return now.hour >= 9
+            return False
+            
+        elif schedule.report_type in ['current_quarter', 'previous_quarter']:
+            # 季報表：可自訂每季第幾天執行
+            quarter_start_months = [1, 4, 7, 10]
+            if now.month in quarter_start_months:
+                if schedule.schedule_day:
+                    # 如果設定了日期，檢查今天是否是指定的日期
+                    if now.day == schedule.schedule_day:
+                        if schedule.schedule_time:
+                            # 如果用戶設定了時間，檢查是否到了執行時間
+                            schedule_hour = schedule.schedule_time.hour
+                            schedule_minute = schedule.schedule_time.minute
+                            return now.hour > schedule_hour or (now.hour == schedule_hour and now.minute >= schedule_minute)
+                        else:
+                            # 預設早上9點後執行
+                            return now.hour >= 9
+                else:
+                    # 預設每季第一天執行
+                    if now.day == 1:
+                        if schedule.schedule_time:
+                            schedule_hour = schedule.schedule_time.hour
+                            schedule_minute = schedule.schedule_time.minute
+                            return now.hour > schedule_hour or (now.hour == schedule_hour and now.minute >= schedule_minute)
+                        else:
+                            return now.hour >= 9
+            return False
+            
+        elif schedule.report_type in ['current_year', 'previous_year']:
+            # 年報表：可自訂每年幾號執行
+            if schedule.schedule_day:
+                # 如果設定了日期，檢查今天是否是指定的日期
+                if now.month == 1 and now.day == schedule.schedule_day:
+                    if schedule.schedule_time:
+                        # 如果用戶設定了時間，檢查是否到了執行時間
+                        schedule_hour = schedule.schedule_time.hour
+                        schedule_minute = schedule.schedule_time.minute
+                        return now.hour > schedule_hour or (now.hour == schedule_hour and now.minute >= schedule_minute)
+                    else:
+                        # 預設早上9點後執行
+                        return now.hour >= 9
+            else:
+                # 預設每年1月1號執行
+                if now.month == 1 and now.day == 1:
+                    if schedule.schedule_time:
+                        schedule_hour = schedule.schedule_time.hour
+                        schedule_minute = schedule.schedule_time.minute
+                        return now.hour > schedule_hour or (now.hour == schedule_hour and now.minute >= schedule_minute)
+                    else:
+                        return now.hour >= 9
+            return False
+            
+        else:
+            raise ValueError(f"不支援的報表類型: {schedule.report_type}")
     
     def _execute_schedule(self, schedule):
-        """執行排程"""
+        """執行指定的排程"""
         try:
-            # 記錄開始執行
-            self._log_execution(schedule, 'running', '開始執行')
+            if schedule.report_type == 'data_sync':
+                result = self._execute_data_sync(schedule)
+            elif schedule.report_type == 'previous_workday':
+                result = self._execute_previous_workday_report(schedule)
+            elif schedule.report_type in ['current_week', 'previous_week']:
+                result = self._execute_weekly_report(schedule)
+            elif schedule.report_type in ['current_month', 'previous_month']:
+                result = self._execute_monthly_report(schedule)
+            elif schedule.report_type in ['current_quarter', 'previous_quarter']:
+                result = self._execute_quarterly_report(schedule)
+            elif schedule.report_type in ['current_year', 'previous_year']:
+                result = self._execute_yearly_report(schedule)
+            else:
+                raise ValueError(f"不支援的報表類型: {schedule.report_type}")
             
-            now = timezone.now()
-            
-            # 根據報表類型生成報表
-            if schedule.report_type == 'weekly':
-                # 上週的報表
-                last_week = now - timedelta(days=7)
-                year, week, _ = last_week.isocalendar()
-                result = self.report_generator.generate_weekly_report(
-                    schedule.company, year, week, 'excel'
-                )
+            if result['success']:
+                # 記錄成功執行
+                self._log_execution(schedule, 'success', f'報表生成成功: {result["filename"]}', result['file_path'])
                 
-            elif schedule.report_type == 'monthly':
-                # 上個月的報表
-                if now.month == 1:
-                    year = now.year - 1
-                    month = 12
-                else:
-                    year = now.year
-                    month = now.month - 1
+                # 發送郵件（如果有設定收件人）
+                if schedule.email_recipients:
+                    self._send_report_email(schedule, result)
                     
-                result = self.report_generator.generate_monthly_report(
-                    schedule.company, year, month, 'excel'
-                )
-                
-            elif schedule.report_type == 'quarterly':
-                # 上個季度的報表
-                if now.month <= 3:
-                    year = now.year - 1
-                    quarter = 4
-                else:
-                    year = now.year
-                    quarter = ((now.month - 1) // 3)
-                    
-                result = self.report_generator.generate_quarterly_report(
-                    schedule.company, year, quarter, 'excel'
-                )
-                
-            elif schedule.report_type == 'yearly':
-                # 去年的報表
-                year = now.year - 1
-                result = self.report_generator.generate_yearly_report(
-                    schedule.company, year, 'excel'
-                )
-            
-            # 記錄成功執行
-            self._log_execution(schedule, 'success', f'報表生成成功: {result["filename"]}', result['file_path'])
-            
-            # 發送郵件（如果有設定收件人）
-            if schedule.email_recipients:
-                self._send_report_email(schedule, result)
-                
         except Exception as e:
             logger.error(f"執行排程 {schedule.name} 失敗: {str(e)}")
             self._log_execution(schedule, 'failed', str(e))
@@ -818,40 +918,755 @@ class ReportSchedulerService:
             file_path=file_path
         )
     
+    def _execute_data_sync(self, schedule):
+        """執行資料同步"""
+        try:
+            from workorder.fill_work.models import FillWork
+            from workorder.onsite_reporting.models import OnsiteReport
+            from datetime import datetime, timedelta
+            
+            # 同步最近1小時的資料
+            sync_time = timezone.now() - timedelta(hours=1)
+            
+            # 統計同步的資料
+            fill_works_count = FillWork.objects.filter(
+                created_at__gte=sync_time
+            ).count()
+            
+            onsite_reports_count = OnsiteReport.objects.filter(
+                created_at__gte=sync_time
+            ).count()
+            
+            # 生成同步報告
+            sync_report = {
+                'sync_time': timezone.now(),
+                'fill_works_count': fill_works_count,
+                'onsite_reports_count': onsite_reports_count,
+                'total_records': fill_works_count + onsite_reports_count
+            }
+            
+            # 記錄同步結果
+            logger.info(f"資料同步完成: 填報 {fill_works_count} 筆，現場報工 {onsite_reports_count} 筆")
+            
+            return {
+                'success': True,
+                'filename': f'data_sync_{timezone.now().strftime("%Y%m%d_%H%M")}.txt',
+                'file_path': None,  # 資料同步不需要附件檔案
+                'message': f'資料同步完成，共處理 {sync_report["total_records"]} 筆記錄'
+            }
+            
+        except Exception as e:
+            logger.error(f"資料同步失敗: {str(e)}")
+            return {
+                'success': False,
+                'filename': '',
+                'file_path': '',
+                'message': f'資料同步失敗: {str(e)}'
+            }
+    
+    def _execute_previous_workday_report(self, schedule):
+        """執行前一個工作日報表"""
+        try:
+            from .services import PreviousWorkdayReportScheduler
+            import os
+            
+            # 使用前一個工作日報表服務
+            scheduler = PreviousWorkdayReportScheduler()
+            report_date = scheduler.get_report_date()
+            
+            # 收集資料
+            data = scheduler.collect_data(report_date)
+            
+            # 生成報表
+            result = scheduler.generate_report(data)
+            
+            # 記錄執行結果
+            logger.info(f"前一個工作日報表生成成功: {report_date}")
+            
+            return {
+                'success': True,
+                'filename': os.path.basename(result),
+                'file_path': result,
+                'message': f'前一個工作日報表生成成功，報表日期: {report_date}'
+            }
+            
+        except Exception as e:
+            logger.error(f"前一個工作日報表生成失敗: {str(e)}")
+            return {
+                'success': False,
+                'filename': '',
+                'file_path': '',
+                'message': f'前一個工作日報表生成失敗: {str(e)}'
+            }
+    
+    def _execute_weekly_report(self, schedule):
+        """執行週報表"""
+        try:
+            from datetime import timedelta
+            import os
+            
+            now = timezone.localtime(timezone.now())
+            
+            if schedule.report_type == 'current_week':
+                # 本週報表：從週一到現在
+                days_since_monday = now.weekday()
+                start_date = now.date() - timedelta(days=days_since_monday)
+                end_date = now.date()
+                report_title = f"本週報表 ({start_date} ~ {end_date})"
+            else:
+                # 上週報表：上週一到上週日
+                days_since_monday = now.weekday()
+                last_monday = now.date() - timedelta(days=days_since_monday + 7)
+                last_sunday = last_monday + timedelta(days=6)
+                start_date = last_monday
+                end_date = last_sunday
+                report_title = f"上週報表 ({start_date} ~ {end_date})"
+            
+            # 收集資料
+            data = self._collect_workorder_data(start_date, end_date)
+            
+            # 根據用戶選擇的格式生成檔案
+            html_result = None
+            excel_result = None
+            file_path = None
+            filename = None
+            
+            if schedule.file_format in ['html', 'both']:
+                html_result = self._generate_html_report(data, report_title, schedule)
+                if not file_path:
+                    file_path = html_result
+                    filename = os.path.basename(html_result)
+            
+            if schedule.file_format in ['excel', 'both']:
+                excel_result = self._generate_excel_report(data, report_title, schedule)
+                if excel_result:
+                    file_path = excel_result
+                    filename = os.path.basename(excel_result)
+            
+            return {
+                'success': True,
+                'filename': filename,
+                'file_path': file_path,
+                'html_path': html_result,
+                'excel_path': excel_result,
+                'message': f'{report_title}生成成功'
+            }
+            
+        except Exception as e:
+            logger.error(f"週報表生成失敗: {str(e)}")
+            return {
+                'success': False,
+                'filename': '',
+                'file_path': '',
+                'message': f'週報表生成失敗: {str(e)}'
+            }
+    
+    def _execute_monthly_report(self, schedule):
+        """執行月報表"""
+        try:
+            from datetime import date
+            import os
+            
+            now = timezone.localtime(timezone.now())
+            
+            if schedule.report_type == 'current_month':
+                # 本月報表：從本月1號到現在
+                start_date = date(now.year, now.month, 1)
+                end_date = now.date()
+                report_title = f"本月報表 ({start_date} ~ {end_date})"
+            else:
+                # 上月報表：上個月1號到月底
+                if now.month == 1:
+                    year = now.year - 1
+                    month = 12
+                else:
+                    year = now.year
+                    month = now.month - 1
+                start_date = date(year, month, 1)
+                # 計算上個月的最後一天
+                if month == 12:
+                    end_date = date(year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    end_date = date(year, month + 1, 1) - timedelta(days=1)
+                report_title = f"上月報表 ({start_date} ~ {end_date})"
+            
+            # 收集資料
+            data = self._collect_workorder_data(start_date, end_date)
+            
+            # 根據用戶選擇的格式生成檔案
+            html_result = None
+            excel_result = None
+            file_path = None
+            filename = None
+            
+            if schedule.file_format in ['html', 'both']:
+                html_result = self._generate_html_report(data, report_title, schedule)
+                if not file_path:
+                    file_path = html_result
+                    filename = os.path.basename(html_result)
+            
+            if schedule.file_format in ['excel', 'both']:
+                excel_result = self._generate_excel_report(data, report_title, schedule)
+                if excel_result:
+                    file_path = excel_result
+                    filename = os.path.basename(excel_result)
+            
+            return {
+                'success': True,
+                'filename': filename,
+                'file_path': file_path,
+                'html_path': html_result,
+                'excel_path': excel_result,
+                'message': f'{report_title}生成成功'
+            }
+            
+        except Exception as e:
+            logger.error(f"月報表生成失敗: {str(e)}")
+            return {
+                'success': False,
+                'filename': '',
+                'file_path': '',
+                'message': f'月報表生成失敗: {str(e)}'
+            }
+    
+    def _execute_quarterly_report(self, schedule):
+        """執行季報表"""
+        try:
+            from datetime import date
+            import os
+            
+            now = timezone.localtime(timezone.now())
+            
+            if schedule.report_type == 'current_quarter':
+                # 本季報表：從本季第一天到現在
+                quarter = (now.month - 1) // 3 + 1
+                start_month = (quarter - 1) * 3 + 1
+                start_date = date(now.year, start_month, 1)
+                end_date = now.date()
+                report_title = f"本季報表 ({start_date} ~ {end_date})"
+            else:
+                # 上季報表：上個季度的完整期間
+                if now.month <= 3:
+                    year = now.year - 1
+                    quarter = 4
+                else:
+                    year = now.year
+                    quarter = ((now.month - 1) // 3)
+                    
+                start_month = (quarter - 1) * 3 + 1
+                start_date = date(year, start_month, 1)
+                
+                # 計算上季的最後一天
+                if quarter == 4:
+                    end_date = date(year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    end_date = date(year, start_month + 3, 1) - timedelta(days=1)
+                
+                report_title = f"上季報表 ({start_date} ~ {end_date})"
+            
+            # 收集資料
+            data = self._collect_workorder_data(start_date, end_date)
+            
+            # 根據用戶選擇的格式生成檔案
+            html_result = None
+            excel_result = None
+            file_path = None
+            filename = None
+            
+            if schedule.file_format in ['html', 'both']:
+                html_result = self._generate_html_report(data, report_title, schedule)
+                if not file_path:
+                    file_path = html_result
+                    filename = os.path.basename(html_result)
+            
+            if schedule.file_format in ['excel', 'both']:
+                excel_result = self._generate_excel_report(data, report_title, schedule)
+                if excel_result:
+                    file_path = excel_result
+                    filename = os.path.basename(excel_result)
+            
+            return {
+                'success': True,
+                'filename': filename,
+                'file_path': file_path,
+                'html_path': html_result,
+                'excel_path': excel_result,
+                'message': f'{report_title}生成成功'
+            }
+                
+        except Exception as e:
+            logger.error(f"季報表生成失敗: {str(e)}")
+            return {
+                'success': False,
+                'filename': '',
+                'file_path': '',
+                'message': f'季報表生成失敗: {str(e)}'
+            }
+    
+    def _execute_yearly_report(self, schedule):
+        """執行年報表"""
+        try:
+            from datetime import date
+            import os
+            
+            now = timezone.localtime(timezone.now())
+            
+            if schedule.report_type == 'current_year':
+                # 本年報表：從今年1月1號到現在
+                start_date = date(now.year, 1, 1)
+                end_date = now.date()
+                report_title = f"本年報表 ({start_date} ~ {end_date})"
+            else:
+                # 上年報表：去年的完整期間
+                start_date = date(now.year - 1, 1, 1)
+                end_date = date(now.year - 1, 12, 31)
+                report_title = f"上年報表 ({start_date} ~ {end_date})"
+            
+            # 收集資料
+            data = self._collect_workorder_data(start_date, end_date)
+            
+            # 根據用戶選擇的格式生成檔案
+            html_result = None
+            excel_result = None
+            file_path = None
+            filename = None
+            
+            if schedule.file_format in ['html', 'both']:
+                html_result = self._generate_html_report(data, report_title, schedule)
+                if not file_path:
+                    file_path = html_result
+                    filename = os.path.basename(html_result)
+            
+            if schedule.file_format in ['excel', 'both']:
+                excel_result = self._generate_excel_report(data, report_title, schedule)
+                if excel_result:
+                    file_path = excel_result
+                    filename = os.path.basename(excel_result)
+            
+            return {
+                'success': True,
+                'filename': filename,
+                'file_path': file_path,
+                'html_path': html_result,
+                'excel_path': excel_result,
+                'message': f'{report_title}生成成功'
+            }
+            
+        except Exception as e:
+            logger.error(f"年報表生成失敗: {str(e)}")
+            return {
+                'success': False,
+                'filename': '',
+                'file_path': '',
+                'message': f'年報表生成失敗: {str(e)}'
+            }
+    
+    def _collect_workorder_data(self, start_date, end_date):
+        """收集工單資料"""
+        from reporting.models import WorkOrderReportData
+        
+        # 查詢指定日期範圍的工單資料
+        data = WorkOrderReportData.objects.filter(
+            work_date__gte=start_date,
+            work_date__lte=end_date
+        ).order_by('work_date', 'workorder_id')
+        
+        return data
+    
+    def _generate_html_report(self, data, title, schedule):
+        """生成HTML報表"""
+        import os
+        from django.template.loader import render_to_string
+        from django.conf import settings
+        
+        # 準備報表資料
+        report_data = {
+            'title': title,
+            'data': data,
+            'total_records': data.count(),
+            'generated_at': timezone.localtime(timezone.now()),
+            'schedule_name': schedule.name
+        }
+        
+        # 渲染HTML模板
+        html_content = render_to_string('reporting/reporting/report_template.html', report_data)
+        
+        # 生成檔案名稱
+        filename = f"{title.replace(' ', '_')}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.html"
+        file_path = os.path.join(settings.MEDIA_ROOT, 'reports', filename)
+        
+        # 確保目錄存在
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        # 寫入檔案
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        return file_path
+    
     def _send_report_email(self, schedule, result):
         """發送報表郵件"""
         try:
+            import os
             from django.core.mail import EmailMessage
             from django.conf import settings
+            from system.models import EmailConfig
+            
+            # 取得郵件設定
+            try:
+                email_config = EmailConfig.objects.first()
+                if not email_config:
+                    logger.error("未找到郵件設定，無法發送郵件")
+                    return
+                    
+                # 設定郵件連線
+                from django.core.mail import get_connection
+                connection = get_connection(
+                    host=email_config.email_host,
+                    port=email_config.email_port,
+                    username=email_config.email_host_user,
+                    password=email_config.email_host_password,
+                    use_tls=email_config.email_use_tls,
+                )
+                
+                from_email = email_config.default_from_email or settings.DEFAULT_FROM_EMAIL
+                
+            except Exception as e:
+                logger.error(f"郵件設定錯誤: {str(e)}")
+                return
             
             subject = f"自動報表 - {schedule.name}"
-            message = f"""
-            您好，
             
-            這是自動生成的 {schedule.get_report_type_display()}。
+            if schedule.report_type == 'data_sync':
+                message = f"""
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <style>
+                        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                        .header {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
+                        .content {{ background-color: #ffffff; padding: 20px; border: 1px solid #dee2e6; border-radius: 5px; }}
+                        .footer {{ margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; font-size: 12px; color: #6c757d; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h2>自動報表系統</h2>
+                        </div>
+                        <div class="content">
+                            <p>您好，</p>
+                            <p>這是自動執行的 <strong>{schedule.get_report_type_display()}</strong>。</p>
+                            <p><strong>同步結果：</strong>{result['message']}</p>
+                            <p><strong>執行時間：</strong>{timezone.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                        </div>
+                        <div class="footer">
+                            此郵件由系統自動發送，請勿回覆。
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """
+            else:
+                message = f"""
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <style>
+                        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                        .header {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
+                        .content {{ background-color: #ffffff; padding: 20px; border: 1px solid #dee2e6; border-radius: 5px; }}
+                        .attachment {{ background-color: #e9ecef; padding: 10px; border-radius: 3px; margin: 10px 0; }}
+                        .footer {{ margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; font-size: 12px; color: #6c757d; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h2>自動報表系統</h2>
+                        </div>
+                        <div class="content">
+                            <p>您好，</p>
+                            <p>這是自動生成的 <strong>{schedule.get_report_type_display()}</strong>。</p>
+                            <div class="attachment">
+                                <p><strong>報表檔案：</strong>{result['filename']}</p>
+                                <p><strong>生成時間：</strong>{timezone.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                            </div>
+                            <p>報表檔案已作為附件附加到此郵件中，請查收。</p>
+                        </div>
+                        <div class="footer">
+                            此郵件由系統自動發送，請勿回覆。
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """
             
-            報表檔案：{result['filename']}
-            生成時間：{timezone.now().strftime('%Y-%m-%d %H:%M:%S')}
-            
-            此郵件由系統自動發送，請勿回覆。
-            """
-            
+            # 創建EmailMessage物件
             email = EmailMessage(
                 subject=subject,
                 body=message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
+                from_email=from_email,
                 to=schedule.email_recipients.split(','),
+                connection=connection,
             )
+            email.content_subtype = "html"  # 設定為HTML格式
             
             # 附加檔案
-            with open(result['file_path'], 'rb') as f:
-                email.attach(result['filename'], f.read(), 'application/octet-stream')
+            if schedule.report_type == 'data_sync':
+                # 資料同步不需要附加檔案，只發送文字內容
+                pass
+            elif schedule.file_format == 'both':
+                # 如果選擇兩種格式，都附加
+                if result.get('excel_path') and os.path.exists(result['excel_path']):
+                    with open(result['excel_path'], 'rb') as f:
+                        email.attach(result['filename'], f.read(), 'application/vnd.ms-excel')
+                
+                if result.get('html_path') and os.path.exists(result['html_path']):
+                    with open(result['html_path'], 'rb') as f:
+                        email.attach(os.path.basename(result['html_path']), f.read(), 'application/octet-stream')
+            
+            elif schedule.file_format == 'excel':
+                # 只附加Excel檔案 - 使用Outlook專用編碼
+                if result.get('excel_path') and os.path.exists(result['excel_path']):
+                    from email.mime.base import MIMEBase
+                    from email import encoders
+                    from email.header import Header
+                    
+                    with open(result['excel_path'], 'rb') as f:
+                        attachment = MIMEBase('application', 'vnd.ms-excel')
+                        attachment.set_payload(f.read())
+                        encoders.encode_base64(attachment)
+                        
+                        # Outlook專用編碼 - 使用email.header.Header確保中文檔案名稱正確顯示
+                        filename = result['filename']
+                        encoded_filename = Header(filename, 'utf-8').encode()
+                        attachment.add_header('Content-Disposition', 'attachment', filename=encoded_filename)
+                        email.attach(attachment)
+            
+            else:
+                # 預設附加HTML檔案
+                if result.get('file_path') and os.path.exists(result['file_path']):
+                    with open(result['file_path'], 'rb') as f:
+                        email.attach(result['filename'], f.read(), 'application/octet-stream')
             
             email.send()
-            logger.info(f"報表郵件發送成功: {schedule.name}")
+            logger.info(f"報表郵件發送成功: {schedule.name} 發送到 {schedule.email_recipients}")
+            print(f"郵件發送成功: {schedule.name} -> {schedule.email_recipients}")
             
         except Exception as e:
             logger.error(f"發送報表郵件失敗: {str(e)}") 
+    
+    def _generate_excel_report(self, data, title, schedule):
+        """生成Excel報表（包含統計摘要、明細、統計三個活頁簿）"""
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            from openpyxl.utils import get_column_letter
+            import os
+            from django.conf import settings
+            from django.db.models import Sum, Avg, Count
+            
+            # 建立工作簿
+            wb = openpyxl.Workbook()
+            
+            # 移除預設的工作表
+            wb.remove(wb.active)
+            
+            # 計算統計摘要
+            total_work_hours = sum(float(record.work_hours or 0) for record in data)
+            total_overtime_hours = sum(float(record.overtime_hours or 0) for record in data)
+            total_operators = len(set(record.operator_name for record in data if record.operator_name))
+            workorder_count = len(set(record.workorder_id for record in data if record.workorder_id))
+            avg_work_hours = total_work_hours / len(data) if data else 0
+            
+            # 1. 統計摘要活頁簿
+            ws_summary = wb.create_sheet("統計摘要")
+            self._create_summary_sheet_for_email(ws_summary, {
+                'report_type': title,
+                'total_work_hours': total_work_hours,
+                'total_overtime_hours': total_overtime_hours,
+                'total_operators': total_operators,
+                'workorder_count': workorder_count,
+                'avg_work_hours': avg_work_hours,
+                'generated_at': timezone.now()
+            })
+            
+            # 2. 明細活頁簿
+            ws_detail = wb.create_sheet("明細")
+            self._create_detail_sheet_for_email(ws_detail, data, title)
+            
+            # 3. 統計活頁簿
+            ws_stats = wb.create_sheet("統計")
+            self._create_stats_sheet_for_email(ws_stats, data, title)
+            
+            # 生成檔案名稱 - 使用中文名稱
+            filename = f"月工作時數報表_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            file_path = os.path.join(settings.MEDIA_ROOT, 'reports', filename)
+            
+            # 確保目錄存在
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # 儲存檔案
+            wb.save(file_path)
+            
+            return file_path
+            
+        except ImportError:
+            logger.error("未安裝 openpyxl，無法生成 Excel 報表")
+            return None
+        except Exception as e:
+            logger.error(f"生成 Excel 報表失敗: {str(e)}")
+            return None
+    
+    def _create_summary_sheet_for_email(self, ws, report_data):
+        """建立統計摘要活頁簿（用於郵件附件）"""
+        # 設定樣式
+        from openpyxl.styles import Font, Alignment
+        title_font = Font(bold=True, size=14)
+        header_font = Font(bold=True)
+        header_alignment = Alignment(horizontal='center', vertical='center')
+        
+        # 報表標題
+        ws['A1'] = f"{report_data['report_type']} - 統計摘要"
+        ws['A1'].font = title_font
+        ws.merge_cells('A1:D1')
+        
+        # 基本資訊
+        ws['A3'] = "生成時間"
+        ws['B3'] = report_data['generated_at'].strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 摘要資料
+        ws['A5'] = "總工作時數"
+        ws['B5'] = report_data['total_work_hours']
+        ws['C5'] = "總作業員數"
+        ws['D5'] = report_data['total_operators']
+        
+        ws['A6'] = "總加班時數"
+        ws['B6'] = report_data['total_overtime_hours']
+        ws['C6'] = "工單數量"
+        ws['D6'] = report_data['workorder_count']
+        
+        ws['A7'] = "平均工作時數"
+        ws['B7'] = report_data['avg_work_hours']
+        
+        # 設定樣式 - 只設定粗體，不使用背景色
+        for row in [5, 6, 7]:
+            for col in ['A', 'B', 'C', 'D']:
+                cell = ws[f'{col}{row}']
+                cell.font = header_font
+        
+        # 設定欄寬
+        ws.column_dimensions['A'].width = 20
+        ws.column_dimensions['B'].width = 15
+        ws.column_dimensions['C'].width = 20
+        ws.column_dimensions['D'].width = 15
+    
+    def _create_detail_sheet_for_email(self, ws, data, title):
+        """建立明細活頁簿（用於郵件附件）"""
+        # 設定樣式
+        from openpyxl.styles import Font, Alignment, Border, Side
+        header_font = Font(bold=True)
+        header_alignment = Alignment(horizontal='center', vertical='center')
+        border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                       top=Side(style='thin'), bottom=Side(style='thin'))
+        
+        # 標題
+        ws['A1'] = f"{title} - 明細資料"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws.merge_cells('A1:K1')
+        
+        # 表頭
+        headers = ['作業員名稱', '公司名稱', '報工日期', '開始時間', '結束時間', 
+                  '工單號', '產品編號', '工序名稱', '工作時數', '加班時數', '合計時數']
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col, value=header)
+            cell.font = header_font
+            cell.alignment = header_alignment
+            cell.border = border
+        
+        # 填入資料
+        for row, record in enumerate(data, 4):
+            work_hours = float(record.work_hours or 0)
+            overtime_hours = float(record.overtime_hours or 0)
+            total_hours = work_hours + overtime_hours
+            
+            ws.cell(row=row, column=1, value=record.operator_name or '').border = border
+            ws.cell(row=row, column=2, value=record.company or '').border = border
+            ws.cell(row=row, column=3, value=record.work_date.strftime('%Y-%m-%d') if record.work_date else '').border = border
+            ws.cell(row=row, column=4, value=record.start_time.strftime('%H:%M') if record.start_time else '').border = border
+            ws.cell(row=row, column=5, value=record.end_time.strftime('%H:%M') if record.end_time else '').border = border
+            ws.cell(row=row, column=6, value=record.workorder_id or '').border = border
+            ws.cell(row=row, column=7, value=record.product_code or '').border = border
+            ws.cell(row=row, column=8, value=record.process_name or '').border = border
+            ws.cell(row=row, column=9, value=work_hours).border = border
+            ws.cell(row=row, column=10, value=overtime_hours).border = border
+            ws.cell(row=row, column=11, value=total_hours).border = border
+        
+        # 設定欄寬
+        from openpyxl.utils import get_column_letter
+        column_widths = [15, 15, 12, 10, 10, 15, 20, 15, 12, 12, 12]
+        for col, width in enumerate(column_widths, 1):
+            ws.column_dimensions[get_column_letter(col)].width = width
+    
+    def _create_stats_sheet_for_email(self, ws, data, title):
+        """建立統計活頁簿（用於郵件附件）"""
+        # 設定樣式
+        from openpyxl.styles import Font, Alignment, Border, Side
+        header_font = Font(bold=True)
+        header_alignment = Alignment(horizontal='center', vertical='center')
+        border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                       top=Side(style='thin'), bottom=Side(style='thin'))
+        
+        # 標題
+        ws['A1'] = f"{title} - 作業員統計"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws.merge_cells('A1:E1')
+        
+        # 表頭
+        headers = ['排名', '作業員', '工作時數', '加班時數', '合計時數']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col, value=header)
+            cell.font = header_font
+            cell.alignment = header_alignment
+            cell.border = border
+        
+        # 計算作業員統計
+        operator_stats = {}
+        for record in data:
+            operator = record.operator_name or '未指定'
+            if operator not in operator_stats:
+                operator_stats[operator] = {
+                    'work_hours': 0,
+                    'overtime_hours': 0,
+                    'total_hours': 0
+                }
+            work_hours = float(record.work_hours or 0)
+            overtime_hours = float(record.overtime_hours or 0)
+            total_hours = work_hours + overtime_hours
+            
+            operator_stats[operator]['work_hours'] += work_hours
+            operator_stats[operator]['overtime_hours'] += overtime_hours
+            operator_stats[operator]['total_hours'] += total_hours
+        
+        # 排序並寫入資料
+        sorted_operators = sorted(operator_stats.items(), key=lambda x: x[1]['total_hours'], reverse=True)
+        
+        for row, (operator, stats) in enumerate(sorted_operators, 4):
+            ws.cell(row=row, column=1, value=row-3).border = border  # 排名
+            ws.cell(row=row, column=2, value=operator).border = border  # 作業員
+            ws.cell(row=row, column=3, value=stats['work_hours']).border = border  # 工作時數
+            ws.cell(row=row, column=4, value=stats['overtime_hours']).border = border  # 加班時數
+            ws.cell(row=row, column=5, value=stats['total_hours']).border = border  # 合計時數
+        
+        # 設定欄寬
+        from openpyxl.utils import get_column_letter
+        column_widths = [8, 20, 12, 12, 12]
+        for col, width in enumerate(column_widths, 1):
+            ws.column_dimensions[get_column_letter(col)].width = width 
 
 
 class CompletedWorkOrderReportService:
@@ -2252,6 +3067,7 @@ class PreviousWorkdayReportScheduler:
         """
         import os
         from datetime import datetime
+        from django.conf import settings
         
         # 建立報表目錄
         report_dir = os.path.join(settings.MEDIA_ROOT, 'reports', 'previous_workday')
@@ -3009,3 +3825,84 @@ class CSVHolidayImportService:
         writer.writerows(sample_data)
         
         return output.getvalue()
+        """生成Excel報表"""
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill
+            from openpyxl.utils import get_column_letter
+            import os
+            from django.conf import settings
+            
+            # 建立工作簿
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = '工單報表'
+            
+            # 定義標題列
+            headers = [
+                '作業員名稱', '公司名稱', '報工日期', '開始時間', '結束時間', 
+                '工單號', '產品編號', '工序名稱', '設備名稱', '報工數量', 
+                '不良品數量', '備註', '異常紀錄', '工作時數', '加班時數'
+            ]
+            
+            # 設定標題列樣式
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            header_alignment = Alignment(horizontal='center', vertical='center')
+            
+            # 寫入標題列
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+            
+            # 填入資料
+            for row, record in enumerate(data, 2):
+                ws.cell(row=row, column=1, value=record.operator_name or '')
+                ws.cell(row=row, column=2, value=record.company or '')
+                ws.cell(row=row, column=3, value=record.work_date.strftime('%Y-%m-%d') if record.work_date else '')
+                ws.cell(row=row, column=4, value=record.start_time.strftime('%H:%M') if record.start_time else '')
+                ws.cell(row=row, column=5, value=record.end_time.strftime('%H:%M') if record.end_time else '')
+                ws.cell(row=row, column=6, value=record.workorder_id or '')
+                ws.cell(row=row, column=7, value=record.product_code or '')
+                ws.cell(row=row, column=8, value=record.process_name or '')
+                ws.cell(row=row, column=9, value='')  # equipment_name 欄位不存在
+                ws.cell(row=row, column=10, value=0)  # completed_quantity 欄位不存在
+                ws.cell(row=row, column=11, value=0)  # defect_quantity 欄位不存在
+                ws.cell(row=row, column=12, value='')  # remarks 欄位不存在
+                ws.cell(row=row, column=13, value='')  # abnormal_notes 欄位不存在
+                ws.cell(row=row, column=14, value=float(record.work_hours or 0))
+                ws.cell(row=row, column=15, value=float(record.overtime_hours or 0))
+            
+            # 調整欄寬
+            for column in ws.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                ws.column_dimensions[column_letter].width = adjusted_width
+            
+            # 生成檔案名稱 - 使用中文名稱
+            filename = f"月工作時數報表_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            file_path = os.path.join(settings.MEDIA_ROOT, 'reports', filename)
+            
+            # 確保目錄存在
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # 儲存檔案
+            wb.save(file_path)
+            
+            return file_path
+            
+        except ImportError:
+            logger.error("未安裝 openpyxl，無法生成 Excel 報表")
+            return None
+        except Exception as e:
+            logger.error(f"生成 Excel 報表失敗: {str(e)}")
+            return None

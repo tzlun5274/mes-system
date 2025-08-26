@@ -1,0 +1,350 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}報表清理設定{% endblock %}
+
+{% block extra_head %}
+<style>
+    .cleanup-settings-container {
+        padding: 20px;
+    }
+    
+    .settings-section {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .section-title {
+        font-size: 1.3em;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 10px;
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        text-align: center;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    
+    .stats-number {
+        font-size: 2.5em;
+        font-weight: bold;
+        margin-bottom: 5px;
+        display: block;
+    }
+    
+    .stats-label {
+        font-size: 1.1em;
+        opacity: 0.9;
+        margin-bottom: 5px;
+        display: block;
+    }
+    
+    .cleanup-log-item {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        transition: all 0.3s ease;
+    }
+    
+    .cleanup-log-item:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .status-badge {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border-radius: 12px;
+    }
+    
+    .status-success {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-failed {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .status-pending {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .btn-action {
+        margin-right: 5px;
+        margin-bottom: 5px;
+    }
+    
+    .retention-info {
+        background-color: #f8f9fa;
+        border-left: 4px solid #007bff;
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-broom text-primary"></i>
+                    報表清理設定
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">報表清理設定</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- 統計摘要 -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stats-card">
+                <span class="stats-number">{{ file_count }}</span>
+                <span class="stats-label">報表檔案數量</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <span class="stats-number">{{ total_size_mb|floatformat:1 }}</span>
+                <span class="stats-label">總檔案大小 (MB)</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <span class="stats-number">{{ log_count }}</span>
+                <span class="stats-label">執行日誌數量</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 清理設定 -->
+    <div class="settings-section">
+        <h3 class="section-title">
+            <i class="fas fa-cog"></i>
+            自動清理設定
+        </h3>
+        
+        <div class="retention-info">
+            <h5><i class="fas fa-info-circle"></i> 當前保留設定</h5>
+            <p><strong>報表檔案保留天數：</strong>{{ file_retention_days }} 天</p>
+            <p><strong>執行日誌保留天數：</strong>{{ log_retention_days }} 天</p>
+        </div>
+
+        <form method="post" action="{% url 'system:update_cleanup_settings' %}">
+            {% csrf_token %}
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="file_retention_days" class="form-label">報表檔案保留天數</label>
+                        <input type="number" class="form-control" id="file_retention_days" name="file_retention_days" 
+                               value="{{ file_retention_days }}" min="1" max="365">
+                        <div class="form-text">設定報表檔案自動保留的天數，超過此天數的檔案將被自動刪除</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="log_retention_days" class="form-label">執行日誌保留天數</label>
+                        <input type="number" class="form-control" id="log_retention_days" name="log_retention_days" 
+                               value="{{ log_retention_days }}" min="1" max="365">
+                        <div class="form-text">設定報表執行日誌自動保留的天數，超過此天數的日誌將被自動刪除</div>
+                    </div>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i>
+                儲存設定
+            </button>
+        </form>
+    </div>
+
+    <!-- 手動清理 -->
+    <div class="settings-section">
+        <h3 class="section-title">
+            <i class="fas fa-tools"></i>
+            手動清理操作
+        </h3>
+        
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>注意：</strong>手動清理操作會立即執行，請確認後再操作。
+        </div>
+        
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">清理報表檔案</h5>
+                        <p class="card-text">刪除超過保留天數的報表檔案</p>
+                        <button type="button" class="btn btn-warning" onclick="executeCleanup('files')">
+                            <i class="fas fa-file-times"></i>
+                            執行清理
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">清理執行日誌</h5>
+                        <p class="card-text">刪除超過保留天數的執行日誌</p>
+                        <button type="button" class="btn btn-warning" onclick="executeCleanup('logs')">
+                            <i class="fas fa-trash-alt"></i>
+                            執行清理
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">生成清理報告</h5>
+                        <p class="card-text">生成系統清理狀態報告</p>
+                        <button type="button" class="btn btn-info" onclick="executeCleanup('report')">
+                            <i class="fas fa-chart-bar"></i>
+                            生成報告
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 清理歷史 -->
+    <div class="settings-section">
+        <h3 class="section-title">
+            <i class="fas fa-history"></i>
+            清理歷史記錄
+        </h3>
+        
+        {% if cleanup_logs %}
+            {% for log in cleanup_logs %}
+            <div class="cleanup-log-item">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>{{ log.action }}</strong>
+                    </div>
+                    <div class="col-md-3">
+                        <span class="status-badge status-{{ log.status }}">
+                            {{ log.get_status_display }}
+                        </span>
+                    </div>
+                    <div class="col-md-3">
+                        {{ log.execution_time|date:"Y-m-d H:i:s" }}
+                    </div>
+                    <div class="col-md-3">
+                        {% if log.details %}
+                            <button type="button" class="btn btn-sm btn-outline-info" 
+                                    onclick="showDetails('{{ log.details|escapejs }}')">
+                                查看詳情
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="text-center text-muted">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <p>暫無清理歷史記錄</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 詳情彈出視窗 -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">清理詳情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="detailsContent"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function executeCleanup(type) {
+    if (!confirm('確定要執行清理操作嗎？此操作不可撤銷。')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 執行中...';
+    button.disabled = true;
+    
+    fetch('{% url "system:execute_cleanup" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            cleanup_type: type
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('清理操作執行成功！');
+            location.reload();
+        } else {
+            alert('清理操作失敗：' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('執行清理操作時發生錯誤：' + error);
+    })
+    .finally(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+function showDetails(details) {
+    document.getElementById('detailsContent').textContent = details;
+    new bootstrap.Modal(document.getElementById('detailsModal')).show();
+}
+</script>
+{% endblock %}

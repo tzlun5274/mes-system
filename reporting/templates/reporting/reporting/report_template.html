@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { text-align: center; border-bottom: 2px solid #007bff; padding-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #007bff; color: white; }
+        .footer { margin-top: 30px; text-align: center; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ title }}</h1>
+        <p>生成時間：{{ generated_at|date:"Y-m-d H:i:s" }} | 排程名稱：{{ schedule_name }}</p>
+    </div>
+
+    <div>
+        <h3>報表摘要</h3>
+        <p>總記錄數：{{ total_records }}</p>
+    </div>
+
+    {% if data %}
+    <table>
+        <thead>
+            <tr>
+                <th>工單編號</th>
+                <th>工作日期</th>
+                <th>作業員</th>
+                <th>產品編號</th>
+                <th>開始時間</th>
+                <th>結束時間</th>
+                <th>工作時數</th>
+                <th>完成數量</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in data %}
+            <tr>
+                <td>{{ record.workorder_id }}</td>
+                <td>{{ record.work_date|date:"Y-m-d" }}</td>
+                <td>{{ record.operator_name|default:"-" }}</td>
+                <td>{{ record.product_code|default:"-" }}</td>
+                <td>{{ record.start_time|time:"H:i"|default:"-" }}</td>
+                <td>{{ record.end_time|time:"H:i"|default:"-" }}</td>
+                <td>{{ record.work_hours|default:"-" }}</td>
+                <td>{{ record.completed_quantity|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>無資料</p>
+    {% endif %}
+
+    <div class="footer">
+        <p>此報表由 MES 系統自動生成</p>
+    </div>
+</body>
+</html>

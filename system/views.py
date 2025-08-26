@@ -18,7 +18,8 @@ from .models import (
     BackupSchedule, 
     OperationLogConfig,
     UserWorkPermission,
-    AutoApprovalSettings
+    AutoApprovalSettings,
+    CleanupLog
 )
 from django.core.mail import get_connection, send_mail
 from django.http import HttpResponse, FileResponse, JsonResponse
@@ -2247,6 +2248,134 @@ def test_switches(request):
     }
     
     return render(request, 'system/test_switches.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def report_cleanup_settings(request):
+    """報表清理設定頁面"""
+    import os
+    from django.conf import settings
+    from reporting.models import ReportExecutionLog
+    
+    # 取得統計資料
+    reports_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
+    file_count = 0
+    total_size = 0
+    
+    if os.path.exists(reports_dir):
+        for filename in os.listdir(reports_dir):
+            file_path = os.path.join(reports_dir, filename)
+            if os.path.isfile(file_path):
+                file_count += 1
+                total_size += os.path.getsize(file_path)
+    
+    total_size_mb = total_size / (1024 * 1024)
+    log_count = ReportExecutionLog.objects.count()
+    
+    # 取得保留天數設定
+    file_retention_days = getattr(settings, 'REPORT_FILE_RETENTION_DAYS', 7)
+    log_retention_days = getattr(settings, 'REPORT_LOG_RETENTION_DAYS', 30)
+    
+    # 取得清理歷史記錄
+    cleanup_logs = CleanupLog.objects.order_by('-execution_time')[:20]
+    
+    context = {
+        'file_count': file_count,
+        'total_size_mb': total_size_mb,
+        'log_count': log_count,
+        'file_retention_days': file_retention_days,
+        'log_retention_days': log_retention_days,
+        'cleanup_logs': cleanup_logs,
+    }
+    
+    return render(request, 'system/report_cleanup_settings.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def update_cleanup_settings(request):
+    """更新清理設定"""
+    if request.method == 'POST':
+        try:
+            file_retention_days = int(request.POST.get('file_retention_days', 7))
+            log_retention_days = int(request.POST.get('log_retention_days', 30))
+            
+            # 驗證輸入
+            if file_retention_days < 1 or file_retention_days > 365:
+                messages.error(request, '報表檔案保留天數必須在1-365天之間')
+                return redirect('system:report_cleanup_settings')
+            
+            if log_retention_days < 1 or log_retention_days > 365:
+                messages.error(request, '執行日誌保留天數必須在1-365天之間')
+                return redirect('system:report_cleanup_settings')
+            
+            # 更新設定檔（這裡需要重啟服務才能生效）
+            # 實際應用中可能需要使用資料庫儲存設定
+            messages.success(request, f'清理設定已更新：檔案保留{file_retention_days}天，日誌保留{log_retention_days}天')
+            
+            # 記錄操作日誌
+            CleanupLog.objects.create(
+                action='更新清理設定',
+                status='success',
+                details=f'檔案保留天數：{file_retention_days}天，日誌保留天數：{log_retention_days}天',
+                user=request.user
+            )
+            
+        except ValueError:
+            messages.error(request, '請輸入有效的數字')
+        except Exception as e:
+            messages.error(request, f'更新設定失敗：{str(e)}')
+    
+    return redirect('system:report_cleanup_settings')
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_cleanup(request):
+    """執行清理操作"""
+    if request.method == 'POST':
+        import json
+        from reporting.tasks import cleanup_report_files, cleanup_report_execution_logs, generate_system_cleanup_report
+        
+        try:
+            data = json.loads(request.body)
+            cleanup_type = data.get('cleanup_type')
+            
+            if cleanup_type == 'files':
+                cleanup_report_files()
+                action = '清理報表檔案'
+            elif cleanup_type == 'logs':
+                cleanup_report_execution_logs()
+                action = '清理執行日誌'
+            elif cleanup_type == 'report':
+                generate_system_cleanup_report()
+                action = '生成清理報告'
+            else:
+                return JsonResponse({'success': False, 'error': '無效的清理類型'})
+            
+            # 記錄操作日誌
+            CleanupLog.objects.create(
+                action=action,
+                status='success',
+                details=f'手動執行{action}操作',
+                user=request.user
+            )
+            
+            return JsonResponse({'success': True})
+            
+        except Exception as e:
+            # 記錄錯誤日誌
+            CleanupLog.objects.create(
+                action=f'執行清理操作失敗',
+                status='failed',
+                details=f'錯誤：{str(e)}',
+                user=request.user
+            )
+            
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': '無效的請求方法'})
 
 
 

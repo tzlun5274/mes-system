@@ -82,6 +82,10 @@ SECURE_CONTENT_TYPE_NOSNIFF = False
 SECURE_BROWSER_XSS_FILTER = False
 SECURE_REFERRER_POLICY = 'no-referrer-when-downgrade'
 
+# 報表清理設定
+REPORT_FILE_RETENTION_DAYS = 7  # 報表檔案保留天數
+REPORT_LOG_RETENTION_DAYS = 30  # 報表執行日誌保留天數
+
 # URL 配置
 ROOT_URLCONF = "mes_config.urls"
 
@@ -150,6 +154,10 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")  # 新增 STATIC_ROOT 設定
+
+# 媒體檔案設定
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # 自動主鍵字段設置
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

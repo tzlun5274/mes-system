@@ -29,7 +29,7 @@
                 </div>
                 <div class="card-body">
                     <h4>{{ test_results.current_date|date:"Y-m-d" }}</h4>
-                    <p class="text-muted mb-0">{{ test_results.current_date|date:"l" }}</p>
+                    <p class="text-muted mb-0">{{ test_results.current_weekday }}</p>
                 </div>
             </div>
         </div>
@@ -56,7 +56,7 @@
                 </div>
                 <div class="card-body">
                     <h4>{{ test_results.previous_workday|date:"Y-m-d" }}</h4>
-                    <p class="text-muted mb-0">{{ test_results.previous_workday|date:"l" }}</p>
+                    <p class="text-muted mb-0">{{ test_results.previous_weekday }}</p>
                 </div>
             </div>
         </div>

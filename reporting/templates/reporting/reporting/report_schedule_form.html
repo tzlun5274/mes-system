@@ -102,6 +102,23 @@
                             </div>
                         </div>
 
+                        <div class="row mb-3" id="file_format_row">
+                            <div class="col-md-6">
+                                <label for="file_format" class="form-label">
+                                    <i class="fas fa-file-alt text-primary"></i> 檔案格式
+                                </label>
+                                <select class="form-select" id="file_format" name="file_format">
+                                    {% for value, label in file_formats %}
+                                        <option value="{{ value }}" 
+                                                {% if schedule.file_format == value or not schedule and value == 'html' %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">選擇報表發送的檔案格式</div>
+                            </div>
+                        </div>
+
                         <!-- 排程設定 -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
@@ -124,9 +141,9 @@
                                         <input type="number" class="form-control" id="schedule_day" name="schedule_day" 
                                                value="{{ schedule.schedule_day|default:'' }}" 
                                                min="1" max="31"
-                                               placeholder="週報表：1-7，月報表：1-31">
+                                               placeholder="請選擇執行日期">
                                         <div class="form-text">
-                                            <span id="schedule_day_help">週報表：週幾(1-7)，月報表：每月幾號(1-31)</span>
+                                            <span id="schedule_day_help">週報表：週幾(1-7)，月報表：每月幾號(1-31)，年報表：每年幾號(1-31)</span>
                                         </div>
                                     </div>
                                 </div>
@@ -181,22 +198,82 @@
                     <h6 class="mb-0"><i class="fas fa-info-circle text-info"></i> 說明</h6>
                 </div>
                 <div class="card-body">
-                    <h6><i class="fas fa-lightbulb text-warning"></i> 排程設定說明</h6>
-                    <ul class="list-unstyled">
-                        <li><strong>週報表：</strong>每週指定星期幾執行</li>
-                        <li><strong>月報表：</strong>每月指定日期執行</li>
-                        <li><strong>季報表：</strong>每季指定日期執行</li>
-                        <li><strong>年報表：</strong>每年指定日期執行</li>
+                    <h6><i class="fas fa-lightbulb text-warning"></i> 報表類型說明</h6>
+                    <div class="mb-3">
+                        <h6 class="text-primary">📊 資料同步</h6>
+                        <p class="small mb-2">每小時自動同步工單和填報資料，無需設定執行時間</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="text-primary">📅 前一個工作日報表</h6>
+                        <p class="small mb-2">每天早上10點後自動生成前一個工作日的報表，考慮假期和補班日</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="text-primary">📈 週報表</h6>
+                        <ul class="small mb-2">
+                            <li><strong>本週報表：</strong>從週一到現在的工作資料</li>
+                            <li><strong>上週報表：</strong>上週一到上週日的完整資料</li>
+                        </ul>
+                        <p class="small text-muted">執行時間：每週一早上9點後</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="text-primary">📊 月報表</h6>
+                        <ul class="small mb-2">
+                            <li><strong>本月報表：</strong>從本月1號到現在的工作資料</li>
+                            <li><strong>上月報表：</strong>上個月1號到月底的完整資料</li>
+                        </ul>
+                        <p class="small text-muted">執行時間：每月1號早上9點後</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="text-primary">📈 季報表</h6>
+                        <ul class="small mb-2">
+                            <li><strong>本季報表：</strong>從本季第一天到現在的工作資料</li>
+                            <li><strong>上季報表：</strong>上個季度的完整期間資料</li>
+                        </ul>
+                        <p class="small text-muted">執行時間：可自訂每季第幾天執行（1-31）</p>
+                        <p class="small text-muted">季度定義：Q1(1-3月)、Q2(4-6月)、Q3(7-9月)、Q4(10-12月)</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="text-primary">📊 年報表</h6>
+                        <ul class="small mb-2">
+                            <li><strong>本年報表：</strong>從今年1月1號到現在的工作資料</li>
+                            <li><strong>上年報表：</strong>去年的完整年度資料</li>
+                        </ul>
+                        <p class="small text-muted">執行時間：每年1月1號早上9點後</p>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6><i class="fas fa-clock text-info"></i> 執行時間說明</h6>
+                    <div id="execution_time_info">
+                        <p class="small text-muted">請選擇報表類型以查看詳細說明</p>
+                    </div>
+                    <p class="small text-muted">※ 未設定執行時間時，系統預設在早上9點後執行</p>
+                    <p class="small text-muted">※ 未設定執行日期時，週報表預設週一，月報表預設1號，年報表預設1號</p>
+                    
+                    <hr>
+                    
+                    <h6><i class="fas fa-file-alt text-info"></i> 檔案格式說明</h6>
+                    <ul class="list-unstyled small">
+                        <li>• <strong>HTML格式：</strong>網頁格式，可用瀏覽器開啟查看</li>
+                        <li>• <strong>Excel格式：</strong>Excel檔案，可用Excel開啟進行資料分析</li>
+                        <li>• <strong>HTML + Excel格式：</strong>同時發送兩種格式的檔案</li>
                     </ul>
                     
                     <hr>
                     
                     <h6><i class="fas fa-exclamation-triangle text-warning"></i> 注意事項</h6>
-                    <ul class="list-unstyled">
+                    <ul class="list-unstyled small">
                         <li>• 排程名稱必須唯一</li>
                         <li>• 執行時間為24小時制</li>
                         <li>• 收件人信箱格式必須正確</li>
                         <li>• 停用的排程不會自動執行</li>
+                        <li>• 報表會自動發送到指定信箱</li>
+                        <li>• 所有報表都會記錄執行日誌</li>
                     </ul>
                 </div>
             </div>
@@ -213,22 +290,76 @@ document.addEventListener('DOMContentLoaded', function() {
     // 根據報表類型更新執行日期的說明
     function updateScheduleDayHelp() {
         const reportType = reportTypeSelect.value;
-        if (reportType === 'weekly') {
-            scheduleDayHelp.textContent = '週報表：週幾(1-7，1=週一，7=週日)';
+        const scheduleTimeInput = document.getElementById('schedule_time');
+        const scheduleDayInput = document.getElementById('schedule_day');
+        const scheduleDayHelp = document.getElementById('schedule_day_help');
+        const executionTimeInfo = document.getElementById('execution_time_info');
+        
+        // 隱藏或顯示相關欄位
+        if (reportType === 'data_sync') {
+            // 資料同步不需要設定執行時間和檔案格式
+            scheduleTimeInput.parentElement.style.display = 'none';
+            scheduleDayInput.parentElement.style.display = 'none';
+            document.getElementById('file_format_row').style.display = 'none';
+            executionTimeInfo.innerHTML = '<p class="small text-success"><strong>📊 資料同步：</strong>每小時自動執行，無需設定執行時間</p>';
+        } else if (reportType === 'previous_workday') {
+            // 前一個工作日報表只需要執行時間
+            scheduleTimeInput.parentElement.style.display = 'block';
+            scheduleDayInput.parentElement.style.display = 'none';
+            document.getElementById('file_format_row').style.display = 'block';
+            scheduleTimeInput.placeholder = '建議設定為 10:00';
+            executionTimeInfo.innerHTML = '<p class="small text-info"><strong>📅 前一個工作日報表：</strong>每天早上10點後自動執行，考慮假期和補班日</p>';
+        } else if (reportType.includes('week')) {
+            // 週報表：可自訂週幾
+            scheduleTimeInput.parentElement.style.display = 'block';
+            scheduleDayInput.parentElement.style.display = 'block';
+            document.getElementById('file_format_row').style.display = 'block';
+            scheduleTimeInput.placeholder = '建議設定為 09:00';
+            scheduleDayInput.min = '1';
             scheduleDayInput.max = '7';
             scheduleDayInput.placeholder = '1-7';
-        } else if (reportType === 'monthly') {
+            scheduleDayHelp.textContent = '週報表：週幾(1=週一, 2=週二, ..., 7=週日)';
+            executionTimeInfo.innerHTML = '<p class="small text-primary"><strong>📈 週報表：</strong>可自訂週幾執行（1=週一, 7=週日），建議設定為週一</p>';
+        } else if (reportType.includes('month')) {
+            // 月報表：可自訂每月幾號
+            scheduleTimeInput.parentElement.style.display = 'block';
+            scheduleDayInput.parentElement.style.display = 'block';
+            document.getElementById('file_format_row').style.display = 'block';
+            scheduleTimeInput.placeholder = '建議設定為 09:00';
+            scheduleDayInput.min = '1';
+            scheduleDayInput.max = '31';
+            scheduleDayInput.placeholder = '1-31';
             scheduleDayHelp.textContent = '月報表：每月幾號(1-31)';
+            executionTimeInfo.innerHTML = '<p class="small text-primary"><strong>📊 月報表：</strong>可自訂每月幾號執行（1-31），建議設定為1號</p>';
+        } else if (reportType.includes('quarter')) {
+            // 季報表：可自訂每季第幾天
+            scheduleTimeInput.parentElement.style.display = 'block';
+            scheduleDayInput.parentElement.style.display = 'block';
+            document.getElementById('file_format_row').style.display = 'block';
+            scheduleTimeInput.placeholder = '建議設定為 09:00';
+            scheduleDayInput.min = '1';
             scheduleDayInput.max = '31';
             scheduleDayInput.placeholder = '1-31';
-        } else if (reportType === 'quarterly') {
-            scheduleDayHelp.textContent = '季報表：每季幾號(1-31)';
+            scheduleDayHelp.textContent = '季報表：每季第幾天(1-31)';
+            executionTimeInfo.innerHTML = '<p class="small text-primary"><strong>📈 季報表：</strong>可自訂每季第幾天執行（1-31），建議設定為1號</p>';
+        } else if (reportType.includes('year')) {
+            // 年報表：可自訂每年幾號
+            scheduleTimeInput.parentElement.style.display = 'block';
+            scheduleDayInput.parentElement.style.display = 'block';
+            document.getElementById('file_format_row').style.display = 'block';
+            scheduleTimeInput.placeholder = '建議設定為 09:00';
+            scheduleDayInput.min = '1';
             scheduleDayInput.max = '31';
             scheduleDayInput.placeholder = '1-31';
-        } else if (reportType === 'yearly') {
             scheduleDayHelp.textContent = '年報表：每年幾號(1-31)';
-            scheduleDayInput.max = '31';
-            scheduleDayInput.placeholder = '1-31';
+            executionTimeInfo.innerHTML = '<p class="small text-primary"><strong>📊 年報表：</strong>可自訂每年幾號執行（1-31），建議設定為1號</p>';
+        } else {
+            // 其他報表類型
+            scheduleTimeInput.parentElement.style.display = 'block';
+            scheduleDayInput.parentElement.style.display = 'none';
+            document.getElementById('file_format_row').style.display = 'block';
+            scheduleTimeInput.placeholder = '建議設定為 09:00';
+            executionTimeInfo.innerHTML = '<p class="small text-muted">請選擇報表類型以查看詳細說明</p>';
         }
     }
     

@@ -1561,6 +1561,7 @@ def report_schedule_form(request, schedule_id=None):
                 schedule.company = request.POST.get('company')
                 schedule.schedule_time = request.POST.get('schedule_time')
                 schedule.schedule_day = request.POST.get('schedule_day') or None
+                schedule.file_format = request.POST.get('file_format', 'html')
                 schedule.status = request.POST.get('status')
                 schedule.email_recipients = request.POST.get('email_recipients', '')
                 schedule.save()
@@ -1573,6 +1574,7 @@ def report_schedule_form(request, schedule_id=None):
                     company=request.POST.get('company'),
                     schedule_time=request.POST.get('schedule_time'),
                     schedule_day=request.POST.get('schedule_day') or None,
+                    file_format=request.POST.get('file_format', 'html'),
                     status=request.POST.get('status'),
                     email_recipients=request.POST.get('email_recipients', ''),
                 )
@@ -1586,6 +1588,7 @@ def report_schedule_form(request, schedule_id=None):
     context = {
         'schedule': schedule,
         'report_types': ReportSchedule.REPORT_TYPES,
+        'file_formats': ReportSchedule.FILE_FORMATS,
         'status_choices': ReportSchedule.STATUS_CHOICES,
     }
     return render(request, 'reporting/reporting/report_schedule_form.html', context)
@@ -2363,15 +2366,6 @@ def test_workday_calendar(request):
     calendar_service = WorkdayCalendarService()
     current_date = date.today()
     
-    # 測試資料
-    test_results = {
-        'current_date': current_date,
-        'is_current_workday': calendar_service.is_workday(current_date),
-        'previous_workday': calendar_service.get_previous_workday(current_date),
-        'next_5_days': [],
-        'previous_5_days': [],
-    }
-    
     # 繁體中文星期對應
     weekday_names = {
         0: '星期一',
@@ -2381,6 +2375,17 @@ def test_workday_calendar(request):
         4: '星期五',
         5: '星期六',
         6: '星期日'
+    }
+    
+    # 測試資料
+    test_results = {
+        'current_date': current_date,
+        'current_weekday': weekday_names[current_date.weekday()],
+        'is_current_workday': calendar_service.is_workday(current_date),
+        'previous_workday': calendar_service.get_previous_workday(current_date),
+        'previous_weekday': weekday_names[calendar_service.get_previous_workday(current_date).weekday()],
+        'next_5_days': [],
+        'previous_5_days': [],
     }
     
     # 測試未來5天

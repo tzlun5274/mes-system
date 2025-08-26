@@ -81,4 +81,9 @@ urlpatterns = [
     # 完工檢查配置（已整合到工單管理設定中）
     # path('completion-check/config/', views.completion_check_config, name='completion_check_config'),
     # path('completion-check/status/', views.completion_check_status, name='completion_check_status'),
+    
+    # 報表清理設定
+    path("report_cleanup_settings/", views.report_cleanup_settings, name="report_cleanup_settings"),
+    path("update_cleanup_settings/", views.update_cleanup_settings, name="update_cleanup_settings"),
+    path("execute_cleanup/", views.execute_cleanup, name="execute_cleanup"),
 ]

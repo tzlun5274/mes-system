@@ -382,10 +382,22 @@ class ReportSchedule(models.Model):
     """報表排程設定"""
     
     REPORT_TYPES = [
-        ('weekly', '週報表'),
-        ('monthly', '月報表'),
-        ('quarterly', '季報表'),
-        ('yearly', '年報表'),
+        ('data_sync', '資料同步'),
+        ('previous_workday', '前一個工作日報表'),
+        ('current_week', '本週報表'),
+        ('previous_week', '上週報表'),
+        ('current_month', '本月報表'),
+        ('previous_month', '上月報表'),
+        ('current_quarter', '本季報表'),
+        ('previous_quarter', '上季報表'),
+        ('current_year', '本年報表'),
+        ('previous_year', '上年報表'),
+    ]
+    
+    FILE_FORMATS = [
+        ('html', 'HTML格式'),
+        ('excel', 'Excel格式'),
+        ('both', 'HTML + Excel格式'),
     ]
     
     STATUS_CHOICES = [
@@ -400,6 +412,14 @@ class ReportSchedule(models.Model):
     # 排程設定
     schedule_time = models.TimeField(verbose_name="執行時間")
     schedule_day = models.IntegerField(null=True, blank=True, verbose_name="執行日期", help_text="週報表：週幾(1-7)，月報表：每月幾號(1-31)")
+    
+    # 檔案格式設定
+    file_format = models.CharField(
+        max_length=20,
+        choices=FILE_FORMATS,
+        default='html',
+        verbose_name="檔案格式"
+    )
     
     # 狀態
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', verbose_name="狀態")

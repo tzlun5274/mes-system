@@ -499,6 +499,29 @@ class UserWorkPermission(models.Model):
 # 使用現有的 SystemConfig 模型來管理完工判斷相關設定
 
 
+class CleanupLog(models.Model):
+    """清理操作日誌"""
+    STATUS_CHOICES = [
+        ('success', '成功'),
+        ('failed', '失敗'),
+        ('pending', '執行中'),
+    ]
+    
+    action = models.CharField(max_length=100, verbose_name="操作類型")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, verbose_name="執行狀態")
+    execution_time = models.DateTimeField(auto_now_add=True, verbose_name="執行時間")
+    details = models.TextField(blank=True, null=True, verbose_name="執行詳情")
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="執行使用者")
+    
+    class Meta:
+        verbose_name = "清理操作日誌"
+        verbose_name_plural = "清理操作日誌"
+        ordering = ['-execution_time']
+    
+    def __str__(self):
+        return f"{self.action} - {self.get_status_display()} - {self.execution_time.strftime('%Y-%m-%d %H:%M:%S')}"
+
+
 
 
 
