@@ -71,6 +71,7 @@ urlpatterns = [
     
     # 手動執行 API 端點
     path("execute_auto_allocation/", views.execute_auto_allocation, name="execute_auto_allocation"),
+    path("execute_auto_approval/", views.execute_auto_approval, name="execute_auto_approval"),
     path("execute_completion_check/", views.execute_completion_check, name="execute_completion_check"),
     path("execute_data_transfer/", views.execute_data_transfer, name="execute_data_transfer"),
     
@@ -86,4 +87,12 @@ urlpatterns = [
     path("report_cleanup_settings/", views.report_cleanup_settings, name="report_cleanup_settings"),
     path("update_cleanup_settings/", views.update_cleanup_settings, name="update_cleanup_settings"),
     path("execute_cleanup/", views.execute_cleanup, name="execute_cleanup"),
+    
+    # 定時任務管理
+    path('scheduled-tasks/', views.ScheduledTaskListView.as_view(), name='scheduled_task_list'),
+    path('scheduled-tasks/create/', views.ScheduledTaskCreateView.as_view(), name='scheduled_task_create'),
+    path('scheduled-tasks/<int:pk>/update/', views.ScheduledTaskUpdateView.as_view(), name='scheduled_task_update'),
+    path('scheduled-tasks/<int:pk>/delete/', views.ScheduledTaskDeleteView.as_view(), name='scheduled_task_delete'),
+    path('scheduled-tasks/<int:pk>/toggle/', views.toggle_scheduled_task, name='toggle_scheduled_task'),
+    path('test-cron-expression/', views.test_cron_expression, name='test_cron_expression'),
 ]

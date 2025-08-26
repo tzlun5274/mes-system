@@ -6,7 +6,8 @@ from .models import (
     BackupSchedule, 
     OperationLogConfig,
     UserWorkPermission,
-    AutoApprovalSettings
+    AutoApprovalSettings,
+    ScheduledTask
 )
 
 
@@ -569,6 +570,86 @@ class AutoApprovalSettingsForm(forms.ModelForm):
             )
             if not has_condition:
                 raise forms.ValidationError('啟用自動審核時，至少需要設定一個審核條件')
+        
+        return cleaned_data
+
+
+
+
+
+
+
+
+class ScheduledTaskForm(forms.ModelForm):
+    """定時任務設定表單"""
+    
+    # 預設的間隔選項
+    INTERVAL_PRESETS = [
+        (5, '每5分鐘'),
+        (15, '每15分鐘'),
+        (30, '每30分鐘'),
+        (60, '每1小時'),
+        (120, '每2小時'),
+        (360, '每6小時'),
+        (720, '每12小時'),
+        (1440, '每24小時'),
+    ]
+    
+    interval_preset = forms.ChoiceField(
+        choices=[('', '-- 自訂間隔 --')] + INTERVAL_PRESETS,
+        required=False,
+        label="預設間隔",
+        help_text="選擇預設間隔或自訂"
+    )
+    
+    class Meta:
+        model = ScheduledTask
+        fields = ['name', 'task_type', 'task_function', 'interval_minutes', 
+                 'is_enabled', 'description']
+        widgets = {
+            'interval_minutes': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '例如: 30 (每30分鐘執行)',
+                'min': '1'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': '請描述此定時任務的用途...'
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 設定任務函數的預設值
+        self.fields['task_function'].widget.attrs.update({
+            'class': 'form-control',
+            'readonly': 'readonly'
+        })
+        
+        # 根據任務類型設定預設的任務函數
+        if 'instance' in kwargs and kwargs['instance']:
+            instance = kwargs['instance']
+            if instance.task_type == 'auto_approve':
+                self.fields['task_function'].initial = 'system.tasks.auto_approve_work_reports'
+            elif instance.task_type == 'workorder_analysis':
+                self.fields['task_function'].initial = 'reporting.tasks.auto_analyze_completed_workorders'
+            elif instance.task_type == 'data_backup':
+                self.fields['task_function'].initial = 'system.tasks.auto_backup_database'
+            elif instance.task_type == 'report_generation':
+                self.fields['task_function'].initial = 'reporting.tasks.generate_daily_reports'
+            elif instance.task_type == 'data_cleanup':
+                self.fields['task_function'].initial = 'system.tasks.cleanup_old_data'
+
+    def clean(self):
+        """整體驗證"""
+        cleaned_data = super().clean()
+        interval_preset = cleaned_data.get('interval_preset')
+        interval_minutes = cleaned_data.get('interval_minutes')
+        
+        # 如果選擇了預設間隔，使用預設值
+        if interval_preset and not interval_minutes:
+            cleaned_data['interval_minutes'] = int(interval_preset)
         
         return cleaned_data
 

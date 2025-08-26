@@ -16,16 +16,19 @@ from django.utils import timezone
 import json
 from django.core.serializers.json import DjangoJSONEncoder
 from django.conf import settings
+from django.views.generic import TemplateView, ListView, DetailView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.decorators.http import require_POST
 
 from .models import (
-    WorkOrderReportData, ReportSchedule, ReportExecutionLog, CompletedWorkOrderReportData,
-    OperatorProcessCapacityScore
+    WorkOrderReportData, ReportSchedule, ReportExecutionLog,
+    OperatorProcessCapacityScore, CompletedWorkOrderAnalysis
 )
 from .forms import (
     GenerateScoringReportForm, 
     SupervisorScoreForm, OperatorScoreFilterForm
 )
-from .services import WorkHourReportService, ReportGeneratorService, ReportSchedulerService, CompletedWorkOrderReportService, ScoringService, OperatorCapacityService
+from .services import WorkHourReportService, ReportGeneratorService, ReportSchedulerService, CompletedWorkOrderReportService, ScoringService, OperatorCapacityService, WorkOrderAnalysisService
 
 logger = logging.getLogger(__name__)
 
@@ -1876,100 +1879,7 @@ def completed_workorder_report_index(request):
     return render(request, 'reporting/reporting/completed_workorder_report.html', context)
 
 
-@login_required
-def completed_workorder_report_list(request):
-    """已完工工單報表列表"""
-    try:
-        # 取得查詢參數
-        company_code = request.GET.get('company')
-        year = request.GET.get('year')
-        month = request.GET.get('month')
-        quarter = request.GET.get('quarter')
-        
-        # 建立查詢集
-        queryset = CompletedWorkOrderReportData.objects.all()
-        
-        if company_code:
-            queryset = queryset.filter(company_code=company_code)
-        if year:
-            queryset = queryset.filter(completion_year=year)
-        if month:
-            queryset = queryset.filter(completion_month=month)
-        if quarter:
-            queryset = queryset.filter(completion_quarter=quarter)
-        
-        # 排序
-        queryset = queryset.order_by('-completion_date', '-created_at')
-        
-        # 分頁
-        paginator = Paginator(queryset, 50)
-        page_number = request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
-        
-        # 取得公司列表
-        companies = CompletedWorkOrderReportData.objects.values_list('company_code', 'company_name').distinct()
-        
-        context = {
-            'page_obj': page_obj,
-            'companies': companies,
-            'selected_company': company_code,
-            'selected_year': year,
-            'selected_month': month,
-            'selected_quarter': quarter,
-        }
-    except Exception as e:
-        logger.error(f"取得已完工工單報表列表失敗: {str(e)}")
-        context = {
-            'page_obj': None,
-            'companies': [],
-            'selected_company': None,
-            'selected_year': None,
-            'selected_month': None,
-            'selected_quarter': None,
-        }
-    
-    return render(request, 'reporting/reporting/completed_workorder_report_list.html', context)
-
-
-@login_required
-def completed_workorder_report_detail(request, report_id):
-    """已完工工單報表詳情"""
-    try:
-        report_data = get_object_or_404(CompletedWorkOrderReportData, id=report_id)
-        
-        context = {
-            'report_data': report_data,
-        }
-    except Exception as e:
-        logger.error(f"取得已完工工單報表詳情失敗: {str(e)}")
-        messages.error(request, '取得報表詳情失敗')
-        return redirect('reporting:completed_workorder_report_list')
-    
-    return render(request, 'reporting/reporting/completed_workorder_report_detail.html', context) 
-
-@login_required
-def sync_completed_workorder_data(request):
-    """同步已完工工單資料"""
-    try:
-        from workorder.models import CompletedWorkOrder
-        
-        # 取得所有已完工工單
-        completed_workorders = CompletedWorkOrder.objects.all()
-        
-        synced_count = 0
-        for completed_workorder in completed_workorders:
-            try:
-                CompletedWorkOrderReportData.create_from_completed_workorder(completed_workorder)
-                synced_count += 1
-            except Exception as e:
-                logger.error(f"同步已完工工單資料失敗: {completed_workorder.id} - {str(e)}")
-        
-        messages.success(request, f'已完工工單資料同步完成，共處理 {synced_count} 筆記錄')
-        
-    except Exception as e:
-        messages.error(request, f'同步已完工工單資料失敗: {str(e)}')
-    
-    return redirect('reporting:completed_workorder_report_index') 
+ 
 
 # ==================== 評分報表視圖 ====================
 
@@ -2814,3 +2724,364 @@ def csv_holiday_import(request):
     }
     
     return render(request, 'reporting/reporting/csv_holiday_import.html', context)
+
+class CompletedWorkOrderAnalysisIndexView(LoginRequiredMixin, TemplateView):
+    """已完工工單分析報表首頁"""
+    template_name = 'reporting/completed_workorder_analysis.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # 取得統計摘要
+        from .models import CompletedWorkOrderAnalysis
+        from workorder.models import CompletedWorkOrder
+        
+        # 已分析工單數
+        total_analyzed = CompletedWorkOrderAnalysis.objects.count()
+        
+        # 已完工工單數
+        total_completed = CompletedWorkOrder.objects.count()
+        
+        # 待分析工單數
+        pending_analysis = total_completed - total_analyzed
+        
+        # 最後分析時間
+        last_analysis = CompletedWorkOrderAnalysis.objects.order_by('-created_at').first()
+        if last_analysis:
+            # 轉換為本地時間
+            from django.utils import timezone
+            local_time = timezone.localtime(last_analysis.created_at)
+            last_analysis_date = local_time.strftime('%Y-%m-%d %H:%M')
+        else:
+            last_analysis_date = '無'
+        
+        # 平均執行天數
+        avg_execution_days = CompletedWorkOrderAnalysis.objects.aggregate(
+            avg_days=Avg('total_execution_days')
+        )['avg_days'] or 0
+        
+        # 平均工作時數
+        avg_work_hours = CompletedWorkOrderAnalysis.objects.aggregate(
+            avg_hours=Avg('total_work_hours')
+        )['avg_hours'] or 0
+        
+        # 平均工序數
+        avg_processes = CompletedWorkOrderAnalysis.objects.aggregate(
+            avg_processes=Avg('total_processes')
+        )['avg_processes'] or 0
+        
+        context.update({
+            'summary': {
+                'total_workorders': total_analyzed,
+                'avg_execution_days': avg_execution_days,
+                'avg_work_hours': avg_work_hours,
+                'avg_processes': avg_processes,
+            }
+        })
+        
+        return context
+
+
+class CompletedWorkOrderAnalysisListView(LoginRequiredMixin, ListView):
+    """已完工工單分析列表"""
+    model = CompletedWorkOrderAnalysis
+    template_name = 'reporting/completed_workorder_analysis_list.html'
+    context_object_name = 'page_obj'
+    paginate_by = 20
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # 公司篩選
+        company = self.request.GET.get('company')
+        if company:
+            queryset = queryset.filter(company_code=company)
+        
+        # 日期範圍篩選
+        start_date = self.request.GET.get('start_date')
+        if start_date:
+            queryset = queryset.filter(completion_date__gte=start_date)
+        
+        end_date = self.request.GET.get('end_date')
+        if end_date:
+            queryset = queryset.filter(completion_date__lte=end_date)
+        
+        # 執行天數篩選
+        min_days = self.request.GET.get('min_days')
+        if min_days:
+            queryset = queryset.filter(total_execution_days__gte=min_days)
+        
+        max_days = self.request.GET.get('max_days')
+        if max_days:
+            queryset = queryset.filter(total_execution_days__lte=max_days)
+        
+        return queryset
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # 取得公司列表
+        from erp_integration.models import CompanyConfig
+        companies = CompanyConfig.objects.values_list('company_code', 'company_name')
+        context['companies'] = companies
+        
+        # 篩選條件
+        context['selected_company'] = self.request.GET.get('company', '')
+        context['selected_start_date'] = self.request.GET.get('start_date', '')
+        context['selected_end_date'] = self.request.GET.get('end_date', '')
+        context['selected_min_days'] = self.request.GET.get('min_days', '')
+        context['selected_max_days'] = self.request.GET.get('max_days', '')
+        
+        return context
+
+
+class CompletedWorkOrderAnalysisDetailView(LoginRequiredMixin, DetailView):
+    """已完工工單分析詳情"""
+    model = CompletedWorkOrderAnalysis
+    template_name = 'reporting/completed_workorder_analysis_detail.html'
+    context_object_name = 'analysis'
+    
+    def get_object(self, queryset=None):
+        return get_object_or_404(CompletedWorkOrderAnalysis, id=self.kwargs['analysis_id'])
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # 按第一筆記錄時間排序工序詳細資料，但出貨包裝永遠排在最後
+        if self.object.process_details:
+            # 分離出貨包裝和其他工序
+            shipping_processes = []
+            other_processes = []
+            
+            for name, data in self.object.process_details.items():
+                if name == '出貨包裝':
+                    shipping_processes.append((name, data))
+                else:
+                    other_processes.append((name, data))
+            
+            # 對其他工序按第一筆記錄時間排序
+            sorted_other_processes = sorted(
+                other_processes,
+                key=lambda x: x[1].get('first_record_date', '9999-12-31')
+            )
+            
+            # 組合：其他工序 + 出貨包裝
+            context['sorted_process_details'] = sorted_other_processes + shipping_processes
+        else:
+            context['sorted_process_details'] = []
+        
+        return context
+
+
+class WorkOrderAnalysisManagementView(LoginRequiredMixin, TemplateView):
+    """工單分析管理頁面"""
+    template_name = 'reporting/workorder_analysis_management.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # 取得統計資料
+        from .models import CompletedWorkOrderAnalysis
+        from workorder.models import CompletedWorkOrder
+        
+        # 計算已分析工單數（唯一工單）
+        total_analyzed = CompletedWorkOrderAnalysis.objects.values('workorder_id', 'company_code', 'product_code').distinct().count()
+        total_completed = CompletedWorkOrder.objects.count()
+        pending_analysis = total_completed - total_analyzed
+        
+        last_analysis = CompletedWorkOrderAnalysis.objects.order_by('-created_at').first()
+        if last_analysis:
+            # 轉換為本地時間
+            from django.utils import timezone
+            local_time = timezone.localtime(last_analysis.created_at)
+            last_analysis_date = local_time.strftime('%Y-%m-%d %H:%M')
+        else:
+            last_analysis_date = '無'
+        
+        # 取得公司列表
+        from erp_integration.models import CompanyConfig
+        companies = CompanyConfig.objects.values_list('company_code', 'company_name')
+        
+        # 取得最近的分析記錄
+        recent_analyses = CompletedWorkOrderAnalysis.objects.order_by('-created_at')[:10]
+        
+        context.update({
+            'stats': {
+                'total_analyzed': total_analyzed,
+                'total_completed': total_completed,
+                'pending_analysis': pending_analysis,
+                'last_analysis_date': last_analysis_date,
+            },
+            'companies': companies,
+            'recent_analyses': recent_analyses,
+        })
+        
+        return context
+
+
+@login_required
+@require_POST
+def analyze_single_workorder(request):
+    """分析單一工單"""
+    from django.http import JsonResponse
+    
+    workorder_id = request.POST.get('workorder_id')
+    company_code = request.POST.get('company_code')
+    force = request.POST.get('force') == 'true'
+    
+    if not workorder_id or not company_code:
+        return JsonResponse({
+            'success': False,
+            'error': '請提供工單編號和公司代號'
+        })
+    
+    try:
+        from .services import WorkOrderAnalysisService
+        result = WorkOrderAnalysisService.analyze_completed_workorder(
+            workorder_id, company_code, force=force
+        )
+        
+        return JsonResponse(result)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'分析時發生錯誤: {str(e)}'
+        })
+
+
+@login_required
+@require_POST
+def analyze_batch_workorders(request):
+    """批量分析工單"""
+    from django.http import JsonResponse
+    
+    company_code = request.POST.get('company_code')
+    start_date = request.POST.get('start_date')
+    end_date = request.POST.get('end_date')
+    
+    try:
+        from .services import WorkOrderAnalysisService
+        result = WorkOrderAnalysisService.analyze_completed_workorders_batch(
+            start_date=start_date,
+            end_date=end_date,
+            company_code=company_code
+        )
+        
+        return JsonResponse(result)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'批量分析時發生錯誤: {str(e)}'
+        })
+
+
+@login_required
+@require_POST
+def setup_analysis_schedule(request):
+    """設定分析定時任務"""
+    from django.http import JsonResponse
+    import json
+    
+    try:
+        data = json.loads(request.body)
+        action = data.get('action')
+        interval = data.get('interval', 60)
+        
+        if action == 'setup':
+            # 設定定時任務
+            from django_celery_beat.models import PeriodicTask, IntervalSchedule
+            
+            interval_schedule, created = IntervalSchedule.objects.get_or_create(
+                every=interval,
+                period=IntervalSchedule.MINUTES,
+            )
+            
+            task, created = PeriodicTask.objects.get_or_create(
+                name='auto_analyze_completed_workorders',
+                defaults={
+                    'task': 'reporting.tasks.auto_analyze_completed_workorders',
+                    'interval': interval_schedule,
+                    'enabled': True,
+                    'description': f'自動分析已完工工單（每{interval}分鐘執行）'
+                }
+            )
+            
+            if not created:
+                task.interval = interval_schedule
+                task.enabled = True  # 確保任務被啟用
+                task.description = f'自動分析已完工工單（每{interval}分鐘執行）'
+                task.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'定時任務設定成功，每{interval}分鐘執行一次'
+            })
+            
+        elif action == 'remove':
+            # 移除定時任務
+            from django_celery_beat.models import PeriodicTask
+            
+            try:
+                task = PeriodicTask.objects.get(name='auto_analyze_completed_workorders')
+                task.delete()
+                return JsonResponse({
+                    'success': True,
+                    'message': '定時任務已移除'
+                })
+            except PeriodicTask.DoesNotExist:
+                return JsonResponse({
+                    'success': True,
+                    'message': '定時任務不存在'
+                })
+        
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': '無效的操作'
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'設定失敗: {str(e)}'
+        })
+
+
+@login_required
+def get_analysis_schedule_status(request):
+    """取得分析定時任務狀態"""
+    from django.http import JsonResponse
+    
+    try:
+        from django_celery_beat.models import PeriodicTask
+        
+        task = PeriodicTask.objects.filter(name='auto_analyze_completed_workorders').first()
+        
+        if task:
+            from django.utils import timezone
+            
+            last_run = None
+            
+            if task.last_run_at:
+                local_last_run = timezone.localtime(task.last_run_at)
+                last_run = local_last_run.strftime('%Y-%m-%d %H:%M:%S')
+            
+            return JsonResponse({
+                'has_schedule': True,
+                'interval': task.interval.every if task.interval else 0,
+                'last_run': last_run,
+                'next_run': '自動計算',  # PeriodicTask 沒有 next_run_at 屬性
+            })
+        else:
+            return JsonResponse({
+                'has_schedule': False
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'has_schedule': False,
+            'error': str(e)
+        })

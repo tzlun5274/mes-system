@@ -413,6 +413,53 @@
                     </div>
                 </div>
             </div>
+            
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">自動審核定時任務</div>
+                        <div class="setting-description">定期執行自動審核，處理待審核的報工記錄</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="auto_approval_task_enabled" {% if auto_approval_task.enabled %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="mt-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">執行間隔</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="auto_approval_task_interval" 
+                                       value="{{ auto_approval_task.interval_minutes }}" min="5" max="1440">
+                                <div class="input-group-append">
+                                    <span class="input-group-text">分鐘</span>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted">建議設定：30-60分鐘</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">任務狀態</label>
+                            <div class="task-status">
+                                <span class="badge {% if auto_approval_task.enabled %}badge-success{% else %}badge-secondary{% endif %}">
+                                    {% if auto_approval_task.enabled %}啟用{% else %}停用{% endif %}
+                                </span>
+                                {% if auto_approval_task.last_run %}
+                                <br><small class="text-muted">最後執行：{{ auto_approval_task.last_run|date:"Y-m-d H:i" }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <button type="button" class="btn btn-primary" onclick="executeAutoApproval()">
+                                <i class="fas fa-play mr-2"></i>手動執行自動審核
+                            </button>
+                            <div id="auto-approval-result" class="mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- 完工判斷設定 -->
@@ -800,6 +847,49 @@ function disableAutoCompletion() {
     .catch(error => {
         console.error('停用自動完工功能失敗:', error);
         resultDiv.innerHTML = `<div class="alert alert-danger">停用失敗：${error.message}</div>`;
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+// 手動執行自動審核
+function executeAutoApproval() {
+    const resultDiv = document.getElementById('auto-approval-result');
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // 顯示載入中
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>執行中...';
+    button.disabled = true;
+    resultDiv.innerHTML = '';
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:execute_auto_approval" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+        }
+    })
+    .catch(error => {
+        console.error('執行自動審核失敗:', error);
+        resultDiv.innerHTML = `<div class="alert alert-danger">執行失敗：${error.message}</div>`;
     })
     .finally(() => {
         // 恢復按鈕狀態

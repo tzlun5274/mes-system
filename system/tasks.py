@@ -100,6 +100,225 @@ def auto_backup_database():
 
 
 @shared_task
+def auto_approve_work_reports():
+    """
+    自動審核報工記錄
+    根據設定的條件自動審核符合條件的報工
+    """
+    from system.models import AutoApprovalSettings
+    from workorder.fill_work.models import FillWork
+    from django.db.models import Q
+    from decimal import Decimal
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # 取得自動審核設定
+        try:
+            settings = AutoApprovalSettings.objects.first()
+            if not settings:
+                logger.info("未找到自動審核設定，跳過自動審核")
+                return {
+                    'success': False,
+                    'message': '未找到自動審核設定'
+                }
+            
+            if not settings.is_enabled:
+                logger.info("自動審核功能未啟用，跳過自動審核")
+                return {
+                    'success': False,
+                    'message': '自動審核功能未啟用'
+                }
+        except Exception as e:
+            logger.error(f"取得自動審核設定失敗: {str(e)}")
+            return {
+                'success': False,
+                'error': f'取得自動審核設定失敗: {str(e)}'
+            }
+        
+        # 查詢待審核的報工記錄
+        pending_reports = FillWork.objects.filter(
+            approval_status='pending'  # 待審核狀態
+        )
+        
+        # 排除設定的作業員和工序
+        if settings.exclude_operators:
+            pending_reports = pending_reports.exclude(operator__in=settings.exclude_operators)
+        
+        if settings.exclude_processes:
+            pending_reports = pending_reports.exclude(operation__in=settings.exclude_processes)
+        
+        total_pending = pending_reports.count()
+        if total_pending == 0:
+            logger.info("沒有待審核的報工記錄")
+            return {
+                'success': True,
+                'message': '沒有待審核的報工記錄',
+                'approved_count': 0,
+                'rejected_count': 0
+            }
+        
+        approved_count = 0
+        rejected_count = 0
+        approved_reports = []
+        rejected_reports = []
+        
+        for report in pending_reports:
+            should_approve = True
+            rejection_reason = []
+            
+            # 檢查工作時數
+            if settings.auto_approve_work_hours:
+                work_hours = float(report.work_hours_calculated or 0)
+                if work_hours > float(settings.max_work_hours):
+                    should_approve = False
+                    rejection_reason.append(f"工作時數({work_hours}小時)超過限制({settings.max_work_hours}小時)")
+            
+            # 檢查不良率
+            if settings.auto_approve_defect_rate and should_approve:
+                if hasattr(report, 'defect_quantity') and hasattr(report, 'completed_quantity'):
+                    if report.completed_quantity > 0:
+                        defect_rate = (report.defect_quantity / report.completed_quantity) * 100
+                        if defect_rate > float(settings.max_defect_rate):
+                            should_approve = False
+                            rejection_reason.append(f"不良率({defect_rate:.2f}%)超過限制({settings.max_defect_rate}%)")
+            
+            # 檢查加班時數
+            if settings.auto_approve_overtime and should_approve:
+                overtime_hours = float(report.overtime_hours_calculated or 0)
+                if overtime_hours > float(settings.max_overtime_hours):
+                    should_approve = False
+                    rejection_reason.append(f"加班時數({overtime_hours}小時)超過限制({settings.max_overtime_hours}小時)")
+            
+            # 執行審核
+            if should_approve:
+                report.approval_status = 'approved'
+                report.approved_at = timezone.now()
+                report.approved_by = '自動審核系統'
+                report.approval_remarks = '自動審核通過'
+                report.save()
+                approved_count += 1
+                approved_reports.append(report.id)
+                logger.info(f"自動審核通過: 報工記錄 {report.id} (作業員: {report.operator}, 工序: {report.operation})")
+            else:
+                report.approval_status = 'rejected'
+                report.rejected_at = timezone.now()
+                report.rejected_by = '自動審核系統'
+                report.rejection_reason = '; '.join(rejection_reason)
+                report.save()
+                rejected_count += 1
+                rejected_reports.append(report.id)
+                logger.info(f"自動審核拒絕: 報工記錄 {report.id} (作業員: {report.operator}, 工序: {report.operation}) - 原因: {'; '.join(rejection_reason)}")
+        
+        # 發送通知（如果啟用）
+        if settings.notification_enabled and (approved_count > 0 or rejected_count > 0):
+            try:
+                # 這裡可以實作發送通知的邏輯
+                logger.info(f"自動審核完成通知: 通過 {approved_count} 筆，拒絕 {rejected_count} 筆")
+            except Exception as e:
+                logger.error(f"發送自動審核通知失敗: {str(e)}")
+        
+        logger.info(f"自動審核完成: 總計 {total_pending} 筆，通過 {approved_count} 筆，拒絕 {rejected_count} 筆")
+        
+        return {
+            'success': True,
+            'message': f'自動審核完成，通過: {approved_count}，拒絕: {rejected_count}',
+            'total_pending': total_pending,
+            'approved_count': approved_count,
+            'rejected_count': rejected_count,
+            'approved_reports': approved_reports,
+            'rejected_reports': rejected_reports
+        }
+        
+    except Exception as e:
+        logger.error(f"自動審核任務執行失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'自動審核任務執行失敗: {str(e)}'
+        }
+
+
+@shared_task
+def sync_scheduled_tasks_to_celery():
+    """
+    同步 ScheduledTask 到 Celery Beat
+    確保所有定時任務都正確地同步到 Celery Beat 系統
+    """
+    from system.models import ScheduledTask
+    from django_celery_beat.models import PeriodicTask, CrontabSchedule
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        synced_count = 0
+        error_count = 0
+        
+        for scheduled_task in ScheduledTask.objects.all():
+            try:
+                # 解析 Cron 表達式
+                cron_parts = scheduled_task.cron_expression.split()
+                if len(cron_parts) != 5:
+                    logger.error(f"任務 {scheduled_task.name} 的 Cron 表達式格式錯誤: {scheduled_task.cron_expression}")
+                    error_count += 1
+                    continue
+                
+                minute, hour, day_of_month, month_of_year, day_of_week = cron_parts
+                
+                # 創建或取得 Crontab 排程
+                crontab, created = CrontabSchedule.objects.get_or_create(
+                    minute=minute,
+                    hour=hour,
+                    day_of_month=day_of_month,
+                    month_of_year=month_of_year,
+                    day_of_week=day_of_week,
+                )
+                
+                # 創建或更新定時任務
+                task, created = PeriodicTask.objects.get_or_create(
+                    name=f"scheduled_task_{scheduled_task.id}",
+                    defaults={
+                        'task': scheduled_task.task_function,
+                        'crontab': crontab,
+                        'enabled': scheduled_task.is_enabled,
+                        'description': scheduled_task.description
+                    }
+                )
+                
+                if not created:
+                    # 更新現有任務
+                    task.task = scheduled_task.task_function
+                    task.crontab = crontab
+                    task.enabled = scheduled_task.is_enabled
+                    task.description = scheduled_task.description
+                    task.save()
+                
+                synced_count += 1
+                logger.info(f"成功同步任務: {scheduled_task.name}")
+                
+            except Exception as e:
+                logger.error(f"同步任務 {scheduled_task.name} 失敗: {str(e)}")
+                error_count += 1
+        
+        logger.info(f"定時任務同步完成: 成功 {synced_count} 個，失敗 {error_count} 個")
+        
+        return {
+            'success': True,
+            'synced_count': synced_count,
+            'error_count': error_count,
+            'message': f'同步完成: 成功 {synced_count} 個，失敗 {error_count} 個'
+        }
+        
+    except Exception as e:
+        logger.error(f"同步定時任務失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'同步定時任務失敗: {str(e)}'
+        }
+
+
+@shared_task
 def clean_operation_logs_task():
     try:
         config = OperationLogConfig.objects.get(id=1)

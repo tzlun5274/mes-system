@@ -224,6 +224,67 @@ class AutoApprovalSettings(models.Model):
         return "、".join(conditions) if conditions else "無自動審核條件"
 
 
+class ScheduledTask(models.Model):
+    """定時任務設定"""
+    TASK_TYPES = [
+        ('auto_approve', '自動審核'),
+        ('workorder_analysis', '工單分析'),
+        ('data_backup', '資料備份'),
+        ('report_generation', '報表生成'),
+        ('data_cleanup', '資料清理'),
+    ]
+    
+    name = models.CharField(max_length=100, verbose_name="任務名稱")
+    task_type = models.CharField(max_length=50, choices=TASK_TYPES, verbose_name="任務類型")
+    task_function = models.CharField(max_length=200, verbose_name="任務函數")
+    
+    # 間隔設定
+    interval_minutes = models.IntegerField(
+        verbose_name="間隔分鐘數",
+        help_text="每多少分鐘執行一次"
+    )
+    
+    is_enabled = models.BooleanField(default=True, verbose_name="啟用狀態")
+    description = models.TextField(blank=True, verbose_name="任務描述")
+    last_run_at = models.DateTimeField(null=True, blank=True, verbose_name="最後執行時間")
+    next_run_at = models.DateTimeField(null=True, blank=True, verbose_name="下次執行時間")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+
+    class Meta:
+        verbose_name = "定時任務"
+        verbose_name_plural = "定時任務"
+        db_table = 'system_scheduled_task'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_task_type_display()})"
+
+    def get_schedule_description(self):
+        """取得定時描述"""
+        if self.interval_minutes:
+            if self.interval_minutes < 60:
+                return f"每 {self.interval_minutes} 分鐘執行一次"
+            elif self.interval_minutes == 60:
+                return "每小時執行一次"
+            else:
+                hours = self.interval_minutes // 60
+                minutes = self.interval_minutes % 60
+                if minutes == 0:
+                    return f"每 {hours} 小時執行一次"
+                else:
+                    return f"每 {hours} 小時 {minutes} 分鐘執行一次"
+        else:
+            return "未設定間隔"
+
+    def clean(self):
+        """驗證模型"""
+        from django.core.exceptions import ValidationError
+        
+        if not self.interval_minutes or self.interval_minutes <= 0:
+            raise ValidationError("間隔分鐘數必須大於0")
+
+
 class ReportSyncSettings(models.Model):
     """報表同步設定"""
     sync_type = models.CharField(

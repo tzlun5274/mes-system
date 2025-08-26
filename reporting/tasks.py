@@ -129,3 +129,118 @@ def generate_system_cleanup_report():
         
     except Exception as e:
         logger.error(f"生成系統清理報告失敗: {str(e)}")
+
+
+@shared_task
+def auto_analyze_completed_workorders():
+    """
+    定時自動分析已完工工單
+    每小時執行一次，分析最近完工的工單
+    """
+    from workorder.models import CompletedWorkOrder
+    from .models import CompletedWorkOrderAnalysis
+    from .services import WorkOrderAnalysisService
+    from datetime import datetime, timedelta
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # 取得最近24小時內完工的工單
+        yesterday = datetime.now().date() - timedelta(days=1)
+        
+        # 查詢最近完工但尚未分析的工單
+        recent_completed = CompletedWorkOrder.objects.filter(
+            completed_at__date__gte=yesterday
+        ).values_list('workorder_id', 'company_code')
+        
+        # 取得已經分析過的工單ID
+        analyzed_workorders = set(
+            CompletedWorkOrderAnalysis.objects.values_list('workorder_id', 'company_code')
+        )
+        
+        # 過濾出尚未分析的工單
+        pending_analysis = [
+            (workorder_id, company_code) 
+            for workorder_id, company_code in recent_completed
+            if (workorder_id, company_code) not in analyzed_workorders
+        ]
+        
+        if not pending_analysis:
+            logger.info("沒有需要分析的工單")
+            return {
+                'success': True,
+                'message': '沒有需要分析的工單',
+                'analyzed_count': 0
+            }
+        
+        # 批量分析
+        success_count = 0
+        error_count = 0
+        errors = []
+        
+        for workorder_id, company_code in pending_analysis:
+            try:
+                result = WorkOrderAnalysisService.analyze_completed_workorder(
+                    workorder_id, company_code, force=False
+                )
+                if result['success']:
+                    success_count += 1
+                    logger.info(f"成功分析工單: {workorder_id}")
+                else:
+                    error_count += 1
+                    errors.append(f"工單 {workorder_id}: {result.get('error', '未知錯誤')}")
+                    logger.error(f"分析工單失敗 {workorder_id}: {result.get('error', '未知錯誤')}")
+            except Exception as e:
+                error_count += 1
+                errors.append(f"工單 {workorder_id}: {str(e)}")
+                logger.error(f"分析工單時發生異常 {workorder_id}: {str(e)}")
+        
+        logger.info(f"自動分析完成: 成功 {success_count} 筆，失敗 {error_count} 筆")
+        
+        return {
+            'success': True,
+            'message': f'自動分析完成，成功: {success_count}，失敗: {error_count}',
+            'analyzed_count': success_count,
+            'error_count': error_count,
+            'errors': errors
+        }
+        
+    except Exception as e:
+        logger.error(f"自動分析任務執行失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'自動分析任務執行失敗: {str(e)}'
+        }
+
+
+@shared_task
+def batch_analyze_completed_workorders(start_date=None, end_date=None, company_code=None):
+    """
+    批量分析已完工工單（手動觸發）
+    """
+    from .services import WorkOrderAnalysisService
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        result = WorkOrderAnalysisService.analyze_completed_workorders_batch(
+            start_date=start_date,
+            end_date=end_date,
+            company_code=company_code
+        )
+        
+        if result['success']:
+            logger.info(f"批量分析完成: {result['message']}")
+        else:
+            logger.error(f"批量分析失敗: {result.get('error', '未知錯誤')}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"批量分析任務執行失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'批量分析任務執行失敗: {str(e)}'
+        }

@@ -1,0 +1,8 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+
+唯一工單識別條件
+公司名稱+工單號碼+產品編號才是唯一的工單

@@ -40,6 +40,9 @@ from django.db.models import Q
 from datetime import timedelta
 from django.views.generic import UpdateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.views.generic import ListView, CreateView, DeleteView
+from .models import ScheduledTask
+from .forms import ScheduledTaskForm
 
 # 設定系統管理模組的日誌記錄器
 system_logger = logging.getLogger("system")
@@ -1715,6 +1718,8 @@ def workorder_settings(request):
         # 定時任務設定
         auto_allocation_enabled = request.POST.get('auto_allocation_enabled') == 'on'
         auto_allocation_interval = int(request.POST.get('auto_allocation_interval', 30))
+        auto_approval_task_enabled = request.POST.get('auto_approval_task_enabled') == 'on'
+        auto_approval_task_interval = int(request.POST.get('auto_approval_task_interval', 30))
         
         # 完工判斷設定
         completion_check_enabled = request.POST.get('completion_check_enabled') == 'on'
@@ -1826,6 +1831,17 @@ def workorder_settings(request):
                 )
                 auto_allocation_task.interval = interval_schedule
             auto_allocation_task.save()
+            
+            # 自動審核定時任務
+            auto_approval_task = PeriodicTask.objects.get(name='auto_approve_work_reports')
+            auto_approval_task.enabled = auto_approval_task_enabled
+            if auto_approval_task_interval != auto_approval_task.interval.every:
+                interval_schedule, _ = IntervalSchedule.objects.get_or_create(
+                    every=auto_approval_task_interval,
+                    period=IntervalSchedule.MINUTES,
+                )
+                auto_approval_task.interval = interval_schedule
+            auto_approval_task.save()
             
         except PeriodicTask.DoesNotExist as e:
             messages.warning(request, f"部分定時任務未找到：{str(e)}")
@@ -1952,6 +1968,17 @@ def workorder_settings(request):
             'last_run': None
         })
     
+    # 取得自動審核定時任務狀態
+    try:
+        auto_approval_task = PeriodicTask.objects.get(name='auto_approve_work_reports')
+        auto_approval_task.interval_minutes = auto_approval_task.interval.every
+    except PeriodicTask.DoesNotExist:
+        auto_approval_task = type('obj', (object,), {
+            'enabled': False,
+            'interval_minutes': 30,
+            'last_run': None
+        })
+    
     context = {
         'auto_approval': auto_approval,
         'notification_enabled': notification_enabled,
@@ -1959,6 +1986,7 @@ def workorder_settings(request):
         'max_file_size': max_file_size,
         'session_timeout': session_timeout,
         'auto_allocation_task': auto_allocation_task,
+        'auto_approval_task': auto_approval_task,
         'completion_check_enabled': completion_check_enabled,
         'completion_check_interval': completion_check_interval,
         'packaging_process_name': packaging_process_name,
@@ -1979,6 +2007,39 @@ def workorder_settings(request):
     }
     
     return render(request, 'system/workorder_settings.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_auto_approval(request):
+    """
+    手動執行自動審核 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from system.tasks import auto_approve_work_reports
+        
+        result = auto_approve_work_reports()
+        
+        if result['success']:
+            return JsonResponse({
+                'success': True,
+                'message': f"自動審核執行完成：{result['message']}"
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': f"自動審核執行失敗：{result.get('error', '未知錯誤')}"
+            })
+            
+    except Exception as e:
+        logger.error(f"手動執行自動審核失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f"執行失敗：{str(e)}"
+        })
 
 
 @login_required
@@ -2374,6 +2435,221 @@ def execute_cleanup(request):
             )
             
             return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': '無效的請求方法'})
+
+
+class ScheduledTaskListView(LoginRequiredMixin, ListView):
+    """定時任務清單"""
+    model = ScheduledTask
+    template_name = 'system/scheduled_task_list.html'
+    context_object_name = 'tasks'
+    paginate_by = 20
+
+    def get_queryset(self):
+        return ScheduledTask.objects.all().order_by('-created_at')
+
+
+class ScheduledTaskCreateView(LoginRequiredMixin, CreateView):
+    """創建定時任務"""
+    model = ScheduledTask
+    form_class = ScheduledTaskForm
+    template_name = 'system/scheduled_task_form.html'
+    success_url = reverse_lazy('system:scheduled_task_list')
+
+    def form_valid(self, form):
+        # 根據任務類型設定預設的任務函數
+        task_type = form.cleaned_data['task_type']
+        if task_type == 'auto_approve':
+            form.instance.task_function = 'system.tasks.auto_approve_work_reports'
+        elif task_type == 'workorder_analysis':
+            form.instance.task_function = 'reporting.tasks.auto_analyze_completed_workorders'
+        elif task_type == 'data_backup':
+            form.instance.task_function = 'system.tasks.auto_backup_database'
+        elif task_type == 'report_generation':
+            form.instance.task_function = 'reporting.tasks.generate_daily_reports'
+        elif task_type == 'data_cleanup':
+            form.instance.task_function = 'system.tasks.cleanup_old_data'
+        
+        response = super().form_valid(form)
+        
+        # 創建或更新 Celery Beat 定時任務
+        self.create_celery_task(form.instance)
+        
+        messages.success(self.request, f'定時任務 "{form.instance.name}" 已創建')
+        return response
+
+    def create_celery_task(self, scheduled_task):
+        """創建 Celery Beat 定時任務"""
+        try:
+            from django_celery_beat.models import PeriodicTask, IntervalSchedule
+            
+            # 創建或取得間隔排程
+            interval_schedule, created = IntervalSchedule.objects.get_or_create(
+                every=scheduled_task.interval_minutes,
+                period=IntervalSchedule.MINUTES,
+            )
+            
+            # 創建或更新定時任務
+            task, created = PeriodicTask.objects.get_or_create(
+                name=f"scheduled_task_{scheduled_task.id}",
+                defaults={
+                    'task': scheduled_task.task_function,
+                    'interval': interval_schedule,
+                    'enabled': scheduled_task.is_enabled,
+                    'description': scheduled_task.description
+                }
+            )
+            
+            if not created:
+                task.task = scheduled_task.task_function
+                task.interval = interval_schedule
+                task.enabled = scheduled_task.is_enabled
+                task.description = scheduled_task.description
+                task.save()
+                
+        except Exception as e:
+            messages.error(self.request, f'創建 Celery 定時任務失敗: {str(e)}')
+
+
+class ScheduledTaskUpdateView(LoginRequiredMixin, UpdateView):
+    """更新定時任務"""
+    model = ScheduledTask
+    form_class = ScheduledTaskForm
+    template_name = 'system/scheduled_task_form.html'
+    success_url = reverse_lazy('system:scheduled_task_list')
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        
+        # 更新 Celery Beat 定時任務
+        self.update_celery_task(form.instance)
+        
+        messages.success(self.request, f'定時任務 "{form.instance.name}" 已更新')
+        return response
+
+    def update_celery_task(self, scheduled_task):
+        """更新 Celery Beat 定時任務"""
+        try:
+            from django_celery_beat.models import PeriodicTask, CrontabSchedule
+            
+            # 解析 Cron 表達式
+            cron_parts = scheduled_task.cron_expression.split()
+            if len(cron_parts) != 5:
+                raise ValueError("Cron 表達式格式錯誤")
+            
+            minute, hour, day_of_month, month_of_year, day_of_week = cron_parts
+            
+            # 創建或取得 Crontab 排程
+            crontab, created = CrontabSchedule.objects.get_or_create(
+                minute=minute,
+                hour=hour,
+                day_of_month=day_of_month,
+                month_of_year=month_of_year,
+                day_of_week=day_of_week,
+            )
+            
+            # 更新定時任務
+            task = PeriodicTask.objects.filter(name=f"scheduled_task_{scheduled_task.id}").first()
+            if task:
+                task.task = scheduled_task.task_function
+                task.crontab = crontab
+                task.enabled = scheduled_task.is_enabled
+                task.description = scheduled_task.description
+                task.save()
+            else:
+                # 如果不存在，創建新的
+                PeriodicTask.objects.create(
+                    name=f"scheduled_task_{scheduled_task.id}",
+                    task=scheduled_task.task_function,
+                    crontab=crontab,
+                    enabled=scheduled_task.is_enabled,
+                    description=scheduled_task.description
+                )
+                
+        except Exception as e:
+            messages.error(self.request, f'更新 Celery 定時任務失敗: {str(e)}')
+
+
+class ScheduledTaskDeleteView(LoginRequiredMixin, DeleteView):
+    """刪除定時任務"""
+    model = ScheduledTask
+    template_name = 'system/scheduled_task_confirm_delete.html'
+    success_url = reverse_lazy('system:scheduled_task_list')
+
+    def delete(self, request, *args, **kwargs):
+        scheduled_task = self.get_object()
+        
+        # 刪除 Celery Beat 定時任務
+        try:
+            from django_celery_beat.models import PeriodicTask
+            task = PeriodicTask.objects.filter(name=f"scheduled_task_{scheduled_task.id}").first()
+            if task:
+                task.delete()
+        except Exception as e:
+            messages.error(request, f'刪除 Celery 定時任務失敗: {str(e)}')
+        
+        messages.success(request, f'定時任務 "{scheduled_task.name}" 已刪除')
+        return super().delete(request, *args, **kwargs)
+
+
+@login_required
+def toggle_scheduled_task(request, pk):
+    """切換定時任務啟用狀態"""
+    try:
+        task = ScheduledTask.objects.get(pk=pk)
+        task.is_enabled = not task.is_enabled
+        task.save()
+        
+        # 更新 Celery Beat 定時任務狀態
+        from django_celery_beat.models import PeriodicTask
+        celery_task = PeriodicTask.objects.filter(name=f"scheduled_task_{task.id}").first()
+        if celery_task:
+            celery_task.enabled = task.is_enabled
+            celery_task.save()
+        
+        status = '啟用' if task.is_enabled else '停用'
+        return JsonResponse({
+            'success': True, 
+            'message': f'定時任務已{status}',
+            'is_enabled': task.is_enabled
+        })
+        
+    except ScheduledTask.DoesNotExist:
+        return JsonResponse({'success': False, 'error': '定時任務不存在'})
+
+
+@login_required
+def test_cron_expression(request):
+    """測試 Cron 表達式"""
+    if request.method == 'POST':
+        cron_expression = request.POST.get('cron_expression', '')
+        
+        try:
+            from croniter import croniter
+            from datetime import datetime, timedelta
+            
+            cron = croniter(cron_expression)
+            
+            # 計算接下來5次的執行時間
+            next_runs = []
+            current_time = datetime.now()
+            
+            for i in range(5):
+                next_run = cron.get_next(datetime)
+                next_runs.append(next_run.strftime('%Y-%m-%d %H:%M:%S'))
+            
+            return JsonResponse({
+                'success': True,
+                'description': cron.get_description(locale='zh_TW'),
+                'next_runs': next_runs
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Cron 表達式錯誤: {str(e)}'
+            })
     
     return JsonResponse({'success': False, 'error': '無效的請求方法'})
 

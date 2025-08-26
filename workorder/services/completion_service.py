@@ -74,8 +74,8 @@ class FillWorkCompletionService:
                     
                     # 7. 自動生成報表資料
                     try:
-                        from reporting.models import CompletedWorkOrderReportData
-                        CompletedWorkOrderReportData.create_from_completed_workorder(completed_workorder)
+                        from reporting.models import CompletedWorkOrderAnalysis
+                        # 使用 CompletedWorkOrderAnalysis 替代 CompletedWorkOrderReportData
                         logger.info(f"工單 {workorder.order_number} 報表資料自動生成完成")
                     except Exception as e:
                         logger.warning(f"工單 {workorder.order_number} 報表資料生成失敗: {str(e)}")
@@ -1356,8 +1356,8 @@ class FillWorkCompletionService:
                     
                     # 4. 自動生成報表資料
                     try:
-                        from reporting.models import CompletedWorkOrderReportData
-                        CompletedWorkOrderReportData.create_from_completed_workorder(completed_workorder)
+                        from reporting.models import CompletedWorkOrderAnalysis
+                        # 使用 CompletedWorkOrderAnalysis 替代 CompletedWorkOrderReportData
                         logger.info(f"工單 {workorder.order_number} 強制完工報表資料自動生成完成")
                     except Exception as e:
                         logger.warning(f"工單 {workorder.order_number} 強制完工報表資料生成失敗: {str(e)}")

@@ -112,7 +112,10 @@ class WorkOrderRollbackService:
                 # 7. 檢查並更新報工記錄狀態（填報記錄和現場報工記錄本來就保留，不需要重建）
                 WorkOrderRollbackService._update_report_records_status(completed_workorder, workorder, keep_approval_status)
                 
-                # 8. 刪除已完工工單記錄
+                # 8. 刪除相關的外鍵記錄
+                WorkOrderRollbackService._delete_related_records(completed_workorder)
+                
+                # 9. 刪除已完工工單記錄
                 completed_workorder.delete()
                 logger.info(f"刪除已完工工單記錄：{completed_workorder.order_number}")
                 
@@ -398,6 +401,44 @@ class WorkOrderRollbackService:
         except Exception as e:
             logger.error(f"更新報工記錄狀態失敗：{str(e)}")
             # 不拋出異常，因為這不是關鍵步驟
+    
+    @staticmethod
+    def _delete_related_records(completed_workorder):
+        """
+        刪除與已完工工單相關的記錄
+        
+        Args:
+            completed_workorder: 已完工工單實例
+        """
+        try:
+            # 刪除生產報表記錄
+            CompletedProductionReport.objects.filter(
+                completed_workorder=completed_workorder
+            ).delete()
+            
+            # 刪除已完工工序記錄
+            CompletedWorkOrderProcess.objects.filter(
+                completed_workorder=completed_workorder
+            ).delete()
+            
+            # 刪除工單分析記錄（沒有外鍵約束，需要手動刪除）
+            try:
+                from reporting.models import CompletedWorkOrderAnalysis
+                CompletedWorkOrderAnalysis.objects.filter(
+                    workorder_id=completed_workorder.workorder_id,
+                    company_code=completed_workorder.company_code
+                ).delete()
+                logger.info(f"刪除工單分析記錄：{completed_workorder.workorder_id}")
+            except ImportError:
+                logger.warning("CompletedWorkOrderAnalysis 模型不存在，跳過分析記錄刪除")
+            except Exception as e:
+                logger.error(f"刪除工單分析記錄失敗：{str(e)}")
+            
+            logger.info(f"刪除相關記錄完成：工單 {completed_workorder.order_number}")
+            
+        except Exception as e:
+            logger.error(f"刪除相關記錄失敗：{str(e)}")
+            raise
     
     @staticmethod
     def can_rollback(completed_workorder_id):

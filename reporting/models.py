@@ -211,171 +211,7 @@ class WorkOrderReportData(models.Model):
         return report_data
 
 
-class CompletedWorkOrderReportData(models.Model):
-    """
-    已完工工單報表資料模型
-    用於儲存已完工工單的報表統計資料
-    """
-    # 工單識別資訊
-    workorder_id = models.CharField(max_length=100, verbose_name="工單編號")
-    product_code = models.CharField(max_length=100, verbose_name="產品編號")
-    company_code = models.CharField(max_length=10, verbose_name="公司代號")
-    company_name = models.CharField(max_length=100, verbose_name="公司名稱")
-    
-    # 時間維度
-    completion_date = models.DateField(verbose_name="完工日期")
-    completion_week = models.IntegerField(verbose_name="完工週數")
-    completion_month = models.IntegerField(verbose_name="完工月份")
-    completion_quarter = models.IntegerField(verbose_name="完工季度")
-    completion_year = models.IntegerField(verbose_name="完工年度")
-    
-    # 數量統計
-    planned_quantity = models.IntegerField(verbose_name="計劃數量")
-    completed_quantity = models.IntegerField(verbose_name="完成數量")
-    completion_rate = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="完工率")
-    
-    # 品質統計
-    total_good_quantity = models.IntegerField(verbose_name="總合格品數量")
-    total_defect_quantity = models.IntegerField(verbose_name="總不良品數量")
-    defect_rate = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="不良率")
-    
-    # 時數統計
-    total_work_hours = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="總工作時數")
-    total_overtime_hours = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="總加班時數")
-    total_all_hours = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="全部總時數")
-    
-    # 效率統計
-    efficiency_rate = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="效率率")
-    hourly_output = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="每小時產出")
-    
-    # 人員和設備統計
-    unique_operators_count = models.IntegerField(verbose_name="參與作業員數")
-    unique_equipment_count = models.IntegerField(verbose_name="使用設備數")
-    total_report_count = models.IntegerField(verbose_name="總報工次數")
-    
-    # 工序統計
-    total_processes = models.IntegerField(verbose_name="總工序數")
-    completed_processes = models.IntegerField(verbose_name="完成工序數")
-    
-    # 系統欄位
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
-    
-    class Meta:
-        verbose_name = "已完工工單報表資料"
-        verbose_name_plural = "已完工工單報表資料"
-        db_table = 'completed_workorder_report_data'
-        unique_together = ['workorder_id', 'company_code', 'completion_date']
-        indexes = [
-            models.Index(fields=['company_code', 'completion_date']),
-            models.Index(fields=['company_code', 'completion_year', 'completion_month']),
-            models.Index(fields=['company_code', 'completion_year', 'completion_quarter']),
-            models.Index(fields=['company_code', 'completion_year']),
-        ]
-    
-    def __str__(self):
-        return f"{self.workorder_id} - {self.completion_date}"
-    
-    @classmethod
-    def create_from_completed_workorder(cls, completed_workorder):
-        """從已完工工單建立報表資料"""
-        from datetime import datetime
-        import calendar
-        
-        # 取得完工日期
-        completion_date = completed_workorder.completed_at.date()
-        
-        # 計算時間維度
-        completion_year = completion_date.year
-        completion_month = completion_date.month
-        
-        # 計算週數
-        week_num = completion_date.isocalendar()[1]
-        
-        # 計算季度
-        completion_quarter = (completion_month - 1) // 3 + 1
-        
-        # 計算完工率
-        completion_rate = Decimal('0.00')
-        if completed_workorder.planned_quantity > 0:
-            completion_rate = Decimal(str((completed_workorder.completed_quantity / completed_workorder.planned_quantity) * 100)).quantize(Decimal('0.01'))
-        
-        # 計算不良率
-        defect_rate = Decimal('0.00')
-        total_quantity = completed_workorder.total_good_quantity + completed_workorder.total_defect_quantity
-        if total_quantity > 0:
-            defect_rate = Decimal(str((completed_workorder.total_defect_quantity / total_quantity) * 100)).quantize(Decimal('0.01'))
-        
-        # 計算效率率（基於計劃時數，這裡簡化為100%）
-        efficiency_rate = Decimal('100.00')
-        
-        # 計算每小時產出
-        hourly_output = Decimal('0.00')
-        if completed_workorder.total_all_hours > 0:
-            hourly_output = Decimal(str(completed_workorder.completed_quantity / completed_workorder.total_all_hours)).quantize(Decimal('0.01'))
-        
-        # 計算參與人員和設備數
-        unique_operators_count = len(completed_workorder.unique_operators) if completed_workorder.unique_operators else 0
-        unique_equipment_count = len(completed_workorder.unique_equipment) if completed_workorder.unique_equipment else 0
-        
-        # 計算工序統計
-        total_processes = completed_workorder.processes.count()
-        completed_processes = completed_workorder.processes.filter(status='completed').count()
-        
-        # 建立或更新報表資料
-        report_data, created = cls.objects.get_or_create(
-            workorder_id=completed_workorder.order_number,
-            company_code=completed_workorder.company_code,
-            completion_date=completion_date,
-            defaults={
-                'product_code': completed_workorder.product_code,
-                'company_name': completed_workorder.company_name,
-                'completion_week': week_num,
-                'completion_month': completion_month,
-                'completion_quarter': completion_quarter,
-                'completion_year': completion_year,
-                'planned_quantity': completed_workorder.planned_quantity,
-                'completed_quantity': completed_workorder.completed_quantity,
-                'completion_rate': completion_rate,
-                'total_good_quantity': completed_workorder.total_good_quantity,
-                'total_defect_quantity': completed_workorder.total_defect_quantity,
-                'defect_rate': defect_rate,
-                'total_work_hours': completed_workorder.total_work_hours,
-                'total_overtime_hours': completed_workorder.total_overtime_hours,
-                'total_all_hours': completed_workorder.total_all_hours,
-                'efficiency_rate': efficiency_rate,
-                'hourly_output': hourly_output,
-                'unique_operators_count': unique_operators_count,
-                'unique_equipment_count': unique_equipment_count,
-                'total_report_count': completed_workorder.total_report_count,
-                'total_processes': total_processes,
-                'completed_processes': completed_processes,
-            }
-        )
-        
-        if not created:
-            # 更新現有記錄
-            report_data.product_code = completed_workorder.product_code
-            report_data.company_name = completed_workorder.company_name
-            report_data.planned_quantity = completed_workorder.planned_quantity
-            report_data.completed_quantity = completed_workorder.completed_quantity
-            report_data.completion_rate = completion_rate
-            report_data.total_good_quantity = completed_workorder.total_good_quantity
-            report_data.total_defect_quantity = completed_workorder.total_defect_quantity
-            report_data.defect_rate = defect_rate
-            report_data.total_work_hours = completed_workorder.total_work_hours
-            report_data.total_overtime_hours = completed_workorder.total_overtime_hours
-            report_data.total_all_hours = completed_workorder.total_all_hours
-            report_data.efficiency_rate = efficiency_rate
-            report_data.hourly_output = hourly_output
-            report_data.unique_operators_count = unique_operators_count
-            report_data.unique_equipment_count = unique_equipment_count
-            report_data.total_report_count = completed_workorder.total_report_count
-            report_data.total_processes = total_processes
-            report_data.completed_processes = completed_processes
-            report_data.save()
-        
-        return report_data
+
 
 
 class ReportSchedule(models.Model):
@@ -603,3 +439,53 @@ class OperatorProcessCapacityScore(models.Model):
             self.overall_grade = self.get_grade(self.total_score)
         
         super().save(*args, **kwargs) 
+
+
+class CompletedWorkOrderAnalysis(models.Model):
+    """已完工工單分析資料表"""
+    workorder_id = models.CharField(max_length=50, verbose_name="工單編號")
+    company_code = models.CharField(max_length=10, verbose_name="公司代號")
+    company_name = models.CharField(max_length=100, verbose_name="公司名稱")
+    product_code = models.CharField(max_length=100, verbose_name="產品編號")
+    product_name = models.CharField(max_length=200, verbose_name="產品名稱")
+    order_quantity = models.IntegerField(verbose_name="訂單數量")
+    
+    # 時間分析
+    first_record_date = models.DateField(verbose_name="第一筆紀錄日期")
+    last_record_date = models.DateField(verbose_name="最後一筆紀錄日期")
+    total_execution_days = models.IntegerField(verbose_name="總執行天數")
+    total_work_hours = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="總工作時數")
+    total_overtime_hours = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="總加班時數")
+    average_daily_hours = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="平均每日工作時數")
+    efficiency_rate = models.DecimalField(max_digits=5, decimal_places=2, verbose_name="效率比率")
+    
+    # 工序分析
+    total_processes = models.IntegerField(verbose_name="總工序數")
+    unique_processes = models.IntegerField(verbose_name="不重複工序數")
+    total_operators = models.IntegerField(verbose_name="參與作業員數")
+    
+    # 完成資訊
+    completion_date = models.DateField(verbose_name="完工日期")
+    completion_status = models.CharField(max_length=20, verbose_name="完工狀態")
+    
+    # 詳細資料（JSON格式）
+    process_details = models.JSONField(verbose_name="工序詳細資料", help_text="包含每個工序的執行順序、時間、作業員等詳細資訊")
+    operator_details = models.JSONField(verbose_name="作業員詳細資料", help_text="包含每個作業員的工作時數、工序等資訊")
+    
+    # 系統欄位
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    
+    class Meta:
+        verbose_name = "已完工工單分析"
+        verbose_name_plural = "已完工工單分析"
+        db_table = 'completed_workorder_analysis'
+        unique_together = ['workorder_id', 'company_code']
+        indexes = [
+            models.Index(fields=['company_code', 'completion_date']),
+            models.Index(fields=['completion_date']),
+            models.Index(fields=['workorder_id']),
+        ]
+    
+    def __str__(self):
+        return f"{self.workorder_id} - {self.company_name} - {self.completion_date}" 

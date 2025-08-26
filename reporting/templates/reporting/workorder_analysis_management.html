@@ -1,0 +1,460 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}工單分析管理 - MES系統{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+    }
+    .management-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .schedule-status {
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+    }
+    .status-active {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    .status-inactive {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-cogs text-primary"></i>
+                    工單分析管理
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}">報表管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'reporting:completed_workorder_analysis' %}">已完工工單分析報表</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">分析管理</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計摘要 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <h3 class="card-title">{{ stats.total_analyzed }}</h3>
+                    <p class="card-text">已分析工單數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <h3 class="card-title">{{ stats.total_completed }}</h3>
+                    <p class="card-text">已完工工單數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <h3 class="card-title">{{ stats.pending_analysis }}</h3>
+                    <p class="card-text">待分析工單數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <h3 class="card-title">{{ stats.last_analysis_date }}</h3>
+                    <p class="card-text">最後分析時間</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 單一工單分析 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-search text-primary"></i>
+                        單一工單分析
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="singleAnalysisForm" method="post" action="{% url 'reporting:analyze_single_workorder' %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="single_workorder_id" class="form-label">工單編號</label>
+                            <input type="text" class="form-control" id="single_workorder_id" name="workorder_id" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="single_company_code" class="form-label">公司代號</label>
+                            <select class="form-select" id="single_company_code" name="company_code" required>
+                                <option value="">請選擇公司</option>
+                                {% for company_code, company_name in companies %}
+                                <option value="{{ company_code }}">{{ company_name }} ({{ company_code }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="single_force" name="force" value="true">
+                                <label class="form-check-label" for="single_force">
+                                    強制重新分析（覆蓋現有結果）
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-play"></i> 開始分析
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 批量分析 -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-layer-group text-success"></i>
+                        批量分析
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="batchAnalysisForm" method="post" action="{% url 'reporting:analyze_batch_workorders' %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="batch_company_code" class="form-label">公司代號</label>
+                            <select class="form-select" id="batch_company_code" name="company_code">
+                                <option value="">全部公司</option>
+                                {% for company_code, company_name in companies %}
+                                <option value="{{ company_code }}">{{ company_name }} ({{ company_code }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="batch_start_date" class="form-label">開始日期</label>
+                                    <input type="date" class="form-control" id="batch_start_date" name="start_date">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="batch_end_date" class="form-label">結束日期</label>
+                                    <input type="date" class="form-control" id="batch_end_date" name="end_date">
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-play"></i> 開始批量分析
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 定時任務管理 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clock text-warning"></i>
+                        定時任務管理
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>設定定時分析任務</h6>
+                            <div class="mb-3">
+                                <label for="schedule_interval" class="form-label">執行間隔（分鐘）</label>
+                                <input type="number" class="form-control" id="schedule_interval" value="60" min="1">
+                                <small class="form-text text-muted">建議設定為60分鐘或更長時間</small>
+                            </div>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-primary" onclick="setupSchedule()">
+                                    <i class="fas fa-play"></i> 啟動定時任務
+                                </button>
+                                <button type="button" class="btn btn-danger" onclick="removeSchedule()">
+                                    <i class="fas fa-stop"></i> 停止定時任務
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>定時任務狀態</h6>
+                            <div id="scheduleStatus">
+                                <div class="text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">載入中...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近分析記錄 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history text-info"></i>
+                        最近分析記錄
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_analyses %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>工單編號</th>
+                                    <th>公司</th>
+                                    <th>產品</th>
+                                    <th>執行天數</th>
+                                    <th>工作時數</th>
+                                    <th>分析時間</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for analysis in recent_analyses %}
+                                <tr>
+                                    <td><strong>{{ analysis.workorder_id }}</strong></td>
+                                    <td>{{ analysis.company_name }}</td>
+                                    <td>{{ analysis.product_name|truncatechars:30 }}</td>
+                                    <td><span class="badge bg-info">{{ analysis.total_execution_days }}天</span></td>
+                                    <td><span class="badge bg-primary">{{ analysis.total_work_hours|floatformat:1 }}小時</span></td>
+                                    <td><small>{{ analysis.created_at|date:"m-d H:i" }}</small></td>
+                                    <td>
+                                        <a href="{% url 'reporting:completed_workorder_analysis_detail' analysis.id %}" 
+                                           class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-inbox fa-2x text-muted mb-3"></i>
+                        <p class="text-muted">還沒有分析記錄</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 載入定時任務狀態
+function loadScheduleStatus() {
+    fetch('{% url "reporting:get_analysis_schedule_status" %}')
+        .then(response => response.json())
+        .then(data => {
+            const statusDiv = document.getElementById('scheduleStatus');
+            
+            if (data.has_schedule) {
+                statusDiv.innerHTML = `
+                    <div class="schedule-status status-active">
+                        <i class="fas fa-check-circle"></i>
+                        <strong>定時任務已啟動</strong><br>
+                        <small>執行間隔: 每${data.interval}分鐘</small><br>
+                        <small>最後執行: ${data.last_run || '尚未執行'}</small><br>
+                        <small>下次執行: ${data.next_run || '未知'}</small>
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="schedule-status status-inactive">
+                        <i class="fas fa-times-circle"></i>
+                        <strong>定時任務未啟動</strong><br>
+                        <small>請設定定時任務以自動分析工單</small>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('載入定時任務狀態失敗:', error);
+            document.getElementById('scheduleStatus').innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    載入狀態失敗，請稍後再試
+                </div>
+            `;
+        });
+}
+
+// 設定定時任務
+function setupSchedule() {
+    const interval = document.getElementById('schedule_interval').value;
+    
+    if (!interval || interval < 1) {
+        alert('請輸入有效的執行間隔');
+        return;
+    }
+    
+    fetch('{% url "reporting:setup_analysis_schedule" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            action: 'setup',
+            interval: parseInt(interval)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('定時任務設定成功！');
+            loadScheduleStatus();
+        } else {
+            alert('設定失敗: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('設定定時任務失敗:', error);
+        alert('設定失敗，請稍後再試');
+    });
+}
+
+// 移除定時任務
+function removeSchedule() {
+    if (!confirm('確定要停止定時任務嗎？')) {
+        return;
+    }
+    
+    fetch('{% url "reporting:setup_analysis_schedule" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            action: 'remove'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('定時任務已停止！');
+            loadScheduleStatus();
+        } else {
+            alert('停止失敗: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('停止定時任務失敗:', error);
+        alert('停止失敗，請稍後再試');
+    });
+}
+
+// 表單提交處理
+document.getElementById('singleAnalysisForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 分析中...';
+    
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('分析完成: ' + (data.message || '成功'));
+            this.reset();
+        } else {
+            alert('分析失敗: ' + (data.error || '未知錯誤'));
+        }
+    })
+    .catch(error => {
+        console.error('分析失敗:', error);
+        alert('分析失敗，請稍後再試');
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+});
+
+document.getElementById('batchAnalysisForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 批量分析中...';
+    
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('批量分析完成: ' + (data.message || '成功'));
+            this.reset();
+        } else {
+            alert('批量分析失敗: ' + (data.error || '未知錯誤'));
+        }
+    })
+    .catch(error => {
+        console.error('批量分析失敗:', error);
+        alert('批量分析失敗，請稍後再試');
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+});
+
+// 頁面載入完成後執行
+document.addEventListener('DOMContentLoaded', function() {
+    loadScheduleStatus();
+});
+</script>
+{% endblock %}

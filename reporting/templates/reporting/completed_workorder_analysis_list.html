@@ -1,0 +1,326 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}已完工工單分析列表 - MES系統{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-card {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+    }
+    .analysis-status {
+        font-size: 0.8em;
+        padding: 2px 8px;
+        border-radius: 12px;
+    }
+    .status-completed {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    .table-hover tbody tr:hover {
+        background-color: rgba(0,123,255,0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-list text-primary"></i>
+                    已完工工單分析列表
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}">報表管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'reporting:completed_workorder_analysis' %}">已完工工單分析報表</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">分析列表</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 篩選條件 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card filter-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter text-info"></i>
+                        篩選條件
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-2">
+                            <label for="company" class="form-label">公司</label>
+                            <select class="form-select" id="company" name="company">
+                                <option value="">全部公司</option>
+                                {% for company_code, company_name in companies %}
+                                <option value="{{ company_code }}" {% if selected_company == company_code %}selected{% endif %}>
+                                    {{ company_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="start_date" class="form-label">開始日期</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" 
+                                   value="{{ selected_start_date }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="end_date" class="form-label">結束日期</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" 
+                                   value="{{ selected_end_date }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="min_days" class="form-label">最少天數</label>
+                            <input type="number" class="form-control" id="min_days" name="min_days" 
+                                   value="{{ selected_min_days }}" min="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="max_days" class="form-label">最多天數</label>
+                            <input type="number" class="form-control" id="max_days" name="max_days" 
+                                   value="{{ selected_max_days }}" min="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> 篩選
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分析列表 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-table text-success"></i>
+                            分析結果列表
+                        </h5>
+                        <div>
+                            <a href="{% url 'reporting:workorder_analysis_management' %}" class="btn btn-success btn-sm">
+                                <i class="fas fa-cogs"></i> 分析管理
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if page_obj %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>工單編號</th>
+                                    <th>公司</th>
+                                    <th>產品</th>
+                                    <th>完工日期</th>
+                                    <th>執行天數</th>
+                                    <th>工作時數</th>
+                                    <th>工序數</th>
+                                    <th>效率比率</th>
+                                    <th>分析時間</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for analysis in page_obj %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ analysis.workorder_id }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ analysis.company_code }}</span>
+                                        <br><small>{{ analysis.company_name }}</small>
+                                    </td>
+                                    <td>
+                                        <div>{{ analysis.product_code }}</div>
+                                        <small class="text-muted">{{ analysis.product_name|truncatechars:30 }}</small>
+                                    </td>
+                                    <td>{{ analysis.completion_date|date:"Y-m-d" }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ analysis.total_execution_days }}天</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ analysis.total_work_hours|floatformat:1 }}小時</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-warning">{{ analysis.total_processes }}個</span>
+                                    </td>
+                                    <td>
+                                        {% if analysis.efficiency_rate >= 100 %}
+                                            <span class="badge bg-success">{{ analysis.efficiency_rate|floatformat:1 }}%</span>
+                                        {% elif analysis.efficiency_rate >= 80 %}
+                                            <span class="badge bg-warning">{{ analysis.efficiency_rate|floatformat:1 }}%</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">{{ analysis.efficiency_rate|floatformat:1 }}%</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small>{{ analysis.created_at|date:"m-d H:i" }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'reporting:completed_workorder_analysis_detail' analysis.id %}" 
+                                               class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-outline-warning btn-sm" 
+                                                    onclick="reanalyzeWorkorder('{{ analysis.workorder_id }}', '{{ analysis.company_code }}')">
+                                                <i class="fas fa-sync-alt"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分頁 -->
+                    {% if page_obj.has_other_pages %}
+                    <nav aria-label="分頁導航">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if selected_company %}&company={{ selected_company }}{% endif %}{% if selected_start_date %}&start_date={{ selected_start_date }}{% endif %}{% if selected_end_date %}&end_date={{ selected_end_date }}{% endif %}{% if selected_min_days %}&min_days={{ selected_min_days }}{% endif %}{% if selected_max_days %}&max_days={{ selected_max_days }}{% endif %}">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if selected_company %}&company={{ selected_company }}{% endif %}{% if selected_start_date %}&start_date={{ selected_start_date }}{% endif %}{% if selected_end_date %}&end_date={{ selected_end_date }}{% endif %}{% if selected_min_days %}&min_days={{ selected_min_days }}{% endif %}{% if selected_max_days %}&max_days={{ selected_max_days }}{% endif %}">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if selected_company %}&company={{ selected_company }}{% endif %}{% if selected_start_date %}&start_date={{ selected_start_date }}{% endif %}{% if selected_end_date %}&end_date={{ selected_end_date }}{% endif %}{% if selected_min_days %}&min_days={{ selected_min_days }}{% endif %}{% if selected_max_days %}&max_days={{ selected_max_days }}{% endif %}">{{ num }}</a>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if selected_company %}&company={{ selected_company }}{% endif %}{% if selected_start_date %}&start_date={{ selected_start_date }}{% endif %}{% if selected_end_date %}&end_date={{ selected_end_date }}{% endif %}{% if selected_min_days %}&min_days={{ selected_min_days }}{% endif %}{% if selected_max_days %}&max_days={{ selected_max_days }}{% endif %}">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if selected_company %}&company={{ selected_company }}{% endif %}{% if selected_start_date %}&start_date={{ selected_start_date }}{% endif %}{% if selected_end_date %}&end_date={{ selected_end_date }}{% endif %}{% if selected_min_days %}&min_days={{ selected_min_days }}{% endif %}{% if selected_max_days %}&max_days={{ selected_max_days }}{% endif %}">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    <div class="text-center mt-3">
+                        <small class="text-muted">
+                            顯示第 {{ page_obj.start_index }} 到 {{ page_obj.end_index }} 筆，共 {{ page_obj.paginator.count }} 筆記錄
+                        </small>
+                    </div>
+
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">沒有找到分析記錄</h5>
+                        <p class="text-muted">請先執行工單分析或調整篩選條件</p>
+                        <a href="{% url 'reporting:workorder_analysis_management' %}" class="btn btn-primary">
+                            <i class="fas fa-cogs"></i> 前往分析管理
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 重新分析確認對話框 -->
+<div class="modal fade" id="reanalyzeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">重新分析工單</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>確定要重新分析工單 <strong id="reanalyzeWorkorderId"></strong> 嗎？</p>
+                <p class="text-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    這將會覆蓋現有的分析結果
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" onclick="confirmReanalyze()">
+                    <i class="fas fa-sync-alt"></i> 確定重新分析
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentWorkorderId = '';
+let currentCompanyCode = '';
+
+function reanalyzeWorkorder(workorderId, companyCode) {
+    currentWorkorderId = workorderId;
+    currentCompanyCode = companyCode;
+    document.getElementById('reanalyzeWorkorderId').textContent = workorderId;
+    new bootstrap.Modal(document.getElementById('reanalyzeModal')).show();
+}
+
+function confirmReanalyze() {
+    const formData = new FormData();
+    formData.append('workorder_id', currentWorkorderId);
+    formData.append('company_code', currentCompanyCode);
+    formData.append('force', 'true');
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    fetch('{% url "reporting:analyze_single_workorder" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('重新分析失敗: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('重新分析失敗:', error);
+        alert('重新分析失敗，請稍後再試');
+    });
+
+    bootstrap.Modal.getInstance(document.getElementById('reanalyzeModal')).hide();
+}
+</script>
+{% endblock %}

@@ -438,69 +438,76 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 回朔按鈕點擊事件
-    $('#rollbackBtn').click(function() {
-        const workorderId = $(this).data('workorder-id');
-        const keepApprovalStatus = $('#keepApprovalStatus').is(':checked');
-        const $btn = $(this);
-        const $spinner = $btn.find('.loading-spinner');
-        const $icon = $btn.find('i.fas');
-        const originalText = $btn.html();
-        
-        // 顯示確認對話框
-        const approvalText = keepApprovalStatus ? '保持核准狀態' : '改為待核准狀態';
-        if (!confirm(`確定要將此工單回朔到生產中狀態嗎？\n填報記錄將${approvalText}。\n此操作不可逆轉！`)) {
-            return;
-        }
-        
-        // 禁用按鈕並顯示載入狀態
-        $btn.prop('disabled', true).addClass('btn-disabled');
-        $spinner.show();
-        $icon.hide();
-        $btn.html('<span class="loading-spinner"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>處理中...');
-        
-        // 發送回朔請求
-        $.ajax({
-            url: `/workorder/rollback/${workorderId}/execute/`,
-            method: 'POST',
-            data: {
-                keep_approval_status: keepApprovalStatus
-            },
-            headers: {
-                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
-            },
-            success: function(response) {
-                if (response.success) {
+    const rollbackBtn = document.getElementById('rollbackBtn');
+    if (rollbackBtn) {
+        rollbackBtn.addEventListener('click', function() {
+            const workorderId = this.getAttribute('data-workorder-id');
+            const keepApprovalStatusCheckbox = document.getElementById('keepApprovalStatus');
+            const keepApprovalStatus = keepApprovalStatusCheckbox ? keepApprovalStatusCheckbox.checked : true;
+            const btn = this;
+            const spinner = btn.querySelector('.loading-spinner');
+            const icon = btn.querySelector('i.fas');
+            const originalText = btn.innerHTML;
+            
+            // 顯示確認對話框
+            const approvalText = keepApprovalStatus ? '保持核准狀態' : '改為待核准狀態';
+            if (!confirm(`確定要將此工單回朔到生產中狀態嗎？\n填報記錄將${approvalText}。\n此操作不可逆轉！`)) {
+                return;
+            }
+            
+            // 禁用按鈕並顯示載入狀態
+            btn.disabled = true;
+            btn.classList.add('btn-disabled');
+            if (spinner) spinner.style.display = 'block';
+            if (icon) icon.style.display = 'none';
+            btn.innerHTML = '<span class="loading-spinner"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>處理中...';
+            
+            // 獲取 CSRF Token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            // 發送回朔請求
+            fetch(`/workorder/rollback/${workorderId}/execute/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken
+                },
+                body: new URLSearchParams({
+                    keep_approval_status: keepApprovalStatus
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
                     // 顯示成功訊息
-                    showAlert('success', response.message);
+                    showAlert('success', data.message);
                     
                     // 延遲重定向
                     setTimeout(function() {
-                        window.location.href = response.redirect_url;
+                        window.location.href = data.redirect_url;
                     }, 2000);
                 } else {
-                    showAlert('error', response.error || '回朔失敗');
+                    showAlert('error', data.error || '回朔失敗');
                     resetButton();
                 }
-            },
-            error: function(xhr) {
-                let errorMessage = '回朔失敗';
-                if (xhr.responseJSON && xhr.responseJSON.error) {
-                    errorMessage = xhr.responseJSON.error;
-                }
-                showAlert('error', errorMessage);
+            })
+            .catch(error => {
+                console.error('回朔請求失敗:', error);
+                showAlert('error', '回朔失敗');
                 resetButton();
+            });
+            
+            function resetButton() {
+                btn.disabled = false;
+                btn.classList.remove('btn-disabled');
+                if (spinner) spinner.style.display = 'none';
+                if (icon) icon.style.display = 'inline';
+                btn.innerHTML = originalText;
             }
         });
-        
-        function resetButton() {
-            $btn.prop('disabled', false).removeClass('btn-disabled');
-            $spinner.hide();
-            $icon.show();
-            $btn.html(originalText);
-        }
-    });
+    }
     
     // 顯示訊息函數
     function showAlert(type, message) {
@@ -515,7 +522,10 @@ $(document).ready(function() {
             </div>
         `;
         
-        $('.rollback-confirm-container').prepend(alertHtml);
+        const container = document.querySelector('.rollback-confirm-container');
+        if (container) {
+            container.insertAdjacentHTML('afterbegin', alertHtml);
+        }
     }
 });
 </script>

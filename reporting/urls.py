@@ -52,11 +52,19 @@ urlpatterns = [
     # 資料同步
     path('sync/', views.sync_report_data, name='sync_report_data'),
     
-    # 已完工工單報表
-    path('completed-workorder/', views.completed_workorder_report_index, name='completed_workorder_report_index'),
-    path('completed-workorder/list/', views.completed_workorder_report_list, name='completed_workorder_report_list'),
-    path('completed-workorder/<int:report_id>/', views.completed_workorder_report_detail, name='completed_workorder_report_detail'),
-    path('completed-workorder/sync/', views.sync_completed_workorder_data, name='sync_completed_workorder_data'),
+
+    
+    # 已完工工單分析報表
+    path('completed-workorder-analysis/', views.CompletedWorkOrderAnalysisIndexView.as_view(), name='completed_workorder_analysis'),
+    path('completed-workorder-analysis/list/', views.CompletedWorkOrderAnalysisListView.as_view(), name='completed_workorder_analysis_list'),
+    path('completed-workorder-analysis/<int:analysis_id>/', views.CompletedWorkOrderAnalysisDetailView.as_view(), name='completed_workorder_analysis_detail'),
+
+    # 工單分析管理
+    path('workorder-analysis/', views.WorkOrderAnalysisManagementView.as_view(), name='workorder_analysis_management'),
+    path('workorder-analysis/single/', views.analyze_single_workorder, name='analyze_single_workorder'),
+    path('workorder-analysis/batch/', views.analyze_batch_workorders, name='analyze_batch_workorders'),
+    path('workorder-analysis/setup-schedule/', views.setup_analysis_schedule, name='setup_analysis_schedule'),
+    path('workorder-analysis/schedule-status/', views.get_analysis_schedule_status, name='get_analysis_schedule_status'),
     
     # API 端點
     path('api/chart-data/', views.chart_data, name='chart_data'),

@@ -1,0 +1,480 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}工單分析詳情 - MES系統{% endblock %}
+
+{% block extra_css %}
+<style>
+    .detail-card {
+        margin-bottom: 20px;
+    }
+    .metric-item {
+        text-align: center;
+        padding: 15px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        margin-bottom: 15px;
+    }
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .metric-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    .process-item {
+        border-left: 4px solid #007bff;
+        padding-left: 15px;
+        margin-bottom: 15px;
+    }
+    .operator-item {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin: 20px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-chart-line text-primary"></i>
+                    工單分析詳情
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}">報表管理</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'reporting:completed_workorder_analysis' %}">已完工工單分析報表</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'reporting:completed_workorder_analysis_list' %}">分析列表</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">分析詳情</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 基本資訊 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle text-info"></i>
+                        工單基本資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>工單編號:</strong> {{ analysis.workorder_id }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>公司:</strong> {{ analysis.company_name }} ({{ analysis.company_code }})
+                        </div>
+                        <div class="col-md-3">
+                            <strong>產品編號:</strong> {{ analysis.product_code }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>完工日期:</strong> {{ analysis.completion_date|date:"Y-m-d" }}
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-6">
+                            <strong>產品名稱:</strong> {{ analysis.product_name }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>訂單數量:</strong> {{ analysis.order_quantity }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>分析時間:</strong> {{ analysis.created_at|date:"Y-m-d H:i" }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 關鍵指標 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="metric-item">
+                <div class="metric-value">{{ analysis.total_execution_days }}</div>
+                <div class="metric-label">總執行天數</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-item">
+                <div class="metric-value">{{ analysis.total_work_hours|floatformat:1 }}</div>
+                <div class="metric-label">總工作時數</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-item">
+                <div class="metric-value">{{ analysis.total_processes }}</div>
+                <div class="metric-label">總工序數</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-item">
+                <div class="metric-value">{{ analysis.efficiency_rate|floatformat:1 }}%</div>
+                <div class="metric-label">效率比率</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 時間分析 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card detail-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clock text-warning"></i>
+                        時間分析
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <p><strong>第一筆紀錄:</strong> {{ analysis.first_record_date|date:"Y-m-d" }}</p>
+                            <p><strong>最後一筆紀錄:</strong> {{ analysis.last_record_date|date:"Y-m-d" }}</p>
+                        </div>
+                        <div class="col-6">
+                            <p><strong>平均每日工作時數:</strong> {{ analysis.average_daily_hours|floatformat:1 }}小時</p>
+                            <p><strong>總加班時數:</strong> {{ analysis.total_overtime_hours|floatformat:1 }}小時</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card detail-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie text-success"></i>
+                        工序分析
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <p><strong>不重複工序數:</strong> {{ analysis.unique_processes }}</p>
+                            <p><strong>參與作業員數:</strong> {{ analysis.total_operators }}</p>
+                        </div>
+                        <div class="col-6">
+                            <p><strong>工序重複率:</strong> 
+                                {% if analysis.total_processes > 0 %}
+                                    {{ analysis.total_processes|add:"-"|add:analysis.unique_processes|floatformat:0 }}次
+                                {% else %}
+                                    0次
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 圖表分析 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card detail-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar text-primary"></i>
+                        工序時數分布
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="processHoursChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card detail-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-users text-info"></i>
+                        作業員工作時數
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="operatorHoursChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工序詳細分析 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-tasks text-success"></i>
+                        工序詳細分析
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if sorted_process_details %}
+                        {% for process_name, process_data in sorted_process_details %}
+                        <div class="process-item">
+                            <h6>
+                                {{ process_name }}
+                                {% if process_data.first_record_date and process_data.first_record_date != '9999-12-31' %}
+                                    <small class="text-muted">(開始: {{ process_data.first_record_date }})</small>
+                                {% endif %}
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <strong>總工作時數:</strong> {{ process_data.total_hours|floatformat:1 }}小時
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>參與作業員:</strong> {{ process_data.operators|length }}人
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>作業員:</strong> {{ process_data.operators|join:", " }}
+                                </div>
+                            </div>
+                            {% if process_data.records %}
+                            <div class="mt-2">
+                                <small class="text-muted">最近記錄:</small>
+                                <ul class="list-unstyled">
+                                    {% for record in process_data.records|slice:":3" %}
+                                    <li><small>{{ record.date }} - {{ record.operator }} ({{ record.hours|floatformat:1 }}小時)</small></li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">沒有工序詳細資料</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 作業員詳細分析 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card detail-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-user-clock text-warning"></i>
+                        作業員詳細分析
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if analysis.operator_details %}
+                        <div class="row">
+                            {% for operator_name, operator_data in analysis.operator_details.items %}
+                            <div class="col-md-6">
+                                <div class="operator-item">
+                                    <h6>{{ operator_name }}</h6>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <small><strong>總工作時數:</strong> {{ operator_data.total_hours|floatformat:1 }}小時</small><br>
+                                            <small><strong>加班時數:</strong> {{ operator_data.overtime_hours|floatformat:1 }}小時</small>
+                                        </div>
+                                        <div class="col-6">
+                                            <small><strong>工作天數:</strong> {{ operator_data.work_days }}天</small><br>
+                                            <small><strong>參與工序:</strong> {{ operator_data.processes|length }}個</small>
+                                        </div>
+                                    </div>
+                                    {% if operator_data.processes %}
+                                    <div class="mt-2">
+                                        <small class="text-muted">工序: {{ operator_data.processes|join:", " }}</small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">沒有作業員詳細資料</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="row">
+        <div class="col-12 text-center">
+            <a href="{% url 'reporting:completed_workorder_analysis_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> 返回列表
+            </a>
+            <button type="button" class="btn btn-warning" onclick="reanalyzeWorkorder()">
+                <i class="fas fa-sync-alt"></i> 重新分析
+            </button>
+            <a href="#" class="btn btn-primary" onclick="exportAnalysis()">
+                <i class="fas fa-download"></i> 匯出分析
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 重新分析確認對話框 -->
+<div class="modal fade" id="reanalyzeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">重新分析工單</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>確定要重新分析工單 <strong>{{ analysis.workorder_id }}</strong> 嗎？</p>
+                <p class="text-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    這將會覆蓋現有的分析結果
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" onclick="confirmReanalyze()">
+                    <i class="fas fa-sync-alt"></i> 確定重新分析
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// 工序時數分布圖表
+const processHoursCtx = document.getElementById('processHoursChart').getContext('2d');
+const processHoursChart = new Chart(processHoursCtx, {
+    type: 'bar',
+    data: {
+        labels: [
+            {% for process_name, process_data in analysis.process_details.items %}
+                '{{ process_name }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            label: '工作時數',
+            data: [
+                {% for process_name, process_data in analysis.process_details.items %}
+                    {{ process_data.total_hours }},
+                {% endfor %}
+            ],
+            backgroundColor: 'rgba(54, 162, 235, 0.8)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: '工作時數'
+                }
+            }
+        }
+    }
+});
+
+// 作業員工作時數圖表
+const operatorHoursCtx = document.getElementById('operatorHoursChart').getContext('2d');
+const operatorHoursChart = new Chart(operatorHoursCtx, {
+    type: 'doughnut',
+    data: {
+        labels: [
+            {% for operator_name, operator_data in analysis.operator_details.items %}
+                '{{ operator_name }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for operator_name, operator_data in analysis.operator_details.items %}
+                    {{ operator_data.total_hours }},
+                {% endfor %}
+            ],
+            backgroundColor: [
+                '#FF6384',
+                '#36A2EB',
+                '#FFCE56',
+                '#4BC0C0',
+                '#9966FF',
+                '#FF9F40'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+function reanalyzeWorkorder() {
+    new bootstrap.Modal(document.getElementById('reanalyzeModal')).show();
+}
+
+function confirmReanalyze() {
+    const formData = new FormData();
+    formData.append('workorder_id', '{{ analysis.workorder_id }}');
+    formData.append('company_code', '{{ analysis.company_code }}');
+    formData.append('force', 'true');
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    fetch('{% url "reporting:analyze_single_workorder" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('重新分析失敗: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('重新分析失敗:', error);
+        alert('重新分析失敗，請稍後再試');
+    });
+
+    bootstrap.Modal.getInstance(document.getElementById('reanalyzeModal')).hide();
+}
+
+function exportAnalysis() {
+    // 這裡可以實作匯出功能
+    alert('匯出功能開發中...');
+}
+</script>
+{% endblock %}

@@ -39,7 +39,7 @@
                     <h5 class="mb-0"><i class="fas fa-search"></i> 查詢條件</h5>
                 </div>
                 <div class="card-body">
-                                        <form method="post" id="reportForm">
+                    <form method="post" id="reportForm">
                         {% csrf_token %}
                         <input type="hidden" name="report_type" value="custom">
                         
@@ -54,24 +54,24 @@
                                     {% endfor %}
                                 </select>
                                 <div class="form-text">請選擇要查詢的公司</div>
-                            </div>
-                            
+                        </div>
+
                             <div class="col-md-3 mb-3">
-                                <label for="operator" class="form-label">作業員 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="operator" name="operator" required>
+                                    <label for="operator" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="operator" name="operator" required>
                                     <option value="all" {% if operator == 'all' or not operator %}selected{% endif %}>全部作業員</option>
                                     {% for operator_option in operators %}
                                         <option value="{{ operator_option.name }}" {% if operator == operator_option.name %}selected{% endif %}>{{ operator_option.name }}</option>
                                     {% endfor %}
-                                </select>
+                                    </select>
                                 <div class="form-text">請選擇要查詢的作業員</div>
-                            </div>
-                            
+                                </div>
+                                
                             <div class="col-md-3 mb-3">
                                 <label for="start_date" class="form-label">起始日期 <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control" id="start_date" name="start_date" value="{% if start_date %}{{ start_date|date:'Y-m-d' }}{% else %}{{ current_date|date:'Y-m-d' }}{% endif %}" required>
                                 <div class="form-text">請選擇查詢的起始日期</div>
-                            </div>
+                                </div>
                             
                             <div class="col-md-3 mb-3">
                                 <label for="end_date" class="form-label">終止日期 <span class="text-danger">*</span></label>
@@ -79,7 +79,7 @@
                                 <div class="form-text">請選擇查詢的終止日期</div>
                             </div>
                         </div>
-                        
+
                         <!-- 查詢按鈕 -->
                         <div class="row mb-4">
                             <div class="col-12 text-center">
@@ -91,16 +91,16 @@
                     </form>
                 </div>
             </div>
-        </div>
-    </div>
-
+                                </div>
+                                </div>
+                                
     <!-- 統計摘要區塊 -->
     <div class="row mt-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="fas fa-chart-pie"></i> 統計摘要</h5>
-                </div>
+                                </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-3 text-center">
@@ -120,7 +120,7 @@
                                 <h4 class="text-info">{{ summary.total_equipment_hours|floatformat:2|default:'0.00' }}</h4>
                                 <p class="text-muted">總設備使用時數</p>
                             </div>
-                        </div>
+                                </div>
                         <div class="col-md-3 text-center">
                             <div class="stat-item">
                                 <h4 class="text-warning">{{ summary.workorder_count|default:'0' }}</h4>
@@ -245,7 +245,7 @@
                                             <a class="page-link" href="?page={{ report_data.next_page_number }}&company={{ company }}&operator={{ operator }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">下一頁</a>
                                         </li>
                                     {% endif %}
-                                </ul>
+                            </ul>
                             </nav>
                             {% endif %}
                         </div>
@@ -310,7 +310,7 @@
                                             <a class="page-link" href="?page={{ operator_stats.next_page_number }}&company={{ company }}&operator={{ operator }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&tab=statistics">下一頁</a>
                                         </li>
                                     {% endif %}
-                                </ul>
+                            </ul>
                             </nav>
                             {% endif %}
                         </div>
