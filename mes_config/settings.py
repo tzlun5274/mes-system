@@ -4,9 +4,6 @@ from django.db import connections
 import mimetypes
 import environ
 
-# 安全金鑰，Django 啟動必須，請勿外洩
-SECRET_KEY = "m3s$2024!@#MES系統安全金鑰987654321"
-
 # 基本路徑設置
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -14,12 +11,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
-# 僅保留開發環境設定
-DEBUG = True  # 開發模式
-ALLOWED_HOSTS = ["*"]  # 允許所有主機存取
+# 安全金鑰，從環境變數讀取
+SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-fallback-key-for-development-only')
+
+# 開發/生產環境設定
+DEBUG = env.bool('DEBUG', default=False)
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 # API 基礎 URL
-SITE_URL = f"http://{os.environ.get('HOST_IP', 'localhost')}:8000"
+SITE_URL = f"http://{env('HOST_IP', default='localhost')}:8000"
 
 # 已安裝的應用
 INSTALLED_APPS = [
@@ -73,14 +73,30 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://192.168.1.29",
+    f"http://{env('HOST_IP', default='localhost')}",
 ]
 CORS_ALLOW_CREDENTIALS = True  # 允許傳遞 cookie（如 sessionid）
 
-# 安全設定（開發環境）
-SECURE_CONTENT_TYPE_NOSNIFF = False
-SECURE_BROWSER_XSS_FILTER = False
-SECURE_REFERRER_POLICY = 'no-referrer-when-downgrade'
+# 安全設定（根據環境自動調整）
+if DEBUG:
+    # 開發環境安全設定
+    SECURE_CONTENT_TYPE_NOSNIFF = False
+    SECURE_BROWSER_XSS_FILTER = False
+    SECURE_REFERRER_POLICY = 'no-referrer-when-downgrade'
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+else:
+    # 生產環境安全設定
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_HTTPONLY = True
 
 # 報表清理設定
 REPORT_FILE_RETENTION_DAYS = 7  # 報表檔案保留天數
@@ -114,11 +130,11 @@ WSGI_APPLICATION = "mes_config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DATABASE_NAME", "mesdb"),
-        "USER": os.environ.get("DATABASE_USER", "mesuser"),
-        "PASSWORD": os.environ.get("DATABASE_PASSWORD", "mespassword"),
-        "HOST": os.environ.get("DATABASE_HOST", "localhost"),
-        "PORT": os.environ.get("DATABASE_PORT", "5432"),
+        "NAME": env("DATABASE_NAME", default="mesdb"),
+        "USER": env("DATABASE_USER", default="mesuser"),
+        "PASSWORD": env("DATABASE_PASSWORD", default="mespassword"),
+        "HOST": env("DATABASE_HOST", default="localhost"),
+        "PORT": env("DATABASE_PORT", default="5432"),
         "OPTIONS": {
             "options": "-c search_path=public"
         },
@@ -139,8 +155,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # 國際化和時區設置
-LANGUAGE_CODE = os.environ.get("LANGUAGE_CODE", "zh-hant")
-TIME_ZONE = os.environ.get("TIME_ZONE", "Asia/Taipei")
+LANGUAGE_CODE = env("LANGUAGE_CODE", default="zh-hant")
+TIME_ZONE = env("TIME_ZONE", default="Asia/Taipei")
 USE_I18N = True
 USE_TZ = True
 
@@ -150,10 +166,14 @@ FILE_CHARSET = "utf-8"
 
 # 靜態檔案設定（開發模式下自動處理）
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
-]
-STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")  # 新增 STATIC_ROOT 設定
+if DEBUG:
+    STATICFILES_DIRS = [
+        os.path.join(BASE_DIR, "static"),
+    ]
+    STATIC_ROOT = None
+else:
+    STATICFILES_DIRS = []
+    STATIC_ROOT = env("STATIC_ROOT", default=os.path.join(BASE_DIR, "staticfiles"))
 
 # 媒體檔案設定
 MEDIA_URL = "/media/"
@@ -162,11 +182,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 # 自動主鍵字段設置
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Celery 配置：硬編碼值
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.environ.get(
-    "CELERY_RESULT_BACKEND", "redis://localhost:6379/0"
-)
+# Celery 配置：使用環境變數
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/0")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
@@ -203,13 +221,32 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440
 FILE_UPLOAD_TEMP_DIR = os.path.join(BASE_DIR, "tmp")
 
 # 日誌設置（支援多環境）
-ENVIRONMENT = os.environ.get(
-    "DJANGO_ENV", "development"
-)  # development, testing, production
+ENVIRONMENT = env("DJANGO_ENV", default="development")  # development, testing, production
 
 # 日誌目錄設定
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
+
+# 統一日誌路徑配置
+LOG_BASE_DIR = env("LOG_BASE_DIR", default="/var/log/mes")
+DJANGO_LOG_DIR = os.path.join(LOG_BASE_DIR, "django")
+SYSTEM_LOG_DIR = os.path.join(LOG_BASE_DIR, "system")
+WORKORDER_LOG_DIR = os.path.join(LOG_BASE_DIR, "workorder")
+ERP_LOG_DIR = os.path.join(LOG_BASE_DIR, "erp_integration")
+EQUIP_LOG_DIR = os.path.join(LOG_BASE_DIR, "equip")
+MATERIAL_LOG_DIR = os.path.join(LOG_BASE_DIR, "material")
+QUALITY_LOG_DIR = os.path.join(LOG_BASE_DIR, "quality")
+KANBAN_LOG_DIR = os.path.join(LOG_BASE_DIR, "kanban")
+PRODUCTION_LOG_DIR = os.path.join(LOG_BASE_DIR, "production")
+AI_LOG_DIR = os.path.join(LOG_BASE_DIR, "ai")
+SCHEDULING_LOG_DIR = os.path.join(LOG_BASE_DIR, "scheduling")
+PROCESS_LOG_DIR = os.path.join(LOG_BASE_DIR, "process")
+
+# 確保日誌目錄存在
+for log_dir in [LOG_BASE_DIR, DJANGO_LOG_DIR, SYSTEM_LOG_DIR, WORKORDER_LOG_DIR, 
+                ERP_LOG_DIR, EQUIP_LOG_DIR, MATERIAL_LOG_DIR, QUALITY_LOG_DIR,
+                KANBAN_LOG_DIR, PRODUCTION_LOG_DIR, AI_LOG_DIR, SCHEDULING_LOG_DIR, PROCESS_LOG_DIR]:
+    os.makedirs(log_dir, exist_ok=True)
 
 # 基礎日誌配置
 LOGGING = {
@@ -346,9 +383,9 @@ TIME_INPUT_FORMATS = [
 ]
 
 # 新增的 EMAIL 設置
-EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
-EMAIL_PORT = os.environ.get("EMAIL_PORT", "25")
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") == "True"
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "webmaster@localhost")
+EMAIL_HOST = env("EMAIL_HOST", default="localhost")
+EMAIL_PORT = env.int("EMAIL_PORT", default=25)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="webmaster@localhost")

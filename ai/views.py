@@ -7,9 +7,11 @@ from .utils import log_user_operation
 from .models import AIPrediction, AIOptimization, AIAnomaly
 from django.utils import timezone
 
+import os
 # 設定AI模組的日誌記錄器
 ai_logger = logging.getLogger("ai")
-ai_handler = logging.FileHandler("/var/log/mes/ai.log")
+from django.conf import settings
+ai_handler = logging.FileHandler(os.path.join(settings.AI_LOG_DIR, "ai.log"))
 ai_handler.setFormatter(
     logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 )

@@ -28,9 +28,11 @@ from .models import (
 )
 from erp_integration.models import CompanyConfig
 
+import os
 # 設定物料管理模組的日誌記錄器
 material_logger = logging.getLogger("material")
-material_handler = logging.FileHandler("/var/log/mes/material.log")
+from django.conf import settings
+material_handler = logging.FileHandler(os.path.join(settings.MATERIAL_LOG_DIR, "material.log"))
 material_handler.setFormatter(
     logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 )

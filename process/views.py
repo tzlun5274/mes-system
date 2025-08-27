@@ -20,9 +20,11 @@ import csv, io
 from django.utils import timezone
 import pandas as pd
 
+import os
 # 設定製程管理模組的日誌記錄器
 process_logger = logging.getLogger("process")
-process_handler = logging.FileHandler("/var/log/mes/process.log")
+from django.conf import settings
+process_handler = logging.FileHandler(os.path.join(settings.PROCESS_LOG_DIR, "process.log"))
 process_handler.setFormatter(
     logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 )

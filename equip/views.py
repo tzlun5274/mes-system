@@ -11,9 +11,11 @@ import tablib
 import json
 from production.models import ProductionLine
 
+import os
 # 設定設備管理模組的日誌記錄器
 equip_logger = logging.getLogger("equip")
-equip_handler = logging.FileHandler("/var/log/mes/equip.log")
+from django.conf import settings
+equip_handler = logging.FileHandler(os.path.join(settings.EQUIP_LOG_DIR, "equip.log"))
 equip_handler.setFormatter(
     logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 )

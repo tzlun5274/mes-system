@@ -172,7 +172,7 @@ find /tmp -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
 # 清理 Redis 資料（可選）
 echo "清理 Redis 資料..." | tee -a $LOG_FILE
-redis-cli -a mesredis2025 FLUSHALL 2>/dev/null || true
+redis-cli -a $REDIS_PASSWORD FLUSHALL 2>/dev/null || true
 
 echo -e "${GREEN}✅ 清理完成${NC}" | tee -a $LOG_FILE
 
@@ -212,8 +212,8 @@ run_command "usermod -aG www-data mes" "將 mes 加入 www-data 群組"
 echo ""
 echo -e "${BLUE}📁 步驟 7: 建立專案目錄${NC}"
 run_command "mkdir -p $PROJECT_DIR" "建立專案目錄"
-run_command "chown mes:www-data $PROJECT_DIR" "設定專案目錄權限"
-run_command "chmod 775 $PROJECT_DIR" "設定專案目錄權限"
+run_command "chown -R mes:www-data $PROJECT_DIR" "設定專案目錄權限"
+run_command "chmod -R 775 $PROJECT_DIR" "設定專案目錄權限"
 
 # 步驟 8: 配置 PostgreSQL
 echo ""
@@ -223,10 +223,27 @@ run_command "systemctl start postgresql" "啟動 PostgreSQL 服務"
 
 # 建立資料庫和使用者
 echo "建立資料庫和使用者..." | tee -a $LOG_FILE
-sudo -u postgres psql -c "CREATE DATABASE $DATABASE_NAME;" 2>&1 | tee -a $LOG_FILE
-sudo -u postgres psql -c "CREATE USER $DATABASE_USER WITH PASSWORD '$DATABASE_PASSWORD';" 2>&1 | tee -a $LOG_FILE
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DATABASE_NAME TO $DATABASE_USER;" 2>&1 | tee -a $LOG_FILE
-sudo -u postgres psql -c "ALTER USER $DATABASE_USER CREATEDB;" 2>&1 | tee -a $LOG_FILE
+
+# 檢查資料庫是否已存在
+if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw $DATABASE_NAME; then
+    echo "資料庫 $DATABASE_NAME 已存在，跳過建立" | tee -a $LOG_FILE
+else
+    run_command "sudo -u postgres psql -c \"CREATE DATABASE $DATABASE_NAME;\"" "建立資料庫"
+fi
+
+# 檢查使用者是否已存在
+if sudo -u postgres psql -t -c "SELECT 1 FROM pg_roles WHERE rolname='$DATABASE_USER'" | grep -q 1; then
+    echo "使用者 $DATABASE_USER 已存在，更新密碼" | tee -a $LOG_FILE
+    run_command "sudo -u postgres psql -c \"ALTER USER $DATABASE_USER WITH PASSWORD '$DATABASE_PASSWORD';\"" "更新使用者密碼"
+else
+    run_command "sudo -u postgres psql -c \"CREATE USER $DATABASE_USER WITH PASSWORD '$DATABASE_PASSWORD';\"" "建立使用者"
+fi
+
+# 授予權限
+run_command "sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE $DATABASE_NAME TO $DATABASE_USER;\"" "授予資料庫權限"
+run_command "sudo -u postgres psql -c \"ALTER USER $DATABASE_USER CREATEDB;\"" "授予建立資料庫權限"
+
+echo "資料庫配置完成" | tee -a $LOG_FILE
 
 # 步驟 9: 配置 Redis
 echo ""
@@ -255,7 +272,6 @@ echo ""
 echo -e "${BLUE}📋 步驟 10: 複製專案檔案${NC}"
 if [ -f "manage.py" ]; then
     run_command "cp -r * $PROJECT_DIR/" "複製專案檔案"
-    run_command "chown -R mes:www-data $PROJECT_DIR" "設定檔案權限"
     run_command "chmod +x $PROJECT_DIR/manage.py" "設定執行權限"
 else
     echo -e "${RED}❌ 未找到 manage.py，請確保在專案根目錄執行此腳本${NC}"
@@ -298,13 +314,13 @@ DATABASE_PASSWORD=$DATABASE_PASSWORD
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_URL='postgresql://$DATABASE_USER:$DATABASE_PASSWORD@localhost:5432/$DATABASE_NAME'
-CELERY_BROKER_URL=redis://:mesredis2025@127.0.0.1:6379/0
-CELERY_RESULT_BACKEND=redis://:mesredis2025@127.0.0.1:6379/0
-LOG_FILE=/var/log/mes/django/mes.log
+CELERY_BROKER_URL=redis://:$REDIS_PASSWORD@127.0.0.1:6379/0
+CELERY_RESULT_BACKEND=redis://:$REDIS_PASSWORD@127.0.0.1:6379/0
+LOG_FILE=$LOG_BASE_DIR/django/mes.log
 SERVER_NAME=mes
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
-REDIS_PASSWORD=mesredis2025
+REDIS_PASSWORD=$REDIS_PASSWORD
 REDIS_MAXMEMORY=2147483648
 REDIS_MAXCLIENTS=1000
 EMAIL_HOST=smtp.gmail.com
@@ -340,15 +356,17 @@ run_command "chmod 640 $PROJECT_DIR/.env" "設定 .env 檔案權限"
 
 # 建立必要的目錄
 echo "建立必要的目錄..." | tee -a $LOG_FILE
-run_command "mkdir -p /var/log/mes/django" "建立 Django 日誌目錄"
-run_command "mkdir -p /var/log/mes/workorder" "建立工單日誌目錄"
-run_command "mkdir -p /var/log/mes/erp_integration" "建立 ERP 整合日誌目錄"
+run_command "mkdir -p $LOG_BASE_DIR/django" "建立 Django 日誌目錄"
+run_command "mkdir -p $LOG_BASE_DIR/workorder" "建立工單日誌目錄"
+run_command "mkdir -p $LOG_BASE_DIR/erp_integration" "建立 ERP 整合日誌目錄"
 run_command "mkdir -p $PROJECT_DIR/static" "建立靜態檔案目錄"
 run_command "mkdir -p $PROJECT_DIR/media" "建立媒體檔案目錄"
 run_command "mkdir -p $PROJECT_DIR/tmp" "建立臨時檔案目錄"
 run_command "mkdir -p $PROJECT_DIR/logs" "建立專案日誌目錄"
-run_command "chown -R mes:www-data /var/log/mes" "設定日誌目錄權限"
+run_command "chown -R mes:www-data $LOG_BASE_DIR" "設定日誌目錄權限"
+run_command "chmod -R 755 $LOG_BASE_DIR" "設定日誌目錄權限"
 run_command "chown -R mes:www-data $PROJECT_DIR/static $PROJECT_DIR/media $PROJECT_DIR/tmp $PROJECT_DIR/logs" "設定專案目錄權限"
+run_command "chmod -R 775 $PROJECT_DIR/static $PROJECT_DIR/media $PROJECT_DIR/tmp $PROJECT_DIR/logs" "設定專案目錄權限"
 
 # 步驟 12: 安裝 Python 套件
 echo ""
@@ -360,24 +378,54 @@ echo ""
 echo -e "${BLUE}🗃️ 步驟 13: 執行資料庫遷移${NC}"
 export DJANGO_SETTINGS_MODULE=mes_config.settings
 
-# 自動修復所有遷移問題（生產環境專用）
-echo "自動修復所有遷移問題..." | tee -a $LOG_FILE
+# 初始化資料庫（全新生產環境專用）
+echo "初始化資料庫..." | tee -a $LOG_FILE
 
 cd $PROJECT_DIR
 
-# 直接標記所有遷移為已應用，避免任何遷移問題
-echo "標記所有遷移為已應用..." | tee -a $LOG_FILE
-python3 manage.py migrate --fake 2>&1 | tee -a $LOG_FILE
+# 全新生產主機的資料庫初始化策略
+echo "執行全新資料庫初始化..." | tee -a $LOG_FILE
 
-# 驗證遷移狀態
-echo "驗證遷移狀態..." | tee -a $LOG_FILE
-python3 manage.py showmigrations 2>&1 | tee -a $LOG_FILE
+# 步驟 1: 先標記所有遷移為已應用（避免遷移依賴問題）
+echo "步驟 1: 標記所有遷移為已應用..." | tee -a $LOG_FILE
+sudo -u mes python3 manage.py migrate --fake 2>&1 | tee -a $LOG_FILE
 
-# 檢查是否還有未應用的遷移
-echo "檢查是否還有未應用的遷移..." | tee -a $LOG_FILE
-python3 manage.py migrate --plan 2>&1 | tee -a $LOG_FILE
+# 步驟 2: 執行實際的資料庫初始化
+echo "步驟 2: 執行資料庫初始化..." | tee -a $LOG_FILE
+sudo -u mes python3 manage.py migrate --run-syncdb 2>&1 | tee -a $LOG_FILE
 
-echo -e "${GREEN}✅ 所有遷移問題已自動修復${NC}" | tee -a $LOG_FILE
+# 檢查初始化是否成功
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ 資料庫初始化成功${NC}" | tee -a $LOG_FILE
+else
+    echo -e "${RED}❌ 資料庫初始化失敗，嘗試替代方案..." | tee -a $LOG_FILE
+    
+    # 替代方案：使用 Django 的內建初始化
+    echo "嘗試替代初始化方案..." | tee -a $LOG_FILE
+    sudo -u mes python3 manage.py migrate --fake-initial 2>&1 | tee -a $LOG_FILE
+    sudo -u mes python3 manage.py migrate 2>&1 | tee -a $LOG_FILE
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 替代初始化方案成功${NC}" | tee -a $LOG_FILE
+    else
+        echo -e "${RED}❌ 所有初始化方案都失敗，請手動檢查${NC}" | tee -a $LOG_FILE
+        echo "請檢查以下項目：" | tee -a $LOG_FILE
+        echo "1. 資料庫連接是否正常" | tee -a $LOG_FILE
+        echo "2. 資料庫用戶權限是否正確" | tee -a $LOG_FILE
+        echo "3. 遷移文件是否有語法錯誤" | tee -a $LOG_FILE
+        exit 1
+    fi
+fi
+
+# 驗證資料庫初始化狀態
+echo "驗證資料庫初始化狀態..." | tee -a $LOG_FILE
+sudo -u mes python3 manage.py showmigrations 2>&1 | tee -a $LOG_FILE
+
+# 檢查資料庫表是否正確創建
+echo "檢查資料庫表結構..." | tee -a $LOG_FILE
+sudo -u mes python3 manage.py dbshell -c "\dt" 2>&1 | tee -a $LOG_FILE
+
+echo -e "${GREEN}✅ 資料庫初始化完成${NC}" | tee -a $LOG_FILE
 
 # 建立超級用戶
 echo "建立超級用戶..." | tee -a $LOG_FILE
@@ -506,6 +554,7 @@ echo ""
 echo -e "${BLUE}🚀 步驟 16: 啟動所有服務${NC}"
 run_command "mkdir -p /var/run/celery /var/log/celery" "建立 Celery 目錄"
 run_command "chown -R mes:www-data /var/run/celery /var/log/celery" "設定 Celery 目錄權限"
+run_command "chmod -R 755 /var/run/celery /var/log/celery" "設定 Celery 目錄權限"
 run_command "systemctl daemon-reload" "重新載入 systemd"
 
 # 啟動所有服務
@@ -604,7 +653,7 @@ echo "查看日誌: sudo journalctl -u mes.service -f"
 echo ""
 echo -e "${BLUE}📊 日誌位置${NC}"
 echo "----------------------------------------"
-echo "應用程式日誌: /var/log/mes/"
+echo "應用程式日誌: $LOG_BASE_DIR/"
 echo "Nginx 日誌: /var/log/nginx/"
 echo "PostgreSQL 日誌: /var/log/postgresql/"
 echo "Redis 日誌: /var/log/redis/"

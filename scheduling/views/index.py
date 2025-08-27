@@ -6,9 +6,11 @@ from django.utils import timezone
 from ..models import Event, SchedulingOperationLog
 import logging
 
+import os
 # 設定生產排程模組的日誌記錄器
 scheduling_logger = logging.getLogger("scheduling")
-scheduling_handler = logging.FileHandler("/var/log/mes/scheduling.log")
+from django.conf import settings
+scheduling_handler = logging.FileHandler(os.path.join(settings.SCHEDULING_LOG_DIR, "scheduling.log"))
 scheduling_handler.setFormatter(
     logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 )

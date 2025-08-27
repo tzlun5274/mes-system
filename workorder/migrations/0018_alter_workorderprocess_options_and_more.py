@@ -119,24 +119,32 @@ class Migration(migrations.Migration):
                     ALTER TABLE workorder_workorderprocess ADD COLUMN workorder_id integer DEFAULT 0;
                 END IF;
                 
-                -- 檢查並添加 workorder_process_id 欄位到 workorderprocesscapacity
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderprocesscapacity' AND column_name = 'workorder_process_id') THEN
-                    ALTER TABLE workorder_workorderprocesscapacity ADD COLUMN workorder_process_id integer DEFAULT 0 UNIQUE;
+                -- 檢查並添加 workorder_process_id 欄位到 workorderprocesscapacity（如果表存在）
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'workorder_workorderprocesscapacity') THEN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderprocesscapacity' AND column_name = 'workorder_process_id') THEN
+                        ALTER TABLE workorder_workorderprocesscapacity ADD COLUMN workorder_process_id integer DEFAULT 0 UNIQUE;
+                    END IF;
                 END IF;
                 
-                -- 檢查並添加 workorder_process_id 欄位到 workorderprocesslog
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderprocesslog' AND column_name = 'workorder_process_id') THEN
-                    ALTER TABLE workorder_workorderprocesslog ADD COLUMN workorder_process_id integer DEFAULT 0;
+                -- 檢查並添加 workorder_process_id 欄位到 workorderprocesslog（如果表存在）
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'workorder_workorderprocesslog') THEN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderprocesslog' AND column_name = 'workorder_process_id') THEN
+                        ALTER TABLE workorder_workorderprocesslog ADD COLUMN workorder_process_id integer DEFAULT 0;
+                    END IF;
                 END IF;
                 
-                -- 檢查並添加 workorder_id 欄位到 workorderproduction
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderproduction' AND column_name = 'workorder_id') THEN
-                    ALTER TABLE workorder_workorderproduction ADD COLUMN workorder_id integer DEFAULT NULL UNIQUE;
+                -- 檢查並添加 workorder_id 欄位到 workorderproduction（如果表存在）
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'workorder_workorderproduction') THEN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderproduction' AND column_name = 'workorder_id') THEN
+                        ALTER TABLE workorder_workorderproduction ADD COLUMN workorder_id integer DEFAULT NULL UNIQUE;
+                    END IF;
                 END IF;
                 
-                -- 檢查並添加 workorder_production_id 欄位到 workorderproductiondetail
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderproductiondetail' AND column_name = 'workorder_production_id') THEN
-                    ALTER TABLE workorder_workorderproductiondetail ADD COLUMN workorder_production_id integer DEFAULT 0;
+                -- 檢查並添加 workorder_production_id 欄位到 workorderproductiondetail（如果表存在）
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'workorder_workorderproductiondetail') THEN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderproductiondetail' AND column_name = 'workorder_production_id') THEN
+                        ALTER TABLE workorder_workorderproductiondetail ADD COLUMN workorder_production_id integer DEFAULT 0;
+                    END IF;
                 END IF;
             END $$;
             """,

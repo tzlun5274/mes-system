@@ -45,10 +45,6 @@ cp -r reporting $TEMP_DIR/
 cp -r scheduling $TEMP_DIR/
 cp -r system $TEMP_DIR/
 cp -r workorder $TEMP_DIR/
-cp -r workorder_dispatch $TEMP_DIR/
-cp -r fill_work $TEMP_DIR/
-cp -r onsite_reporting $TEMP_DIR/
-cp -r company_order $TEMP_DIR/
 cp -r templates $TEMP_DIR/
 cp -r static $TEMP_DIR/
 cp -r media $TEMP_DIR/
@@ -63,12 +59,13 @@ cp 全新部署.sh $TEMP_DIR/
 # 複製部署腳本
 echo "複製部署腳本..."
 cp 專案更新.sh $TEMP_DIR/ 2>/dev/null || true
-cp 環境需求檢查.sh $TEMP_DIR/ 2>/dev/null || true
 cp 完全清理系統.sh $TEMP_DIR/ 2>/dev/null || true
 cp deploy.sh $TEMP_DIR/ 2>/dev/null || true
 
-# 複製重要文件
+# 複製重要文件（如果存在）
 echo "複製重要文件..."
+# 注意：這些檔案可能不存在，使用 2>/dev/null || true 避免錯誤
+# 實際檢查發現根目錄沒有 .md 檔案，所以這些複製會失敗但不影響打包
 cp README.md $TEMP_DIR/ 2>/dev/null || true
 cp VERSION.md $TEMP_DIR/ 2>/dev/null || true
 cp CHANGELOG.md $TEMP_DIR/ 2>/dev/null || true

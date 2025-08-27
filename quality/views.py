@@ -12,9 +12,11 @@ from .models import (
 )
 from .utils import log_user_operation
 
+import os
 # 設定品質管理模組的日誌記錄器
 quality_logger = logging.getLogger("quality")
-quality_handler = logging.FileHandler("/var/log/mes/quality.log")
+from django.conf import settings
+quality_handler = logging.FileHandler(os.path.join(settings.QUALITY_LOG_DIR, "quality.log"))
 quality_handler.setFormatter(
     logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 )

@@ -17,9 +17,11 @@ from .forms import (
 )
 import json
 
+import os
 # 設定生產管理模組的日誌記錄器
 production_logger = logging.getLogger("production")
-production_handler = logging.FileHandler("/var/log/mes/production.log")
+from django.conf import settings
+production_handler = logging.FileHandler(os.path.join(settings.PRODUCTION_LOG_DIR, "production.log"))
 production_handler.setFormatter(
     logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 )

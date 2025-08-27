@@ -20,8 +20,9 @@ from django_celery_beat.models import CrontabSchedule, PeriodicTask  # 導入定
 from django.http import JsonResponse
 
 # 設定ERP整合模組的日誌記錄器
+from django.conf import settings
 erp_logger = logging.getLogger("erp_integration")
-erp_handler = logging.FileHandler("/var/log/mes/erp_integration.log")
+erp_handler = logging.FileHandler(os.path.join(settings.ERP_LOG_DIR, "erp_integration.log"))
 erp_handler.setFormatter(
     logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 )
@@ -33,7 +34,7 @@ logging.basicConfig(
     level=logging.ERROR,  # 只記錄錯誤等級以上的日誌
     format="%(levelname)s %(asctime)s %(module)s %(message)s",
     handlers=[
-        logging.FileHandler("/var/log/mes/django/erp_integration.log"),
+        logging.FileHandler(os.path.join(settings.DJANGO_LOG_DIR, "erp_integration.log")),
     ],
 )
 logger = logging.getLogger("erp_integration")

@@ -46,8 +46,9 @@ from .forms import ScheduledTaskForm
 from system.models import AutoApprovalTask
 
 # 設定系統管理模組的日誌記錄器
+from django.conf import settings
 system_logger = logging.getLogger("system")
-system_handler = logging.FileHandler("/var/log/mes/system.log")
+system_handler = logging.FileHandler(os.path.join(settings.SYSTEM_LOG_DIR, "system.log"))
 system_handler.setFormatter(
     logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 )
@@ -56,7 +57,7 @@ system_logger.setLevel(logging.INFO)
 
 logger = logging.getLogger("django")
 logger.setLevel(logging.DEBUG)
-handler = logging.FileHandler("/var/log/mes/django/mes.log")
+handler = logging.FileHandler(os.path.join(settings.DJANGO_LOG_DIR, "mes.log"))
 formatter = logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 handler.setFormatter(formatter)
 logger.handlers = [handler]

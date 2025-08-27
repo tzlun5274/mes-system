@@ -68,9 +68,11 @@ def deprecated_warning(func_name):
         stacklevel=2
     )
 
+import os
 # 設定工單管理模組的日誌記錄器
 workorder_logger = logging.getLogger("workorder")
-workorder_handler = logging.FileHandler("/var/log/mes/workorder.log")
+from django.conf import settings
+workorder_handler = logging.FileHandler(os.path.join(settings.WORKORDER_LOG_DIR, "workorder.log"))
 workorder_handler.setFormatter(
     logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 )

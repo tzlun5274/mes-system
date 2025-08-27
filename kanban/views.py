@@ -14,9 +14,11 @@ from .models import (
 from .utils import log_user_operation
 from collections import Counter
 
+import os
 # 設定看板模組的日誌記錄器
 kanban_logger = logging.getLogger("kanban")
-kanban_handler = logging.FileHandler("/var/log/mes/kanban.log")
+from django.conf import settings
+kanban_handler = logging.FileHandler(os.path.join(settings.KANBAN_LOG_DIR, "kanban.log"))
 kanban_handler.setFormatter(
     logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 )

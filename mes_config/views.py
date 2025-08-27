@@ -1,3 +1,4 @@
+import os
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordResetForm
@@ -13,10 +14,11 @@ from system.models import EmailConfig
 import logging
 import smtplib
 
-# 設置日誌，統一寫入 /var/log/mes/setup_project.log
+# 設置日誌，統一寫入設定檔指定的日誌目錄
+from django.conf import settings
 logger = logging.getLogger("mes_setup")
 logger.setLevel(logging.DEBUG)
-handler = logging.FileHandler("/var/log/mes/setup_project.log")
+handler = logging.FileHandler(os.path.join(settings.LOG_BASE_DIR, "setup_project.log"))
 formatter = logging.Formatter("%(levelname)s %(asctime)s %(module)s %(message)s")
 handler.setFormatter(formatter)
 logger.handlers = [handler]
@@ -160,7 +162,7 @@ class CustomPasswordResetView(View):
             except Exception as e:
                 logger.error(f"密碼重置郵件發送失敗: {email}, 錯誤: {str(e)}")
                 # 備用方案：記錄郵件內容，供管理員手動處理
-                with open("/var/log/mes/failed_emails.log", "a") as f:
+                with open(os.path.join(settings.LOG_BASE_DIR, "failed_emails.log"), "a") as f:
                     f.write(f"[{email}] 密碼重置郵件發送失敗: {str(e)}\n")
                 form.add_error(None, "無法發送密碼重置郵件，請聯繫管理員")
                 return render(request, self.template_name, {"form": form})
