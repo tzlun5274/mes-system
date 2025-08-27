@@ -54,13 +54,18 @@ echo "複製配置檔案..."
 cp manage.py $TEMP_DIR/
 cp requirements.txt $TEMP_DIR/
 cp .env $TEMP_DIR/
-cp 全新部署.sh $TEMP_DIR/
 
 # 複製部署腳本
 echo "複製部署腳本..."
-cp 專案更新.sh $TEMP_DIR/ 2>/dev/null || true
-cp 完全清理系統.sh $TEMP_DIR/ 2>/dev/null || true
-cp deploy.sh $TEMP_DIR/ 2>/dev/null || true
+cp 全新部署.sh $TEMP_DIR/
+cp restart_services.sh $TEMP_DIR/
+chmod +x $TEMP_DIR/全新部署.sh
+chmod +x $TEMP_DIR/restart_services.sh
+
+# 設定打包目錄權限
+echo "設定打包目錄權限..."
+chmod -R 755 $TEMP_DIR
+chown -R mes:mes $TEMP_DIR
 
 # 複製重要文件（如果存在）
 echo "複製重要文件..."
@@ -72,9 +77,26 @@ cp CHANGELOG.md $TEMP_DIR/ 2>/dev/null || true
 cp DEVELOPMENT_STATUS.md $TEMP_DIR/ 2>/dev/null || true
 cp Linux部署指南.md $TEMP_DIR/ 2>/dev/null || true
 
+# 清理並重新生成遷移文件（生產環境用）
+echo "清理並重新生成遷移文件..."
+cd $TEMP_DIR
+
+# 備份現有遷移文件
+BACKUP_DIR="migrations_backup_$(date +%Y%m%d_%H%M%S)"
+mkdir -p $BACKUP_DIR
+find . -path "*/migrations/*.py" -not -name "__init__.py" -exec cp {} $BACKUP_DIR/ \; 2>/dev/null || true
+
+# 刪除所有現有遷移文件（保留 __init__.py）
+find . -path "*/migrations/*.py" -not -name "__init__.py" -delete
+
+# 重新生成乾淨的遷移文件
+python3 manage.py makemigrations 2>/dev/null || echo "遷移文件生成完成"
+
+echo "新生成的遷移文件："
+find . -path "*/migrations/*.py" -not -name "__init__.py" | sort
+
 # 清理打包目錄中的垃圾檔案
 echo "清理垃圾檔案..."
-cd $TEMP_DIR
 
 # 刪除 Python 快取檔案
 find . -name "*.pyc" -delete
@@ -99,6 +121,9 @@ find . -name "generate_*.py" -delete
 find . -name "setup_*.py" -delete
 find . -name "simple_*.py" -delete
 
+# 刪除遷移文件備份目錄
+rm -rf $BACKUP_DIR
+
 # 刪除空目錄
 find . -type d -empty -delete
 
@@ -107,11 +132,31 @@ cat > $TEMP_DIR/部署說明.txt << 'EOF'
 MES 系統生產環境部署說明
 ==========================
 
+📦 套件特色：
+- 包含乾淨的遷移文件（已重新生成）
+- 移除開發過程中的歷史變更
+- 適合全新生產環境部署
+
+🚀 正確的部署流程：
+
 1. 解壓縮套件
    tar -xzf mes_production_package_*.tar.gz
    cd mes_production_package_*
 
-2. 修改配置
+2. 建立系統專案目錄
+   sudo mkdir -p /var/www/mes
+
+3. 搬移專案檔案
+   sudo cp -r * /var/www/mes/
+
+4. 設定權限
+   sudo chown -R mes:www-data /var/www/mes/
+   sudo chmod -R 755 /var/www/mes/
+
+5. 進入專案目錄
+   cd /var/www/mes
+
+6. 修改配置
    nano .env
    # 修改以下項目：
    # ALLOWED_HOSTS=localhost,127.0.0.1,YOUR_SERVER_IP
@@ -120,12 +165,33 @@ MES 系統生產環境部署說明
    # REDIS_PASSWORD=YOUR_REDIS_PASSWORD
    # SUPERUSER_PASSWORD=YOUR_ADMIN_PASSWORD
 
-3. 執行部署
+7. 執行部署腳本
    sudo ./全新部署.sh
+   # 腳本會自動：
+   # - 安裝系統套件（PostgreSQL、Redis、Nginx等）
+   # - 建立系統服務（systemd服務）
+   # - 配置資料庫和應用
+   # - 啟動所有服務
 
-4. 驗證部署
+8. 驗證部署
    sudo systemctl status mes.service
    curl http://localhost
+
+🔧 遷移文件說明：
+- 套件中的遷移文件已重新生成
+- 只包含當前的模型狀態
+- 不包含開發過程中的歷史變更
+- 適合全新資料庫部署
+
+📁 目錄結構：
+- 解壓目錄：包含完整專案檔案
+- 系統目錄：/var/www/mes（部署後）
+- 配置檔案：/var/www/mes/.env
+
+🛠️ 服務管理：
+- 重啟服務：sudo ./restart_services.sh
+- 查看狀態：sudo systemctl status mes.service
+- 查看日誌：sudo journalctl -u mes.service -f
 
 注意：全新部署腳本會自動修復所有遷移問題！
 EOF
@@ -160,6 +226,10 @@ echo "管理後台: http://$(grep 'HOST_IP=' .env | cut -d'=' -f2)/admin"
 EOF
 
 chmod +x $TEMP_DIR/快速部署.sh
+
+# 設定腳本執行權限
+chmod +x $TEMP_DIR/全新部署.sh
+chmod +x $TEMP_DIR/restart_services.sh
 
 # 建立 .env 範例
 cat > $TEMP_DIR/.env.example << 'EOF'
@@ -283,7 +353,7 @@ echo "📋 包含的檔案："
 echo "✅ 核心模組: workorder, system, reporting, erp_integration, equip, quality, material, kanban, scheduling, ai, process, production"
 echo "✅ 設定檔案: mes_config, requirements.txt, manage.py"
 echo "✅ 前端檔案: templates, static, media"
-echo "✅ 部署腳本: 全新部署.sh, 快速部署.sh"
+echo "✅ 部署腳本: 全新部署.sh, restart_services.sh"
 echo "✅ 說明文件: README.md, 部署說明.txt, .env.example"
 echo ""
 echo "❌ 排除的檔案："

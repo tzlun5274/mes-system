@@ -21,11 +21,12 @@ fi
 
 # 設定變數
 PROJECT_DIR="/var/www/mes"
-LOG_FILE="/var/log/mes/deploy.log"
+LOG_BASE_DIR="/var/log/mes"
+LOG_FILE="$LOG_BASE_DIR/deploy.log"
 HOST_IP=$(ip addr show | grep -oP 'inet \K[\d.]+' | grep -v '127.0.0.1' | head -n 1)
 
 # 建立日誌目錄
-mkdir -p /var/log/mes
+mkdir -p $LOG_BASE_DIR
 touch $LOG_FILE
 
 echo "開始部署時間: $(date)" | tee -a $LOG_FILE
@@ -33,13 +34,17 @@ echo "主機 IP: $HOST_IP" | tee -a $LOG_FILE
 
 # 函數：從 .env 檔案讀取配置
 load_env_config() {
+    # 檢查當前目錄的 .env 檔案
     if [ ! -f ".env" ]; then
         echo -e "${RED}❌ 未找到 .env 檔案${NC}" | tee -a $LOG_FILE
-        echo "請確保在專案根目錄執行此腳本，且 .env 檔案存在" | tee -a $LOG_FILE
+        echo "請確保在解壓後的目錄執行此腳本，且 .env 檔案存在" | tee -a $LOG_FILE
+        echo "當前目錄: $(pwd)" | tee -a $LOG_FILE
+        echo "請檢查 .env 檔案是否存在" | tee -a $LOG_FILE
         exit 1
     fi
     
-    echo "正在讀取 .env 配置..." | tee -a $LOG_FILE
+    echo "正在讀取當前目錄的 .env 配置..." | tee -a $LOG_FILE
+    echo "當前目錄: $(pwd)" | tee -a $LOG_FILE
     
     # 讀取資料庫配置
     DATABASE_NAME=$(grep "^DATABASE_NAME=" .env | cut -d'=' -f2)
@@ -151,8 +156,6 @@ systemctl daemon-reload
 # 清理舊的專案檔案
 echo "清理舊的專案檔案..." | tee -a $LOG_FILE
 if [ -d "$PROJECT_DIR" ]; then
-    echo "備份舊專案到 /tmp/mes_backup_$(date +%Y%m%d_%H%M%S)" | tee -a $LOG_FILE
-    cp -r $PROJECT_DIR /tmp/mes_backup_$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
     rm -rf $PROJECT_DIR
 fi
 
@@ -267,16 +270,34 @@ EOF
 
 run_command "systemctl restart redis-server" "重啟 Redis 服務"
 
-# 步驟 10: 複製專案檔案
+# 步驟 10: 驗證專案目錄
 echo ""
-echo -e "${BLUE}📋 步驟 10: 複製專案檔案${NC}"
-if [ -f "manage.py" ]; then
-    run_command "cp -r * $PROJECT_DIR/" "複製專案檔案"
-    run_command "chmod +x $PROJECT_DIR/manage.py" "設定執行權限"
-else
-    echo -e "${RED}❌ 未找到 manage.py，請確保在專案根目錄執行此腳本${NC}"
+echo -e "${BLUE}📋 步驟 10: 驗證專案目錄${NC}"
+
+# 檢查當前目錄是否為專案目錄
+if [ ! -f "manage.py" ]; then
+    echo -e "${RED}❌ 未找到 manage.py，請確保在 /var/www/mes 專案目錄執行此腳本${NC}"
+    echo "當前目錄: $(pwd)" | tee -a $LOG_FILE
+    echo "請先執行以下步驟：" | tee -a $LOG_FILE
+    echo "1. 解壓縮套件" | tee -a $LOG_FILE
+    echo "2. 建立目錄: sudo mkdir -p /var/www/mes" | tee -a $LOG_FILE
+    echo "3. 搬移檔案: sudo cp -r 解壓目錄/* /var/www/mes/" | tee -a $LOG_FILE
+    echo "4. 設定權限: sudo chown -R mes:www-data /var/www/mes/" | tee -a $LOG_FILE
+    echo "5. 進入目錄: cd /var/www/mes" | tee -a $LOG_FILE
+    echo "6. 修改配置: nano .env" | tee -a $LOG_FILE
+    echo "7. 執行部署: sudo ./全新部署.sh" | tee -a $LOG_FILE
     exit 1
 fi
+
+# 檢查是否在正確的目錄
+if [ "$(pwd)" != "$PROJECT_DIR" ]; then
+    echo -e "${RED}❌ 請在 $PROJECT_DIR 目錄執行此腳本${NC}" | tee -a $LOG_FILE
+    echo "當前目錄: $(pwd)" | tee -a $LOG_FILE
+    echo "請執行: cd $PROJECT_DIR" | tee -a $LOG_FILE
+    exit 1
+fi
+
+echo -e "${GREEN}✅ 專案目錄驗證通過${NC}" | tee -a $LOG_FILE
 
 # 步驟 11: 建立環境變數檔案
 echo ""
@@ -386,33 +407,39 @@ cd $PROJECT_DIR
 # 全新生產主機的資料庫初始化策略
 echo "執行全新資料庫初始化..." | tee -a $LOG_FILE
 
-# 步驟 1: 先標記所有遷移為已應用（避免遷移依賴問題）
-echo "步驟 1: 標記所有遷移為已應用..." | tee -a $LOG_FILE
-sudo -u mes python3 manage.py migrate --fake 2>&1 | tee -a $LOG_FILE
+# 執行 Django 遷移
+echo "執行 Django 遷移..." | tee -a $LOG_FILE
+sudo -u mes python3 manage.py migrate 2>&1 | tee -a $LOG_FILE
 
-# 步驟 2: 執行實際的資料庫初始化
-echo "步驟 2: 執行資料庫初始化..." | tee -a $LOG_FILE
-sudo -u mes python3 manage.py migrate --run-syncdb 2>&1 | tee -a $LOG_FILE
-
-# 檢查初始化是否成功
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ 資料庫初始化成功${NC}" | tee -a $LOG_FILE
+# 強制檢查資料庫表是否真的建立
+echo "檢查資料庫表是否建立..." | tee -a $LOG_FILE
+if sudo -u mes python3 manage.py dbshell -c "\dt auth_user" 2>&1 | grep -q "auth_user"; then
+    echo -e "${GREEN}✅ Django 遷移成功，資料表已建立${NC}" | tee -a $LOG_FILE
 else
-    echo -e "${RED}❌ 資料庫初始化失敗，嘗試替代方案..." | tee -a $LOG_FILE
+    echo -e "${RED}❌ Django 遷移失敗，auth_user 表不存在${NC}" | tee -a $LOG_FILE
     
-    # 替代方案：使用 Django 的內建初始化
-    echo "嘗試替代初始化方案..." | tee -a $LOG_FILE
-    sudo -u mes python3 manage.py migrate --fake-initial 2>&1 | tee -a $LOG_FILE
+    # 重新建立資料庫並重試
+    echo "重新建立資料庫並重試..." | tee -a $LOG_FILE
+    sudo -u postgres dropdb $DATABASE_NAME 2>/dev/null || true
+    sudo -u postgres createdb $DATABASE_NAME
+    
+    # 重新授予權限
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DATABASE_NAME TO $DATABASE_USER;"
+    sudo -u postgres psql -c "ALTER USER $DATABASE_USER CREATEDB;"
+    
+    # 重新執行遷移
+    echo "重新執行遷移..." | tee -a $LOG_FILE
     sudo -u mes python3 manage.py migrate 2>&1 | tee -a $LOG_FILE
     
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ 替代初始化方案成功${NC}" | tee -a $LOG_FILE
+    # 再次檢查
+    if sudo -u mes python3 manage.py dbshell -c "\dt auth_user" 2>&1 | grep -q "auth_user"; then
+        echo -e "${GREEN}✅ 重新建立資料庫成功${NC}" | tee -a $LOG_FILE
     else
-        echo -e "${RED}❌ 所有初始化方案都失敗，請手動檢查${NC}" | tee -a $LOG_FILE
-        echo "請檢查以下項目：" | tee -a $LOG_FILE
-        echo "1. 資料庫連接是否正常" | tee -a $LOG_FILE
-        echo "2. 資料庫用戶權限是否正確" | tee -a $LOG_FILE
-        echo "3. 遷移文件是否有語法錯誤" | tee -a $LOG_FILE
+        echo -e "${RED}❌ 資料庫建立仍然失敗${NC}" | tee -a $LOG_FILE
+        echo "檢查遷移狀態..." | tee -a $LOG_FILE
+        sudo -u mes python3 manage.py showmigrations 2>&1 | tee -a $LOG_FILE
+        echo "檢查資料庫表..." | tee -a $LOG_FILE
+        sudo -u mes python3 manage.py dbshell -c "\dt" 2>&1 | tee -a $LOG_FILE
         exit 1
     fi
 fi
