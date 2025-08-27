@@ -109,34 +109,62 @@ class Migration(migrations.Migration):
             name="workorder_id",
             field=models.IntegerField(default=0, verbose_name="工單ID"),
         ),
-        migrations.AddField(
-            model_name="workorderprocess",
-            name="workorder_id",
-            field=models.IntegerField(default=0, verbose_name="工單ID"),
-        ),
-        migrations.AddField(
-            model_name="workorderprocesscapacity",
-            name="workorder_process_id",
-            field=models.IntegerField(
-                default=0, unique=True, verbose_name="工單工序ID"
-            ),
-        ),
-        migrations.AddField(
-            model_name="workorderprocesslog",
-            name="workorder_process_id",
-            field=models.IntegerField(default=0, verbose_name="工單工序ID"),
-        ),
-        migrations.AddField(
-            model_name="workorderproduction",
-            name="workorder_id",
-            field=models.IntegerField(
-                blank=True, null=True, unique=True, verbose_name="工單ID"
-            ),
-        ),
-        migrations.AddField(
-            model_name="workorderproductiondetail",
-            name="workorder_production_id",
-            field=models.IntegerField(default=0, verbose_name="生產中工單ID"),
+        # 添加欄位存在性檢查的遷移
+        migrations.RunSQL(
+            sql="""
+            DO $$
+            BEGIN
+                -- 檢查並添加 workorder_id 欄位到 workorderprocess
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderprocess' AND column_name = 'workorder_id') THEN
+                    ALTER TABLE workorder_workorderprocess ADD COLUMN workorder_id integer DEFAULT 0;
+                END IF;
+                
+                -- 檢查並添加 workorder_process_id 欄位到 workorderprocesscapacity
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderprocesscapacity' AND column_name = 'workorder_process_id') THEN
+                    ALTER TABLE workorder_workorderprocesscapacity ADD COLUMN workorder_process_id integer DEFAULT 0 UNIQUE;
+                END IF;
+                
+                -- 檢查並添加 workorder_process_id 欄位到 workorderprocesslog
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderprocesslog' AND column_name = 'workorder_process_id') THEN
+                    ALTER TABLE workorder_workorderprocesslog ADD COLUMN workorder_process_id integer DEFAULT 0;
+                END IF;
+                
+                -- 檢查並添加 workorder_id 欄位到 workorderproduction
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderproduction' AND column_name = 'workorder_id') THEN
+                    ALTER TABLE workorder_workorderproduction ADD COLUMN workorder_id integer DEFAULT NULL UNIQUE;
+                END IF;
+                
+                -- 檢查並添加 workorder_production_id 欄位到 workorderproductiondetail
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderproductiondetail' AND column_name = 'workorder_production_id') THEN
+                    ALTER TABLE workorder_workorderproductiondetail ADD COLUMN workorder_production_id integer DEFAULT 0;
+                END IF;
+            END $$;
+            """,
+            reverse_sql="""
+            DO $$
+            BEGIN
+                -- 移除添加的欄位（如果需要回滾）
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderprocess' AND column_name = 'workorder_id') THEN
+                    ALTER TABLE workorder_workorderprocess DROP COLUMN workorder_id;
+                END IF;
+                
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderprocesscapacity' AND column_name = 'workorder_process_id') THEN
+                    ALTER TABLE workorder_workorderprocesscapacity DROP COLUMN workorder_process_id;
+                END IF;
+                
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderprocesslog' AND column_name = 'workorder_process_id') THEN
+                    ALTER TABLE workorder_workorderprocesslog DROP COLUMN workorder_process_id;
+                END IF;
+                
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderproduction' AND column_name = 'workorder_id') THEN
+                    ALTER TABLE workorder_workorderproduction DROP COLUMN workorder_id;
+                END IF;
+                
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'workorder_workorderproductiondetail' AND column_name = 'workorder_production_id') THEN
+                    ALTER TABLE workorder_workorderproductiondetail DROP COLUMN workorder_production_id;
+                END IF;
+            END $$;
+            """
         ),
         migrations.AddIndex(
             model_name="workorderproductiondetail",

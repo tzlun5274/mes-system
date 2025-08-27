@@ -3100,6 +3100,41 @@ def auto_approval_task_detail(request, task_id):
     return render(request, 'system/auto_approval_task_detail.html', context)
 
 
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def report_settings(request):
+    """
+    報表設定頁面
+    """
+    context = {
+        'page_title': '報表設定',
+        'breadcrumb': [
+            {'name': '系統管理', 'url': 'system:index'},
+            {'name': '報表設定', 'url': 'system:report_settings'},
+        ]
+    }
+    
+    return render(request, 'system/report_settings.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def manual_sync_reports(request):
+    """
+    手動同步報表頁面
+    """
+    context = {
+        'page_title': '手動同步報表',
+        'breadcrumb': [
+            {'name': '系統管理', 'url': 'system:index'},
+            {'name': '報表設定', 'url': 'system:report_settings'},
+            {'name': '手動同步報表', 'url': 'system:manual_sync_reports'},
+        ]
+    }
+    
+    return render(request, 'system/manual_sync_reports.html', context)
+
+
 
 
 

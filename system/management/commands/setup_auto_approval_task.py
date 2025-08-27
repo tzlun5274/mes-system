@@ -95,3 +95,4 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.ERROR(f'移除自動審核定時任務失敗: {str(e)}')
             )
+

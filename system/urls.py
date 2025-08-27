@@ -78,6 +78,10 @@ urlpatterns = [
     # 自動審核定時任務管理
     path("auto_approval_tasks/", views.auto_approval_tasks, name="auto_approval_tasks"),
     path("auto_approval_tasks/<int:task_id>/", views.auto_approval_task_detail, name="auto_approval_task_detail"),
+    path("add_auto_approval_task/", views.add_auto_approval_task, name="add_auto_approval_task"),
+    path("delete_auto_approval_task/", views.delete_auto_approval_task, name="delete_auto_approval_task"),
+    path("execute_specific_auto_approval_task/", views.execute_specific_auto_approval_task, name="execute_specific_auto_approval_task"),
+    path("execute_all_auto_approval_tasks/", views.execute_all_auto_approval_tasks, name="execute_all_auto_approval_tasks"),
     
     # 自動完工功能 API 端點
     path("enable_auto_completion/", views.enable_auto_completion, name="enable_auto_completion"),
@@ -91,6 +95,10 @@ urlpatterns = [
     path("report_cleanup_settings/", views.report_cleanup_settings, name="report_cleanup_settings"),
     path("update_cleanup_settings/", views.update_cleanup_settings, name="update_cleanup_settings"),
     path("execute_cleanup/", views.execute_cleanup, name="execute_cleanup"),
+    
+    # 報表設定相關
+    path("report_settings/", views.report_settings, name="report_settings"),
+    path("manual_sync_reports/", views.manual_sync_reports, name="manual_sync_reports"),
     
     # 定時任務管理
     path('scheduled-tasks/', views.ScheduledTaskListView.as_view(), name='scheduled_task_list'),

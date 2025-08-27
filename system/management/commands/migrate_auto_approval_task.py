@@ -77,3 +77,4 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.ERROR(f'遷移失敗: {str(e)}')
             )
+
