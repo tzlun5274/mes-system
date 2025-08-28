@@ -176,7 +176,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{% static 'js/chart.min.js' %}"></script>
 <script>
 // 載入快速統計
 document.addEventListener('DOMContentLoaded', function() {

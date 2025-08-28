@@ -360,7 +360,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{% static 'js/chart.min.js' %}"></script>
 <script>
 // 工序時數分布圖表
 const processHoursCtx = document.getElementById('processHoursChart').getContext('2d');

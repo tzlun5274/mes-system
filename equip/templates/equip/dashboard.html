@@ -4,7 +4,7 @@
 {% block title %}設備監控看板{% endblock %}
 
 {% block extra_css %}
-<link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet">
+<link href="{% static 'js/chart.min.js' %}" rel="stylesheet">
 <style>
     .status-card {
         border-radius: 10px;
@@ -68,6 +68,16 @@
         100% { opacity: 1; }
     }
 </style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'home_page' %}">首頁</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'equip:index' %}">設備管理</a></li>
+        <li class="breadcrumb-item active" aria-current="page">設備監控看板</li>
+    </ol>
+</nav>
 {% endblock %}
 
 {% block content %}
@@ -330,7 +340,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script src="{% static 'js/chart.min.js' %}"></script>
 <script>
 // 自動刷新頁面數據
 setInterval(function() {

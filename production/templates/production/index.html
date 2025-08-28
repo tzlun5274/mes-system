@@ -3,6 +3,15 @@
 
 {% block title %}產線管理 - MES系統{% endblock %}
 
+{% block breadcrumb %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'home_page' %}">首頁</a></li>
+        <li class="breadcrumb-item active" aria-current="page">生產管理</li>
+    </ol>
+</nav>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <!-- 頁面標題 -->

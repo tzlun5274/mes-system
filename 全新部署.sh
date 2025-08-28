@@ -34,17 +34,27 @@ echo "主機 IP: $HOST_IP" | tee -a $LOG_FILE
 
 # 函數：從 .env 檔案讀取配置
 load_env_config() {
+    # 使用更穩定的方法檢查當前目錄
+    CURRENT_DIR=$(cd . && pwd 2>/dev/null || echo "unknown")
+    
     # 檢查當前目錄的 .env 檔案
     if [ ! -f ".env" ]; then
         echo -e "${RED}❌ 未找到 .env 檔案${NC}" | tee -a $LOG_FILE
-        echo "請確保在解壓後的目錄執行此腳本，且 .env 檔案存在" | tee -a $LOG_FILE
-        echo "當前目錄: $(pwd)" | tee -a $LOG_FILE
-        echo "請檢查 .env 檔案是否存在" | tee -a $LOG_FILE
+        echo "請確保在 /var/www/mes 專案目錄執行此腳本，且 .env 檔案存在" | tee -a $LOG_FILE
+        echo "當前目錄: $CURRENT_DIR" | tee -a $LOG_FILE
+        echo "請先執行以下步驟：" | tee -a $LOG_FILE
+        echo "1. 解壓縮套件" | tee -a $LOG_FILE
+        echo "2. 建立目錄: sudo mkdir -p /var/www/mes" | tee -a $LOG_FILE
+        echo "3. 搬移檔案: sudo cp -r 解壓目錄/* /var/www/mes/" | tee -a $LOG_FILE
+        echo "4. 設定權限: sudo chown -R mes:www-data /var/www/mes/" | tee -a $LOG_FILE
+        echo "5. 進入目錄: cd /var/www/mes" | tee -a $LOG_FILE
+        echo "6. 修改配置: nano .env" | tee -a $LOG_FILE
+        echo "7. 執行部署: sudo ./全新部署.sh" | tee -a $LOG_FILE
         exit 1
     fi
     
     echo "正在讀取當前目錄的 .env 配置..." | tee -a $LOG_FILE
-    echo "當前目錄: $(pwd)" | tee -a $LOG_FILE
+    echo "當前目錄: $CURRENT_DIR" | tee -a $LOG_FILE
     
     # 讀取資料庫配置
     DATABASE_NAME=$(grep "^DATABASE_NAME=" .env | cut -d'=' -f2)
@@ -94,8 +104,32 @@ run_command() {
         return 0
     else
         echo -e "${RED}❌ $desc 失敗${NC}" | tee -a $LOG_FILE
+        echo -e "${YELLOW}⚠️  請檢查日誌檔案: $LOG_FILE${NC}" | tee -a $LOG_FILE
         return 1
     fi
+}
+
+# 函數：檢查服務狀態
+check_service() {
+    local service_name="$1"
+    local max_attempts=3
+    local attempt=1
+    
+    while [ $attempt -le $max_attempts ]; do
+        if systemctl is-active --quiet $service_name; then
+            echo -e "${GREEN}✅ $service_name 服務運行正常${NC}" | tee -a $LOG_FILE
+            return 0
+        else
+            echo -e "${YELLOW}⚠️  $service_name 服務未運行，嘗試重啟 (第 $attempt 次)${NC}" | tee -a $LOG_FILE
+            systemctl restart $service_name
+            sleep 5
+            attempt=$((attempt + 1))
+        fi
+    done
+    
+    echo -e "${RED}❌ $service_name 服務啟動失敗${NC}" | tee -a $LOG_FILE
+    systemctl status $service_name --no-pager | tee -a $LOG_FILE
+    return 1
 }
 
 # 步驟 0: 讀取 .env 配置
@@ -136,6 +170,26 @@ fi
 echo ""
 echo -e "${YELLOW}🧹 步驟 2: 清理之前的安裝${NC}"
 echo -e "${YELLOW}⚠️  這將停止並清理之前的 MES 系統安裝${NC}"
+echo -e "${RED}⚠️  注意：此操作將清除所有資料庫資料！${NC}"
+echo ""
+read -p "是否要先備份現有資料庫？(y/N): " backup_choice
+
+if [[ $backup_choice =~ ^[Yy]$ ]]; then
+    echo "正在備份資料庫..." | tee -a $LOG_FILE
+    backup_file="/var/www/mes/backup_$(date +%Y%m%d_%H%M%S).sql"
+    sudo -u postgres pg_dump $DATABASE_NAME > $backup_file 2>/dev/null || echo "備份失敗或資料庫不存在"
+    echo "備份檔案位置: $backup_file" | tee -a $LOG_FILE
+fi
+
+echo ""
+read -p "確認要清除所有資料並重新部署嗎？(y/N): " confirm_clear
+
+if [[ ! $confirm_clear =~ ^[Yy]$ ]]; then
+    echo -e "${RED}❌ 部署已取消${NC}"
+    exit 1
+else
+    echo -e "${GREEN}✅ 確認清除資料，繼續部署${NC}"
+fi
 
 # 停止相關服務
 echo "停止相關服務..." | tee -a $LOG_FILE
@@ -146,6 +200,15 @@ systemctl stop nginx 2>/dev/null || true
 systemctl stop redis-server 2>/dev/null || true
 systemctl stop postgresql 2>/dev/null || true
 
+# 徹底清除資料庫相關資料
+echo "徹底清除資料庫相關資料..." | tee -a $LOG_FILE
+sudo -u postgres dropdb $DATABASE_NAME 2>/dev/null || true
+sudo -u postgres dropuser $DATABASE_USER 2>/dev/null || true
+
+# 清除 Redis 資料
+echo "清除 Redis 資料..." | tee -a $LOG_FILE
+redis-cli -a $REDIS_PASSWORD FLUSHALL 2>/dev/null || true
+
 # 移除舊的服務檔案
 echo "移除舊的服務檔案..." | tee -a $LOG_FILE
 rm -f /etc/systemd/system/mes.service
@@ -153,11 +216,28 @@ rm -f /etc/systemd/system/mes-celery.service
 rm -f /etc/systemd/system/celery-beat.service
 systemctl daemon-reload
 
-# 清理舊的專案檔案
-echo "清理舊的專案檔案..." | tee -a $LOG_FILE
-if [ -d "$PROJECT_DIR" ]; then
-    rm -rf $PROJECT_DIR
+# 檢查專案目錄是否正確
+echo "檢查專案目錄..." | tee -a $LOG_FILE
+if [ ! -d "$PROJECT_DIR" ]; then
+    echo -e "${RED}❌ 專案目錄 $PROJECT_DIR 不存在${NC}" | tee -a $LOG_FILE
+    echo "請先執行以下步驟：" | tee -a $LOG_FILE
+    echo "1. 解壓縮套件" | tee -a $LOG_FILE
+    echo "2. 建立目錄: sudo mkdir -p /var/www/mes" | tee -a $LOG_FILE
+    echo "3. 搬移檔案: sudo cp -r 解壓目錄/* /var/www/mes/" | tee -a $LOG_FILE
+    echo "4. 設定權限: sudo chown -R mes:www-data /var/www/mes/" | tee -a $LOG_FILE
+    echo "5. 進入目錄: cd /var/www/mes" | tee -a $LOG_FILE
+    echo "6. 修改配置: nano .env" | tee -a $LOG_FILE
+    echo "7. 執行部署: sudo ./全新部署.sh" | tee -a $LOG_FILE
+    exit 1
 fi
+
+if [ ! -f "$PROJECT_DIR/manage.py" ]; then
+    echo -e "${RED}❌ 專案目錄 $PROJECT_DIR 中未找到 manage.py${NC}" | tee -a $LOG_FILE
+    echo "請確保專案檔案已正確搬移到 $PROJECT_DIR" | tee -a $LOG_FILE
+    exit 1
+fi
+
+echo -e "${GREEN}✅ 專案目錄檢查通過${NC}" | tee -a $LOG_FILE
 
 # 清理舊的 Nginx 配置
 echo "清理舊的 Nginx 配置..." | tee -a $LOG_FILE
@@ -172,10 +252,13 @@ rm -rf /var/log/mes/* 2>/dev/null || true
 echo "清理 Python 快取..." | tee -a $LOG_FILE
 find /tmp -name "*.pyc" -delete 2>/dev/null || true
 find /tmp -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+find $PROJECT_DIR -name "*.pyc" -delete 2>/dev/null || true
+find $PROJECT_DIR -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
-# 清理 Redis 資料（可選）
-echo "清理 Redis 資料..." | tee -a $LOG_FILE
-redis-cli -a $REDIS_PASSWORD FLUSHALL 2>/dev/null || true
+# 清理 Celery 相關檔案
+echo "清理 Celery 相關檔案..." | tee -a $LOG_FILE
+rm -rf /var/run/celery/* 2>/dev/null || true
+rm -rf /var/log/celery/* 2>/dev/null || true
 
 echo -e "${GREEN}✅ 清理完成${NC}" | tee -a $LOG_FILE
 
@@ -211,12 +294,25 @@ if ! getent group "www-data" >/dev/null 2>&1; then
 fi
 run_command "usermod -aG www-data mes" "將 mes 加入 www-data 群組"
 
-# 步驟 7: 建立專案目錄
+# 步驟 7: 檢查專案目錄
 echo ""
-echo -e "${BLUE}📁 步驟 7: 建立專案目錄${NC}"
-run_command "mkdir -p $PROJECT_DIR" "建立專案目錄"
+echo -e "${BLUE}📁 步驟 7: 檢查專案目錄${NC}"
+if [ ! -d "$PROJECT_DIR" ]; then
+    echo -e "${RED}❌ 專案目錄 $PROJECT_DIR 不存在${NC}" | tee -a $LOG_FILE
+    echo "請先執行以下步驟：" | tee -a $LOG_FILE
+    echo "1. 解壓縮套件" | tee -a $LOG_FILE
+    echo "2. 建立目錄: sudo mkdir -p /var/www/mes" | tee -a $LOG_FILE
+    echo "3. 搬移檔案: sudo cp -r 解壓目錄/* /var/www/mes/" | tee -a $LOG_FILE
+    echo "4. 設定權限: sudo chown -R mes:www-data /var/www/mes/" | tee -a $LOG_FILE
+    echo "5. 進入目錄: cd /var/www/mes" | tee -a $LOG_FILE
+    echo "6. 修改配置: nano .env" | tee -a $LOG_FILE
+    echo "7. 執行部署: sudo ./全新部署.sh" | tee -a $LOG_FILE
+    exit 1
+fi
+
+echo -e "${GREEN}✅ 專案目錄已存在${NC}" | tee -a $LOG_FILE
 run_command "chown -R mes:www-data $PROJECT_DIR" "設定專案目錄權限"
-run_command "chmod -R 775 $PROJECT_DIR" "設定專案目錄權限"
+run_command "chmod -R 755 $PROJECT_DIR" "設定專案目錄權限"
 
 # 步驟 8: 配置 PostgreSQL
 echo ""
@@ -227,24 +323,29 @@ run_command "systemctl start postgresql" "啟動 PostgreSQL 服務"
 # 建立資料庫和使用者
 echo "建立資料庫和使用者..." | tee -a $LOG_FILE
 
-# 檢查資料庫是否已存在
-if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw $DATABASE_NAME; then
-    echo "資料庫 $DATABASE_NAME 已存在，跳過建立" | tee -a $LOG_FILE
-else
-    run_command "sudo -u postgres psql -c \"CREATE DATABASE $DATABASE_NAME;\"" "建立資料庫"
-fi
+# 確保完全清除舊資料庫並重新建立（全新部署）
+echo "確保完全清除舊資料庫並重新建立..." | tee -a $LOG_FILE
+sudo -u postgres dropdb $DATABASE_NAME 2>/dev/null || true
+sudo -u postgres dropuser $DATABASE_USER 2>/dev/null || true
 
-# 檢查使用者是否已存在
-if sudo -u postgres psql -t -c "SELECT 1 FROM pg_roles WHERE rolname='$DATABASE_USER'" | grep -q 1; then
-    echo "使用者 $DATABASE_USER 已存在，更新密碼" | tee -a $LOG_FILE
-    run_command "sudo -u postgres psql -c \"ALTER USER $DATABASE_USER WITH PASSWORD '$DATABASE_PASSWORD';\"" "更新使用者密碼"
-else
-    run_command "sudo -u postgres psql -c \"CREATE USER $DATABASE_USER WITH PASSWORD '$DATABASE_PASSWORD';\"" "建立使用者"
-fi
+# 重新建立使用者
+run_command "sudo -u postgres psql -c \"CREATE USER $DATABASE_USER WITH PASSWORD '$DATABASE_PASSWORD';\"" "建立資料庫使用者"
+
+# 重新建立資料庫
+run_command "sudo -u postgres psql -c \"CREATE DATABASE $DATABASE_NAME OWNER $DATABASE_USER;\"" "建立資料庫"
 
 # 授予權限
 run_command "sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE $DATABASE_NAME TO $DATABASE_USER;\"" "授予資料庫權限"
 run_command "sudo -u postgres psql -c \"ALTER USER $DATABASE_USER CREATEDB;\"" "授予建立資料庫權限"
+
+# 測試資料庫連線
+echo "測試資料庫連線..." | tee -a $LOG_FILE
+if sudo -u postgres psql -d $DATABASE_NAME -c "SELECT 1;" 2>&1 | grep -q "1 row"; then
+    echo -e "${GREEN}✅ 資料庫連線測試成功${NC}" | tee -a $LOG_FILE
+else
+    echo -e "${RED}❌ 資料庫連線測試失敗${NC}" | tee -a $LOG_FILE
+    exit 1
+fi
 
 echo "資料庫配置完成" | tee -a $LOG_FILE
 
@@ -409,39 +510,25 @@ echo "執行全新資料庫初始化..." | tee -a $LOG_FILE
 
 # 執行 Django 遷移
 echo "執行 Django 遷移..." | tee -a $LOG_FILE
+
+# 先執行 makemigrations 確保所有應用程式都有遷移檔案
+echo "檢查並創建遷移檔案..." | tee -a $LOG_FILE
+sudo -u mes python3 manage.py makemigrations 2>&1 | tee -a $LOG_FILE
+
+# 執行遷移
 sudo -u mes python3 manage.py migrate 2>&1 | tee -a $LOG_FILE
 
-# 強制檢查資料庫表是否真的建立
+# 檢查資料庫表是否建立
 echo "檢查資料庫表是否建立..." | tee -a $LOG_FILE
-if sudo -u mes python3 manage.py dbshell -c "\dt auth_user" 2>&1 | grep -q "auth_user"; then
+if sudo -u postgres psql -d $DATABASE_NAME -c "\dt auth_user" 2>&1 | grep -q "auth_user"; then
     echo -e "${GREEN}✅ Django 遷移成功，資料表已建立${NC}" | tee -a $LOG_FILE
 else
     echo -e "${RED}❌ Django 遷移失敗，auth_user 表不存在${NC}" | tee -a $LOG_FILE
-    
-    # 重新建立資料庫並重試
-    echo "重新建立資料庫並重試..." | tee -a $LOG_FILE
-    sudo -u postgres dropdb $DATABASE_NAME 2>/dev/null || true
-    sudo -u postgres createdb $DATABASE_NAME
-    
-    # 重新授予權限
-    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DATABASE_NAME TO $DATABASE_USER;"
-    sudo -u postgres psql -c "ALTER USER $DATABASE_USER CREATEDB;"
-    
-    # 重新執行遷移
-    echo "重新執行遷移..." | tee -a $LOG_FILE
-    sudo -u mes python3 manage.py migrate 2>&1 | tee -a $LOG_FILE
-    
-    # 再次檢查
-    if sudo -u mes python3 manage.py dbshell -c "\dt auth_user" 2>&1 | grep -q "auth_user"; then
-        echo -e "${GREEN}✅ 重新建立資料庫成功${NC}" | tee -a $LOG_FILE
-    else
-        echo -e "${RED}❌ 資料庫建立仍然失敗${NC}" | tee -a $LOG_FILE
-        echo "檢查遷移狀態..." | tee -a $LOG_FILE
-        sudo -u mes python3 manage.py showmigrations 2>&1 | tee -a $LOG_FILE
-        echo "檢查資料庫表..." | tee -a $LOG_FILE
-        sudo -u mes python3 manage.py dbshell -c "\dt" 2>&1 | tee -a $LOG_FILE
-        exit 1
-    fi
+    echo "檢查遷移狀態..." | tee -a $LOG_FILE
+    sudo -u mes python3 manage.py showmigrations 2>&1 | tee -a $LOG_FILE
+    echo "檢查資料庫表..." | tee -a $LOG_FILE
+    sudo -u postgres psql -d $DATABASE_NAME -c "\dt" 2>&1 | tee -a $LOG_FILE
+    exit 1
 fi
 
 # 驗證資料庫初始化狀態
@@ -450,7 +537,7 @@ sudo -u mes python3 manage.py showmigrations 2>&1 | tee -a $LOG_FILE
 
 # 檢查資料庫表是否正確創建
 echo "檢查資料庫表結構..." | tee -a $LOG_FILE
-sudo -u mes python3 manage.py dbshell -c "\dt" 2>&1 | tee -a $LOG_FILE
+sudo -u postgres psql -d $DATABASE_NAME -c "\dt" 2>&1 | tee -a $LOG_FILE
 
 echo -e "${GREEN}✅ 資料庫初始化完成${NC}" | tee -a $LOG_FILE
 
@@ -480,6 +567,7 @@ Description=MES Gunicorn daemon
 After=network.target postgresql.service redis-server.service
 
 [Service]
+Type=notify
 User=mes
 Group=www-data
 WorkingDirectory=$PROJECT_DIR
@@ -569,6 +657,14 @@ server {
 
     location /static/ {
         alias $PROJECT_DIR/static/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location /media/ {
+        alias $PROJECT_DIR/media/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
     }
 }
 EOF
@@ -576,6 +672,7 @@ EOF
 run_command "ln -sf /etc/nginx/sites-available/mes /etc/nginx/sites-enabled/" "啟用 Nginx 網站"
 run_command "rm -f /etc/nginx/sites-enabled/default" "移除預設網站"
 run_command "nginx -t" "測試 Nginx 配置"
+run_command "systemctl reload nginx" "重新載入 Nginx 配置"
 # 步驟 16: 啟動所有服務
 echo ""
 echo -e "${BLUE}🚀 步驟 16: 啟動所有服務${NC}"
@@ -610,15 +707,7 @@ sleep 3
 # 最終檢查所有服務
 echo "檢查所有服務狀態..." | tee -a $LOG_FILE
 for service in mes mes-celery celery-beat nginx; do
-    if systemctl is-active --quiet $service.service; then
-        echo -e "${GREEN}✅ $service 服務運行正常${NC}" | tee -a $LOG_FILE
-    else
-        echo -e "${RED}❌ $service 服務啟動失敗${NC}" | tee -a $LOG_FILE
-        systemctl status $service.service --no-pager | tee -a $LOG_FILE
-        echo "嘗試重新啟動 $service 服務..." | tee -a $LOG_FILE
-        systemctl restart $service.service
-        sleep 5
-    fi
+    check_service $service.service
 done
 
 # 步驟 17: 驗證部署
@@ -642,7 +731,7 @@ netstat -tlnp | grep -E ':(80|8000|6379|5432)' | tee -a $LOG_FILE
 # 測試網站
 echo "測試網站..." | tee -a $LOG_FILE
 sleep 5
-if curl -s -f http://localhost > /dev/null 2>&1; then
+if curl -s -o /dev/null -w "%{http_code}" http://localhost | grep -q "200\|302"; then
     echo "✅ 網站可訪問" | tee -a $LOG_FILE
 else
     echo "❌ 網站無法訪問，檢查服務狀態..." | tee -a $LOG_FILE
@@ -652,7 +741,7 @@ else
     systemctl restart mes.service
     systemctl restart nginx
     sleep 10
-    if curl -s -f http://localhost > /dev/null 2>&1; then
+    if curl -s -o /dev/null -w "%{http_code}" http://localhost | grep -q "200\|302"; then
         echo "✅ 網站重新啟動後可訪問" | tee -a $LOG_FILE
     else
         echo "❌ 網站仍然無法訪問" | tee -a $LOG_FILE
@@ -686,3 +775,34 @@ echo "PostgreSQL 日誌: /var/log/postgresql/"
 echo "Redis 日誌: /var/log/redis/"
 echo ""
 echo "部署完成時間: $(date)" | tee -a $LOG_FILE
+
+# 部署總結
+echo ""
+echo -e "${BLUE}📊 部署總結${NC}"
+echo "----------------------------------------"
+echo "✅ 系統套件安裝完成"
+echo "✅ 資料庫配置完成"
+echo "✅ Redis 配置完成"
+echo "✅ Python 環境配置完成"
+echo "✅ Django 專案配置完成"
+echo "✅ 靜態檔案收集完成"
+echo "✅ 系統服務配置完成"
+echo "✅ Nginx 配置完成"
+echo "✅ 所有服務啟動完成"
+echo ""
+echo -e "${BLUE}🔍 故障排除${NC}"
+echo "----------------------------------------"
+echo "如果遇到問題，請檢查："
+echo "1. 日誌檔案: $LOG_FILE"
+echo "2. 服務狀態: sudo systemctl status mes.service"
+echo "3. 端口監聽: netstat -tlnp | grep -E ':(80|8000)'"
+echo "4. 資料庫連線: sudo -u postgres psql -l"
+echo "5. Redis 連線: redis-cli ping"
+echo ""
+echo -e "${GREEN}🎯 下一步${NC}"
+echo "----------------------------------------"
+echo "1. 開啟瀏覽器訪問: http://$HOST_IP"
+echo "2. 使用管理員帳號登入系統"
+echo "3. 開始配置您的 MES 系統"
+echo ""
+echo -e "${GREEN}🎉 部署完成！${NC}"

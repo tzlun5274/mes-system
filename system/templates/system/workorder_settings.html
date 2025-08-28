@@ -438,13 +438,15 @@
                                            value="{{ task.name }}" placeholder="例如：快速審核">
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="form-label">執行間隔</label>
-                                    <div class="input-group">
-                                        <input type="number" class="form-control" name="task_interval_{{ task.id }}" 
-                                               value="{{ task.interval_minutes }}" min="5" max="1440">
-                                        <div class="input-group-append">
-                                            <span class="input-group-text">分鐘</span>
-                                        </div>
+                                    <label class="form-label">執行設定</label>
+                                    <div class="task-schedule">
+                                        {% if task.execution_type == 'fixed_time' %}
+                                            <span class="badge badge-info">固定時間</span>
+                                            <br><small>{{ task.fixed_time|time:"H:i" }}</small>
+                                        {% else %}
+                                            <span class="badge badge-primary">間隔執行</span>
+                                            <br><small>{{ task.interval_minutes }} 分鐘</small>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 <div class="col-md-2">
@@ -485,10 +487,55 @@
                     <!-- 新增任務按鈕 -->
                     <div class="row mt-3">
                         <div class="col-md-12">
-                            <button type="button" class="btn btn-success" onclick="addNewTask()">
-                                <i class="fas fa-plus mr-2"></i>新增執行間隔
+                            <button type="button" class="btn btn-success" onclick="showAddTaskModal()">
+                                <i class="fas fa-plus mr-2"></i>新增任務
                             </button>
-                            <small class="form-text text-muted">建議設定：30-60分鐘，最少要有一條執行間隔</small>
+                            <small class="form-text text-muted">支援間隔執行（建議30-60分鐘）或固定時間執行（每天指定時間）</small>
+                        </div>
+                    </div>
+                    
+                    <!-- 新增任務模態框 -->
+                    <div class="modal fade" id="addTaskModal" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">新增自動審核定時任務</h5>
+                                    <button type="button" class="close" onclick="hideAddTaskModal()">
+                                        <span>&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="form-group">
+                                        <label for="taskName">任務名稱</label>
+                                        <input type="text" class="form-control" id="taskName" placeholder="例如：快速審核">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>執行類型</label>
+                                        <div class="form-check">
+                                            <input type="radio" class="form-check-input" id="executionTypeInterval" name="executionType" value="interval" checked>
+                                            <label class="form-check-label" for="executionTypeInterval">間隔執行</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input type="radio" class="form-check-input" id="executionTypeFixed" name="executionType" value="fixed_time">
+                                            <label class="form-check-label" for="executionTypeFixed">固定時間</label>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" id="intervalSettings">
+                                        <label for="taskInterval">執行間隔（分鐘）</label>
+                                        <input type="number" class="form-control" id="taskInterval" value="30" min="5" max="1440">
+                                        <small class="form-text text-muted">建議設定：30-60分鐘</small>
+                                    </div>
+                                    <div class="form-group" id="fixedTimeSettings" style="display: none;">
+                                        <label for="taskFixedTime">固定執行時間</label>
+                                        <input type="time" class="form-control" id="taskFixedTime" value="09:00">
+                                        <small class="form-text text-muted">每天固定時間執行</small>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" onclick="hideAddTaskModal()">取消</button>
+                                    <button type="button" class="btn btn-primary" onclick="addNewTask()">新增</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -683,21 +730,77 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// 顯示新增任務模態框
+function showAddTaskModal() {
+    const modal = document.getElementById('addTaskModal');
+    const bootstrapModal = new bootstrap.Modal(modal, {
+        backdrop: true,
+        keyboard: true
+    });
+    bootstrapModal.show();
+}
+
+// 隱藏新增任務模態框
+function hideAddTaskModal() {
+    const modal = document.getElementById('addTaskModal');
+    const bootstrapModal = bootstrap.Modal.getInstance(modal);
+    if (bootstrapModal) {
+        bootstrapModal.hide();
+    }
+}
+
+// 切換執行類型設定
+document.addEventListener('DOMContentLoaded', function() {
+    const executionTypeRadios = document.querySelectorAll('input[name="executionType"]');
+    const intervalSettings = document.getElementById('intervalSettings');
+    const fixedTimeSettings = document.getElementById('fixedTimeSettings');
+    
+    executionTypeRadios.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            if (this.value === 'interval') {
+                intervalSettings.style.display = 'block';
+                fixedTimeSettings.style.display = 'none';
+            } else {
+                intervalSettings.style.display = 'none';
+                fixedTimeSettings.style.display = 'block';
+            }
+        });
+    });
+});
+
 // 新增自動審核定時任務
 function addNewTask() {
-    const taskName = prompt('請輸入任務名稱：', '新自動審核任務');
-    if (!taskName) return;
-    
-    const intervalMinutes = prompt('請輸入執行間隔（分鐘）：', '30');
-    if (!intervalMinutes || isNaN(intervalMinutes)) {
-        alert('請輸入有效的執行間隔！');
+    const taskName = document.getElementById('taskName').value.trim();
+    if (!taskName) {
+        alert('請輸入任務名稱！');
         return;
     }
     
-    const interval = parseInt(intervalMinutes);
-    if (interval < 5 || interval > 1440) {
-        alert('執行間隔必須在 5-1440 分鐘之間！');
-        return;
+    const executionType = document.querySelector('input[name="executionType"]:checked').value;
+    let requestBody = `name=${encodeURIComponent(taskName)}&execution_type=${executionType}`;
+    
+    if (executionType === 'interval') {
+        const intervalMinutes = document.getElementById('taskInterval').value;
+        if (!intervalMinutes || isNaN(intervalMinutes)) {
+            alert('請輸入有效的執行間隔！');
+            return;
+        }
+        
+        const interval = parseInt(intervalMinutes);
+        if (interval < 5 || interval > 1440) {
+            alert('執行間隔必須在 5-1440 分鐘之間！');
+            return;
+        }
+        
+        requestBody += `&interval_minutes=${interval}`;
+    } else if (executionType === 'fixed_time') {
+        const fixedTime = document.getElementById('taskFixedTime').value;
+        if (!fixedTime) {
+            alert('請設定固定執行時間！');
+            return;
+        }
+        
+        requestBody += `&fixed_time=${fixedTime}`;
     }
     
     // 發送 AJAX 請求
@@ -707,12 +810,17 @@ function addNewTask() {
             'Content-Type': 'application/x-www-form-urlencoded',
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
         },
-        body: `name=${encodeURIComponent(taskName)}&interval_minutes=${interval}`
+        body: requestBody
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
             alert(data.message);
+            const modal = document.getElementById('addTaskModal');
+            const bootstrapModal = bootstrap.Modal.getInstance(modal);
+            if (bootstrapModal) {
+                bootstrapModal.hide();
+            }
             location.reload(); // 重新載入頁面以顯示新任務
         } else {
             alert('新增失敗：' + data.message);

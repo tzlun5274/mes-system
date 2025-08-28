@@ -168,7 +168,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{% static 'js/chart.min.js' %}"></script>
 <script>
 // 執行天數分布圖表
 const executionDaysCtx = document.getElementById('executionDaysChart').getContext('2d');

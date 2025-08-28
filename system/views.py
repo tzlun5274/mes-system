@@ -1039,9 +1039,11 @@ def operation_log_manage(request):
         form = OperationLogConfigForm(request.POST, instance=config)
         if form.is_valid():
             form.save()
-            logger.info(f"操作紀錄保留天數更新為 {config.retain_days} 天")
+            # 重新讀取配置以獲取更新後的值
+            config.refresh_from_db()
+            logger.info(f"操作紀錄保留天數更新為 {config.retention_days} 天")
             messages.success(
-                request, f"操作紀錄保留天數已更新為 {config.retain_days} 天！"
+                request, f"操作紀錄保留天數已更新為 {config.retention_days} 天！"
             )
             return redirect("system:operation_log_manage")
     else:
@@ -1135,8 +1137,9 @@ def operation_log_manage(request):
 @login_required
 @user_passes_test(superuser_required, login_url="/accounts/login/")
 def clean_operation_logs(request):
+    import datetime
     config, created = OperationLogConfig.objects.get_or_create(id=1)
-    cutoff_date = timezone.now() - datetime.timedelta(days=config.retain_days)
+    cutoff_date = timezone.now() - datetime.timedelta(days=config.retention_days)
     total_deleted = 0
     for module, model_path in MODULE_LOG_MODELS.items():
         try:
@@ -1179,80 +1182,70 @@ def change_password(request):
 @user_passes_test(superuser_required, login_url="/accounts/login/")
 def environment_management(request):
     """環境管理視圖"""
+    import datetime
     # 獲取當前環境信息
-    current_env = os.environ.get("DJANGO_ENV", "development")
     current_debug = getattr(settings, "DEBUG", True)
+    
+    # 根據 DEBUG 設定判斷環境
+    if current_debug:
+        current_env = "development"
+    else:
+        current_env = "production"
 
     # 環境配置信息
     environments = {
         "development": {
             "name": "開發環境",
-            "description": "用於程式開發和調試，記錄詳細的 DEBUG 日誌",
+            "description": "DEBUG=True，用於程式開發和調試",
             "debug": True,
-            "log_level": "DEBUG",
             "features": ["詳細調試信息", "終端日誌輸出", "完整錯誤追蹤"],
-        },
-        "testing": {
-            "name": "測試環境",
-            "description": "用於功能測試和驗證，記錄 INFO 級別日誌",
-            "debug": False,
-            "log_level": "INFO",
-            "features": ["功能測試", "中等詳細日誌", "效能測試"],
         },
         "production": {
             "name": "生產環境",
-            "description": "正式營運環境，只記錄重要日誌，支援郵件通知",
+            "description": "DEBUG=False，正式營運環境",
             "debug": False,
-            "log_level": "WARNING",
-            "features": ["高安全性", "自動日誌輪轉", "錯誤郵件通知", "效能優化"],
+            "features": ["高安全性", "效能優化"],
         },
     }
 
+    # 處理日誌清理請求
     if request.method == "POST":
         action = request.POST.get("action")
-
-        if action == "switch_environment":
-            target_env = request.POST.get("environment")
-
-            if target_env in environments:
-                try:
-                    # 備份現有的 .env 檔案
-                    if os.path.exists(".env"):
-                        backup_name = (
-                            f'.env.backup.{datetime.now().strftime("%Y%m%d_%H%M%S")}'
-                        )
-                        shutil.copy2(".env", backup_name)
-                        messages.success(request, f"已備份現有環境設定到 {backup_name}")
-
-                    # 複製目標環境檔案
-                    env_file = f"env_{target_env}.txt"
-                    if os.path.exists(env_file):
-                        shutil.copy2(env_file, ".env")
-                        messages.success(
-                            request, f'已切換到 {environments[target_env]["name"]}'
-                        )
-
-                        # 記錄操作日誌
-                        logger.info(
-                            f"系統管理員 {request.user.username} 將環境從 {current_env} 切換到 {target_env}"
-                        )
-
-                        # 提示重啟服務
-                        messages.warning(
-                            request, "請重啟 Django 服務以套用新的環境設定"
-                        )
-                    else:
-                        messages.error(request, f"環境檔案 {env_file} 不存在")
-
-                except Exception as e:
-                    messages.error(request, f"環境切換失敗: {str(e)}")
-                    logger.error(f"環境切換失敗: {str(e)}")
-            else:
-                messages.error(request, "無效的環境名稱")
+        
+        if action == "clean_logs":
+            try:
+                days = int(request.POST.get("days", 30))
+                dry_run = request.POST.get("dry_run") == "on"
+                
+                if dry_run:
+                    # 模擬執行
+                    messages.info(request, f"模擬清理 {days} 天前的日誌檔案")
+                    logger.info(f"模擬清理 {days} 天前的日誌檔案")
+                else:
+                    # 實際執行
+                    from datetime import datetime, timedelta
+                    cutoff_date = datetime.now() - timedelta(days=days)
+                    
+                    cleaned_count = 0
+                    for log_file in log_files:
+                        if log_file["modified"] < cutoff_date:
+                            file_path = os.path.join(log_dir, log_file["name"])
+                            try:
+                                os.remove(file_path)
+                                cleaned_count += 1
+                            except Exception as e:
+                                logger.error(f"刪除日誌檔案失敗 {file_path}: {str(e)}")
+                    
+                    messages.success(request, f"已清理 {cleaned_count} 個舊日誌檔案")
+                    logger.info(f"已清理 {cleaned_count} 個舊日誌檔案")
+                    
+            except Exception as e:
+                messages.error(request, f"清理日誌失敗: {str(e)}")
+                logger.error(f"清理日誌失敗: {str(e)}")
 
     # 獲取日誌檔案信息
     log_dir = getattr(
-        settings, "LOG_DIR", os.path.join(os.path.dirname(settings.BASE_DIR), "logs")
+        settings, "LOG_BASE_DIR", os.path.join(settings.BASE_DIR, "logs")
     )
     log_files = []
 
@@ -2688,25 +2681,61 @@ def add_auto_approval_task(request):
     
     try:
         from system.models import ScheduledTask
+        from datetime import datetime
         
         name = request.POST.get('name', '新自動審核任務')
-        interval_minutes = int(request.POST.get('interval_minutes', 30))
+        execution_type = request.POST.get('execution_type', 'interval')
         
-        if interval_minutes < 5 or interval_minutes > 1440:
+        if execution_type == 'interval':
+            interval_minutes = int(request.POST.get('interval_minutes', 30))
+            
+            if interval_minutes < 5 or interval_minutes > 1440:
+                return JsonResponse({
+                    'success': False,
+                    'message': '執行間隔必須在 5-1440 分鐘之間'
+                })
+            
+            # 建立間隔執行任務
+            new_task = ScheduledTask.objects.create(
+                name=name,
+                task_type='auto_approve',
+                task_function='system.tasks.auto_approve_work_reports',
+                execution_type='interval',
+                interval_minutes=interval_minutes,
+                is_enabled=True,
+                description=f'自動審核定時任務 - {name}'
+            )
+        elif execution_type == 'fixed_time':
+            fixed_time_str = request.POST.get('fixed_time', '')
+            if not fixed_time_str:
+                return JsonResponse({
+                    'success': False,
+                    'message': '固定時間執行必須設定執行時間'
+                })
+            
+            try:
+                fixed_time = datetime.strptime(fixed_time_str, '%H:%M').time()
+            except ValueError:
+                return JsonResponse({
+                    'success': False,
+                    'message': '時間格式錯誤，請使用 HH:MM 格式'
+                })
+            
+            # 建立固定時間執行任務
+            new_task = ScheduledTask.objects.create(
+                name=name,
+                task_type='auto_approve',
+                task_function='system.tasks.auto_approve_work_reports',
+                execution_type='fixed_time',
+                fixed_time=fixed_time,
+                is_enabled=True,
+                description=f'自動審核定時任務 - {name}'
+            )
+        else:
             return JsonResponse({
                 'success': False,
-                'message': '執行間隔必須在 5-1440 分鐘之間'
+                'message': '不支援的執行類型'
             })
-        
-        # 建立新任務
-        new_task = ScheduledTask.objects.create(
-            name=name,
-            task_type='auto_approve',
-            task_function='system.tasks.auto_approve_work_reports',
-            interval_minutes=interval_minutes,
-            is_enabled=True,
-            description=f'自動審核定時任務 - {name}'
-        )
         
         return JsonResponse({
             'success': True,
@@ -2925,16 +2954,19 @@ def auto_approval_tasks(request):
                     return redirect('system:auto_approval_tasks')
                 
                 # 檢查任務名稱是否重複
-                if AutoApprovalTask.objects.filter(name=name).exists():
+                if ScheduledTask.objects.filter(name=name, task_type='auto_approve').exists():
                     messages.error(request, f"任務名稱 '{name}' 已存在")
                     return redirect('system:auto_approval_tasks')
                 
                 # 建立新任務
-                task = AutoApprovalTask.objects.create(
+                task = ScheduledTask.objects.create(
                     name=name,
+                    task_type='auto_approve',
+                    task_function='system.tasks.auto_approve_work_reports',
+                    execution_type='interval',
                     interval_minutes=interval_minutes,
-                    description=description,
-                    created_by=request.user
+                    is_enabled=True,
+                    description=description
                 )
                 
                 messages.success(request, f"定時任務 '{name}' 建立成功")
@@ -2953,10 +2985,10 @@ def auto_approval_tasks(request):
             is_enabled = request.POST.get('is_enabled') == 'on'
             
             try:
-                task = AutoApprovalTask.objects.get(id=task_id)
+                task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
                 
                 # 檢查名稱是否重複（排除自己）
-                if AutoApprovalTask.objects.filter(name=name).exclude(id=task_id).exists():
+                if ScheduledTask.objects.filter(name=name, task_type='auto_approve').exclude(id=task_id).exists():
                     messages.error(request, f"任務名稱 '{name}' 已存在")
                     return redirect('system:auto_approval_tasks')
                 
@@ -2964,12 +2996,11 @@ def auto_approval_tasks(request):
                 task.interval_minutes = int(interval_minutes)
                 task.description = description
                 task.is_enabled = is_enabled
-                task.updated_by = request.user
                 task.save()
                 
                 messages.success(request, f"定時任務 '{name}' 更新成功")
                 
-            except AutoApprovalTask.DoesNotExist:
+            except ScheduledTask.DoesNotExist:
                 messages.error(request, "找不到指定的定時任務")
             except ValueError:
                 messages.error(request, "執行間隔必須是有效的數字")
@@ -2981,12 +3012,12 @@ def auto_approval_tasks(request):
             task_id = request.POST.get('task_id')
             
             try:
-                task = AutoApprovalTask.objects.get(id=task_id)
+                task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
                 task_name = task.name
                 task.delete()
                 messages.success(request, f"定時任務 '{task_name}' 刪除成功")
                 
-            except AutoApprovalTask.DoesNotExist:
+            except ScheduledTask.DoesNotExist:
                 messages.error(request, "找不到指定的定時任務")
             except Exception as e:
                 messages.error(request, f"刪除任務失敗：{str(e)}")
@@ -2996,15 +3027,14 @@ def auto_approval_tasks(request):
             task_id = request.POST.get('task_id')
             
             try:
-                task = AutoApprovalTask.objects.get(id=task_id)
+                task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
                 task.is_enabled = not task.is_enabled
-                task.updated_by = request.user
                 task.save()
                 
                 status = "啟用" if task.is_enabled else "停用"
                 messages.success(request, f"定時任務 '{task.name}' 已{status}")
                 
-            except AutoApprovalTask.DoesNotExist:
+            except ScheduledTask.DoesNotExist:
                 messages.error(request, "找不到指定的定時任務")
             except Exception as e:
                 messages.error(request, f"切換狀態失敗：{str(e)}")
@@ -3014,21 +3044,19 @@ def auto_approval_tasks(request):
             task_id = request.POST.get('task_id')
             
             try:
-                task = AutoApprovalTask.objects.get(id=task_id)
+                task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
                 
                 # 執行自動審核任務
                 from system.tasks import auto_approve_work_reports
                 result = auto_approve_work_reports.delay()
                 
                 # 更新任務執行記錄
-                task.execution_count += 1
                 task.last_run_at = timezone.now()
-                task.updated_by = request.user
                 task.save()
                 
                 messages.success(request, f"定時任務 '{task.name}' 手動執行成功")
                 
-            except AutoApprovalTask.DoesNotExist:
+            except ScheduledTask.DoesNotExist:
                 messages.error(request, "找不到指定的定時任務")
             except Exception as e:
                 messages.error(request, f"執行任務失敗：{str(e)}")
@@ -3036,7 +3064,7 @@ def auto_approval_tasks(request):
         return redirect('system:auto_approval_tasks')
     
     # 取得所有定時任務
-    tasks = AutoApprovalTask.objects.all().order_by('-created_at')
+    tasks = ScheduledTask.objects.filter(task_type='auto_approve').order_by('-created_at')
     
     context = {
         'tasks': tasks,
@@ -3056,8 +3084,8 @@ def auto_approval_task_detail(request, task_id):
     自動審核定時任務詳情頁面
     """
     try:
-        task = AutoApprovalTask.objects.get(id=task_id)
-    except AutoApprovalTask.DoesNotExist:
+        task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
+    except ScheduledTask.DoesNotExist:
         messages.error(request, "找不到指定的定時任務")
         return redirect('system:auto_approval_tasks')
     
@@ -3070,14 +3098,13 @@ def auto_approval_task_detail(request, task_id):
         
         try:
             # 檢查名稱是否重複
-            if AutoApprovalTask.objects.filter(name=name).exclude(id=task_id).exists():
+            if ScheduledTask.objects.filter(name=name, task_type='auto_approve').exclude(id=task_id).exists():
                 messages.error(request, f"任務名稱 '{name}' 已存在")
             else:
                 task.name = name
                 task.interval_minutes = int(interval_minutes)
                 task.description = description
                 task.is_enabled = is_enabled
-                task.updated_by = request.user
                 task.save()
                 
                 messages.success(request, f"定時任務 '{name}' 更新成功")

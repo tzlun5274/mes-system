@@ -7,18 +7,26 @@
 
 {% block content %}
 <div class="container mt-4">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+            <li class="breadcrumb-item active" aria-current="page">系統管理</li>
+        </ol>
+    </nav>
+    
     <h2 class="mb-4 text-primary"><i class="bi bi-gear"></i> 系統管理首頁</h2>
     <p class="text-secondary mb-4">這裡可以設定系統基本功能，管理用戶、群組、權限、備份與操作紀錄。每個功能都有清楚的中文說明，操作簡單，適合不懂程式的人。</p>
-    <div class="row row-cols-1 row-cols-md-2 g-4">
-        <!-- 環境管理 -->
+        <div class="row row-cols-1 row-cols-md-2 g-4">
+        <!-- 關於系統 -->
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0"><i class="bi bi-cogs"></i> 環境管理</h5>
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> 關於系統</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">切換系統環境（開發/測試/生產），管理日誌檔案，查看系統運行狀態。</p>
-                    <a href="{% url 'system:environment_management' %}" class="btn btn-danger"><i class="bi bi-cogs"></i> 環境管理</a>
+                    <p class="card-text">查看系統版本資訊、運行狀態、日誌檔案，了解系統基本資訊。</p>
+                    <a href="{% url 'system:environment_management' %}" class="btn btn-danger"><i class="bi bi-info-circle"></i> 關於系統</a>
                 </div>
             </div>
         </div>

@@ -1,5 +1,8 @@
+import os
 from django.urls import path, include
 from django.views.generic import RedirectView
+from django.conf import settings
+from django.conf.urls.static import static
 from . import views
 
 urlpatterns = [
@@ -23,3 +26,9 @@ urlpatterns = [
     # path("work-reporting-management/", include("work_reporting_management.urls", namespace="work_reporting_management")),  # 已移除新的報工管理系統
     path("database-error/", views.database_error, name="database_error"),
 ]
+
+# 靜態檔案路由
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=os.path.join(settings.BASE_DIR, "static"))
+else:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

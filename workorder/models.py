@@ -1315,6 +1315,36 @@ class SystemConfig(models.Model):
         return config
 
 
+class WorkOrderOperationLog(models.Model):
+    """
+    工單操作日誌模型，記錄每次工單操作的基本資訊與細節
+    """
+    
+    timestamp = models.DateTimeField(default=timezone.now, verbose_name="時間戳")
+    user = models.CharField(max_length=150, verbose_name="用戶")
+    action = models.CharField(max_length=255, verbose_name="操作")
+    workorder_related = models.ForeignKey(
+        "WorkOrder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="關聯工單",
+    )
+    ip_address = models.GenericIPAddressField(
+        null=True, blank=True, verbose_name="IP 地址"
+    )
+    details = models.TextField(blank=True, null=True, verbose_name="細節")
+
+    class Meta:
+        default_permissions = ()  # 禁用默認權限
+        verbose_name = "工單操作日誌"
+        verbose_name_plural = "工單操作日誌"
+        db_table = "workorder_operation_log"
+
+    def __str__(self):
+        return f"{self.timestamp} - {self.user} - {self.action}"
+
+
 
 
 

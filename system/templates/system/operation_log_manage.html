@@ -15,8 +15,8 @@
             <form method="post" class="form-inline">
                 {% csrf_token %}
                 <div class="form-group mb-2">
-                    {{ form.retain_days.label_tag }}
-                    {{ form.retain_days }}
+                    {{ form.retention_days.label_tag }}
+                    {{ form.retention_days }}
                 </div>
                 <button type="submit" class="btn btn-primary mb-2 ms-2">保存</button>
                 <a href="{% url 'system:index' %}" class="btn btn-secondary mb-2 ms-2">返回</a>

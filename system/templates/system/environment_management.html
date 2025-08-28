@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}環境管理 - {{ block.super }}{% endblock %}
+{% block title %}關於系統 - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -95,7 +95,7 @@
             <div class="card">
                 <div class="card-header">
                     <h4 class="card-title">
-                        <i class="fas fa-cogs"></i> 環境管理
+                        <i class="fas fa-info-circle"></i> 關於系統
                     </h4>
                 </div>
                 <div class="card-body">
@@ -125,11 +125,11 @@
                         </div>
                     </div>
 
-                    <!-- 環境切換 -->
+                    <!-- 環境狀態顯示 -->
                     <div class="row">
                         <div class="col-12">
-                            <h5><i class="fas fa-exchange-alt"></i> 環境切換</h5>
-                            <p class="text-muted">選擇要切換的環境，系統會自動備份當前設定並套用新環境配置。</p>
+                            <h5><i class="fas fa-info-circle"></i> 環境狀態</h5>
+                            <p class="text-muted">顯示當前系統環境狀態。如需切換環境，請手動修改 .env 檔案中的 LOG_LEVEL 設定。</p>
                         </div>
                     </div>
 
@@ -161,20 +161,14 @@
                                     {% endfor %}
                                 </ul>
                                 
-                                {% if env_key != current_env %}
-                                    <form method="post" style="display: inline;">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="switch_environment">
-                                        <input type="hidden" name="environment" value="{{ env_key }}">
-                                        <button type="submit" class="btn btn-primary btn-sm" 
-                                                onclick="return confirm('確定要切換到 {{ env_info.name }} 嗎？\\n\\n注意：切換後需要重啟 Django 服務才能生效。')">
-                                            <i class="fas fa-arrow-right"></i> 切換到此環境
-                                        </button>
-                                    </form>
-                                {% else %}
-                                    <button class="btn btn-secondary btn-sm" disabled>
+                                {% if env_key == current_env %}
+                                    <button class="btn btn-success btn-sm" disabled>
                                         <i class="fas fa-check"></i> 當前環境
                                     </button>
+                                {% else %}
+                                    <div class="text-muted small">
+                                        <i class="fas fa-info-circle"></i> 手動修改 .env 檔案切換環境
+                                    </div>
                                 {% endif %}
                             </div>
                         </div>
@@ -268,22 +262,11 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
-    // 環境切換確認
-    $('form[action="switch_environment"]').on('submit', function(e) {
-        var targetEnv = $(this).find('input[name="environment"]').val();
-        var envNames = {
-            'development': '開發環境',
-            'testing': '測試環境',
-            'production': '生產環境'
-        };
-        
-        if (!confirm('確定要切換到 ' + envNames[targetEnv] + ' 嗎？\n\n注意：切換後需要重啟 Django 服務才能生效。')) {
-            e.preventDefault();
-        }
-    });
-    
     // 清理日誌確認
-    $('form[action="clean_logs"]').on('submit', function(e) {
+    $('form').on('submit', function(e) {
+        var action = $(this).find('input[name="action"]').val();
+        if (action !== 'clean_logs') return;
+        
         var days = $(this).find('select[name="days"]').val();
         var dryRun = $(this).find('input[name="dry_run"]').is(':checked');
         

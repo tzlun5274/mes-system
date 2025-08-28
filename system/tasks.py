@@ -322,7 +322,7 @@ def sync_scheduled_tasks_to_celery():
 def clean_operation_logs_task():
     try:
         config = OperationLogConfig.objects.get(id=1)
-        cutoff_date = timezone.now() - datetime.timedelta(days=config.retain_days)
+        cutoff_date = timezone.now() - datetime.timedelta(days=config.retention_days)
         total_deleted = 0
         for module, model_path in MODULE_LOG_MODELS.items():
             try:

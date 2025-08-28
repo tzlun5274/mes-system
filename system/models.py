@@ -235,15 +235,37 @@ class ScheduledTask(models.Model):
         ('data_cleanup', '資料清理'),
     ]
     
+    # 執行類型選項
+    EXECUTION_TYPE_CHOICES = [
+        ('interval', '間隔執行'),
+        ('fixed_time', '固定時間'),
+    ]
+    
     name = models.CharField(max_length=100, verbose_name="任務名稱")
     task_type = models.CharField(max_length=50, choices=TASK_TYPES, verbose_name="任務類型")
     task_function = models.CharField(max_length=200, verbose_name="任務函數")
+    
+    execution_type = models.CharField(
+        max_length=20,
+        choices=EXECUTION_TYPE_CHOICES,
+        default='interval',
+        verbose_name="執行類型",
+        help_text="選擇執行方式：間隔執行或固定時間執行"
+    )
     
     # 間隔設定
     interval_minutes = models.IntegerField(
         default=30,
         verbose_name="間隔分鐘數",
-        help_text="每多少分鐘執行一次"
+        help_text="每多少分鐘執行一次（僅適用於間隔執行）"
+    )
+    
+    # 固定時間設定
+    fixed_time = models.TimeField(
+        null=True,
+        blank=True,
+        verbose_name="固定執行時間",
+        help_text="每天固定時間執行（僅適用於固定時間執行）"
     )
     
     is_enabled = models.BooleanField(default=True, verbose_name="啟用狀態")
@@ -264,27 +286,37 @@ class ScheduledTask(models.Model):
 
     def get_schedule_description(self):
         """取得定時描述"""
-        if self.interval_minutes:
-            if self.interval_minutes < 60:
-                return f"每 {self.interval_minutes} 分鐘執行一次"
-            elif self.interval_minutes == 60:
-                return "每小時執行一次"
+        if self.execution_type == 'fixed_time':
+            if self.fixed_time:
+                return f"每天 {self.fixed_time.strftime('%H:%M')} 執行"
             else:
-                hours = self.interval_minutes // 60
-                minutes = self.interval_minutes % 60
-                if minutes == 0:
-                    return f"每 {hours} 小時執行一次"
-                else:
-                    return f"每 {hours} 小時 {minutes} 分鐘執行一次"
+                return "未設定固定時間"
         else:
-            return "未設定間隔"
+            if self.interval_minutes:
+                if self.interval_minutes < 60:
+                    return f"每 {self.interval_minutes} 分鐘執行一次"
+                elif self.interval_minutes == 60:
+                    return "每小時執行一次"
+                else:
+                    hours = self.interval_minutes // 60
+                    minutes = self.interval_minutes % 60
+                    if minutes == 0:
+                        return f"每 {hours} 小時執行一次"
+                    else:
+                        return f"每 {hours} 小時 {minutes} 分鐘執行一次"
+            else:
+                return "未設定間隔"
 
     def clean(self):
         """驗證模型"""
         from django.core.exceptions import ValidationError
         
-        if not self.interval_minutes or self.interval_minutes <= 0:
-            raise ValidationError("間隔分鐘數必須大於0")
+        if self.execution_type == 'interval':
+            if not self.interval_minutes or self.interval_minutes <= 0:
+                raise ValidationError("間隔分鐘數必須大於0")
+        elif self.execution_type == 'fixed_time':
+            if not self.fixed_time:
+                raise ValidationError("固定時間執行必須設定執行時間")
 
 
 class ReportSyncSettings(models.Model):
@@ -586,7 +618,13 @@ class CleanupLog(models.Model):
 
 
 class AutoApprovalTask(models.Model):
-    """自動審核定時任務模型 - 支援多個執行間隔"""
+    """自動審核定時任務模型 - 支援多個執行間隔和固定時間執行"""
+    
+    # 執行類型選項
+    EXECUTION_TYPE_CHOICES = [
+        ('interval', '間隔執行'),
+        ('fixed_time', '固定時間'),
+    ]
     
     name = models.CharField(
         max_length=100, 
@@ -594,11 +632,26 @@ class AutoApprovalTask(models.Model):
         help_text="為此定時任務設定一個描述性名稱"
     )
     
+    execution_type = models.CharField(
+        max_length=20,
+        choices=EXECUTION_TYPE_CHOICES,
+        default='interval',
+        verbose_name="執行類型",
+        help_text="選擇執行方式：間隔執行或固定時間執行"
+    )
+    
     interval_minutes = models.IntegerField(
         verbose_name="執行間隔（分鐘）",
-        help_text="每多少分鐘執行一次自動審核",
+        help_text="每多少分鐘執行一次自動審核（僅適用於間隔執行）",
         validators=[MinValueValidator(1), MaxValueValidator(1440)],  # 1分鐘到24小時
         default=30
+    )
+    
+    fixed_time = models.TimeField(
+        null=True,
+        blank=True,
+        verbose_name="固定執行時間",
+        help_text="每天固定時間執行（僅適用於固定時間執行）"
     )
     
     is_enabled = models.BooleanField(
@@ -688,21 +741,27 @@ class AutoApprovalTask(models.Model):
 
     def __str__(self):
         status = "啟用" if self.is_enabled else "停用"
-        return f"{self.name} (每{self.interval_minutes}分鐘 - {status})"
+        if self.execution_type == 'fixed_time':
+            return f"{self.name} (每天 {self.fixed_time.strftime('%H:%M')} - {status})"
+        else:
+            return f"{self.name} (每{self.interval_minutes}分鐘 - {status})"
 
     def get_interval_display(self):
         """取得間隔顯示文字"""
-        if self.interval_minutes < 60:
-            return f"每 {self.interval_minutes} 分鐘"
-        elif self.interval_minutes == 60:
-            return "每小時"
+        if self.execution_type == 'fixed_time':
+            return f"每天 {self.fixed_time.strftime('%H:%M')}"
         else:
-            hours = self.interval_minutes // 60
-            minutes = self.interval_minutes % 60
-            if minutes == 0:
-                return f"每 {hours} 小時"
+            if self.interval_minutes < 60:
+                return f"每 {self.interval_minutes} 分鐘"
+            elif self.interval_minutes == 60:
+                return "每小時"
             else:
-                return f"每 {hours} 小時 {minutes} 分鐘"
+                hours = self.interval_minutes // 60
+                minutes = self.interval_minutes % 60
+                if minutes == 0:
+                    return f"每 {hours} 小時"
+                else:
+                    return f"每 {hours} 小時 {minutes} 分鐘"
 
     def get_status_display(self):
         """取得狀態顯示"""
@@ -726,11 +785,15 @@ class AutoApprovalTask(models.Model):
         if not self.name:
             raise ValidationError("任務名稱不能為空")
         
-        if self.interval_minutes < 1:
-            raise ValidationError("執行間隔必須大於0分鐘")
-        
-        if self.interval_minutes > 1440:
-            raise ValidationError("執行間隔不能超過1440分鐘（24小時）")
+        if self.execution_type == 'interval':
+            if self.interval_minutes < 1:
+                raise ValidationError("執行間隔必須大於0分鐘")
+            
+            if self.interval_minutes > 1440:
+                raise ValidationError("執行間隔不能超過1440分鐘（24小時）")
+        elif self.execution_type == 'fixed_time':
+            if not self.fixed_time:
+                raise ValidationError("固定時間執行必須設定執行時間")
 
     def save(self, *args, **kwargs):
         """儲存時自動設定描述"""

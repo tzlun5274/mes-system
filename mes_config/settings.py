@@ -69,12 +69,22 @@ MIDDLEWARE = [
     "mes_config.middleware.DataIsolationMiddleware",  # 資料隔離中間件
 ]
 
-# CORS 配置（可選，如果前端或模組跨域訪問 API）
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    f"http://{env('HOST_IP', default='localhost')}",
-]
+# CORS 配置（根據環境自動調整）
+if DEBUG:
+    # 開發環境：允許所有來源
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        f"http://{env('HOST_IP', default='localhost')}",
+    ]
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    # 生產環境：只允許指定來源
+    CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[
+        f"https://{env('HOST_IP', default='localhost')}",
+    ])
+    CORS_ALLOW_ALL_ORIGINS = False
+
 CORS_ALLOW_CREDENTIALS = True  # 允許傳遞 cookie（如 sessionid）
 
 # 安全設定（根據環境自動調整）
@@ -220,8 +230,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = None
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440
 FILE_UPLOAD_TEMP_DIR = os.path.join(BASE_DIR, "tmp")
 
-# 日誌設置（支援多環境）
-ENVIRONMENT = env("DJANGO_ENV", default="development")  # development, testing, production
+# 日誌設置（根據 DEBUG 設定自動調整）
 
 # 日誌目錄設定
 LOG_DIR = os.path.join(BASE_DIR, "logs")
@@ -297,31 +306,17 @@ LOGGING = {
     },
 }
 
-# 根據環境調整日誌級別
-if ENVIRONMENT == "production":
-    # 生產環境：只記錄重要日誌
-    LOGGING["loggers"]["django"]["level"] = "WARNING"
-    LOGGING["loggers"]["mes"]["level"] = "WARNING"
-    LOGGING["loggers"]["erp_integration"]["level"] = "INFO"
-
-    # 添加郵件通知
-    LOGGING["loggers"]["django.security"] = {
-        "handlers": ["production_mail"],
-        "level": "ERROR",
-        "propagate": False,
-    }
-
-elif ENVIRONMENT == "testing":
-    # 測試環境：中等詳細度
+# 根據 DEBUG 設定調整日誌級別
+if DEBUG:
+    # 開發環境：最詳細的日誌
+    LOGGING["loggers"]["django"]["level"] = "DEBUG"
+    LOGGING["loggers"]["mes"]["level"] = "DEBUG"
+    LOGGING["loggers"]["erp_integration"]["level"] = "DEBUG"
+else:
+    # 生產環境：INFO 等級
     LOGGING["loggers"]["django"]["level"] = "INFO"
     LOGGING["loggers"]["mes"]["level"] = "INFO"
-    LOGGING["loggers"]["erp_integration"]["level"] = "DEBUG"
-
-else:
-    # 開發環境：最詳細的日誌
-    LOGGING["loggers"]["django"]["level"] = "INFO"
-LOGGING["loggers"]["mes"]["level"] = "INFO"
-LOGGING["loggers"]["erp_integration"]["level"] = "INFO"
+    LOGGING["loggers"]["erp_integration"]["level"] = "INFO"
 
 # 只需要設置 EMAIL_BACKEND，具體郵件設定從資料庫讀取
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
@@ -334,9 +329,10 @@ INTERNAL_IPS = [
 ]
 
 # 安全設置
-SECURE_CROSS_ORIGIN_OPENER_POLICY = None  # 禁用 COOP 檢查
-CORS_ALLOW_ALL_ORIGINS = True  # 允許所有來源的跨域請求
-CORS_ALLOW_CREDENTIALS = True
+if DEBUG:
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = None  # 開發環境禁用 COOP 檢查
+else:
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"  # 生產環境啟用 COOP 檢查
 
 # 添加正確的 MIME 類型
 mimetypes.add_type("text/css", ".css")

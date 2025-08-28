@@ -4,7 +4,7 @@
 {% block title %}設備效能報表{% endblock %}
 
 {% block extra_css %}
-<link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet">
+<link href="{% static 'js/chart.min.js' %}" rel="stylesheet">
 <style>
     .metric-card {
         background: white;
@@ -394,7 +394,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script src="{% static 'js/chart.min.js' %}"></script>
 <script>
 // 匯出報表功能
 function exportReport() {
