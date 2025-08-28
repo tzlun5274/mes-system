@@ -14,7 +14,7 @@ from typing import List, Dict, Optional, Tuple
 from django.db import connections, DatabaseError
 from django.conf import settings
 from django.utils import timezone
-from django.db.models import Q, Count, Sum
+from django.db.models import Q, Count, Sum, F
 from django.http import HttpResponse
 import csv
 import json
@@ -317,6 +317,8 @@ class OrderQueryManager:
                 query &= Q(pre_in_date__gte=filters["date_start"])
             if filters.get("date_end"):
                 query &= Q(pre_in_date__lte=filters["date_end"])
+            
+
 
             # 取得排序欄位，預設用預交貨日（pre_in_date）升冪排序
             order_by = filters.get("order_by", "pre_in_date")
@@ -328,11 +330,29 @@ class OrderQueryManager:
             ]:
                 order_by = "pre_in_date"
 
-            # 執行查詢
+            # 執行查詢並去重（按公司名稱和訂單號去重，保留最新的記錄）
             orders = OrderMain.objects.filter(query).order_by(order_by)
-            # 計算統計資訊
-            stats = self._calculate_order_stats(orders)
-            return orders, stats
+            
+            # 去重邏輯：按公司名稱、訂單號和產品編號分組，保留每組中最新更新的記錄
+            unique_orders = []
+            seen_keys = set()
+            
+            for order in orders:
+                # 建立唯一鍵：公司名稱 + 訂單號 + 產品編號
+                unique_key = f"{order.company_name}_{order.bill_no}_{order.product_id}"
+                
+                # 排除公司名稱與客戶名稱相同的問題記錄
+                if order.company_name == order.customer_short_name:
+                    self.logger.warning(f"跳過問題記錄: 公司={order.company_name}, 客戶={order.customer_short_name}, 訂單號={order.bill_no}")
+                    continue
+                
+                if unique_key not in seen_keys:
+                    seen_keys.add(unique_key)
+                    unique_orders.append(order)
+            
+            # 計算統計資訊（使用去重後的資料）
+            stats = self._calculate_order_stats(unique_orders)
+            return unique_orders, stats
         except Exception as e:
             self.logger.error(f"查詢訂單失敗: {str(e)}")
             return [], {}
@@ -340,30 +360,52 @@ class OrderQueryManager:
     def _calculate_order_stats(self, orders) -> Dict:
         """計算訂單統計資訊"""
         try:
-            total_orders = orders.count()
-            total_quantity = orders.aggregate(Sum("quantity"))["quantity__sum"] or 0
-            total_remain = orders.aggregate(Sum("qty_remain"))["qty_remain__sum"] or 0
+            # 檢查 orders 的類型並進行相應的計算
+            if isinstance(orders, list):
+                # 如果 orders 是列表（去重後的資料），手動計算
+                total_orders = len(orders)
+                total_quantity = sum(order.quantity for order in orders)
+                total_remain = sum(order.qty_remain for order in orders)
+            else:
+                # 如果 orders 是 QuerySet，使用資料庫聚合
+                total_orders = orders.count()
+                total_quantity = orders.aggregate(Sum("quantity"))["quantity__sum"] or 0
+                total_remain = orders.aggregate(Sum("qty_remain"))["qty_remain__sum"] or 0
 
             # 按公司統計
-            company_stats = orders.values("company_name").annotate(
-                count=Count("id"),
-                total_qty=Sum("quantity"),
-                total_remain=Sum("qty_remain"),
-            )
+            company_stats = {}
+            for order in orders:
+                company_name = order.company_name
+                if company_name not in company_stats:
+                    company_stats[company_name] = {
+                        'count': 0,
+                        'total_qty': 0,
+                        'total_remain': 0
+                    }
+                company_stats[company_name]['count'] += 1
+                company_stats[company_name]['total_qty'] += order.quantity
+                company_stats[company_name]['total_remain'] += order.qty_remain
 
             # 按訂單類型統計
-            type_stats = orders.values("order_type").annotate(
-                count=Count("id"),
-                total_qty=Sum("quantity"),
-                total_remain=Sum("qty_remain"),
-            )
+            type_stats = {}
+            for order in orders:
+                order_type = order.order_type
+                if order_type not in type_stats:
+                    type_stats[order_type] = {
+                        'count': 0,
+                        'total_qty': 0,
+                        'total_remain': 0
+                    }
+                type_stats[order_type]['count'] += 1
+                type_stats[order_type]['total_qty'] += order.quantity
+                type_stats[order_type]['total_remain'] += order.qty_remain
 
             return {
                 "total_orders": total_orders,
                 "total_quantity": total_quantity,
                 "total_remain": total_remain,
-                "company_stats": list(company_stats),
-                "type_stats": list(type_stats),
+                "company_stats": [{'company_name': k, **v} for k, v in company_stats.items()],
+                "type_stats": [{'order_type': k, **v} for k, v in type_stats.items()],
             }
 
         except Exception as e:

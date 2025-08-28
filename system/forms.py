@@ -7,7 +7,8 @@ from .models import (
     OperationLogConfig,
     UserWorkPermission,
     AutoApprovalSettings,
-    ScheduledTask
+    ScheduledTask,
+    OrderSyncSettings
 )
 
 
@@ -652,6 +653,91 @@ class ScheduledTaskForm(forms.ModelForm):
             cleaned_data['interval_minutes'] = int(interval_preset)
         
         return cleaned_data
+
+
+
+
+
+
+
+
+class OrderSyncSettingsForm(forms.ModelForm):
+    """
+    訂單同步設定表單
+    """
+    
+    class Meta:
+        model = OrderSyncSettings
+        fields = [
+            'sync_enabled', 'sync_interval_minutes',
+            'cleanup_enabled', 'cleanup_interval_hours', 'cleanup_retention_days',
+            'status_update_enabled', 'status_update_interval_minutes'
+        ]
+        widgets = {
+            'sync_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'sync_interval_minutes': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '5',
+                'max': '1440',
+                'help_text': '建議設定：30-60分鐘'
+            }),
+            'cleanup_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'cleanup_interval_hours': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'max': '168',
+                'help_text': '建議設定：24小時'
+            }),
+            'cleanup_retention_days': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '7',
+                'max': '365',
+                'help_text': '建議設定：90天'
+            }),
+            'status_update_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'status_update_interval_minutes': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '15',
+                'max': '1440',
+                'help_text': '建議設定：60分鐘'
+            }),
+        }
+    
+    def clean_sync_interval_minutes(self):
+        """驗證同步間隔"""
+        interval = self.cleaned_data['sync_interval_minutes']
+        if interval < 5:
+            raise forms.ValidationError("同步間隔不能少於5分鐘")
+        if interval > 1440:
+            raise forms.ValidationError("同步間隔不能超過24小時（1440分鐘）")
+        return interval
+    
+    def clean_cleanup_interval_hours(self):
+        """驗證清理間隔"""
+        interval = self.cleaned_data['cleanup_interval_hours']
+        if interval < 1:
+            raise forms.ValidationError("清理間隔不能少於1小時")
+        if interval > 168:
+            raise forms.ValidationError("清理間隔不能超過7天（168小時）")
+        return interval
+    
+    def clean_cleanup_retention_days(self):
+        """驗證資料保留天數"""
+        days = self.cleaned_data['cleanup_retention_days']
+        if days < 7:
+            raise forms.ValidationError("資料保留天數不能少於7天")
+        if days > 365:
+            raise forms.ValidationError("資料保留天數不能超過1年（365天）")
+        return days
+    
+    def clean_status_update_interval_minutes(self):
+        """驗證狀態更新間隔"""
+        interval = self.cleaned_data['status_update_interval_minutes']
+        if interval < 15:
+            raise forms.ValidationError("狀態更新間隔不能少於15分鐘")
+        if interval > 1440:
+            raise forms.ValidationError("狀態更新間隔不能超過24小時（1440分鐘）")
+        return interval
 
 
 

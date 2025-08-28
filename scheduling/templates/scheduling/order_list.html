@@ -114,41 +114,32 @@
             <label>公司</label>
             <select name="company" class="form-select">
                 <option value="">全部公司</option>
-                {% for company in companies %}
-                <option value="{{ company.company_code }}" {% if selected_company == company.company_code %}selected{% endif %}>
-                    {{ company.company_name }}
+                {% for company in company_choices %}
+                <option value="{{ company }}" {% if filters.company == company %}selected{% endif %}>
+                    {{ company }}
                 </option>
                 {% endfor %}
             </select>
         </div>
         <div class="col-md-2">
             <label>客戶</label>
-            <input type="text" name="customer" class="form-control" placeholder="客戶名稱" value="{{ selected_customer }}">
+            <input type="text" name="customer" class="form-control" placeholder="客戶名稱" value="{{ filters.customer }}">
         </div>
         <div class="col-md-2">
             <label>訂單類型</label>
             <select name="order_type" class="form-select">
                 <option value="">全部類型</option>
-                <option value="domestic" {% if selected_order_type == 'domestic' %}selected{% endif %}>國內訂單</option>
-                <option value="foreign" {% if selected_order_type == 'foreign' %}selected{% endif %}>國外訂單</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label>交期狀態</label>
-            <select name="delivery_status" class="form-select">
-                <option value="">全部狀態</option>
-                <option value="normal" {% if selected_delivery_status == 'normal' %}selected{% endif %}>正常</option>
-                <option value="urgent" {% if selected_delivery_status == 'urgent' %}selected{% endif %}>緊急</option>
-                <option value="overdue" {% if selected_delivery_status == 'overdue' %}selected{% endif %}>逾期</option>
+                <option value="國內" {% if filters.order_type == '國內' %}selected{% endif %}>國內訂單</option>
+                <option value="國外" {% if filters.order_type == '國外' %}selected{% endif %}>國外訂單</option>
             </select>
         </div>
         <div class="col-md-2">
             <label>開始日期</label>
-            <input type="date" name="start_date" class="form-control" value="{{ selected_start_date }}">
+            <input type="date" name="date_start" class="form-control" value="{{ filters.date_start }}">
         </div>
         <div class="col-md-2">
             <label>結束日期</label>
-            <input type="date" name="end_date" class="form-control" value="{{ selected_end_date }}">
+            <input type="date" name="date_end" class="form-control" value="{{ filters.date_end }}">
         </div>
         <div class="col-12 mt-2">
             <button type="submit" class="btn btn-primary">
@@ -189,15 +180,15 @@
                         {% for order in orders %}
                         <tr>
                             <td>
-                                <span class="badge bg-info me-1">{{ order.company_name|default:order.company_code }}</span>
+                                <span class="badge bg-info me-1">{{ order.company_name }}</span>
                             </td>
-                            <td>{{ order.order_number }}</td>
-                            <td>{{ order.customer_name }}</td>
-                            <td>{{ order.product_code }}</td>
-                            <td>{{ order.order_quantity|floatformat:0 }}</td>
+                            <td>{{ order.bill_no }}</td>
+                            <td>{{ order.customer_short_name }}</td>
+                            <td>{{ order.product_id }}</td>
+                            <td>{{ order.quantity|floatformat:0 }}</td>
                             <td>{{ order.delivered_quantity|floatformat:0 }}</td>
-                            <td>{{ order.remaining_quantity|floatformat:0 }}</td>
-                            <td>{{ order.delivery_date|date:"Y-m-d" }}</td>
+                            <td>{{ order.qty_remain|floatformat:0 }}</td>
+                            <td>{{ order.pre_in_date }}</td>
                             <td>
                                 {% if order.is_overdue %}
                                     <span class="badge bg-danger">逾期</span>
@@ -208,9 +199,9 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-outline-primary" onclick="viewOrderDetail('{{ order.order_number }}')">
-                                    <i class="fas fa-eye"></i> 查看
-                                </button>
+                                                        <a href="{% url 'scheduling:order_detail' order.id %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye"></i> 查看
+                        </a>
                             </td>
                         </tr>
                         {% empty %}
@@ -234,9 +225,6 @@ function exportToExcel() {
     alert('Excel匯出功能開發中...');
 }
 
-function viewOrderDetail(orderNumber) {
-    // 實作查看訂單詳情功能
-    alert('查看訂單詳情功能開發中... 訂單號：' + orderNumber);
-}
+
 </script>
 {% endblock %}

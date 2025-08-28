@@ -100,6 +100,10 @@ urlpatterns = [
     path("report_settings/", views.report_settings, name="report_settings"),
     path("manual_sync_reports/", views.manual_sync_reports, name="manual_sync_reports"),
     
+    # 訂單同步設定
+    path("order_sync_settings/", views.order_sync_settings, name="order_sync_settings"),
+    path("manual_order_sync/", views.manual_order_sync, name="manual_order_sync"),
+    
     # 定時任務管理
     path('scheduled-tasks/', views.ScheduledTaskListView.as_view(), name='scheduled_task_list'),
     path('scheduled-tasks/create/', views.ScheduledTaskCreateView.as_view(), name='scheduled_task_create'),

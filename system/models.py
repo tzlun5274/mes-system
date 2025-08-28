@@ -802,6 +802,112 @@ class AutoApprovalTask(models.Model):
         super().save(*args, **kwargs)
 
 
+class OrderSyncSettings(models.Model):
+    """
+    訂單同步設定：管理訂單資料的自動同步配置
+    """
+    
+    # 同步設定
+    sync_enabled = models.BooleanField(default=True, verbose_name="啟用自動同步")
+    sync_interval_minutes = models.IntegerField(default=30, verbose_name="同步間隔（分鐘）")
+    last_sync_time = models.DateTimeField(null=True, blank=True, verbose_name="上次同步時間")
+    last_sync_status = models.CharField(max_length=20, default="未執行", verbose_name="上次同步狀態")
+    last_sync_message = models.TextField(blank=True, verbose_name="上次同步訊息")
+    
+    # 清理設定
+    cleanup_enabled = models.BooleanField(default=True, verbose_name="啟用自動清理")
+    cleanup_interval_hours = models.IntegerField(default=24, verbose_name="清理間隔（小時）")
+    cleanup_retention_days = models.IntegerField(default=90, verbose_name="資料保留天數")
+    last_cleanup_time = models.DateTimeField(null=True, blank=True, verbose_name="上次清理時間")
+    last_cleanup_count = models.IntegerField(default=0, verbose_name="上次清理數量")
+    
+    # 狀態更新設定
+    status_update_enabled = models.BooleanField(default=True, verbose_name="啟用狀態更新")
+    status_update_interval_minutes = models.IntegerField(default=60, verbose_name="狀態更新間隔（分鐘）")
+    last_status_update_time = models.DateTimeField(null=True, blank=True, verbose_name="上次狀態更新時間")
+    
+    # 系統資訊
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    
+    class Meta:
+        verbose_name = "訂單同步設定"
+        verbose_name_plural = "訂單同步設定"
+        db_table = 'system_order_sync_settings'
+    
+    def __str__(self):
+        return f"訂單同步設定 (ID: {self.id})"
+    
+    def get_sync_status_display(self):
+        """取得同步狀態顯示文字"""
+        status_map = {
+            "未執行": "未執行",
+            "執行中": "執行中",
+            "成功": "成功",
+            "失敗": "失敗"
+        }
+        return status_map.get(self.last_sync_status, self.last_sync_status)
+    
+    def get_sync_status_class(self):
+        """取得同步狀態的 CSS 類別"""
+        status_class_map = {
+            "未執行": "text-muted",
+            "執行中": "text-warning",
+            "成功": "text-success",
+            "失敗": "text-danger"
+        }
+        return status_class_map.get(self.last_sync_status, "text-muted")
+
+
+class OrderSyncLog(models.Model):
+    """
+    訂單同步日誌：記錄每次同步的詳細資訊
+    """
+    
+    SYNC_TYPES = [
+        ('sync', '資料同步'),
+        ('cleanup', '資料清理'),
+        ('status_update', '狀態更新'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('running', '執行中'),
+        ('success', '成功'),
+        ('failed', '失敗'),
+    ]
+    
+    sync_type = models.CharField(max_length=20, choices=SYNC_TYPES, verbose_name="同步類型")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, verbose_name="執行狀態")
+    message = models.TextField(blank=True, verbose_name="執行訊息")
+    details = models.JSONField(default=dict, verbose_name="詳細資訊")
+    started_at = models.DateTimeField(auto_now_add=True, verbose_name="開始時間")
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name="完成時間")
+    duration_seconds = models.FloatField(null=True, blank=True, verbose_name="執行時間（秒）")
+    
+    class Meta:
+        verbose_name = "訂單同步日誌"
+        verbose_name_plural = "訂單同步日誌"
+        db_table = 'system_order_sync_log'
+        ordering = ['-started_at']
+    
+    def __str__(self):
+        return f"{self.get_sync_type_display()} - {self.get_status_display()} ({self.started_at})"
+    
+    def get_duration_display(self):
+        """取得執行時間顯示"""
+        if self.duration_seconds is None:
+            return "未完成"
+        
+        if self.duration_seconds < 60:
+            return f"{self.duration_seconds:.1f} 秒"
+        elif self.duration_seconds < 3600:
+            minutes = self.duration_seconds / 60
+            return f"{minutes:.1f} 分鐘"
+        else:
+            hours = self.duration_seconds / 3600
+            return f"{hours:.1f} 小時"
+
+
 
 
 

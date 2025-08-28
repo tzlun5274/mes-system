@@ -214,8 +214,54 @@ def auto_approve_work_reports():
         # 發送通知（如果啟用）
         if settings.notification_enabled and (approved_count > 0 or rejected_count > 0):
             try:
-                # 這裡可以實作發送通知的邏輯
-                logger.info(f"自動審核完成通知: 通過 {approved_count} 筆，拒絕 {rejected_count} 筆")
+                # 取得通知設定
+                from workorder.models import SystemConfig
+                notification_enabled = SystemConfig.objects.filter(key='auto_approval_notification_enabled').first()
+                recipients = SystemConfig.objects.filter(key='auto_approval_notification_recipients').first()
+                
+                if notification_enabled and notification_enabled.value == 'True' and recipients:
+                    # 發送郵件通知
+                    from django.core.mail import send_mail
+                    from system.models import EmailConfig
+                    
+                    # 取得郵件設定
+                    email_config = EmailConfig.objects.first()
+                    if email_config:
+                        subject = f"[MES系統] 自動審核完成通知 - {timezone.now().strftime('%Y-%m-%d %H:%M')}"
+                        
+                        message = f"""
+自動審核完成通知
+
+執行時間: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}
+總計處理: {total_pending} 筆報工記錄
+審核通過: {approved_count} 筆
+審核拒絕: {rejected_count} 筆
+
+詳細資訊:
+- 通過的報工記錄ID: {', '.join(map(str, approved_reports)) if approved_reports else '無'}
+- 拒絕的報工記錄ID: {', '.join(map(str, rejected_reports)) if rejected_reports else '無'}
+
+此為系統自動發送的通知，請勿直接回覆。
+                        """
+                        
+                        recipient_list = [email.strip() for email in recipients.value.split(',') if email.strip()]
+                        
+                        if recipient_list:
+                            send_mail(
+                                subject,
+                                message,
+                                email_config.default_from_email,
+                                recipient_list,
+                                fail_silently=False,
+                            )
+                            logger.info(f"自動審核通知郵件已發送給: {', '.join(recipient_list)}")
+                        else:
+                            logger.warning("自動審核通知收件人清單為空")
+                    else:
+                        logger.error("未找到郵件設定，無法發送自動審核通知")
+                else:
+                    logger.info("自動審核通知功能未啟用或收件人未設定")
+                    
             except Exception as e:
                 logger.error(f"發送自動審核通知失敗: {str(e)}")
         

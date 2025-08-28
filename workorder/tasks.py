@@ -76,6 +76,43 @@ def convert_all_workorders_to_production():
         }
 
 @shared_task
+def auto_allocation_task():
+    """
+    定時任務：自動為數量為0的報工記錄分配數量
+    """
+    try:
+        from workorder.services.auto_allocation_service import AutoAllocationService
+        
+        service = AutoAllocationService()
+        result = service.allocate_all_pending_workorders()
+        
+        if result.get('success', False):
+            logger.info(f"自動分配任務完成：{result.get('message', '分配完成')}")
+            return {
+                'success': True,
+                'message': result.get('message', '自動分配完成'),
+                'allocated_count': result.get('total_allocated_reports', 0),
+                'total_quantity': result.get('total_allocated_quantity', 0)
+            }
+        else:
+            logger.error(f"自動分配任務失敗：{result.get('message', '未知錯誤')}")
+            return {
+                'success': False,
+                'error': result.get('message', '自動分配失敗'),
+                'allocated_count': 0,
+                'total_quantity': 0
+            }
+            
+    except Exception as e:
+        logger.error(f"自動分配任務執行失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'自動分配任務執行失敗: {str(e)}',
+            'allocated_count': 0,
+            'total_quantity': 0
+        }
+
+@shared_task
 def auto_dispatch_workorders():
     """
     定時任務：自動批次派工

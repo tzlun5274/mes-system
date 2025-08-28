@@ -1,7 +1,8 @@
 # 這個檔案負責訂單管理頁面的後端邏輯
-from django.shortcuts import render
-from django.http import HttpResponse
+from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse, JsonResponse
 from ..order_management import order_query_manager, order_analytics
+from ..models import OrderMain
 
 
 def order_list(request):
@@ -52,3 +53,99 @@ def order_list(request):
             "order_by": order_by,
         },
     )
+
+
+def order_detail(request, order_id):
+    """
+    顯示訂單詳情頁面
+    """
+    order = get_object_or_404(OrderMain, id=order_id)
+    
+    # 計算訂單相關統計
+    context = {
+        'order': order,
+        'delivery_progress': (order.delivered_quantity / order.quantity * 100) if order.quantity > 0 else 0,
+        'days_until_delivery': None,
+        'delivery_status': 'normal'
+    }
+    
+    # 計算距離交期的天數
+    try:
+        from datetime import datetime
+        from django.utils import timezone
+        
+        delivery_date = datetime.strptime(order.pre_in_date, '%Y-%m-%d').date()
+        today = timezone.now().date()
+        days_diff = (delivery_date - today).days
+        
+        context['days_until_delivery'] = days_diff
+        
+        # 設定交期狀態
+        if days_diff < 0:
+            context['delivery_status'] = 'overdue'
+        elif days_diff <= 3:
+            context['delivery_status'] = 'urgent'
+        elif days_diff <= 7:
+            context['delivery_status'] = 'warning'
+    except:
+        pass
+    
+    return render(request, 'scheduling/order_detail.html', context)
+
+
+def order_detail_api(request, order_id):
+    """
+    訂單詳情 API，用於 AJAX 請求
+    """
+    try:
+        order = get_object_or_404(OrderMain, id=order_id)
+        
+        # 計算距離交期的天數
+        days_until_delivery = None
+        delivery_status = 'normal'
+        
+        try:
+            from datetime import datetime
+            from django.utils import timezone
+            
+            delivery_date = datetime.strptime(order.pre_in_date, '%Y-%m-%d').date()
+            today = timezone.now().date()
+            days_diff = (delivery_date - today).days
+            
+            days_until_delivery = days_diff
+            
+            if days_diff < 0:
+                delivery_status = 'overdue'
+            elif days_diff <= 3:
+                delivery_status = 'urgent'
+            elif days_diff <= 7:
+                delivery_status = 'warning'
+        except:
+            pass
+        
+        data = {
+            'id': order.id,
+            'company_name': order.company_name,
+            'customer_short_name': order.customer_short_name,
+            'bill_no': order.bill_no,
+            'product_id': order.product_id,
+            'product_name': order.product_name,
+            'quantity': order.quantity,
+            'delivered_quantity': order.delivered_quantity,
+            'qty_remain': order.qty_remain,
+            'pre_in_date': order.pre_in_date,
+            'order_type': order.order_type,
+            'bill_date': order.bill_date,
+            'created_at': order.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'updated_at': order.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'delivery_progress': round((order.delivered_quantity / order.quantity * 100), 2) if order.quantity > 0 else 0,
+            'days_until_delivery': days_until_delivery,
+            'delivery_status': delivery_status,
+            'is_overdue': order.is_overdue,
+            'is_urgent': order.is_urgent
+        }
+        
+        return JsonResponse({'success': True, 'data': data})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

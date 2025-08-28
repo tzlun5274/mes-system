@@ -1,256 +1,308 @@
+"""
+排程管理模組的 Celery 任務
+"""
+
+import logging
 from celery import shared_task
 from django.utils import timezone
-from django.db import connections
-from django.db.utils import DatabaseError
-from scheduling.models import OrderUpdateSchedule, OrderMain  # 從排程模組匯入訂單主檔
-from .models import CompanyView
-from django.conf import settings
-import logging
+from datetime import datetime, timedelta
 
 logger = logging.getLogger("scheduling.tasks")
 
 
 @shared_task
-def update_orders_task():
+def sync_orders_task():
+    """
+    定時任務：同步訂單資料從 ERP 到 MES
+    """
     try:
-        logger.debug("開始執行訂單更新任務")
-
-        # 清空現有訂單資料
-        OrderMain.objects.all().delete()
-        logger.debug("已清空 OrderMain 表")
-
-        orders = []
-        companies = CompanyView.objects.all()
-        logger.debug(
-            f"從 CompanyView 獲取 {len(companies)} 家公司資料: {[c.mes_database for c in companies]}"
-        )
-
-        if not companies:
-            logger.warning("CompanyView 表為空，無法查詢訂單")
-            return
-
-        default_db_config = settings.DATABASES["default"].copy()
-
-        for company in companies:
-            db_name = company.mes_database
-            company_name = company.company_name
-
-            if not db_name:
-                logger.warning(f"公司 {company_name} 的 mes_database 為空，跳過")
-                continue
-
-            db_config = default_db_config.copy()
-            db_config["NAME"] = db_name
-            connections.databases[db_name] = db_config
-
+        from .order_management import OrderManager
+        
+        logger.info("開始執行訂單同步定時任務")
+        
+        # 創建訂單管理器
+        order_manager = OrderManager()
+        
+        # 執行同步
+        result = order_manager.sync_orders_from_erp()
+        
+        if result.get('status') == 'success':
+            logger.info(f"訂單同步成功：{result.get('message')}")
+            
+            # 更新同步狀態
             try:
-                with connections[db_name].cursor() as cursor:
-                    # 檢查表是否存在
-                    cursor.execute(
-                        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'ordBillMain')"
-                    )
-                    ordBillMain_exists = cursor.fetchone()[0]
-                    cursor.execute(
-                        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'TraBillMain')"
-                    )
-                    TraBillMain_exists = cursor.fetchone()[0]
-                    logger.debug(
-                        f"資料庫 {db_name} 表檢查: ordBillMain={ordBillMain_exists}, TraBillMain={TraBillMain_exists}"
-                    )
-
-                    # 查詢國內訂單
-                    if ordBillMain_exists:
-                        try:
-                            cursor.execute(
-                                """
-                                SELECT 
-                                    COALESCE(c."ShortName", 'N/A') AS CustomerShortName,
-                                    m."BillNO",
-                                    s."ProdID",
-                                    s."ProdName",
-                                    s."Quantity",
-                                    s."PreInDate",
-                                    s."QtyRemain",
-                                    m."BillDate"
-                                FROM "ordBillMain" m
-                                LEFT JOIN "ordBillSub" s ON m."BillNO" = s."BillNO"
-                                LEFT JOIN "comCustomer" c ON m."CustomerID" = c."ID"
-                                WHERE m."BillNO" LIKE '113-%'
-                                AND m."BillDate" >= 20200101
-                                AND (m."BillStatus" = 0 OR m."BillStatus" IS NULL)
-                                AND s."QtyRemain" > 0
-                            """
-                            )
-                            domestic_orders = cursor.fetchall()
-                            logger.info(
-                                f"國內訂單查詢（{db_name}）返回 {len(domestic_orders)} 筆數據"
-                            )
-
-                            for order in domestic_orders:
-                                pre_in_date = "N/A"
-                                bill_date = "N/A"
-                                if order[5] is not None:
-                                    try:
-                                        date_str = str(order[5])
-                                        if len(date_str) == 8:
-                                            pre_in_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
-                                        else:
-                                            logger.warning(
-                                                f"無效的 PreInDate 格式 {order[5]}，訂單 {order[1]}"
-                                            )
-                                    except Exception as e:
-                                        logger.warning(
-                                            f"無法轉換 PreInDate {order[5]}，訂單 {order[1]}，錯誤: {str(e)}"
-                                        )
-                                if order[7] is not None:
-                                    try:
-                                        date_str = str(order[7])
-                                        if len(date_str) == 8:
-                                            bill_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
-                                        else:
-                                            logger.warning(
-                                                f"無效的 BillDate 格式 {order[7]}，訂單 {order[1]}"
-                                            )
-                                    except Exception as e:
-                                        logger.warning(
-                                            f"無法轉換 BillDate {order[7]}，訂單 {order[1]}，錯誤: {str(e)}"
-                                        )
-
-                                quantity = int(order[4]) if order[4] is not None else 0
-                                qty_remain = (
-                                    int(order[6]) if order[6] is not None else 0
-                                )
-
-                                orders.append(
-                                    {
-                                        "company_name": company_name,
-                                        "customer_short_name": order[0],
-                                        "bill_no": order[1] if order[1] else "N/A",
-                                        "product_id": order[2] if order[2] else "N/A",
-                                        "product_name": order[3] if order[3] else "N/A",
-                                        "quantity": quantity,
-                                        "pre_in_date": pre_in_date,
-                                        "qty_remain": qty_remain,
-                                        "order_type": "國內",
-                                        "bill_date": bill_date,
-                                    }
-                                )
-                        except DatabaseError as e:
-                            logger.error(
-                                f"查詢國內訂單失敗，資料庫: {db_name}，公司: {company_name}，錯誤: {str(e)}"
-                            )
-
-                    # 查詢國外訂單
-                    if TraBillMain_exists:
-                        try:
-                            cursor.execute(
-                                """
-                                SELECT 
-                                    COALESCE(c."ShortName", 'N/A') AS CustomerShortName,
-                                    m."BillNo",
-                                    s."ItemNo",
-                                    s."Description",
-                                    s."Quantity",
-                                    s."OnBoardDay",
-                                    s."QtyRemain",
-                                    m."BillDate"
-                                FROM "TraBillMain" m
-                                LEFT JOIN "TraBillSub" s ON m."BillNo" = s."BillNo"
-                                LEFT JOIN "comCustomer" c ON m."CustID" = c."ID"
-                                WHERE m."BillNo" LIKE '542-%'
-                                AND m."BillDate" >= 20200101
-                                AND (m."BillStatus" = 0 OR m."BillStatus" IS NULL)
-                                AND s."QtyRemain" > 0
-                            """
-                            )
-                            foreign_orders = cursor.fetchall()
-                            logger.info(
-                                f"國外訂單查詢（{db_name}）返回 {len(foreign_orders)} 筆數據"
-                            )
-
-                            for order in foreign_orders:
-                                pre_in_date = "N/A"
-                                bill_date = "N/A"
-                                if order[5] is not None:
-                                    try:
-                                        date_str = str(order[5])
-                                        if len(date_str) == 8:
-                                            pre_in_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
-                                        else:
-                                            logger.warning(
-                                                f"無效的 OnBoardDay 格式 {order[5]}，訂單 {order[1]}"
-                                            )
-                                    except Exception as e:
-                                        logger.warning(
-                                            f"無法轉換 OnBoardDay {order[5]}，訂單 {order[1]}，錯誤: {str(e)}"
-                                        )
-                                if order[7] is not None:
-                                    try:
-                                        date_str = str(order[7])
-                                        if len(date_str) == 8:
-                                            bill_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
-                                        else:
-                                            logger.warning(
-                                                f"無效的 BillDate 格式 {order[7]}，訂單 {order[1]}"
-                                            )
-                                    except Exception as e:
-                                        logger.warning(
-                                            f"無法轉換 BillDate {order[7]}，訂單 {order[1]}，錯誤: {str(e)}"
-                                        )
-
-                                quantity = int(order[4]) if order[4] is not None else 0
-                                qty_remain = (
-                                    int(order[6]) if order[6] is not None else 0
-                                )
-
-                                orders.append(
-                                    {
-                                        "company_name": company_name,
-                                        "customer_short_name": order[0],
-                                        "bill_no": order[1] if order[1] else "N/A",
-                                        "product_id": order[2] if order[2] else "N/A",
-                                        "product_name": order[3] if order[3] else "N/A",
-                                        "quantity": quantity,
-                                        "pre_in_date": pre_in_date,
-                                        "qty_remain": qty_remain,
-                                        "order_type": "國外",
-                                        "bill_date": bill_date,
-                                    }
-                                )
-                        except DatabaseError as e:
-                            logger.error(
-                                f"查詢國外訂單失敗，資料庫: {db_name}，公司: {company_name}，錯誤: {str(e)}"
-                            )
-
-            except DatabaseError as e:
-                logger.error(
-                    f"連接到資料庫 {db_name} 失敗，公司: {company_name}，錯誤: {str(e)}"
-                )
-            finally:
-                if db_name in connections.databases:
-                    del connections.databases[db_name]
-
-        # 儲存訂單資料到 OrderMain 模型
-        for order in orders:
-            OrderMain.objects.create(
-                company_name=order["company_name"],
-                customer_short_name=order["customer_short_name"],
-                bill_no=order["bill_no"],
-                product_id=order["product_id"],
-                product_name=order["product_name"],
-                quantity=order["quantity"],
-                pre_in_date=order["pre_in_date"],
-                qty_remain=order["qty_remain"],
-                order_type=order["order_type"],
-                bill_date=order["bill_date"],
-            )
-
-        # 更新 OrderUpdateSchedule 的 last_updated
-        schedule = OrderUpdateSchedule.objects.first()
-        if schedule:
-            schedule.last_updated = timezone.now()
-            schedule.save()
-
-        logger.info(f"訂單更新任務完成，儲存 {len(orders)} 筆訂單資料")
+                from system.models import OrderSyncSettings, OrderSyncLog
+                settings_obj, _ = OrderSyncSettings.objects.get_or_create(id=1)
+                settings_obj.last_sync_time = timezone.now()
+                settings_obj.last_sync_status = "成功"
+                settings_obj.last_sync_message = result.get('message')
+                settings_obj.save()
+                
+                # 更新同步日誌
+                log = OrderSyncLog.objects.filter(
+                    sync_type='sync',
+                    status='running'
+                ).order_by('-started_at').first()
+                
+                if log:
+                    log.status = 'success'
+                    log.completed_at = timezone.now()
+                    log.duration_seconds = (log.completed_at - log.started_at).total_seconds()
+                    log.message = result.get('message')
+                    log.save()
+                    
+            except Exception as e:
+                logger.error(f"更新同步狀態失敗: {str(e)}")
+            
+            return {
+                'success': True,
+                'message': result.get('message'),
+                'total_orders': result.get('total_orders', 0),
+                'executed_at': timezone.now().isoformat()
+            }
+        else:
+            logger.error(f"訂單同步失敗：{result.get('message')}")
+            
+            # 更新同步狀態
+            try:
+                from system.models import OrderSyncSettings, OrderSyncLog
+                settings_obj, _ = OrderSyncSettings.objects.get_or_create(id=1)
+                settings_obj.last_sync_time = timezone.now()
+                settings_obj.last_sync_status = "失敗"
+                settings_obj.last_sync_message = result.get('message')
+                settings_obj.save()
+                
+                # 更新同步日誌
+                log = OrderSyncLog.objects.filter(
+                    sync_type='sync',
+                    status='running'
+                ).order_by('-started_at').first()
+                
+                if log:
+                    log.status = 'failed'
+                    log.completed_at = timezone.now()
+                    log.duration_seconds = (log.completed_at - log.started_at).total_seconds()
+                    log.message = result.get('message')
+                    log.save()
+                    
+            except Exception as e:
+                logger.error(f"更新同步狀態失敗: {str(e)}")
+            
+            return {
+                'success': False,
+                'error': result.get('message'),
+                'total_orders': 0,
+                'executed_at': timezone.now().isoformat()
+            }
+            
     except Exception as e:
-        logger.error(f"訂單更新任務失敗: {str(e)}")
+        logger.error(f"訂單同步定時任務執行失敗: {str(e)}", exc_info=True)
+        
+        # 更新同步狀態為失敗
+        try:
+            from system.models import OrderSyncSettings, OrderSyncLog
+            settings_obj, _ = OrderSyncSettings.objects.get_or_create(id=1)
+            settings_obj.last_sync_time = timezone.now()
+            settings_obj.last_sync_status = "失敗"
+            settings_obj.last_sync_message = f'任務執行失敗: {str(e)}'
+            settings_obj.save()
+            
+            # 更新同步日誌為失敗
+            log = OrderSyncLog.objects.filter(
+                sync_type='sync',
+                status='running'
+            ).order_by('-started_at').first()
+            
+            if log:
+                log.status = 'failed'
+                log.completed_at = timezone.now()
+                log.duration_seconds = (log.completed_at - log.started_at).total_seconds()
+                log.message = f'任務執行失敗: {str(e)}'
+                log.save()
+                
+        except Exception as update_error:
+            logger.error(f"更新失敗狀態時發生錯誤: {str(update_error)}")
+        
+        return {
+            'success': False,
+            'error': f'訂單同步定時任務執行失敗: {str(e)}',
+            'total_orders': 0,
+            'executed_at': timezone.now().isoformat()
+        }
+
+
+@shared_task
+def cleanup_old_orders_task():
+    """
+    定時任務：清理過期的訂單資料
+    """
+    try:
+        from .models import OrderMain
+        from django.utils import timezone
+        
+        logger.info("開始執行訂單清理定時任務")
+        
+        # 設定清理條件：刪除超過 90 天的已完成訂單
+        cutoff_date = timezone.now() - timedelta(days=90)
+        
+        # 找出需要清理的訂單（已交貨完成且超過 90 天）
+        old_orders = OrderMain.objects.filter(
+            qty_remain=0,  # 已交貨完成
+            updated_at__lt=cutoff_date  # 超過 90 天未更新
+        )
+        
+        deleted_count = old_orders.count()
+        old_orders.delete()
+        
+        logger.info(f"訂單清理完成，刪除 {deleted_count} 筆過期訂單")
+        
+        # 更新清理狀態
+        try:
+            from system.models import OrderSyncSettings, OrderSyncLog
+            settings_obj, _ = OrderSyncSettings.objects.get_or_create(id=1)
+            settings_obj.last_cleanup_time = timezone.now()
+            settings_obj.last_cleanup_count = deleted_count
+            settings_obj.save()
+            
+            # 更新同步日誌
+            log = OrderSyncLog.objects.filter(
+                sync_type='cleanup',
+                status='running'
+            ).order_by('-started_at').first()
+            
+            if log:
+                log.status = 'success'
+                log.completed_at = timezone.now()
+                log.duration_seconds = (log.completed_at - log.started_at).total_seconds()
+                log.message = f'清理完成，刪除 {deleted_count} 筆過期訂單'
+                log.save()
+                
+        except Exception as e:
+            logger.error(f"更新清理狀態失敗: {str(e)}")
+        
+        return {
+            'success': True,
+            'message': f'清理完成，刪除 {deleted_count} 筆過期訂單',
+            'deleted_count': deleted_count,
+            'executed_at': timezone.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"訂單清理定時任務執行失敗: {str(e)}", exc_info=True)
+        
+        # 更新清理日誌為失敗
+        try:
+            from system.models import OrderSyncLog
+            log = OrderSyncLog.objects.filter(
+                sync_type='cleanup',
+                status='running'
+            ).order_by('-started_at').first()
+            
+            if log:
+                log.status = 'failed'
+                log.completed_at = timezone.now()
+                log.duration_seconds = (log.completed_at - log.started_at).total_seconds()
+                log.message = f'任務執行失敗: {str(e)}'
+                log.save()
+                
+        except Exception as update_error:
+            logger.error(f"更新失敗狀態時發生錯誤: {str(update_error)}")
+        
+        return {
+            'success': False,
+            'error': f'訂單清理定時任務執行失敗: {str(e)}',
+            'deleted_count': 0,
+            'executed_at': timezone.now().isoformat()
+        }
+
+
+@shared_task
+def update_order_status_task():
+    """
+    定時任務：更新訂單狀態（逾期、緊急等）
+    """
+    try:
+        from .models import OrderMain
+        from django.utils import timezone
+        from datetime import datetime
+        
+        logger.info("開始執行訂單狀態更新定時任務")
+        
+        # 更新所有訂單的狀態
+        updated_count = 0
+        orders = OrderMain.objects.all()
+        
+        for order in orders:
+            try:
+                # 檢查是否需要更新狀態
+                delivery_date = datetime.strptime(order.pre_in_date, '%Y-%m-%d').date()
+                today = timezone.now().date()
+                
+                # 如果訂單狀態需要更新，觸發 save 方法來更新 updated_at
+                if order.is_overdue or order.is_urgent:
+                    order.save(update_fields=['updated_at'])
+                    updated_count += 1
+                    
+            except Exception as e:
+                logger.warning(f"更新訂單 {order.id} 狀態時發生錯誤: {str(e)}")
+                continue
+        
+        logger.info(f"訂單狀態更新完成，更新 {updated_count} 筆訂單")
+        
+        # 更新狀態更新時間
+        try:
+            from system.models import OrderSyncSettings, OrderSyncLog
+            settings_obj, _ = OrderSyncSettings.objects.get_or_create(id=1)
+            settings_obj.last_status_update_time = timezone.now()
+            settings_obj.save()
+            
+            # 更新同步日誌
+            log = OrderSyncLog.objects.filter(
+                sync_type='status_update',
+                status='running'
+            ).order_by('-started_at').first()
+            
+            if log:
+                log.status = 'success'
+                log.completed_at = timezone.now()
+                log.duration_seconds = (log.completed_at - log.started_at).total_seconds()
+                log.message = f'狀態更新完成，更新 {updated_count} 筆訂單'
+                log.save()
+                
+        except Exception as e:
+            logger.error(f"更新狀態更新時間失敗: {str(e)}")
+        
+        return {
+            'success': True,
+            'message': f'狀態更新完成，更新 {updated_count} 筆訂單',
+            'updated_count': updated_count,
+            'executed_at': timezone.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"訂單狀態更新定時任務執行失敗: {str(e)}", exc_info=True)
+        
+        # 更新狀態更新日誌為失敗
+        try:
+            from system.models import OrderSyncLog
+            log = OrderSyncLog.objects.filter(
+                sync_type='status_update',
+                status='running'
+            ).order_by('-started_at').first()
+            
+            if log:
+                log.status = 'failed'
+                log.completed_at = timezone.now()
+                log.duration_seconds = (log.completed_at - log.started_at).total_seconds()
+                log.message = f'任務執行失敗: {str(e)}'
+                log.save()
+                
+        except Exception as update_error:
+            logger.error(f"更新失敗狀態時發生錯誤: {str(update_error)}")
+        
+        return {
+            'success': False,
+            'error': f'訂單狀態更新定時任務執行失敗: {str(e)}',
+            'updated_count': 0,
+            'executed_at': timezone.now().isoformat()
+        }

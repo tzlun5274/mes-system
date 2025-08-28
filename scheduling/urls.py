@@ -5,7 +5,7 @@ from .views.schedule_hybrid import (
     hybrid_scheduling_preview,
     schedule_warning_board,
 )
-from .views.orders import order_list
+from .views.orders import order_list, order_detail, order_detail_api
 from .views.order_api import OrderAPIView
 from .views.unified_scheduling import (
     unified_scheduling_view,
@@ -89,6 +89,8 @@ urlpatterns = [
         name="api_calculate_task_duration",
     ),
     path("order_list/", order_list, name="order_list"),
+    path("order_detail/<int:order_id>/", order_detail, name="order_detail"),
+    path("api/order_detail/<int:order_id>/", order_detail_api, name="order_detail_api"),
     # 訂單 API 路由
     path("api/orders/", OrderAPIView.as_view(), name="api_orders"),
     path("api/orders/<str:action>/", OrderAPIView.as_view(), name="api_orders_action"),

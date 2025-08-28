@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}訂單同步設定 - 系統管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .settings-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px 8px 0 0;
+    }
+    
+    .settings-content {
+        padding: 20px;
+    }
+    
+    .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .status-active {
+        background-color: #28a745;
+    }
+    
+    .status-inactive {
+        background-color: #dc3545;
+    }
+    
+    .log-table {
+        font-size: 0.9em;
+    }
+    
+    .sync-button {
+        margin: 5px;
+    }
+    
+    .task-status {
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+    }
+    
+    .task-enabled {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+    
+    .task-disabled {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">訂單同步設定</li>
+        </ol>
+    </nav>
+
+    <h2 class="mb-4 text-primary"><i class="fas fa-arrow-repeat"></i> 訂單同步設定</h2>
+    <p class="text-secondary mb-4">管理訂單資料的自動同步，設定同步間隔、清理規則，並可手動執行同步操作。</p>
+
+    <!-- 設定表單 -->
+    <div class="settings-card">
+        <div class="settings-header">
+            <h4 class="mb-0"><i class="fas fa-cog"></i> 同步設定</h4>
+        </div>
+        <div class="settings-content">
+            <form method="post">
+                {% csrf_token %}
+                
+                <!-- 同步設定 -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-sync"></i> 資料同步設定</h5>
+                        <div class="form-check mb-3">
+                            {{ form.sync_enabled }}
+                            <label class="form-check-label" for="{{ form.sync_enabled.id_for_label }}">
+                                啟用自動同步
+                            </label>
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.sync_interval_minutes.id_for_label }}" class="form-label">
+                                同步間隔（分鐘）
+                            </label>
+                            {{ form.sync_interval_minutes }}
+                            <div class="form-text">建議設定：30-60分鐘</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-broom"></i> 資料清理設定</h5>
+                        <div class="form-check mb-3">
+                            {{ form.cleanup_enabled }}
+                            <label class="form-check-label" for="{{ form.cleanup_enabled.id_for_label }}">
+                                啟用自動清理
+                            </label>
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.cleanup_interval_hours.id_for_label }}" class="form-label">
+                                清理間隔（小時）
+                            </label>
+                            {{ form.cleanup_interval_hours }}
+                            <div class="form-text">建議設定：24小時</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.cleanup_retention_days.id_for_label }}" class="form-label">
+                                資料保留天數
+                            </label>
+                            {{ form.cleanup_retention_days }}
+                            <div class="form-text">建議設定：90天</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 狀態更新設定 -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-clock"></i> 狀態更新設定</h5>
+                        <div class="form-check mb-3">
+                            {{ form.status_update_enabled }}
+                            <label class="form-check-label" for="{{ form.status_update_enabled.id_for_label }}">
+                                啟用狀態更新
+                            </label>
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.status_update_interval_minutes.id_for_label }}" class="form-label">
+                                狀態更新間隔（分鐘）
+                            </label>
+                            {{ form.status_update_interval_minutes }}
+                            <div class="form-text">建議設定：60分鐘</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> 儲存設定
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 手動執行 -->
+    <div class="settings-card">
+        <div class="settings-header">
+            <h4 class="mb-0"><i class="fas fa-play"></i> 手動執行</h4>
+        </div>
+        <div class="settings-content">
+            <div class="row">
+                <div class="col-md-4">
+                    <form method="post" action="{% url 'system:manual_order_sync' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="sync_type" value="sync">
+                        <button type="submit" class="btn btn-primary sync-button w-100">
+                            <i class="fas fa-sync"></i> 執行資料同步
+                        </button>
+                    </form>
+                </div>
+                <div class="col-md-4">
+                    <form method="post" action="{% url 'system:manual_order_sync' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="sync_type" value="cleanup">
+                        <button type="submit" class="btn btn-warning sync-button w-100">
+                            <i class="fas fa-broom"></i> 執行資料清理
+                        </button>
+                    </form>
+                </div>
+                <div class="col-md-4">
+                    <form method="post" action="{% url 'system:manual_order_sync' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="sync_type" value="status_update">
+                        <button type="submit" class="btn btn-info sync-button w-100">
+                            <i class="fas fa-clock"></i> 執行狀態更新
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 任務狀態 -->
+    <div class="settings-card">
+        <div class="settings-header">
+            <h4 class="mb-0"><i class="fas fa-tasks"></i> 定時任務狀態</h4>
+        </div>
+        <div class="settings-content">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="task-status {% if task_status.sync and task_status.sync.enabled %}task-enabled{% else %}task-disabled{% endif %}">
+                        <h6><i class="fas fa-sync"></i> 資料同步任務</h6>
+                        {% if task_status.sync %}
+                            <p class="mb-1">
+                                <span class="status-indicator {% if task_status.sync.enabled %}status-active{% else %}status-inactive{% endif %}"></span>
+                                狀態: {% if task_status.sync.enabled %}啟用{% else %}停用{% endif %}
+                            </p>
+                            <p class="mb-0 small">間隔: {{ task_status.sync.interval.every }} 分鐘</p>
+                        {% else %}
+                            <p class="mb-0 text-muted">任務未設定</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="task-status {% if task_status.cleanup and task_status.cleanup.enabled %}task-enabled{% else %}task-disabled{% endif %}">
+                        <h6><i class="fas fa-broom"></i> 資料清理任務</h6>
+                        {% if task_status.cleanup %}
+                            <p class="mb-1">
+                                <span class="status-indicator {% if task_status.cleanup.enabled %}status-active{% else %}status-inactive{% endif %}"></span>
+                                狀態: {% if task_status.cleanup.enabled %}啟用{% else %}停用{% endif %}
+                            </p>
+                            <p class="mb-0 small">間隔: {{ task_status.cleanup.interval.every }} 分鐘</p>
+                        {% else %}
+                            <p class="mb-0 text-muted">任務未設定</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="task-status {% if task_status.status_update and task_status.status_update.enabled %}task-enabled{% else %}task-disabled{% endif %}">
+                        <h6><i class="fas fa-clock"></i> 狀態更新任務</h6>
+                        {% if task_status.status_update %}
+                            <p class="mb-1">
+                                <span class="status-indicator {% if task_status.status_update.enabled %}status-active{% else %}status-inactive{% endif %}"></span>
+                                狀態: {% if task_status.status_update.enabled %}啟用{% else %}停用{% endif %}
+                            </p>
+                            <p class="mb-0 small">間隔: {{ task_status.status_update.interval.every }} 分鐘</p>
+                        {% else %}
+                            <p class="mb-0 text-muted">任務未設定</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 同步狀態 -->
+    <div class="settings-card">
+        <div class="settings-header">
+            <h4 class="mb-0"><i class="fas fa-chart-line"></i> 同步狀態</h4>
+        </div>
+        <div class="settings-content">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">資料同步</h5>
+                            <p class="card-text">
+                                <span class="badge {{ settings.get_sync_status_class }}">{{ settings.get_sync_status_display }}</span>
+                            </p>
+                            {% if settings.last_sync_time %}
+                                <small class="text-muted">上次同步: {{ settings.last_sync_time|date:"Y-m-d H:i:s" }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">資料清理</h5>
+                            <p class="card-text">
+                                {% if settings.last_cleanup_time %}
+                                    <span class="badge bg-success">已執行</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">未執行</span>
+                                {% endif %}
+                            </p>
+                            {% if settings.last_cleanup_time %}
+                                <small class="text-muted">上次清理: {{ settings.last_cleanup_time|date:"Y-m-d H:i:s" }}</small>
+                                <br>
+                                <small class="text-muted">清理數量: {{ settings.last_cleanup_count }} 筆</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">狀態更新</h5>
+                            <p class="card-text">
+                                {% if settings.last_status_update_time %}
+                                    <span class="badge bg-success">已執行</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">未執行</span>
+                                {% endif %}
+                            </p>
+                            {% if settings.last_status_update_time %}
+                                <small class="text-muted">上次更新: {{ settings.last_status_update_time|date:"Y-m-d H:i:s" }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 同步日誌 -->
+    <div class="settings-card">
+        <div class="settings-header">
+            <h4 class="mb-0"><i class="fas fa-list"></i> 最近同步日誌</h4>
+        </div>
+        <div class="settings-content">
+            {% if recent_logs %}
+                <div class="table-responsive">
+                    <table class="table table-striped log-table">
+                        <thead>
+                            <tr>
+                                <th>時間</th>
+                                <th>類型</th>
+                                <th>狀態</th>
+                                <th>執行時間</th>
+                                <th>訊息</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_logs %}
+                            <tr>
+                                <td>{{ log.started_at|date:"m-d H:i:s" }}</td>
+                                <td>
+                                    <span class="badge bg-primary">{{ log.get_sync_type_display }}</span>
+                                </td>
+                                <td>
+                                    {% if log.status == 'success' %}
+                                        <span class="badge bg-success">成功</span>
+                                    {% elif log.status == 'failed' %}
+                                        <span class="badge bg-danger">失敗</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">執行中</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ log.get_duration_display }}</td>
+                                <td>
+                                    <small class="text-muted">{{ log.message|truncatechars:50 }}</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted text-center">尚無同步日誌</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // 自動重新整理頁面（每30秒）
+        setTimeout(function() {
+            location.reload();
+        }, 30000);
+    });
+</script>
+{% endblock %}

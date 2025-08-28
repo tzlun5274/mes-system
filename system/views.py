@@ -11,7 +11,8 @@ from .forms import (
     BackupScheduleForm,
     OperationLogConfigForm,
     UserWorkPermissionForm,
-    AutoApprovalSettingsForm
+    AutoApprovalSettingsForm,
+    OrderSyncSettingsForm
 )
 from .models import (
     EmailConfig, 
@@ -19,7 +20,9 @@ from .models import (
     OperationLogConfig,
     UserWorkPermission,
     AutoApprovalSettings,
-    CleanupLog
+    CleanupLog,
+    OrderSyncSettings,
+    OrderSyncLog
 )
 from django.core.mail import get_connection, send_mail
 from django.http import HttpResponse, FileResponse, JsonResponse
@@ -1714,6 +1717,17 @@ def workorder_settings(request):
         auto_allocation_enabled = request.POST.get('auto_allocation_enabled') == 'on'
         auto_allocation_interval = int(request.POST.get('auto_allocation_interval', 30))
         
+        # 導入 ScheduledTask 模型
+        from system.models import ScheduledTask
+        
+        # 自動審核定時任務設定（從第一個任務取得）
+        auto_approval_task_enabled = False
+        auto_approval_task_interval = 30
+        first_auto_approval_task = ScheduledTask.objects.filter(task_type='auto_approve').first()
+        if first_auto_approval_task:
+            auto_approval_task_enabled = first_auto_approval_task.is_enabled
+            auto_approval_task_interval = first_auto_approval_task.interval_minutes
+        
         # 處理多個自動審核定時任務
         from system.models import ScheduledTask
         
@@ -1843,16 +1857,13 @@ def workorder_settings(request):
                 auto_allocation_task.interval = interval_schedule
             auto_allocation_task.save()
             
-            # 自動審核定時任務
-            auto_approval_task = PeriodicTask.objects.get(name='auto_approve_work_reports')
-            auto_approval_task.enabled = auto_approval_task_enabled
-            if auto_approval_task_interval != auto_approval_task.interval.every:
-                interval_schedule, _ = IntervalSchedule.objects.get_or_create(
-                    every=auto_approval_task_interval,
-                    period=IntervalSchedule.MINUTES,
-                )
-                auto_approval_task.interval = interval_schedule
-            auto_approval_task.save()
+            # 自動審核定時任務（使用 ScheduledTask 模型）
+            from system.models import ScheduledTask
+            auto_approval_task = ScheduledTask.objects.filter(task_type='auto_approve').first()
+            if auto_approval_task:
+                auto_approval_task.is_enabled = auto_approval_task_enabled
+                auto_approval_task.interval_minutes = auto_approval_task_interval
+                auto_approval_task.save()
             
         except PeriodicTask.DoesNotExist as e:
             messages.warning(request, f"部分定時任務未找到：{str(e)}")
@@ -3161,6 +3172,217 @@ def manual_sync_reports(request):
     }
     
     return render(request, 'system/manual_sync_reports.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def order_sync_settings(request):
+    """
+    訂單同步設定頁面
+    """
+    try:
+        # 取得或創建設定
+        settings_obj, created = OrderSyncSettings.objects.get_or_create(
+            id=1,
+            defaults={
+                'sync_enabled': True,
+                'sync_interval_minutes': 30,
+                'cleanup_enabled': True,
+                'cleanup_interval_hours': 24,
+                'cleanup_retention_days': 90,
+                'status_update_enabled': True,
+                'status_update_interval_minutes': 60,
+            }
+        )
+        
+        if request.method == 'POST':
+            form = OrderSyncSettingsForm(request.POST, instance=settings_obj)
+            if form.is_valid():
+                form.save()
+                messages.success(request, "訂單同步設定已更新！")
+                
+                # 更新定時任務
+                update_order_sync_tasks(settings_obj)
+                
+                # 不更新同步狀態，只更新定時任務配置
+                # 同步狀態只能由實際的同步任務執行來更新
+                
+                logger.info(f"訂單同步設定由 {request.user.username} 更新")
+                return redirect('system:order_sync_settings')
+        else:
+            form = OrderSyncSettingsForm(instance=settings_obj)
+        
+        # 取得最近的同步日誌
+        recent_logs = OrderSyncLog.objects.all()[:10]
+        
+        # 取得定時任務狀態
+        task_status = get_order_sync_task_status()
+        
+        context = {
+            'form': form,
+            'settings': settings_obj,
+            'recent_logs': recent_logs,
+            'task_status': task_status,
+        }
+        
+        return render(request, 'system/order_sync_settings.html', context)
+        
+    except Exception as e:
+        logger.error(f"訂單同步設定頁面載入失敗: {str(e)}")
+        messages.error(request, f"頁面載入失敗: {str(e)}")
+        return redirect('system:index')
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def manual_order_sync(request):
+    """
+    手動執行訂單同步
+    """
+    try:
+        if request.method == 'POST':
+            sync_type = request.POST.get('sync_type', 'sync')
+            
+            # 創建同步日誌
+            log = OrderSyncLog.objects.create(
+                sync_type=sync_type,
+                status='running',
+                message='手動執行同步任務',
+                started_at=timezone.now()
+            )
+            
+            # 執行同步任務
+            if sync_type == 'sync':
+                from scheduling.tasks import sync_orders_task
+                result = sync_orders_task.delay()
+            elif sync_type == 'cleanup':
+                from scheduling.tasks import cleanup_old_orders_task
+                result = cleanup_old_orders_task.delay()
+            elif sync_type == 'status_update':
+                from scheduling.tasks import update_order_status_task
+                result = update_order_status_task.delay()
+            else:
+                raise ValueError(f"不支援的同步類型: {sync_type}")
+            
+            # 更新日誌
+            log.details = {'task_id': result.id}
+            log.save()
+            
+            # 注意：不更新設定狀態，讓實際的任務執行來更新狀態
+            # 這樣可以確保狀態的真實性
+            
+            messages.success(request, f"同步任務已啟動，任務ID: {result.id}")
+            logger.info(f"手動執行訂單同步任務，類型: {sync_type}，任務ID: {result.id}")
+            
+        return redirect('system:order_sync_settings')
+        
+    except Exception as e:
+        logger.error(f"手動執行訂單同步失敗: {str(e)}")
+        messages.error(request, f"執行失敗: {str(e)}")
+        return redirect('system:order_sync_settings')
+
+
+def update_order_sync_tasks(settings_obj):
+    """
+    更新訂單同步定時任務
+    """
+    try:
+        from django_celery_beat.models import PeriodicTask, IntervalSchedule
+        
+        # 更新同步任務
+        if settings_obj.sync_enabled:
+            interval, _ = IntervalSchedule.objects.get_or_create(
+                every=settings_obj.sync_interval_minutes,
+                period=IntervalSchedule.MINUTES,
+            )
+            
+            task, created = PeriodicTask.objects.get_or_create(
+                name='訂單同步任務',
+                defaults={
+                    'task': 'scheduling.tasks.sync_orders_task',
+                    'interval': interval,
+                    'enabled': True,
+                }
+            )
+            
+            if not created:
+                task.interval = interval
+                task.enabled = True
+                task.save()
+        else:
+            # 停用任務
+            PeriodicTask.objects.filter(name='訂單同步任務').update(enabled=False)
+        
+        # 更新清理任務
+        if settings_obj.cleanup_enabled:
+            interval, _ = IntervalSchedule.objects.get_or_create(
+                every=settings_obj.cleanup_interval_hours * 60,  # 轉換為分鐘
+                period=IntervalSchedule.MINUTES,
+            )
+            
+            task, created = PeriodicTask.objects.get_or_create(
+                name='訂單清理任務',
+                defaults={
+                    'task': 'scheduling.tasks.cleanup_old_orders_task',
+                    'interval': interval,
+                    'enabled': True,
+                }
+            )
+            
+            if not created:
+                task.interval = interval
+                task.enabled = True
+                task.save()
+        else:
+            # 停用任務
+            PeriodicTask.objects.filter(name='訂單清理任務').update(enabled=False)
+        
+        # 更新狀態更新任務
+        if settings_obj.status_update_enabled:
+            interval, _ = IntervalSchedule.objects.get_or_create(
+                every=settings_obj.status_update_interval_minutes,
+                period=IntervalSchedule.MINUTES,
+            )
+            
+            task, created = PeriodicTask.objects.get_or_create(
+                name='訂單狀態更新任務',
+                defaults={
+                    'task': 'scheduling.tasks.update_order_status_task',
+                    'interval': interval,
+                    'enabled': True,
+                }
+            )
+            
+            if not created:
+                task.interval = interval
+                task.enabled = True
+                task.save()
+        else:
+            # 停用任務
+            PeriodicTask.objects.filter(name='訂單狀態更新任務').update(enabled=False)
+            
+    except Exception as e:
+        logger.error(f"更新訂單同步定時任務失敗: {str(e)}")
+
+
+def get_order_sync_task_status():
+    """
+    取得訂單同步定時任務狀態
+    """
+    try:
+        from django_celery_beat.models import PeriodicTask
+        
+        tasks = {
+            'sync': PeriodicTask.objects.filter(name__contains='訂單同步任務').first(),
+            'cleanup': PeriodicTask.objects.filter(name__contains='訂單清理任務').first(),
+            'status_update': PeriodicTask.objects.filter(name__contains='訂單狀態更新任務').first(),
+        }
+        
+        return tasks
+        
+    except Exception as e:
+        logger.error(f"取得訂單同步任務狀態失敗: {str(e)}")
+        return {}
 
 
 

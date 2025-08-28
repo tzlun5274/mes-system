@@ -1,4 +1,6 @@
 from django.db import models
+from django.utils import timezone
+from datetime import datetime
 from .operation_log_models import SchedulingOperationLog
 from .scheduling_models import Unit, Event
 from .company_view_models import CompanyView
@@ -55,3 +57,28 @@ class OrderMain(models.Model):
 
     def __str__(self):
         return f"{self.bill_no} - {self.product_name}"
+    
+    @property
+    def delivered_quantity(self):
+        """已交數量"""
+        return self.quantity - self.qty_remain
+    
+    @property
+    def is_overdue(self):
+        """是否逾期"""
+        try:
+            delivery_date = datetime.strptime(self.pre_in_date, '%Y-%m-%d').date()
+            return delivery_date < timezone.now().date()
+        except:
+            return False
+    
+    @property
+    def is_urgent(self):
+        """是否緊急（交期在3天內）"""
+        try:
+            delivery_date = datetime.strptime(self.pre_in_date, '%Y-%m-%d').date()
+            today = timezone.now().date()
+            days_until_delivery = (delivery_date - today).days
+            return 0 <= days_until_delivery <= 3
+        except:
+            return False
