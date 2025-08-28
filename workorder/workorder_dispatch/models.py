@@ -401,7 +401,9 @@ class WorkOrderDispatch(models.Model):
                     # 如果達到完工條件，標記為已完成
                     if workorder.status != 'completed':
                         workorder.status = 'completed'
-                        workorder.completed_at = timezone.now()
+                        # 只有在完工時間未設定時才設定為當前時間
+                        if workorder.completed_at is None:
+                            workorder.completed_at = timezone.now()
                         workorder.save()
                         logger.info(f"工單 {workorder.order_number} 狀態更新為已完成")
                 elif self.total_quantity > 0:

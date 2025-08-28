@@ -2872,6 +2872,204 @@ class CompletedWorkOrderAnalysisDetailView(LoginRequiredMixin, DetailView):
             context['sorted_process_details'] = []
         
         return context
+    
+    def post(self, request, *args, **kwargs):
+        """處理匯出請求"""
+        action = request.POST.get('action')
+        export_format = request.POST.get('format', 'excel')
+        
+        if action == 'export':
+            if export_format == 'html':
+                return self.export_analysis_html()
+            else:
+                return self.export_analysis_excel()
+        
+        return super().post(request, *args, **kwargs)
+    
+    def export_analysis_excel(self):
+        """匯出工單分析詳情為 Excel 格式"""
+        import pandas as pd
+        from io import BytesIO
+        from django.http import HttpResponse
+        from datetime import datetime
+        
+        analysis = self.get_object()
+        
+        # 建立 Excel 檔案
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            
+            # 工作表1：基本資訊
+            basic_data = {
+                '項目': [
+                    '工單編號', '公司代號', '公司名稱', '產品編號', '產品名稱',
+                    '訂單數量', '完工日期', '分析時間', '總執行天數', '總工作時數',
+                    '總工序數', '效率比率'
+                ],
+                '數值': [
+                    analysis.workorder_id,
+                    analysis.company_code,
+                    analysis.company_name,
+                    analysis.product_code,
+                    analysis.product_name,
+                    analysis.order_quantity,
+                    analysis.completion_date.strftime('%Y-%m-%d') if analysis.completion_date else '',
+                    analysis.created_at.strftime('%Y-%m-%d %H:%M') if analysis.created_at else '',
+                    analysis.total_execution_days,
+                    f"{analysis.total_work_hours:.1f}",
+                    analysis.total_processes,
+                    f"{analysis.efficiency_rate:.1%}" if analysis.efficiency_rate else ''
+                ]
+            }
+            
+            df_basic = pd.DataFrame(basic_data)
+            df_basic.to_excel(writer, sheet_name='基本資訊', index=False)
+            
+            # 工作表2：時間分析
+            time_data = [
+                ['第一筆紀錄日期', analysis.first_record_date.strftime('%Y-%m-%d') if analysis.first_record_date else ''],
+                ['最後一筆紀錄日期', analysis.last_record_date.strftime('%Y-%m-%d') if analysis.last_record_date else ''],
+                ['總執行天數', analysis.total_execution_days],
+                ['總工作時數', f"{analysis.total_work_hours:.1f}"],
+                ['總加班時數', f"{analysis.total_overtime_hours:.1f}"],
+                ['平均每日工作時數', f"{analysis.average_daily_hours:.1f}"],
+                ['效率比率', f"{analysis.efficiency_rate:.1%}" if analysis.efficiency_rate else ''],
+                ['完工日期', analysis.completion_date.strftime('%Y-%m-%d') if analysis.completion_date else ''],
+                ['完工狀態', analysis.completion_status],
+            ]
+            
+            df_time = pd.DataFrame(time_data, columns=['項目', '數值'])
+            df_time.to_excel(writer, sheet_name='時間分析', index=False)
+            
+            # 工作表3：工序分析
+            if analysis.process_details:
+                process_data = []
+                for process_name, process_info in analysis.process_details.items():
+                    process_data.append({
+                        '工序名稱': process_name,
+                        '總工作時數': process_info.get('total_hours', 0),
+                        '參與作業員數': process_info.get('operator_count', 0),
+                        '第一筆記錄': process_info.get('first_record_date', ''),
+                        '最後一筆記錄': process_info.get('last_record_date', ''),
+                        '平均每日工作時數': process_info.get('avg_daily_hours', 0)
+                    })
+                
+                df_process = pd.DataFrame(process_data)
+                df_process.to_excel(writer, sheet_name='工序分析', index=False)
+            
+            # 工作表4：作業員分析
+            if analysis.operator_details:
+                operator_data = []
+                for operator_name, operator_info in analysis.operator_details.items():
+                    operator_data.append({
+                        '作業員姓名': operator_name,
+                        '總工作時數': operator_info.get('total_hours', 0),
+                        '加班時數': operator_info.get('overtime_hours', 0),
+                        '參與工序': ', '.join(operator_info.get('processes', [])),
+                        '工作天數': operator_info.get('work_days', 0),
+                        '參與工序數': operator_info.get('process_count', 0)
+                    })
+                
+                df_operator = pd.DataFrame(operator_data)
+                df_operator.to_excel(writer, sheet_name='作業員分析', index=False)
+            
+            # 工作表5：詳細統計
+            stats_data = [
+                ['不重複工序數', analysis.unique_processes],
+                ['參與作業員數', analysis.total_operators],
+                ['分析建立時間', analysis.created_at.strftime('%Y-%m-%d %H:%M') if analysis.created_at else ''],
+                ['分析更新時間', analysis.updated_at.strftime('%Y-%m-%d %H:%M') if analysis.updated_at else ''],
+            ]
+            
+            df_stats = pd.DataFrame(stats_data, columns=['統計項目', '數值'])
+            df_stats.to_excel(writer, sheet_name='詳細統計', index=False)
+        
+        # 設定檔案名稱
+        import re
+        from urllib.parse import quote
+        # 清理檔案名稱，移除或替換可能導致問題的字符
+        company_name = re.sub(r'[<>:"/\\|?*\s]', '_', analysis.company_name)
+        workorder_id = re.sub(r'[<>:"/\\|?*\s]', '_', analysis.workorder_id)
+        product_code = re.sub(r'[<>:"/\\|?*\s]', '_', analysis.product_code)
+        raw_filename = f"{company_name}_{workorder_id}_{product_code}.xlsx"
+        filename = raw_filename
+        
+        # 設定回應標頭
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{quote(filename)}"; filename*=UTF-8\'\'{quote(filename)}'
+        
+        return response
+    
+    def export_analysis_html(self):
+        """匯出工單分析詳情為 HTML 格式"""
+        from django.template.loader import render_to_string
+        from django.http import HttpResponse
+        from datetime import datetime
+        
+        analysis = self.get_object()
+        
+        # 準備匯出用的資料
+        export_data = {
+            'analysis': analysis,
+            'export_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'company_info': f"{analysis.company_name} ({analysis.company_code})",
+            'basic_info': {
+                '工單編號': analysis.workorder_id,
+                '公司': f"{analysis.company_name} ({analysis.company_code})",
+                '產品編號': analysis.product_code,
+                '產品名稱': analysis.product_name,
+                '訂單數量': analysis.order_quantity,
+                '完工日期': analysis.completion_date.strftime('%Y-%m-%d') if analysis.completion_date else '',
+                '分析時間': analysis.created_at.strftime('%Y-%m-%d %H:%M') if analysis.created_at else '',
+            },
+            'metrics': {
+                '總執行天數': analysis.total_execution_days,
+                '總工作時數': f"{analysis.total_work_hours:.1f}",
+                '總工序數': analysis.total_processes,
+                '效率比率': f"{analysis.efficiency_rate:.1%}" if analysis.efficiency_rate else '',
+            },
+            'time_analysis': {
+                '第一筆紀錄日期': analysis.first_record_date.strftime('%Y-%m-%d') if analysis.first_record_date else '',
+                '最後一筆紀錄日期': analysis.last_record_date.strftime('%Y-%m-%d') if analysis.last_record_date else '',
+                '總執行天數': analysis.total_execution_days,
+                '總工作時數': f"{analysis.total_work_hours:.1f}",
+                '總加班時數': f"{analysis.total_overtime_hours:.1f}",
+                '平均每日工作時數': f"{analysis.average_daily_hours:.1f}",
+                '效率比率': f"{analysis.efficiency_rate:.1%}" if analysis.efficiency_rate else '',
+                '完工日期': analysis.completion_date.strftime('%Y-%m-%d') if analysis.completion_date else '',
+                '完工狀態': analysis.completion_status,
+            },
+            'process_details': analysis.process_details or {},
+            'operator_details': analysis.operator_details or {},
+            'statistics': {
+                '不重複工序數': analysis.unique_processes,
+                '參與作業員數': analysis.total_operators,
+                '分析建立時間': analysis.created_at.strftime('%Y-%m-%d %H:%M') if analysis.created_at else '',
+                '分析更新時間': analysis.updated_at.strftime('%Y-%m-%d %H:%M') if analysis.updated_at else '',
+            },
+        }
+        
+        # 渲染 HTML 模板
+        html_content = render_to_string('reporting/export_workorder_analysis_detail.html', export_data)
+        
+        # 設定檔案名稱
+        import re
+        from urllib.parse import quote
+        # 清理檔案名稱，移除或替換可能導致問題的字符
+        company_name = re.sub(r'[<>:"/\\|?*\s]', '_', analysis.company_name)
+        workorder_id = re.sub(r'[<>:"/\\|?*\s]', '_', analysis.workorder_id)
+        product_code = re.sub(r'[<>:"/\\|?*\s]', '_', analysis.product_code)
+        raw_filename = f"{company_name}_{workorder_id}_{product_code}.html"
+        filename = raw_filename
+        
+        # 設定回應標頭
+        response = HttpResponse(html_content, content_type='text/html; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{quote(filename)}"; filename*=UTF-8\'\'{quote(filename)}'
+        
+        return response
 
 
 class WorkOrderAnalysisManagementView(LoginRequiredMixin, TemplateView):

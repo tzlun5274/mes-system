@@ -99,6 +99,71 @@ class FillWorkCompletionService:
             return False
     
     @classmethod
+    def _get_last_packaging_end_time(cls, workorder):
+        """
+        獲取最後一筆出貨包裝報工的結束時間（嚴格按公司分離）
+        
+        Args:
+            workorder: WorkOrder 實例
+            
+        Returns:
+            datetime: 最後一筆出貨包裝報工的結束時間，如果沒有則返回當前時間
+        """
+        try:
+            from datetime import datetime
+            from django.utils import timezone
+            from ..fill_work.models import FillWork
+            
+            # 基本查詢條件（不限制產品編號，只找最後一筆出貨包裝報工）
+            fillwork_reports = FillWork.objects.filter(
+                workorder=workorder.order_number,
+                process__name__exact=cls.PACKAGING_PROCESS_NAME,
+                approval_status='approved'
+            )
+            
+            # 嚴格的公司分離
+            if workorder.company_code:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(
+                    company_code=workorder.company_code
+                ).first()
+                
+                if company_config:
+                    fillwork_reports = fillwork_reports.filter(
+                        company_name=company_config.company_name
+                    )
+                    logger.debug(f"工單 {workorder.order_number} 完工時間查詢按公司名稱 '{company_config.company_name}' 過濾")
+                else:
+                    logger.warning(f"工單 {workorder.order_number} 公司代號 {workorder.company_code} 在 CompanyConfig 中找不到對應配置")
+                    fillwork_reports = FillWork.objects.none()
+            else:
+                logger.warning(f"工單 {workorder.order_number} 沒有公司代號")
+                fillwork_reports = FillWork.objects.none()
+            
+            # 獲取最後一筆出貨包裝報工記錄
+            last_packaging_report = fillwork_reports.order_by('-work_date', '-end_time').first()
+            
+            if last_packaging_report and last_packaging_report.end_time:
+                # 組合日期和時間
+                end_datetime = datetime.combine(
+                    last_packaging_report.work_date, 
+                    last_packaging_report.end_time
+                )
+                # 轉換為 timezone-aware datetime
+                end_datetime = timezone.make_aware(end_datetime)
+                
+                logger.debug(f"工單 {workorder.order_number} (公司: {workorder.company_code}) 最後一筆出貨包裝報工結束時間: {end_datetime}")
+                return end_datetime
+            else:
+                logger.warning(f"工單 {workorder.order_number} (公司: {workorder.company_code}) 找不到出貨包裝報工記錄，使用當前時間")
+                return timezone.now()
+                
+        except Exception as e:
+            logger.error(f"獲取最後一筆出貨包裝報工結束時間失敗: {str(e)}")
+            from django.utils import timezone
+            return timezone.now()
+    
+    @classmethod
     def _get_packaging_quantity(cls, workorder):
         """
         獲取出貨包裝數量（嚴格按公司分離）
@@ -158,22 +223,25 @@ class FillWorkCompletionService:
             workorder: WorkOrder 實例
         """
         try:
-            # 1. 更新工單狀態
+            # 1. 獲取最後一筆出貨包裝報工的結束時間
+            last_packaging_time = cls._get_last_packaging_end_time(workorder)
+            
+            # 2. 更新工單狀態
             workorder.status = 'completed'
-            workorder.completed_at = timezone.now()
+            workorder.completed_at = last_packaging_time
             workorder.save()
             
-            logger.info(f"工單 {workorder.order_number} 狀態更新為完工")
+            logger.info(f"工單 {workorder.order_number} 狀態更新為完工，完工時間: {last_packaging_time}")
             
-            # 2. 更新生產記錄（WorkOrder 模型沒有 production_record 屬性，跳過此步驟）
+            # 3. 更新生產記錄（WorkOrder 模型沒有 production_record 屬性，跳過此步驟）
             logger.info(f"工單 {workorder.order_number} 跳過生產記錄更新（WorkOrder 模型沒有 production_record 屬性）")
             
-            # 3. 更新所有工序狀態
+            # 4. 更新所有工序狀態
             from ..models import WorkOrderProcess
             processes = WorkOrderProcess.objects.filter(workorder_id=workorder.id)
             for process in processes:
                 process.status = 'completed'
-                process.actual_end_time = timezone.now()
+                process.actual_end_time = last_packaging_time
                 process.save()
             
             logger.info(f"工單 {workorder.order_number} 所有工序狀態更新為完工")
@@ -420,19 +488,21 @@ class FillWorkCompletionService:
             raise
 
     @classmethod
-    def transfer_workorder_to_completed(cls, workorder_id):
+    def transfer_workorder_to_completed(cls, workorder_id, workorder=None):
         """
         將工單轉移到已完工模組
         
         Args:
             workorder_id: 工單ID
+            workorder: WorkOrder 實例（可選，如果提供則使用此實例）
             
         Returns:
             CompletedWorkOrder: 已完工工單物件
         """
         try:
             with transaction.atomic():
-                workorder = WorkOrder.objects.get(id=workorder_id)
+                if workorder is None:
+                    workorder = WorkOrder.objects.get(id=workorder_id)
                 
                 # 檢查是否已經轉移過
                 existing_completed = CompletedWorkOrder.objects.filter(
@@ -443,10 +513,8 @@ class FillWorkCompletionService:
                     logger.info(f"工單 {workorder.order_number} 已經轉移過")
                     return existing_completed
                 
-                # 更新工單狀態為完工（在轉移過程中）
-                workorder.status = 'completed'
-                workorder.completed_at = timezone.now()
-                workorder.save()
+                # 使用已經從 _complete_workorder 方法設定的完工時間
+                last_packaging_time = workorder.completed_at
                 
                 logger.info(f"工單 {workorder.order_number} 狀態更新為完工")
                 
@@ -456,7 +524,7 @@ class FillWorkCompletionService:
                     processes = WorkOrderProcess.objects.filter(workorder_id=workorder.id)
                     for process in processes:
                         process.status = 'completed'
-                        process.actual_end_time = timezone.now()
+                        process.actual_end_time = last_packaging_time
                         process.save()
                     logger.info(f"工單 {workorder.order_number} 所有工序狀態更新為完工")
                 except Exception as e:
@@ -470,8 +538,8 @@ class FillWorkCompletionService:
                 ).first()
                 
                 if dispatch:
-                    # 更新派工單監控資料
-                    dispatch.update_all_statistics()
+                    # 只讀取派工單監控資料，不更新（避免覆蓋完工時間）
+                    # dispatch.update_all_statistics()  # 註解掉，避免修改原始資料
                     
                     # 使用出貨包裝的實際數量（這才是真正的完工數量）
                     actual_completed_quantity = dispatch.packaging_total_quantity  # 出貨包裝總數量
@@ -513,7 +581,7 @@ class FillWorkCompletionService:
                     planned_quantity=workorder.quantity,  # 修正：使用 planned_quantity
                     completed_quantity=actual_completed_quantity,  # 使用實際完成數量
                     status='completed',
-                    completed_at=workorder.completed_at if hasattr(workorder, 'completed_at') and workorder.completed_at else timezone.now(),
+                    completed_at=last_packaging_time,  # 使用最後一筆出貨包裝報工的結束時間
                     production_record_id=None,  # 修正：設為 None 而不是 0
                     # 統計資料
                     total_good_quantity=total_good_quantity,
@@ -588,9 +656,12 @@ class FillWorkCompletionService:
                     'error': f'工單尚未達到完工條件，當前進度: {summary["completion_percentage"]:.1f}%'
                 }
             
-            # 更新工單狀態為完工
+            # 獲取最後一筆出貨包裝報工的結束時間作為完工時間
+            last_packaging_time = cls._get_last_packaging_end_time(workorder)
+            
+            # 更新工單狀態為完工（使用最後一筆出貨包裝報工的結束時間）
             workorder.status = 'completed'
-            workorder.completed_at = timezone.now()
+            workorder.completed_at = last_packaging_time
             workorder.save()
             
             # 轉移到已完工模組
@@ -1350,9 +1421,14 @@ class FillWorkCompletionService:
                 
                 logger.info(f"開始強制完工工單 {workorder.order_number}，原因：{force_reason}")
                 
-                # 3. 先調用獨立的資料轉移服務（不更新工單狀態）
+                # 3. 先執行完工流程（設定正確的完工時間）
+                cls._complete_workorder(workorder)
+                # 重新載入工單以確保獲取最新的完工時間
+                workorder.refresh_from_db()
+                
+                # 4. 調用資料轉移服務
                 try:
-                    completed_workorder = cls.transfer_workorder_to_completed(workorder_id)
+                    completed_workorder = cls.transfer_workorder_to_completed(workorder_id, workorder)
                     
                     # 4. 自動生成報表資料
                     try:

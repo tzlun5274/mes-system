@@ -7,6 +7,15 @@
 {% endblock %}
 
 {% block content %}
+<!-- 麵包屑導航 -->
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'process:index' %}">工序管理</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{% trans "產品工藝路線設定" %}</li>
+    </ol>
+</nav>
+
 <h2>{% trans "MES 系統 - 產品工藝路線設定" %}</h2>
 <hr>
 

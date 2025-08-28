@@ -624,7 +624,7 @@ class CompletedWorkOrder(models.Model):
     # 時間資訊
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
     started_at = models.DateTimeField(null=True, blank=True, verbose_name="開始時間")
-    completed_at = models.DateTimeField(auto_now_add=True, verbose_name="完工時間")
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name="完工時間")
     
     # 生產記錄資訊
     production_record_id = models.IntegerField(verbose_name="生產記錄ID", null=True, blank=True, default=0)

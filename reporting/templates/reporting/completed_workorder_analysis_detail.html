@@ -45,6 +45,7 @@
 {% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container-fluid">
     <!-- 頁面標題 -->
     <div class="row">
@@ -326,9 +327,9 @@
             <button type="button" class="btn btn-warning" onclick="reanalyzeWorkorder()">
                 <i class="fas fa-sync-alt"></i> 重新分析
             </button>
-            <a href="#" class="btn btn-primary" onclick="exportAnalysis()">
+            <button type="button" class="btn btn-primary" onclick="showExportModal()">
                 <i class="fas fa-download"></i> 匯出分析
-            </a>
+            </button>
         </div>
     </div>
 </div>
@@ -353,6 +354,50 @@
                 <button type="button" class="btn btn-warning" onclick="confirmReanalyze()">
                     <i class="fas fa-sync-alt"></i> 確定重新分析
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 匯出格式選擇對話框 -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">選擇匯出格式</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>請選擇要匯出的檔案格式：</p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card text-center mb-3">
+                            <div class="card-body">
+                                <i class="fas fa-file-excel fa-3x text-success mb-3"></i>
+                                <h6 class="card-title">Excel 格式</h6>
+                                <p class="card-text">包含多個工作表的 Excel 檔案，適合進一步分析</p>
+                                <button type="button" class="btn btn-success" onclick="exportAnalysis('excel')">
+                                    <i class="fas fa-download"></i> 匯出 Excel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card text-center mb-3">
+                            <div class="card-body">
+                                <i class="fas fa-file-code fa-3x text-primary mb-3"></i>
+                                <h6 class="card-title">HTML 格式</h6>
+                                <p class="card-text">美觀的網頁格式，適合列印和分享</p>
+                                <button type="button" class="btn btn-primary" onclick="exportAnalysis('html')">
+                                    <i class="fas fa-download"></i> 匯出 HTML
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
             </div>
         </div>
     </div>
@@ -472,9 +517,44 @@ function confirmReanalyze() {
     bootstrap.Modal.getInstance(document.getElementById('reanalyzeModal')).hide();
 }
 
-function exportAnalysis() {
-    // 這裡可以實作匯出功能
-    alert('匯出功能開發中...');
+function showExportModal() {
+    new bootstrap.Modal(document.getElementById('exportModal')).show();
+}
+
+function exportAnalysis(format) {
+    // 建立表單並提交
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = window.location.href;
+    
+    // 添加 CSRF token
+    const csrfToken = document.createElement('input');
+    csrfToken.type = 'hidden';
+    csrfToken.name = 'csrfmiddlewaretoken';
+    csrfToken.value = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    form.appendChild(csrfToken);
+    
+    // 添加動作
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = 'export';
+    form.appendChild(actionInput);
+    
+    // 添加格式
+    const formatInput = document.createElement('input');
+    formatInput.type = 'hidden';
+    formatInput.name = 'format';
+    formatInput.value = format;
+    form.appendChild(formatInput);
+    
+    // 提交表單
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+    
+    // 關閉模態框
+    bootstrap.Modal.getInstance(document.getElementById('exportModal')).hide();
 }
 </script>
 {% endblock %}
