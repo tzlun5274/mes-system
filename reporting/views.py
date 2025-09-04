@@ -2072,7 +2072,6 @@ def scoring_dashboard(request):
     operator_stats = OperatorProcessCapacityScore.objects.aggregate(
         total_records=Count('id'),
         avg_capacity_score=Avg('capacity_score'),
-        avg_quality_score=Avg('quality_score'),
         avg_total_score=Avg('total_score'),
         scored_by_supervisor=Count('id', filter=Q(is_supervisor_scored=True))
     )

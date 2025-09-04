@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+權限同步 - MES 系統
+{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system:permission_list' %}">權限管理</a></li>
+        <li class="breadcrumb-item active" aria-current="page">權限同步</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-sync-alt mr-2"></i>權限同步
+        </h1>
+        <div>
+            <a href="{% url 'system:permission_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left mr-2"></i>返回權限管理
+            </a>
+        </div>
+    </div>
+
+    <!-- 操作說明 -->
+    <div class="alert alert-info" role="alert">
+        <i class="fas fa-info-circle mr-2"></i>
+        <strong>權限同步說明：</strong>
+        權限同步功能會自動檢測所有應用模組的權限定義，並與資料庫中的權限記錄進行同步，確保權限系統的完整性和一致性。
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <!-- 左側：同步操作 -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cogs mr-2"></i>同步操作
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="syncForm">
+                        {% csrf_token %}
+                        
+                        <!-- 同步選項 -->
+                        <div class="mb-3">
+                            <label class="form-label">同步範圍：</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="sync_all" id="syncAll" checked>
+                                <label class="form-check-label" for="syncAll">
+                                    <strong>同步所有應用模組</strong>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- 選擇性同步 -->
+                        <div class="mb-3" id="selectiveSync" style="display: none;">
+                            <label class="form-label">選擇要同步的模組：</label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="sync_modules" value="equip" id="syncEquip">
+                                        <label class="form-check-label" for="syncEquip">設備管理</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="sync_modules" value="material" id="syncMaterial">
+                                        <label class="form-check-label" for="syncMaterial">物料管理</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="sync_modules" value="scheduling" id="syncScheduling">
+                                        <label class="form-check-label" for="syncScheduling">排程管理</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="sync_modules" value="process" id="syncProcess">
+                                        <label class="form-check-label" for="syncProcess">製程管理</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="sync_modules" value="quality" id="syncQuality">
+                                        <label class="form-check-label" for="syncQuality">品質管理</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="sync_modules" value="workorder" id="syncWorkorder">
+                                        <label class="form-check-label" for="syncWorkorder">工單管理</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="sync_modules" value="kanban" id="syncKanban">
+                                        <label class="form-check-label" for="syncKanban">看板管理</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="sync_modules" value="ai" id="syncAi">
+                                        <label class="form-check-label" for="syncAi">AI功能</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 同步選項 -->
+                        <div class="mb-3">
+                            <label class="form-label">同步選項：</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="force_sync" id="forceSync">
+                                <label class="form-check-label" for="forceSync">
+                                    強制同步（覆蓋現有權限）
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="cleanup_orphaned" id="cleanupOrphaned">
+                                <label class="form-check-label" for="cleanupOrphaned">
+                                    清理孤立權限（移除無效權限）
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- 執行按鈕 -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary" id="syncButton">
+                                <i class="fas fa-sync-alt mr-2"></i>執行權限同步
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側：權限統計 -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar mr-2"></i>權限統計
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border rounded p-3">
+                                <h3 class="text-primary">{{ stats.total_permissions|default:0 }}</h3>
+                                <p class="mb-0 text-muted">總權限數</p>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-3">
+                                <h3 class="text-success">{{ stats.total_users|default:0 }}</h3>
+                                <p class="mb-0 text-muted">總用戶數</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- 按模組統計 -->
+                    <h6>各模組權限數量：</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>模組名稱</th>
+                                    <th>權限數量</th>
+                                    <th>狀態</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for module, count in stats.permissions_by_module.items %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-info">{{ module }}</span>
+                                    </td>
+                                    <td>{{ count }}</td>
+                                    <td>
+                                        {% if count > 0 %}
+                                            <span class="badge bg-success">正常</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">待同步</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">暫無統計資料</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 同步日誌 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list-alt mr-2"></i>同步日誌
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning" role="alert">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <strong>注意：</strong>權限同步是一個重要的系統操作，建議在系統維護時間執行，並確保有完整的備份。
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>同步前檢查清單：</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check-circle text-success mr-2"></i>確認系統處於維護模式</li>
+                                <li><i class="fas fa-check-circle text-success mr-2"></i>備份當前權限設定</li>
+                                <li><i class="fas fa-check-circle text-success mr-2"></i>通知相關用戶系統維護</li>
+                                <li><i class="fas fa-check-circle text-success mr-2"></i>檢查資料庫連接狀態</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>同步後驗證：</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check-circle text-success mr-2"></i>檢查權限數量變化</li>
+                                <li><i class="fas fa-check-circle text-success mr-2"></i>測試關鍵功能權限</li>
+                                <li><i class="fas fa-check-circle text-success mr-2"></i>驗證用戶權限設定</li>
+                                <li><i class="fas fa-check-circle text-success mr-2"></i>檢查系統日誌記錄</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 確認對話框 -->
+<div class="modal fade" id="confirmSyncModal" tabindex="-1" aria-labelledby="confirmSyncModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmSyncModalLabel">確認權限同步</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <strong>警告：</strong>此操作將影響系統的權限設定，請確認以下事項：
+                </div>
+                
+                <div id="syncSummary">
+                    <!-- 同步摘要將在這裡動態生成 -->
+                </div>
+                
+                <div class="mt-3">
+                    <h6>同步範圍：</h6>
+                    <ul id="syncModulesList">
+                        <!-- 同步模組列表將在這裡動態生成 -->
+                    </ul>
+                </div>
+                
+                <div class="mt-3">
+                    <h6>同步選項：</h6>
+                    <ul id="syncOptionsList">
+                        <!-- 同步選項將在這裡動態生成 -->
+                    </ul>
+                </div>
+                
+                <div class="alert alert-info mt-3" role="alert">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    同步過程可能需要幾分鐘時間，請耐心等待。同步完成後，系統會自動重新載入權限設定。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirmSync">確認執行同步</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 同步範圍切換
+    const syncAllCheckbox = document.getElementById('syncAll');
+    const selectiveSyncDiv = document.getElementById('selectiveSync');
+    const moduleCheckboxes = document.querySelectorAll('input[name="sync_modules"]');
+    
+    syncAllCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            selectiveSyncDiv.style.display = 'none';
+            moduleCheckboxes.forEach(cb => cb.checked = false);
+        } else {
+            selectiveSyncDiv.style.display = 'block';
+        }
+    });
+    
+    // 表單提交確認
+    document.getElementById('syncForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // 檢查是否選擇了同步範圍
+        if (!syncAllCheckbox.checked) {
+            const selectedModules = document.querySelectorAll('input[name="sync_modules"]:checked');
+            if (selectedModules.length === 0) {
+                alert('請選擇要同步的模組或選擇同步所有模組');
+                return;
+            }
+        }
+        
+        // 生成同步摘要
+        generateSyncSummary();
+        
+        // 顯示確認對話框
+        const confirmModal = new bootstrap.Modal(document.getElementById('confirmSyncModal'));
+        confirmModal.show();
+    });
+    
+    // 生成同步摘要
+    function generateSyncSummary() {
+        const syncSummary = document.getElementById('syncSummary');
+        const syncModulesList = document.getElementById('syncModulesList');
+        const syncOptionsList = document.getElementById('syncOptionsList');
+        
+        // 同步範圍
+        let scopeText = '';
+        if (syncAllCheckbox.checked) {
+            scopeText = '所有應用模組';
+        } else {
+            const selectedModules = Array.from(document.querySelectorAll('input[name="sync_modules"]:checked'))
+                .map(cb => cb.value);
+            scopeText = selectedModules.join(', ');
+        }
+        
+        syncSummary.innerHTML = `
+            <div class="alert alert-info" role="alert">
+                <strong>同步摘要：</strong><br>
+                同步範圍：${scopeText}<br>
+                預計影響：系統權限設定將被更新
+            </div>
+        `;
+        
+        // 同步模組列表
+        if (syncAllCheckbox.checked) {
+            syncModulesList.innerHTML = '<li>所有已安裝的應用模組</li>';
+        } else {
+            syncModulesList.innerHTML = '';
+            document.querySelectorAll('input[name="sync_modules"]:checked').forEach(cb => {
+                const label = cb.nextElementSibling.textContent;
+                syncModulesList.innerHTML += `<li>${label}</li>`;
+            });
+        }
+        
+        // 同步選項
+        syncOptionsList.innerHTML = '';
+        const forceSync = document.getElementById('forceSync').checked;
+        const cleanupOrphaned = document.getElementById('cleanupOrphaned').checked;
+        
+        if (forceSync) {
+            syncOptionsList.innerHTML += '<li>強制同步（覆蓋現有權限）</li>';
+        }
+        if (cleanupOrphaned) {
+            syncOptionsList.innerHTML += '<li>清理孤立權限</li>';
+        }
+        if (!forceSync && !cleanupOrphaned) {
+            syncOptionsList.innerHTML += '<li>標準同步模式</li>';
+        }
+    }
+    
+    // 確認同步
+    document.getElementById('confirmSync').addEventListener('click', function() {
+        // 禁用按鈕防止重複提交
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>同步中...';
+        
+        // 提交表單
+        document.getElementById('syncForm').submit();
+    });
+});
+</script>
+{% endblock %}

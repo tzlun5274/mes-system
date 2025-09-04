@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+權限批量分配 - MES 系統
+{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system:permission_list' %}">權限管理</a></li>
+        <li class="breadcrumb-item active" aria-current="page">權限批量分配</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-users-cog mr-2"></i>權限批量分配
+        </h1>
+        <div>
+            <a href="{% url 'system:permission_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left mr-2"></i>返回權限管理
+            </a>
+        </div>
+    </div>
+
+    <!-- 操作說明 -->
+    <div class="alert alert-info" role="alert">
+        <i class="fas fa-info-circle mr-2"></i>
+        <strong>批量權限分配說明：</strong>
+        您可以選擇多個用戶和多個權限，一次性完成權限分配，提高管理效率。
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" id="bulkAssignForm">
+        {% csrf_token %}
+        
+        <div class="row">
+            <!-- 左側：用戶選擇 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-users mr-2"></i>選擇用戶
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- 用戶搜尋 -->
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="userSearch" placeholder="搜尋用戶名稱或郵箱...">
+                        </div>
+                        
+                        <!-- 用戶列表 -->
+                        <div class="user-list" style="max-height: 400px; overflow-y: auto;">
+                            {% for user in users %}
+                            <div class="form-check user-item" data-username="{{ user.username|lower }}" data-email="{{ user.email|lower }}">
+                                <input class="form-check-input" type="checkbox" name="selected_users" value="{{ user.id }}" id="user_{{ user.id }}">
+                                <label class="form-check-label" for="user_{{ user.id }}">
+                                    <strong>{{ user.username }}</strong>
+                                    {% if user.email %}
+                                        <br><small class="text-muted">{{ user.email }}</small>
+                                    {% endif %}
+                                    {% if user.first_name or user.last_name %}
+                                        <br><small class="text-muted">{{ user.first_name }} {{ user.last_name }}</small>
+                                    {% endif %}
+                                </label>
+                            </div>
+                            {% empty %}
+                            <div class="text-muted">暫無用戶資料</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- 全選/取消全選 -->
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllUsers">全選用戶</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAllUsers">取消全選</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側：權限選擇 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shield-alt mr-2"></i>選擇權限
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- 權限搜尋 -->
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="permissionSearch" placeholder="搜尋權限名稱...">
+                        </div>
+                        
+                        <!-- 權限分類選擇 -->
+                        <div class="mb-3">
+                            <label class="form-label">權限分類：</label>
+                            <select class="form-select" id="permissionCategory">
+                                <option value="">所有分類</option>
+                                {% for category in permission_categories %}
+                                <option value="{{ category.0 }}">{{ category.1 }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- 權限列表 -->
+                        <div class="permission-list" style="max-height: 400px; overflow-y: auto;">
+                            {% for permission in permissions %}
+                            <div class="form-check permission-item" data-name="{{ permission.name|lower }}" data-codename="{{ permission.codename|lower }}" data-category="{{ permission.content_type.app_label }}">
+                                <input class="form-check-input" type="checkbox" name="selected_permissions" value="{{ permission.id }}" id="permission_{{ permission.id }}">
+                                <label class="form-check-label" for="permission_{{ permission.id }}">
+                                    <strong>{{ permission.name }}</strong>
+                                    <br><small class="text-muted">{{ permission.codename }}</small>
+                                    <br><small class="text-muted badge bg-info">{{ permission.content_type.app_label }}</small>
+                                </label>
+                            </div>
+                            {% empty %}
+                            <div class="text-muted">暫無權限資料</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- 全選/取消全選 -->
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-sm btn-outline-success" id="selectAllPermissions">全選權限</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAllPermissions">取消全選</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作按鈕 -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-primary" id="selectedUsersCount">0</span> 個用戶，
+                                <span class="badge bg-success" id="selectedPermissionsCount">0</span> 個權限
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-primary" id="assignButton" disabled>
+                                    <i class="fas fa-save mr-2"></i>執行批量分配
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="history.back()">
+                                    <i class="fas fa-times mr-2"></i>取消
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- 確認對話框 -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalLabel">確認批量權限分配</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>您確定要為選中的 <strong id="confirmUsersCount">0</strong> 個用戶分配 <strong id="confirmPermissionsCount">0</strong> 個權限嗎？</p>
+                <p class="text-warning"><i class="fas fa-exclamation-triangle mr-2"></i>此操作將覆蓋這些用戶的現有權限設定。</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirmAssign">確認分配</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 用戶搜尋功能
+    const userSearch = document.getElementById('userSearch');
+    const userItems = document.querySelectorAll('.user-item');
+    
+    userSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        userItems.forEach(item => {
+            const username = item.dataset.username;
+            const email = item.dataset.email;
+            if (username.includes(searchTerm) || email.includes(searchTerm)) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+
+    // 權限搜尋功能
+    const permissionSearch = document.getElementById('permissionSearch');
+    const permissionItems = document.querySelectorAll('.permission-item');
+    
+    permissionSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        permissionItems.forEach(item => {
+            const name = item.dataset.name;
+            const codename = item.dataset.codename;
+            if (name.includes(searchTerm) || codename.includes(searchTerm)) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+
+    // 權限分類篩選
+    const permissionCategory = document.getElementById('permissionCategory');
+    permissionCategory.addEventListener('change', function() {
+        const selectedCategory = this.value;
+        permissionItems.forEach(item => {
+            const category = item.dataset.category;
+            if (!selectedCategory || category === selectedCategory) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+
+    // 全選/取消全選用戶
+    document.getElementById('selectAllUsers').addEventListener('click', function() {
+        const visibleUsers = document.querySelectorAll('.user-item:not([style*="display: none"]) input[type="checkbox"]');
+        visibleUsers.forEach(checkbox => checkbox.checked = true);
+        updateCounts();
+    });
+
+    document.getElementById('deselectAllUsers').addEventListener('click', function() {
+        const userCheckboxes = document.querySelectorAll('input[name="selected_users"]');
+        userCheckboxes.forEach(checkbox => checkbox.checked = false);
+        updateCounts();
+    });
+
+    // 全選/取消全選權限
+    document.getElementById('selectAllPermissions').addEventListener('click', function() {
+        const visiblePermissions = document.querySelectorAll('.permission-item:not([style*="display: none"]) input[type="checkbox"]');
+        visiblePermissions.forEach(checkbox => checkbox.checked = true);
+        updateCounts();
+    });
+
+    document.getElementById('deselectAllPermissions').addEventListener('click', function() {
+        const permissionCheckboxes = document.querySelectorAll('input[name="selected_permissions"]');
+        permissionCheckboxes.forEach(checkbox => checkbox.checked = false);
+        updateCounts();
+    });
+
+    // 更新計數
+    function updateCounts() {
+        const selectedUsers = document.querySelectorAll('input[name="selected_users"]:checked').length;
+        const selectedPermissions = document.querySelectorAll('input[name="selected_permissions"]:checked').length;
+        
+        document.getElementById('selectedUsersCount').textContent = selectedUsers;
+        document.getElementById('selectedPermissionsCount').textContent = selectedPermissions;
+        
+        // 啟用/禁用分配按鈕
+        const assignButton = document.getElementById('assignButton');
+        assignButton.disabled = (selectedUsers === 0 || selectedPermissions === 0);
+    }
+
+    // 監聽選擇變化
+    document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        checkbox.addEventListener('change', updateCounts);
+    });
+
+    // 表單提交確認
+    document.getElementById('bulkAssignForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const selectedUsers = document.querySelectorAll('input[name="selected_users"]:checked').length;
+        const selectedPermissions = document.querySelectorAll('input[name="selected_permissions"]:checked').length;
+        
+        if (selectedUsers === 0 || selectedPermissions === 0) {
+            alert('請至少選擇一個用戶和一個權限');
+            return;
+        }
+        
+        // 顯示確認對話框
+        document.getElementById('confirmUsersCount').textContent = selectedUsers;
+        document.getElementById('confirmPermissionsCount').textContent = selectedPermissions;
+        
+        const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        confirmModal.show();
+    });
+
+    // 確認分配
+    document.getElementById('confirmAssign').addEventListener('click', function() {
+        document.getElementById('bulkAssignForm').submit();
+    });
+
+    // 初始化計數
+    updateCounts();
+});
+</script>
+{% endblock %}

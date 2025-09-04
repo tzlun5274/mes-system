@@ -28,6 +28,14 @@ urlpatterns = [
     path("schedules/create/", views.schedule_create, name="schedule_create"),
     path("schedules/<int:pk>/edit/", views.schedule_edit, name="schedule_edit"),
     path("schedules/<int:pk>/delete/", views.schedule_delete, name="schedule_delete"),
+    # 匯出功能
+    path("export/lines/", views.export_production_lines, name="export_production_lines"),
+    path("export/line-types/", views.export_line_types, name="export_line_types"),
+    
+    # 匯入功能
+    path("import/lines/", views.import_production_lines, name="import_production_lines"),
+    path("import/line-types/", views.import_line_types, name="import_line_types"),
+    
     # API 端點
     path("api/line-types/", views.api_line_types, name="api_line_types"),
     path(

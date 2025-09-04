@@ -1,0 +1,927 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+細分化權限管理 - MES 系統
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'system:permission_list' %}">權限管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">細分化權限管理</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="bi bi-shield-gear"></i> 細分化權限管理
+                    </h3>
+                    <div class="card-tools">
+                        <a href="{% url 'system:permission_list' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> 返回權限列表
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info" role="alert">
+                        <i class="bi bi-info-circle"></i> 
+                        這裡提供更細分化的權限管理功能，可以針對特定使用者設定詳細的權限控制。
+                        <button type="button" class="btn btn-sm btn-outline-info ms-2" onclick="togglePermissionView()">
+                            <i class="bi bi-eye"></i> 切換權限查看
+                        </button>
+                    </div>
+
+                    <!-- 使用者選擇區域 -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-person-check"></i> 選擇要設定的使用者</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="selected_user" class="form-label">選擇使用者：</label>
+                                        <select class="form-select" id="selected_user" onchange="loadUserPermissions()">
+                                            <option value="">請選擇使用者</option>
+                                            {% for user in users %}
+                                            <option value="{{ user.id }}">{{ user.username }} - {{ user.get_full_name|default:user.email }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">目前狀態：</label>
+                                        <div id="user_status" class="text-muted">請先選擇使用者</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 權限設定表單 -->
+                    <form id="permission_form" method="POST" style="display: none;">
+                        {% csrf_token %}
+                        <input type="hidden" name="user_id" id="form_user_id">
+                        <input type="hidden" name="action" value="save_permissions">
+
+                        <!-- 作業員權限細分 -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-person-gear"></i> 作業員權限細分</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_operate_all_operators" name="can_operate_all_operators" checked>
+                                            <label class="form-check-label" for="can_operate_all_operators">
+                                                可操作全部作業員
+                                            </label>
+                                        </div>
+                                        <div id="operator_selection" style="display: none;">
+                                            <label class="form-label">選擇可操作的作業員：</label>
+                                            <select class="form-select" multiple name="allowed_operators" id="allowed_operators">
+                                                {% for operator in operators %}
+                                                <option value="{{ operator.id }}">{{ operator.name }}{% if operator.production_line %} - {{ operator.production_line.line_name }}{% endif %}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <small class="form-text text-muted">按住 Ctrl 鍵可多選</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="alert alert-info">
+                                            <strong>說明：</strong><br>
+                                            • 勾選「可操作全部作業員」時，使用者可以操作所有作業員<br>
+                                            • 取消勾選時，可以選擇特定的作業員進行權限限制
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 工序權限細分 -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-gear-wide-connected"></i> 工序權限細分</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_operate_all_processes" name="can_operate_all_processes" checked>
+                                            <label class="form-check-label" for="can_operate_all_processes">
+                                                可操作全部工序
+                                            </label>
+                                        </div>
+                                        <div id="process_selection" style="display: none;">
+                                            <label class="form-label">選擇可操作的工序：</label>
+                                            <select class="form-select" multiple name="allowed_processes" id="allowed_processes">
+                                                {% for process in processes %}
+                                                <option value="{{ process.id }}">{{ process.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <small class="form-text text-muted">按住 Ctrl 鍵可多選</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="alert alert-info">
+                                            <strong>說明：</strong><br>
+                                            • 勾選「可操作全部工序」時，使用者可以操作所有工序<br>
+                                            • 取消勾選時，可以選擇特定的工序進行權限限制
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 設備權限細分 -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0"><i class="bi bi-cpu"></i> 設備權限細分</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_operate_all_equipments" name="can_operate_all_equipments" checked>
+                                            <label class="form-check-label" for="can_operate_all_equipments">
+                                                可操作全部設備
+                                            </label>
+                                        </div>
+                                        <div id="equipment_selection" style="display: none;">
+                                            <label class="form-label">選擇可操作的設備：</label>
+                                            <select class="form-select" multiple name="allowed_equipments" id="allowed_equipments">
+                                                {% for equipment in equipments %}
+                                                <option value="{{ equipment.id }}">{{ equipment.name }} - {{ equipment.model|default:"未設定型號" }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <small class="form-text text-muted">按住 Ctrl 鍵可多選</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="alert alert-info">
+                                            <strong>說明：</strong><br>
+                                            • 勾選「可操作全部設備」時，使用者可以操作所有設備<br>
+                                            • 取消勾選時，可以選擇特定的設備進行權限限制
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 報工類型權限 -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-secondary text-white">
+                                <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> 報工類型權限</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_fill_work" name="can_fill_work" checked>
+                                            <label class="form-check-label" for="can_fill_work">
+                                                可填報報工
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_onsite_reporting" name="can_onsite_reporting" checked>
+                                            <label class="form-check-label" for="can_onsite_reporting">
+                                                可現場報工
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_smt_reporting" name="can_smt_reporting">
+                                            <label class="form-check-label" for="can_smt_reporting">
+                                                可SMT報工
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="alert alert-info">
+                                            <strong>說明：</strong><br>
+                                            • 控制使用者可以進行哪些類型的報工操作<br>
+                                            • 根據實際工作需要勾選相應的報工類型
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 模組訪問權限 -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-dark text-white">
+                                <h5 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> 模組訪問權限</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_access_equip" name="can_access_equip" checked>
+                                            <label class="form-check-label" for="can_access_equip">
+                                                可訪問設備管理模組
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_access_workorder" name="can_access_workorder" checked>
+                                            <label class="form-check-label" for="can_access_workorder">
+                                                可訪問工單管理模組
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_access_quality" name="can_access_quality" checked>
+                                            <label class="form-check-label" for="can_access_quality">
+                                                可訪問品質管理模組
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_access_material" name="can_access_material" checked>
+                                            <label class="form-check-label" for="can_access_material">
+                                                可訪問物料管理模組
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_access_scheduling" name="can_access_scheduling" checked>
+                                            <label class="form-check-label" for="can_access_scheduling">
+                                                可訪問排程管理模組
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="alert alert-info">
+                                            <strong>說明：</strong><br>
+                                            • 控制使用者可以訪問哪些功能模組<br>
+                                            • 取消勾選的模組將無法訪問
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 功能級權限 -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-tools"></i> 功能級權限</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_view" name="can_view" checked>
+                                            <label class="form-check-label" for="can_view">
+                                                可查看功能
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_add" name="can_add" checked>
+                                            <label class="form-check-label" for="can_add">
+                                                可新增功能
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_edit" name="can_edit" checked>
+                                            <label class="form-check-label" for="can_edit">
+                                                可編輯功能
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="can_delete" name="can_delete">
+                                            <label class="form-check-label" for="can_delete">
+                                                可刪除功能
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="alert alert-info">
+                                            <strong>說明：</strong><br>
+                                            • 控制使用者在各模組中的具體操作權限<br>
+                                            • 建議謹慎設定刪除權限
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 資料級權限 -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-database"></i> 資料級權限</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="form-label">資料範圍：</label>
+                                        <select class="form-select" name="data_scope" id="data_scope">
+                                            <option value="own">自己的資料</option>
+                                            <option value="department">部門資料</option>
+                                            <option value="company">公司資料</option>
+                                            <option value="all">所有資料</option>
+                                        </select>
+                                        <small class="form-text text-muted">選擇使用者可以查看的資料範圍</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="alert alert-info">
+                                            <strong>說明：</strong><br>
+                                            • <strong>自己的資料：</strong>只能查看自己建立的資料<br>
+                                            • <strong>部門資料：</strong>可以查看同部門的資料<br>
+                                            • <strong>公司資料：</strong>可以查看整個公司的資料<br>
+                                            • <strong>所有資料：</strong>可以查看所有資料
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 儲存按鈕 -->
+                        <div class="card mb-4">
+                            <div class="card-body text-center">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="bi bi-save"></i> 儲存權限設定
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-lg ms-2" onclick="resetForm()">
+                                    <i class="bi bi-arrow-clockwise"></i> 重置表單
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- 權限設定查看區域 -->
+                    <div class="card mb-4" id="permission_view_section" style="display: none;">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="bi bi-eye"></i> 權限設定查看</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>作業員權限</h6>
+                                    <div id="operator_permission_view" class="alert alert-info">
+                                        請先選擇使用者並載入權限設定
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>工序權限</h6>
+                                    <div id="process_permission_view" class="alert alert-info">
+                                        請先選擇使用者並載入權限設定
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <h6>設備權限</h6>
+                                    <div id="equipment_permission_view" class="alert alert-info">
+                                        請先選擇使用者並載入權限設定
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>報工類型權限</h6>
+                                    <div id="reporting_permission_view" class="alert alert-info">
+                                        請先選擇使用者並載入權限設定
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <h6>模組訪問權限</h6>
+                                    <div id="module_permission_view" class="alert alert-info">
+                                        請先選擇使用者並載入權限設定
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>功能操作權限</h6>
+                                    <div id="function_permission_view" class="alert alert-info">
+                                        請先選擇使用者並載入權限設定
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <h6>資料範圍權限</h6>
+                                    <div id="data_scope_view" class="alert alert-info">
+                                        請先選擇使用者並載入權限設定
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 權限統計資訊 -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="bi bi-bar-chart"></i> 權限統計資訊</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">按模組分類</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul class="list-group list-group-flush">
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    設備管理
+                                                    <span class="badge bg-primary rounded-pill">{{ equip_permissions_count }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    物料管理
+                                                    <span class="badge bg-primary rounded-pill">{{ material_permissions_count }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    工單管理
+                                                    <span class="badge bg-primary rounded-pill">{{ workorder_permissions_count }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    品質管理
+                                                    <span class="badge bg-primary rounded-pill">{{ quality_permissions_count }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    系統管理
+                                                    <span class="badge bg-primary rounded-pill">{{ system_permissions_count }}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">按功能分類</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul class="list-group list-group-flush">
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    查看權限
+                                                    <span class="badge bg-success rounded-pill">{{ view_permissions_count }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    新增權限
+                                                    <span class="badge bg-info rounded-pill">{{ add_permissions_count }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    編輯權限
+                                                    <span class="badge bg-warning rounded-pill">{{ change_permissions_count }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    刪除權限
+                                                    <span class="badge bg-danger rounded-pill">{{ delete_permissions_count }}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">按業務分類</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul class="list-group list-group-flush">
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    工單管理
+                                                    <span class="badge bg-primary rounded-pill">{{ workorder_business_count }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    報工管理
+                                                    <span class="badge bg-success rounded-pill">{{ reporting_business_count }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    品質管理
+                                                    <span class="badge bg-warning rounded-pill">{{ quality_business_count }}</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    設備管理
+                                                    <span class="badge bg-info rounded-pill">{{ equipment_business_count }}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript 功能 -->
+<script>
+// 全域變數
+let currentUserPermissions = null;
+
+// 切換權限設定查看區域顯示
+function togglePermissionView() {
+    const viewSection = document.getElementById('permission_view_section');
+    if (viewSection.style.display === 'none') {
+        if (currentUserPermissions) {
+            viewSection.style.display = 'block';
+            updatePermissionView(currentUserPermissions);
+        } else {
+            alert('請先選擇使用者並載入權限設定');
+        }
+    } else {
+        viewSection.style.display = 'none';
+    }
+}
+
+// 載入使用者權限
+function loadUserPermissions() {
+    const userId = document.getElementById('selected_user').value;
+    const form = document.getElementById('permission_form');
+    const userStatus = document.getElementById('user_status');
+    
+    if (!userId) {
+        form.style.display = 'none';
+        userStatus.textContent = '請先選擇使用者';
+        return;
+    }
+    
+    // 顯示表單
+    form.style.display = 'block';
+    document.getElementById('form_user_id').value = userId;
+    
+    // 載入使用者權限設定
+    fetch(`/system/permission/advanced/load_user_permissions/${userId}/`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+            .then(data => {
+            if (data.success) {
+                currentUserPermissions = data.permissions;
+                populateForm(data.permissions);
+                updatePermissionView(data.permissions);
+                userStatus.innerHTML = `<span class="text-success">已載入使用者權限設定</span>`;
+                // 顯示權限設定查看區域
+                document.getElementById('permission_view_section').style.display = 'block';
+            } else {
+                // 如果沒有權限設定，使用預設值
+                currentUserPermissions = getDefaultPermissions();
+                populateForm(currentUserPermissions);
+                updatePermissionView(currentUserPermissions);
+                userStatus.innerHTML = `<span class="text-warning">使用預設權限設定</span>`;
+                // 顯示權限設定查看區域
+                document.getElementById('permission_view_section').style.display = 'block';
+            }
+        })
+    .catch(error => {
+        console.error('載入權限失敗:', error);
+        currentUserPermissions = getDefaultPermissions();
+        populateForm(currentUserPermissions);
+        userStatus.innerHTML = `<span class="text-warning">載入失敗，使用預設權限設定</span>`;
+    });
+}
+
+// 取得預設權限設定
+function getDefaultPermissions() {
+    return {
+        can_operate_all_operators: true,
+        allowed_operators: [],
+        can_operate_all_processes: true,
+        allowed_processes: [],
+        can_operate_all_equipments: true,
+        allowed_equipments: [],
+        can_fill_work: true,
+        can_onsite_reporting: true,
+        can_smt_reporting: false,
+        can_access_equip: true,
+        can_access_workorder: true,
+        can_access_quality: true,
+        can_access_material: true,
+        can_access_scheduling: true,
+        can_view: true,
+        can_add: true,
+        can_edit: true,
+        can_delete: false,
+        data_scope: 'own'
+    };
+}
+
+// 更新權限設定查看區域
+function updatePermissionView(permissions) {
+    // 作業員權限
+    const operatorView = document.getElementById('operator_permission_view');
+    if (permissions.can_operate_all_operators) {
+        operatorView.className = 'alert alert-success';
+        operatorView.innerHTML = '<strong>可操作全部作業員</strong><br>使用者可以操作所有作業員';
+    } else if (permissions.allowed_operators && permissions.allowed_operators.length > 0) {
+        operatorView.className = 'alert alert-warning';
+        operatorView.innerHTML = `<strong>可操作指定作業員</strong><br>限制操作 ${permissions.allowed_operators.length} 個作業員`;
+    } else {
+        operatorView.className = 'alert alert-danger';
+        operatorView.innerHTML = '<strong>無作業員操作權限</strong><br>使用者無法操作任何作業員';
+    }
+
+    // 工序權限
+    const processView = document.getElementById('process_permission_view');
+    if (permissions.can_operate_all_processes) {
+        processView.className = 'alert alert-success';
+        processView.innerHTML = '<strong>可操作全部工序</strong><br>使用者可以操作所有工序';
+    } else if (permissions.allowed_processes && permissions.allowed_processes.length > 0) {
+        processView.className = 'alert alert-warning';
+        processView.innerHTML = `<strong>可操作指定工序</strong><br>限制操作 ${permissions.allowed_processes.length} 個工序`;
+    } else {
+        processView.className = 'alert alert-danger';
+        processView.innerHTML = '<strong>無工序操作權限</strong><br>使用者無法操作任何工序';
+    }
+
+    // 設備權限
+    const equipmentView = document.getElementById('equipment_permission_view');
+    if (permissions.can_operate_all_equipments) {
+        equipmentView.className = 'alert alert-success';
+        equipmentView.innerHTML = '<strong>可操作全部設備</strong><br>使用者可以操作所有設備';
+    } else if (permissions.allowed_equipments && permissions.allowed_equipments.length > 0) {
+        equipmentView.className = 'alert alert-warning';
+        equipmentView.innerHTML = `<strong>可操作指定設備</strong><br>限制操作 ${permissions.allowed_equipments.length} 個設備`;
+    } else {
+        equipmentView.className = 'alert alert-danger';
+        equipmentView.innerHTML = '<strong>無設備操作權限</strong><br>使用者無法操作任何設備';
+    }
+
+    // 報工類型權限
+    const reportingView = document.getElementById('reporting_permission_view');
+    const reportingTypes = [];
+    if (permissions.can_fill_work) reportingTypes.push('填報報工');
+    if (permissions.can_onsite_reporting) reportingTypes.push('現場報工');
+    if (permissions.can_smt_reporting) reportingTypes.push('SMT報工');
+    
+    if (reportingTypes.length > 0) {
+        reportingView.className = 'alert alert-success';
+        reportingView.innerHTML = `<strong>可進行報工類型</strong><br>${reportingTypes.join('、')}`;
+    } else {
+        reportingView.className = 'alert alert-danger';
+        reportingView.innerHTML = '<strong>無報工權限</strong><br>使用者無法進行任何報工操作';
+    }
+
+    // 模組訪問權限
+    const moduleView = document.getElementById('module_permission_view');
+    const accessibleModules = [];
+    if (permissions.can_access_equip) accessibleModules.push('設備管理');
+    if (permissions.can_access_workorder) accessibleModules.push('工單管理');
+    if (permissions.can_access_quality) accessibleModules.push('品質管理');
+    if (permissions.can_access_material) accessibleModules.push('物料管理');
+    if (permissions.can_access_scheduling) accessibleModules.push('排程管理');
+    
+    if (accessibleModules.length > 0) {
+        moduleView.className = 'alert alert-success';
+        moduleView.innerHTML = `<strong>可訪問模組</strong><br>${accessibleModules.join('、')}`;
+    } else {
+        moduleView.className = 'alert alert-danger';
+        moduleView.innerHTML = '<strong>無模組訪問權限</strong><br>使用者無法訪問任何模組';
+    }
+
+    // 功能操作權限
+    const functionView = document.getElementById('function_permission_view');
+    const functions = [];
+    if (permissions.can_view) functions.push('查看');
+    if (permissions.can_add) functions.push('新增');
+    if (permissions.can_edit) functions.push('編輯');
+    if (permissions.can_delete) functions.push('刪除');
+    
+    if (functions.length > 0) {
+        functionView.className = 'alert alert-success';
+        functionView.innerHTML = `<strong>可執行功能</strong><br>${functions.join('、')}`;
+    } else {
+        functionView.className = 'alert alert-danger';
+        functionView.innerHTML = '<strong>無功能操作權限</strong><br>使用者無法執行任何功能';
+    }
+
+    // 資料範圍權限
+    const dataScopeView = document.getElementById('data_scope_view');
+    const scopeTexts = {
+        'own': '自己的資料',
+        'department': '部門資料',
+        'company': '公司資料',
+        'all': '所有資料'
+    };
+    const scopeText = scopeTexts[permissions.data_scope] || '未知範圍';
+    
+    dataScopeView.className = 'alert alert-info';
+    dataScopeView.innerHTML = `<strong>資料查看範圍</strong><br>${scopeText}`;
+}
+
+// 填充表單
+function populateForm(permissions) {
+    // 作業員權限
+    document.getElementById('can_operate_all_operators').checked = permissions.can_operate_all_operators;
+    toggleOperatorSelection();
+    
+    // 工序權限
+    document.getElementById('can_operate_all_processes').checked = permissions.can_operate_all_processes;
+    toggleProcessSelection();
+    
+    // 設備權限
+    document.getElementById('can_operate_all_equipments').checked = permissions.can_operate_all_equipments;
+    toggleEquipmentSelection();
+    
+    // 報工類型權限
+    document.getElementById('can_fill_work').checked = permissions.can_fill_work;
+    document.getElementById('can_onsite_reporting').checked = permissions.can_onsite_reporting;
+    document.getElementById('can_smt_reporting').checked = permissions.can_smt_reporting;
+    
+    // 模組訪問權限
+    document.getElementById('can_access_equip').checked = permissions.can_access_equip;
+    document.getElementById('can_access_workorder').checked = permissions.can_access_workorder;
+    document.getElementById('can_access_quality').checked = permissions.can_access_quality;
+    document.getElementById('can_access_material').checked = permissions.can_access_material;
+    document.getElementById('can_access_scheduling').checked = permissions.can_access_scheduling;
+    
+    // 功能級權限
+    document.getElementById('can_view').checked = permissions.can_view;
+    document.getElementById('can_add').checked = permissions.can_add;
+    document.getElementById('can_edit').checked = permissions.can_edit;
+    document.getElementById('can_delete').checked = permissions.can_delete;
+    
+    // 資料級權限
+    document.getElementById('data_scope').value = permissions.data_scope;
+    
+    // 設定多選欄位的值
+    if (permissions.allowed_operators) {
+        setMultipleSelectValues('allowed_operators', permissions.allowed_operators);
+    }
+    if (permissions.allowed_processes) {
+        setMultipleSelectValues('allowed_processes', permissions.allowed_processes);
+    }
+    if (permissions.allowed_equipments) {
+        setMultipleSelectValues('allowed_equipments', permissions.allowed_equipments);
+    }
+}
+
+// 設定多選欄位的值
+function setMultipleSelectValues(selectId, values) {
+    const select = document.getElementById(selectId);
+    if (select && values) {
+        Array.from(select.options).forEach(option => {
+            option.selected = values.includes(parseInt(option.value));
+        });
+    }
+}
+
+// 切換作業員選擇顯示
+function toggleOperatorSelection() {
+    const canOperateAll = document.getElementById('can_operate_all_operators').checked;
+    const selection = document.getElementById('operator_selection');
+    selection.style.display = canOperateAll ? 'none' : 'block';
+}
+
+// 切換工序選擇顯示
+function toggleProcessSelection() {
+    const canOperateAll = document.getElementById('can_operate_all_processes').checked;
+    const selection = document.getElementById('process_selection');
+    selection.style.display = canOperateAll ? 'none' : 'block';
+}
+
+// 切換設備選擇顯示
+function toggleEquipmentSelection() {
+    const canOperateAll = document.getElementById('can_operate_all_equipments').checked;
+    const selection = document.getElementById('equipment_selection');
+    selection.style.display = canOperateAll ? 'none' : 'block';
+}
+
+// 重置表單
+function resetForm() {
+    if (currentUserPermissions) {
+        populateForm(currentUserPermissions);
+    } else {
+        document.getElementById('permission_form').reset();
+    }
+}
+
+// 綁定事件監聽器
+document.addEventListener('DOMContentLoaded', function() {
+    // 作業員權限切換
+    document.getElementById('can_operate_all_operators').addEventListener('change', toggleOperatorSelection);
+    
+    // 工序權限切換
+    document.getElementById('can_operate_all_processes').addEventListener('change', toggleProcessSelection);
+    
+    // 設備權限切換
+    document.getElementById('can_operate_all_equipments').addEventListener('change', toggleEquipmentSelection);
+    
+    // 表單提交處理
+    document.getElementById('permission_form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // 驗證表單
+        if (!validateForm()) {
+            return;
+        }
+        
+        // 提交表單
+        submitForm();
+    });
+});
+
+// 驗證表單
+function validateForm() {
+    const userId = document.getElementById('selected_user').value;
+    if (!userId) {
+        alert('請先選擇使用者');
+        return false;
+    }
+    
+    // 檢查是否至少選擇了一個模組訪問權限
+    const moduleAccesses = [
+        'can_access_equip',
+        'can_access_workorder',
+        'can_access_quality',
+        'can_access_material',
+        'can_access_scheduling'
+    ];
+    
+    const hasModuleAccess = moduleAccesses.some(id => document.getElementById(id).checked);
+    if (!hasModuleAccess) {
+        alert('至少需要選擇一個模組訪問權限');
+        return false;
+    }
+    
+    return true;
+}
+
+// 提交表單
+function submitForm() {
+    const form = document.getElementById('permission_form');
+    const formData = new FormData(form);
+    
+    // 顯示載入狀態
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> 儲存中...';
+    submitBtn.disabled = true;
+    
+    fetch('/system/permission/advanced/', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => {
+        console.log('回應狀態:', response.status);
+        console.log('回應標頭:', response.headers);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        // 檢查回應類型
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+            throw new Error('伺服器返回 HTML 而不是 JSON，可能是權限檢查失敗');
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert('權限設定儲存成功！');
+            // 更新權限設定查看區域
+            if (currentUserPermissions) {
+                updatePermissionView(currentUserPermissions);
+            }
+            // 重新載入使用者權限
+            loadUserPermissions();
+        } else {
+            alert('儲存失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('提交失敗:', error);
+        if (error.message.includes('HTTP 403')) {
+            alert('權限不足，請確認您有超級使用者權限');
+        } else if (error.message.includes('HTTP 500')) {
+            alert('伺服器內部錯誤，請聯繫系統管理員');
+        } else if (error.message.includes('Unexpected token')) {
+            alert('伺服器回應格式錯誤，可能是權限檢查失敗或會話過期，請重新登入');
+        } else {
+            alert('儲存失敗：' + error.message);
+        }
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+}
+</script>
+{% endblock %}

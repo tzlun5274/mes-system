@@ -156,8 +156,17 @@
     
     <!-- 訂單列表 -->
     <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0">訂單列表 (共 {{ orders|length }} 筆)</h5>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">訂單列表 (共 {{ total_count }} 筆)</h5>
+            <div class="d-flex align-items-center">
+                <label class="me-2">每頁顯示：</label>
+                <select class="form-select form-select-sm" style="width: auto;" onchange="changePerPage(this.value)">
+                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10筆</option>
+                    <option value="20" {% if per_page == 20 %}selected{% endif %}>20筆</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50筆</option>
+                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100筆</option>
+                </select>
+            </div>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -215,6 +224,70 @@
                     </tbody>
                 </table>
             </div>
+            
+            <!-- 分頁導航 -->
+            {% if total_pages > 1 %}
+            <div class="card-footer">
+                <nav aria-label="訂單分頁">
+                    <ul class="pagination justify-content-center mb-0">
+                        <!-- 上一頁 -->
+                        {% if has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% for key, value in filters.items %}{% if key != 'order_by' %}{{ key }}={{ value }}&{% endif %}{% endfor %}order_by={{ order_by }}&page={{ previous_page_number }}&per_page={{ per_page }}">
+                                <i class="fas fa-chevron-left"></i> 上一頁
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link"><i class="fas fa-chevron-left"></i> 上一頁</span>
+                        </li>
+                        {% endif %}
+                        
+                        <!-- 頁碼 -->
+                        {% for page_num in page_range %}
+                            {% if page_num == current_page %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% elif page_num <= current_page|add:2 and page_num >= current_page|add:-2 %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in filters.items %}{% if key != 'order_by' %}{{ key }}={{ value }}&{% endif %}{% endfor %}order_by={{ order_by }}&page={{ page_num }}&per_page={{ per_page }}">{{ page_num }}</a>
+                            </li>
+                            {% elif page_num == 1 or page_num == total_pages %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in filters.items %}{% if key != 'order_by' %}{{ key }}={{ value }}&{% endif %}{% endfor %}order_by={{ order_by }}&page={{ page_num }}&per_page={{ per_page }}">{{ page_num }}</a>
+                            </li>
+                            {% elif page_num == current_page|add:3 or page_num == current_page|add:-3 %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        <!-- 下一頁 -->
+                        {% if has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% for key, value in filters.items %}{% if key != 'order_by' %}{{ key }}={{ value }}&{% endif %}{% endfor %}order_by={{ order_by }}&page={{ next_page_number }}&per_page={{ per_page }}">
+                                下一頁 <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">下一頁 <i class="fas fa-chevron-right"></i></span>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                
+                <!-- 分頁資訊 -->
+                <div class="text-center mt-2">
+                    <small class="text-muted">
+                        顯示第 {{ orders.start_index }} - {{ orders.end_index }} 筆，共 {{ total_count }} 筆訂單
+                        (第 {{ current_page }} 頁，共 {{ total_pages }} 頁)
+                    </small>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -225,6 +298,12 @@ function exportToExcel() {
     alert('Excel匯出功能開發中...');
 }
 
-
+function changePerPage(perPage) {
+    // 改變每頁顯示數量
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('per_page', perPage);
+    urlParams.set('page', '1'); // 重置到第一頁
+    window.location.href = window.location.pathname + '?' + urlParams.toString();
+}
 </script>
 {% endblock %}

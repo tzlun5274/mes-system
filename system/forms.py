@@ -1,747 +1,276 @@
+# -*- coding: utf-8 -*-
+"""
+系統管理模組的表單
+"""
+
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm, UserChangeForm, SetPasswordForm
 from django.contrib.auth.models import User
-from .models import (
-    EmailConfig, 
-    BackupSchedule, 
-    OperationLogConfig,
-    UserWorkPermission,
-    AutoApprovalSettings,
-    ScheduledTask,
-    OrderSyncSettings
-)
+from .models import EmailConfig, BackupSchedule, OperationLogConfig, UserWorkPermission, OrderSyncSettings
+
+
+class UserCreationFormCustom(UserCreationForm):
+    """自定義用戶創建表單"""
+    email = forms.EmailField(required=True, label="電子郵件")
+    first_name = forms.CharField(max_length=30, required=False, label="名字")
+    last_name = forms.CharField(max_length=30, required=False, label="姓氏")
+    is_active = forms.BooleanField(required=False, initial=True, label="啟用帳號")
+    is_staff = forms.BooleanField(required=False, initial=False, label="員工權限")
+    
+    class Meta:
+        model = User
+        fields = ("username", "email", "first_name", "last_name", "is_active", "is_staff", "password1", "password2")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.update({'class': 'form-control'})
+
+
+class UserChangeFormCustom(UserChangeForm):
+    """自定義用戶編輯表單"""
+    email = forms.EmailField(required=True, label="電子郵件")
+    first_name = forms.CharField(max_length=30, required=False, label="名字")
+    last_name = forms.CharField(max_length=30, required=False, label="姓氏")
+    is_active = forms.BooleanField(required=False, label="啟用帳號")
+    is_staff = forms.BooleanField(required=False, label="員工權限")
+    
+    class Meta:
+        model = User
+        fields = ("username", "email", "first_name", "last_name", "is_active", "is_staff")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            if isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs.update({'class': 'form-check-input'})
+            else:
+                field.widget.attrs.update({'class': 'form-control'})
 
 
 class EmailConfigForm(forms.ModelForm):
-    """郵件主機設定表單"""
-    
+    """郵件主機配置表單"""
     class Meta:
         model = EmailConfig
-        fields = [
-            'email_host', 
-            'email_port', 
-            'email_use_tls', 
-            'email_host_user', 
-            'email_host_password', 
-            'default_from_email'
-        ]
+        fields = ["email_host", "email_port", "email_use_tls", "email_host_user", "email_host_password", "default_from_email"]
         widgets = {
-            'email_host': forms.TextInput(attrs={'class': 'form-control'}),
-            'email_port': forms.NumberInput(attrs={'class': 'form-control'}),
-            'email_use_tls': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'email_host_user': forms.TextInput(attrs={'class': 'form-control'}),
-            'email_host_password': forms.PasswordInput(attrs={'class': 'form-control'}),
-            'default_from_email': forms.EmailInput(attrs={'class': 'form-control'}),
+            "email_host": forms.TextInput(attrs={"class": "form-control"}),
+            "email_port": forms.NumberInput(attrs={"class": "form-control"}),
+            "email_use_tls": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "email_host_user": forms.TextInput(attrs={"class": "form-control"}),
+            "email_host_password": forms.PasswordInput(attrs={"class": "form-control"}),
+            "default_from_email": forms.EmailInput(attrs={"class": "form-control"}),
         }
 
 
 class BackupScheduleForm(forms.ModelForm):
-    """備份排程設定表單"""
-    
+    """備份排程表單"""
     class Meta:
         model = BackupSchedule
-        fields = [
-            'schedule_type', 
-            'backup_time', 
-            'retention_days', 
-            'is_active'
-        ]
+        fields = ["schedule_type", "backup_time", "is_active", "retention_days"]
         widgets = {
-            'schedule_type': forms.Select(attrs={'class': 'form-control'}),
-            'backup_time': forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'}),
-            'retention_days': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 365}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            "schedule_type": forms.Select(attrs={"class": "form-select"}),
+            "backup_time": forms.TimeInput(attrs={"class": "form-control", "type": "time"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "retention_days": forms.NumberInput(attrs={"class": "form-control"}),
         }
 
 
 class OperationLogConfigForm(forms.ModelForm):
-    """操作日誌設定表單"""
-    
+    """操作日誌配置表單"""
     class Meta:
         model = OperationLogConfig
-        fields = [
-            'log_level', 
-            'retention_days', 
-            'max_file_size', 
-            'is_active'
-        ]
+        fields = ["log_level", "retention_days", "max_file_size", "is_active"]
         widgets = {
-            'log_level': forms.Select(attrs={'class': 'form-control'}),
-            'retention_days': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 365}),
-            'max_file_size': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 100}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            "log_level": forms.Select(attrs={"class": "form-select"}),
+            "retention_days": forms.NumberInput(attrs={"class": "form-control"}),
+            "max_file_size": forms.NumberInput(attrs={"class": "form-control"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
-
-
-
-
-
-
-
-
-class CustomUserCreationForm(forms.ModelForm):
-    """自訂用戶建立表單"""
-    password1 = forms.CharField(label='密碼', widget=forms.PasswordInput(attrs={'class': 'form-control'}))
-    password2 = forms.CharField(label='確認密碼', widget=forms.PasswordInput(attrs={'class': 'form-control'}))
-
-    class Meta:
-        model = User
-        fields = ('username', 'email', 'first_name', 'last_name')
-        widgets = {
-            'username': forms.TextInput(attrs={'class': 'form-control'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
-        }
-
-    def clean_password2(self):
-        password1 = self.cleaned_data.get("password1")
-        password2 = self.cleaned_data.get("password2")
-        if password1 and password2 and password1 != password2:
-            raise forms.ValidationError("密碼不匹配")
-        return password2
-
-    def save(self, commit=True):
-        user = super().save(commit=False)
-        user.set_password(self.cleaned_data["password1"])
-        if commit:
-            user.save()
-        return user
 
 
 class UserWorkPermissionForm(forms.ModelForm):
-    """使用者工作權限設定表單"""
-    
-    # 多選欄位
-    operator_codes_multiple = forms.MultipleChoiceField(
+    """用戶工作權限表單"""
+    # 作業員選擇欄位
+    operator_choices = forms.MultipleChoiceField(
         choices=[],
         required=False,
-        widget=forms.SelectMultiple(attrs={
-            'class': 'form-control',
-            'size': '8',
-            'id': 'operator_codes_multiple'
-        }),
-        label="作業員編號（多選）",
-        help_text="按住 Ctrl 鍵可多選，留空表示可操作所有作業員"
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        label="允許的作業員"
     )
     
-    process_names_multiple = forms.MultipleChoiceField(
+    # 工序選擇欄位
+    process_choices = forms.MultipleChoiceField(
         choices=[],
         required=False,
-        widget=forms.SelectMultiple(attrs={
-            'class': 'form-control',
-            'size': '8',
-            'id': 'process_names_multiple'
-        }),
-        label="工序名稱（多選）",
-        help_text="按住 Ctrl 鍵可多選，留空表示可操作所有工序"
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        label="允許的工序"
     )
     
-    equipment_names_multiple = forms.MultipleChoiceField(
+    # 設備選擇欄位
+    equipment_choices = forms.MultipleChoiceField(
         choices=[],
         required=False,
-        widget=forms.SelectMultiple(attrs={
-            'class': 'form-control',
-            'size': '8',
-            'id': 'equipment_names_multiple'
-        }),
-        label="設備名稱（多選）",
-        help_text="按住 Ctrl 鍵可多選，留空表示可操作所有設備"
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        label="允許的設備"
     )
     
     class Meta:
         model = UserWorkPermission
         fields = [
-            'user',
-            'operator_codes',
-            'process_names',
-            'equipment_names',
-            'disable_all_equipment',
-            'permission_type',
-            'is_active',
-            'notes'
+            'can_operate_all_operators', 'allowed_operators',
+            'can_operate_all_processes', 'allowed_processes',
+            'can_operate_all_equipments', 'allowed_equipments',
+            'can_fill_work', 'can_onsite_reporting', 'can_smt_reporting',
+            'data_scope', 'can_view', 'can_add', 'can_edit', 'can_delete',
+            'can_approve', 'can_reject', 'can_override_limits', 'can_export_data'
         ]
         widgets = {
-            'user': forms.Select(attrs={
-                'class': 'form-control',
-                'id': 'user_select'
-            }),
-            'operator_codes': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': '例如：OP001, OP002, OP003\n留空表示可操作所有作業員',
-                'id': 'operator_codes_text',
-                'style': 'display: none;'
-            }),
-            'process_names': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': '例如：SMT貼片, 插件, 測試\n留空表示可操作所有工序',
-                'id': 'process_names_text',
-                'style': 'display: none;'
-            }),
-            'equipment_names': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': '例如：SMT-01, 測試機-01, 包裝機-01\n留空表示可操作所有設備',
-                'id': 'equipment_names_text',
-                'style': 'display: none;'
-            }),
-            'disable_all_equipment': forms.CheckboxInput(attrs={
-                'class': 'form-check-input',
-                'id': 'disable_all_equipment'
-            }),
-            'permission_type': forms.Select(attrs={
-                'class': 'form-control'
-            }),
-            'is_active': forms.CheckboxInput(attrs={
-                'class': 'form-check-input'
-            }),
-            'notes': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 2,
-                'placeholder': '備註說明'
-            })
-        }
-        labels = {
-            'user': '使用者',
-            'operator_codes': '作業員編號',
-            'process_names': '工序名稱',
-            'equipment_names': '設備名稱',
-            'disable_all_equipment': '禁用所有設備',
-            'permission_type': '權限類型',
-            'is_active': '啟用狀態',
-            'notes': '備註'
-        }
-        help_texts = {
-            'operator_codes': '可操作的作業員編號，多個用逗號分隔，留空表示可操作所有作業員',
-            'process_names': '可操作的工序名稱，多個用逗號分隔，留空表示可操作所有工序',
-            'equipment_names': '可操作的設備名稱，多個用逗號分隔，留空表示可操作所有設備',
-            'disable_all_equipment': '勾選此項將禁用該使用者的所有設備操作權限',
-            'permission_type': '選擇使用者可以進行的報工類型',
-            'is_active': '啟用或停用此權限設定'
+            'can_operate_all_operators': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_operate_all_processes': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_operate_all_equipments': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_fill_work': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_onsite_reporting': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_smt_reporting': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_view': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_add': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_edit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_delete': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_approve': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_reject': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_override_limits': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_export_data': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'data_scope': forms.Select(attrs={'class': 'form-select'}),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # 將原始欄位設為非必填
-        self.fields['operator_codes'].required = False
-        self.fields['process_names'].required = False
-        self.fields['equipment_names'].required = False
-        self.fields['disable_all_equipment'].required = False
+        # 動態載入作業員選項
+        try:
+            from process.models import Operator
+            operators = Operator.objects.all().order_by('name')
+            self.fields['operator_choices'].choices = [(op.id, op.name) for op in operators]
+        except:
+            self.fields['operator_choices'].choices = []
         
-        # 動態獲取作業員、工序和設備選項
-        self.fields['operator_codes_multiple'].choices = self._get_operator_choices()
-        self.fields['process_names_multiple'].choices = self._get_process_choices()
-        self.fields['equipment_names_multiple'].choices = self._get_equipment_choices()
+        # 動態載入工序選項
+        try:
+            from process.models import ProcessName
+            processes = ProcessName.objects.all().order_by('name')
+            self.fields['process_choices'].choices = [(proc.id, proc.name) for proc in processes]
+        except:
+            self.fields['process_choices'].choices = []
         
-        # 如果有實例，設定多選欄位的初始值
+        # 動態載入設備選項
+        try:
+            from equip.models import Equipment
+            equipments = Equipment.objects.all().order_by('name')
+            self.fields['equipment_choices'].choices = [(eq.id, eq.name) for eq in equipments]
+        except:
+            self.fields['equipment_choices'].choices = []
+        
+        # 如果有實例，設定初始值
         if self.instance and self.instance.pk:
-            if self.instance.operator_codes:
-                operator_codes = [code.strip() for code in self.instance.operator_codes.split(',') if code.strip()]
-                self.fields['operator_codes_multiple'].initial = operator_codes
-            
-            if self.instance.process_names:
-                process_names = [name.strip() for name in self.instance.process_names.split(',') if name.strip()]
-                self.fields['process_names_multiple'].initial = process_names
-            
-            if self.instance.equipment_names:
-                equipment_names = [name.strip() for name in self.instance.equipment_names.split(',') if name.strip()]
-                self.fields['equipment_names_multiple'].initial = equipment_names
-    
-    def _get_operator_choices(self):
-        """獲取作業員選項"""
-        try:
-            # 優先從製程模組獲取作業員資料
-            try:
-                from process.models import Operator
-                operators = Operator.objects.all().order_by('name')
-                if operators.exists():
-                    return [(op.name, f"{op.name} - 作業員") for op in operators]
-            except (ImportError, AttributeError):
-                pass
-            
-            # 嘗試從填報記錄中獲取作業員資料
-            try:
-                from workorder.fill_work.models import FillWork
-                from django.db.models import Q
-                operators = FillWork.objects.values_list('operator', flat=True).distinct().exclude(
-                    Q(operator__isnull=True) | Q(operator='')
-                ).order_by('operator')
-                if operators.exists():
-                    return [(op, f"{op} - 作業員") for op in operators]
-            except (ImportError, AttributeError):
-                pass
-            
-            # 嘗試從現場報工記錄中獲取作業員資料
-            try:
-                from workorder.onsite_reporting.models import OnsiteReportSession
-                from django.db.models import Q
-                operators = OnsiteReportSession.objects.values_list('operator', flat=True).distinct().exclude(
-                    Q(operator__isnull=True) | Q(operator='')
-                ).order_by('operator')
-                if operators.exists():
-                    return [(op, f"{op} - 作業員") for op in operators]
-            except (ImportError, AttributeError):
-                pass
-            
-            # 如果沒有找到任何作業員資料，返回空列表
-            return []
-        except Exception as e:
-            # 如果發生任何錯誤，返回空列表
-            return []
-    
-    def _get_process_choices(self):
-        """獲取工序選項"""
-        try:
-            # 嘗試從工單模組獲取工序資料
-            try:
-                from workorder.models import Process
-                processes = Process.objects.filter(is_active=True).order_by('name')
-                if processes.exists():
-                    return [(proc.name, proc.name) for proc in processes]
-            except (ImportError, AttributeError):
-                pass
-            
-            # 嘗試從製程模組獲取工序資料
-            try:
-                from process.models import Process
-                processes = Process.objects.filter(is_active=True).order_by('name')
-                if processes.exists():
-                    return [(proc.name, proc.name) for proc in processes]
-            except (ImportError, AttributeError):
-                pass
-            
-            # 嘗試從填報記錄中獲取工序資料
-            try:
-                from workorder.fill_work.models import FillWork
-                from django.db.models import Q
-                processes = FillWork.objects.values_list('process__name', flat=True).distinct().exclude(
-                    Q(process__name__isnull=True) | Q(process__name='')
-                ).order_by('process__name')
-                if processes.exists():
-                    return [(proc, proc) for proc in processes]
-            except (ImportError, AttributeError):
-                pass
-            
-            # 如果沒有找到任何工序資料，返回空列表
-            return []
-        except Exception:
-            return []
-    
-    def _get_equipment_choices(self):
-        """獲取設備選項"""
-        try:
-            # 嘗試從設備模組獲取設備資料
-            try:
-                from equip.models import Equipment
-                equipments = Equipment.objects.all().order_by('name')
-                if equipments.exists():
-                    return [(eq.name, eq.name) for eq in equipments]
-            except (ImportError, AttributeError):
-                pass
-            
-            # 嘗試從填報記錄中獲取設備資料
-            try:
-                from workorder.fill_work.models import FillWork
-                from django.db.models import Q
-                equipments = FillWork.objects.values_list('equipment', flat=True).distinct().exclude(
-                    Q(equipment__isnull=True) | Q(equipment='')
-                ).order_by('equipment')
-                if equipments.exists():
-                    return [(eq, eq) for eq in equipments]
-            except (ImportError, AttributeError):
-                pass
-            
-            # 如果沒有找到任何設備資料，返回空列表
-            return []
-        except Exception:
-            return []
-    
-    def clean_operator_codes_multiple(self):
-        """驗證多選作業員編號"""
-        operator_codes = self.cleaned_data.get('operator_codes_multiple')
-        if operator_codes:
-            # 將多選結果轉換為逗號分隔的字串
-            if isinstance(operator_codes, list):
-                return ', '.join(operator_codes)
-            else:
-                return operator_codes
-        return ''
-    
-    def clean_process_names_multiple(self):
-        """驗證多選工序名稱"""
-        process_names = self.cleaned_data.get('process_names_multiple')
-        if process_names:
-            # 將多選結果轉換為逗號分隔的字串
-            if isinstance(process_names, list):
-                return ', '.join(process_names)
-            else:
-                return process_names
-        return ''
-    
-    def clean_equipment_names_multiple(self):
-        """驗證多選設備名稱"""
-        equipment_names = self.cleaned_data.get('equipment_names_multiple')
-        if equipment_names:
-            # 將多選結果轉換為逗號分隔的字串
-            if isinstance(equipment_names, list):
-                return ', '.join(equipment_names)
-            else:
-                return equipment_names
-        return ''
-    
+            self.fields['operator_choices'].initial = self.instance.allowed_operators
+            self.fields['process_choices'].initial = self.instance.allowed_processes
+            self.fields['equipment_choices'].initial = self.instance.allowed_equipments
+
     def clean(self):
-        """整體驗證"""
         cleaned_data = super().clean()
         
-        # 將多選結果同步到原始欄位
-        cleaned_data['operator_codes'] = self.clean_operator_codes_multiple()
-        cleaned_data['process_names'] = self.clean_process_names_multiple()
-        cleaned_data['equipment_names'] = self.clean_equipment_names_multiple()
+        # 驗證權限邏輯
+        can_operate_all_operators = cleaned_data.get('can_operate_all_operators')
+        can_operate_all_processes = cleaned_data.get('can_operate_all_processes')
+        can_operate_all_equipments = cleaned_data.get('can_operate_all_equipments')
         
-        user = cleaned_data.get('user')
-        permission_type = cleaned_data.get('permission_type')
-        
-        # 檢查是否已存在相同使用者和權限類型的記錄
-        if user and permission_type:
-            existing = UserWorkPermission.objects.filter(
-                user=user,
-                permission_type=permission_type
-            )
-            if self.instance.pk:
-                existing = existing.exclude(pk=self.instance.pk)
+        # 如果選擇了"可操作所有"，則清空限制列表
+        if can_operate_all_operators:
+            cleaned_data['allowed_operators'] = []
+        else:
+            cleaned_data['allowed_operators'] = self.data.getlist('operator_choices')
             
-            if existing.exists():
-                permission_type_display = dict(self.fields["permission_type"].choices)[permission_type]
-                raise forms.ValidationError(f'使用者 {user.username} 的 {permission_type_display} 權限已存在')
+        if can_operate_all_processes:
+            cleaned_data['allowed_processes'] = []
+        else:
+            cleaned_data['allowed_processes'] = self.data.getlist('process_choices')
+            
+        if can_operate_all_equipments:
+            cleaned_data['allowed_equipments'] = []
+        else:
+            cleaned_data['allowed_equipments'] = self.data.getlist('equipment_choices')
         
         return cleaned_data
-    
+
     def save(self, commit=True):
-        """儲存時處理多選欄位"""
         instance = super().save(commit=False)
         
-        # 確保多選欄位的資料被正確設定
-        if 'operator_codes_multiple' in self.cleaned_data:
-            instance.operator_codes = self.clean_operator_codes_multiple()
-        
-        if 'process_names_multiple' in self.cleaned_data:
-            instance.process_names = self.clean_process_names_multiple()
-        
-        if 'equipment_names_multiple' in self.cleaned_data:
-            instance.equipment_names = self.clean_equipment_names_multiple()
+        # 設定允許的ID列表
+        if not instance.can_operate_all_operators:
+            instance.allowed_operators = self.cleaned_data.get('allowed_operators', [])
+        if not instance.can_operate_all_processes:
+            instance.allowed_processes = self.cleaned_data.get('allowed_processes', [])
+        if not instance.can_operate_all_equipments:
+            instance.allowed_equipments = self.cleaned_data.get('allowed_equipments', [])
         
         if commit:
             instance.save()
-        
         return instance
 
 
-# 完工判斷設定已整合到現有的工單管理設定中
-# 使用 workorder.company_order.models.SystemConfig 來管理設定
-
-
-class AutoApprovalSettingsForm(forms.ModelForm):
-    """自動審核設定表單"""
-    
-    class Meta:
-        model = AutoApprovalSettings
-        fields = [
-            'is_enabled',
-            'auto_approve_work_hours',
-            'max_work_hours',
-            'auto_approve_defect_rate',
-            'max_defect_rate',
-            'auto_approve_overtime',
-            'max_overtime_hours',
-            'exclude_operators',
-            'exclude_processes',
-            'notification_enabled',
-            'notification_recipients'
-        ]
-        widgets = {
-            'is_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'auto_approve_work_hours': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'max_work_hours': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0',
-                'max': '24',
-                'step': '0.5',
-                'placeholder': '請輸入最大工作時數'
-            }),
-            'auto_approve_defect_rate': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'max_defect_rate': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0',
-                'max': '100',
-                'step': '0.1',
-                'placeholder': '請輸入最大不良率'
-            }),
-            'auto_approve_overtime': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'max_overtime_hours': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0',
-                'max': '12',
-                'step': '0.5',
-                'placeholder': '請輸入最大加班時數'
-            }),
-            'exclude_operators': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': '請輸入要排除的作業員編號，每行一個'
-            }),
-            'exclude_processes': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': '請輸入要排除的工序名稱，每行一個'
-            }),
-            'notification_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'notification_recipients': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': '請輸入通知收件人郵件地址，每行一個'
-            })
-        }
-        labels = {
-            'is_enabled': '啟用自動審核',
-            'auto_approve_work_hours': '自動審核工作時數',
-            'max_work_hours': '最大工作時數',
-            'auto_approve_defect_rate': '自動審核不良率',
-            'max_defect_rate': '最大不良率(%)',
-            'auto_approve_overtime': '自動審核加班',
-            'max_overtime_hours': '最大加班時數',
-            'exclude_operators': '排除作業員',
-            'exclude_processes': '排除工序',
-            'notification_enabled': '啟用通知',
-            'notification_recipients': '通知收件人'
-        }
-        help_texts = {
-            'is_enabled': '啟用後，符合條件的報工將自動審核通過',
-            'auto_approve_work_hours': '工作時數在正常範圍內時自動審核',
-            'max_work_hours': '超過此時數的報工需要人工審核',
-            'auto_approve_defect_rate': '不良率在正常範圍內時自動審核',
-            'max_defect_rate': '超過此不良率的報工需要人工審核',
-            'auto_approve_overtime': '加班時數在正常範圍內時自動審核',
-            'max_overtime_hours': '超過此時數的加班需要人工審核',
-            'exclude_operators': '這些作業員的報工不會自動審核',
-            'exclude_processes': '這些工序的報工不會自動審核',
-            'notification_enabled': '自動審核後發送通知給主管',
-            'notification_recipients': '自動審核通知的收件人清單'
-        }
-
-    def clean_exclude_operators(self):
-        """清理排除作業員資料"""
-        data = self.cleaned_data['exclude_operators']
-        if data:
-            # 將文字轉換為列表
-            operators = [op.strip() for op in data.split('\n') if op.strip()]
-            return operators
-        return []
-
-    def clean_exclude_processes(self):
-        """清理排除工序資料"""
-        data = self.cleaned_data['exclude_processes']
-        if data:
-            # 將文字轉換為列表
-            processes = [proc.strip() for proc in data.split('\n') if proc.strip()]
-            return processes
-        return []
-
-    def clean_notification_recipients(self):
-        """清理通知收件人資料"""
-        data = self.cleaned_data['notification_recipients']
-        if data:
-            # 將文字轉換為列表
-            recipients = [email.strip() for email in data.split('\n') if email.strip()]
-            return recipients
-        return []
-
-    def clean(self):
-        """整體驗證"""
-        cleaned_data = super().clean()
-        
-        # 如果啟用自動審核，至少要有一個審核條件
-        if cleaned_data.get('is_enabled'):
-            has_condition = (
-                cleaned_data.get('auto_approve_work_hours') or
-                cleaned_data.get('auto_approve_defect_rate') or
-                cleaned_data.get('auto_approve_overtime')
-            )
-            if not has_condition:
-                raise forms.ValidationError('啟用自動審核時，至少需要設定一個審核條件')
-        
-        return cleaned_data
-
-
-
-
-
-
-
-
-class ScheduledTaskForm(forms.ModelForm):
-    """定時任務設定表單"""
-    
-    # 預設的間隔選項
-    INTERVAL_PRESETS = [
-        (5, '每5分鐘'),
-        (15, '每15分鐘'),
-        (30, '每30分鐘'),
-        (60, '每1小時'),
-        (120, '每2小時'),
-        (360, '每6小時'),
-        (720, '每12小時'),
-        (1440, '每24小時'),
-    ]
-    
-    interval_preset = forms.ChoiceField(
-        choices=[('', '-- 自訂間隔 --')] + INTERVAL_PRESETS,
-        required=False,
-        label="預設間隔",
-        help_text="選擇預設間隔或自訂"
-    )
-    
-    class Meta:
-        model = ScheduledTask
-        fields = ['name', 'task_type', 'task_function', 'interval_minutes', 
-                 'is_enabled', 'description']
-        widgets = {
-            'interval_minutes': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'placeholder': '例如: 30 (每30分鐘執行)',
-                'min': '1'
-            }),
-            'description': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': '請描述此定時任務的用途...'
-            }),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # 設定任務函數的預設值
-        self.fields['task_function'].widget.attrs.update({
-            'class': 'form-control',
-            'readonly': 'readonly'
-        })
-        
-        # 根據任務類型設定預設的任務函數
-        if 'instance' in kwargs and kwargs['instance']:
-            instance = kwargs['instance']
-            if instance.task_type == 'auto_approve':
-                self.fields['task_function'].initial = 'system.tasks.auto_approve_work_reports'
-            elif instance.task_type == 'workorder_analysis':
-                self.fields['task_function'].initial = 'reporting.tasks.auto_analyze_completed_workorders'
-            elif instance.task_type == 'data_backup':
-                self.fields['task_function'].initial = 'system.tasks.auto_backup_database'
-            elif instance.task_type == 'report_generation':
-                self.fields['task_function'].initial = 'reporting.tasks.generate_daily_reports'
-            elif instance.task_type == 'data_cleanup':
-                self.fields['task_function'].initial = 'system.tasks.cleanup_old_data'
-
-    def clean(self):
-        """整體驗證"""
-        cleaned_data = super().clean()
-        interval_preset = cleaned_data.get('interval_preset')
-        interval_minutes = cleaned_data.get('interval_minutes')
-        
-        # 如果選擇了預設間隔，使用預設值
-        if interval_preset and not interval_minutes:
-            cleaned_data['interval_minutes'] = int(interval_preset)
-        
-        return cleaned_data
-
-
-
-
-
-
-
-
-class OrderSyncSettingsForm(forms.ModelForm):
-    """
-    訂單同步設定表單
-    """
-    
-    class Meta:
-        model = OrderSyncSettings
-        fields = [
-            'sync_enabled', 'sync_interval_minutes',
-            'cleanup_enabled', 'cleanup_interval_hours', 'cleanup_retention_days',
-            'status_update_enabled', 'status_update_interval_minutes'
-        ]
-        widgets = {
-            'sync_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'sync_interval_minutes': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '5',
-                'max': '1440',
-                'help_text': '建議設定：30-60分鐘'
-            }),
-            'cleanup_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'cleanup_interval_hours': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '1',
-                'max': '168',
-                'help_text': '建議設定：24小時'
-            }),
-            'cleanup_retention_days': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '7',
-                'max': '365',
-                'help_text': '建議設定：90天'
-            }),
-            'status_update_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'status_update_interval_minutes': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '15',
-                'max': '1440',
-                'help_text': '建議設定：60分鐘'
-            }),
-        }
-    
-    def clean_sync_interval_minutes(self):
-        """驗證同步間隔"""
-        interval = self.cleaned_data['sync_interval_minutes']
-        if interval < 5:
-            raise forms.ValidationError("同步間隔不能少於5分鐘")
-        if interval > 1440:
-            raise forms.ValidationError("同步間隔不能超過24小時（1440分鐘）")
-        return interval
-    
-    def clean_cleanup_interval_hours(self):
-        """驗證清理間隔"""
-        interval = self.cleaned_data['cleanup_interval_hours']
-        if interval < 1:
-            raise forms.ValidationError("清理間隔不能少於1小時")
-        if interval > 168:
-            raise forms.ValidationError("清理間隔不能超過7天（168小時）")
-        return interval
-    
-    def clean_cleanup_retention_days(self):
-        """驗證資料保留天數"""
-        days = self.cleaned_data['cleanup_retention_days']
-        if days < 7:
-            raise forms.ValidationError("資料保留天數不能少於7天")
-        if days > 365:
-            raise forms.ValidationError("資料保留天數不能超過1年（365天）")
-        return days
-    
-    def clean_status_update_interval_minutes(self):
-        """驗證狀態更新間隔"""
-        interval = self.cleaned_data['status_update_interval_minutes']
-        if interval < 15:
-            raise forms.ValidationError("狀態更新間隔不能少於15分鐘")
-        if interval > 1440:
-            raise forms.ValidationError("狀態更新間隔不能超過24小時（1440分鐘）")
-        return interval
-
-
-
-
-
-
-
+# class OrderSyncSettingsForm(forms.ModelForm):
+#     """訂單同步設定表單"""
+#     
+#     class Meta:
+#         model = OrderSyncSettings
+#         fields = [
+#             'sync_enabled', 'sync_interval_minutes',
+#             'cleanup_enabled', 'cleanup_interval_hours', 'cleanup_retention_days',
+#             'status_update_enabled', 'status_update_interval_minutes'
+#         ]
+#         widgets = {
+#             'sync_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+#             'sync_interval_minutes': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 1, 'max': 1440}),
+#             'cleanup_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+#             'cleanup_interval_hours': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 168}),
+#             'cleanup_retention_days': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 365}),
+#             'status_update_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+#             'status_update_interval_minutes': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 1440}),
+#         }
+# 
+#     
+#     def clean_sync_interval_minutes(self):
+#         """驗證同步間隔"""
+#         interval = self.cleaned_data.get('sync_interval_minutes')
+#         if interval and interval < 1:
+#             raise forms.ValidationError("同步間隔不能少於1分鐘")
+#         if interval and interval > 1440:
+#             raise forms.ValidationError("同步間隔不能超過1440分鐘（24小時）")
+#         return interval
+#     
+#     def clean_cleanup_interval_hours(self):
+#         """驗證清理間隔"""
+#         interval = self.cleaned_data.get('cleanup_interval_hours')
+#         if interval and interval < 1:
+#             raise forms.ValidationError("清理間隔不能少於1小時")
+#         if interval and interval > 168:
+#             raise forms.ValidationError("清理間隔不能超過168小時（7天）")
+#         return interval
+#     
+#     def clean_cleanup_retention_days(self):
+#         """驗證資料保留天數"""
+#         days = self.cleaned_data.get('cleanup_retention_days')
+#         if days and days < 1:
+#             raise forms.ValidationError("資料保留天數不能少於1天")
+#         if days and days > 365:
+#             raise forms.ValidationError("資料保留天數不能超過365天")
+#         return days
+#     
+#     def clean_status_update_interval_minutes(self):
+#         """驗證狀態更新間隔"""
+#         interval = self.cleaned_data.get('status_update_interval_minutes')
+#         if interval and interval < 1:
+#             raise forms.ValidationError("狀態更新間隔不能少於1分鐘")
+#         if interval and interval > 1440:
+#             raise forms.ValidationError("狀態更新間隔不能超過1440分鐘（24小時）")
+#         return interval

@@ -2152,7 +2152,7 @@ class OperatorCapacityService:
         
         # 計算評分
         score_record.capacity_score = score_record.calculate_capacity_score()
-        score_record.quality_score = score_record.calculate_quality_score()
+        # 品質評分不再自動計算，由主管手動評分
         score_record.total_score = score_record.calculate_total_score()
         score_record.grade = score_record.get_grade(score_record.capacity_score)
         score_record.overall_grade = score_record.get_grade(score_record.total_score)

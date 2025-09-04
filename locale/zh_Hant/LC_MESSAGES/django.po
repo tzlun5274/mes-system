@@ -1,0 +1,2405 @@
+#: ai/templates/ai/index.html:6
+msgid "AI  - MES "
+msgstr ""
+
+#: ai/templates/ai/index.html:20
+msgid "AI "
+msgstr ""
+
+#: ai/templates/ai/index.html:30
+msgid "AI "
+msgstr ""
+
+#: ai/templates/ai/index.html:33
+#: ai/templates/ai/run_production_prediction.html:11
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:34 ai/templates/ai/run_demand_prediction.html:11
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:35 ai/templates/ai/run_quality_prediction.html:11
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:41
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:42 ai/templates/ai/index.html:96
+#: ai/templates/ai/index.html:142
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:43
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:44 ai/templates/ai/index.html:98
+#: ai/templates/ai/index.html:144 equip/templates/equip/equipment_types.html:36
+#: equip/templates/equip/index.html:44
+#: quality/templates/quality/aoi_test_report.html:23
+#: quality/templates/quality/defective_products.html:32
+#: quality/templates/quality/final_inspection.html:23
+#: quality/templates/quality/index.html:45
+#: quality/templates/quality/index.html:79
+#: quality/templates/quality/index.html:114
+#: quality/templates/quality/index.html:148
+#: quality/templates/quality/index.html:182
+#: quality/templates/quality/inspection_items.html:22
+#: quality/templates/quality/inspection_records.html:24
+#: scheduling/company_view_models.py:9
+#: scheduling/process_interval_settings.py:9
+#: scheduling/production_safety_settings.py:9
+#: scheduling/scheduling_models.py:28 scheduling/scheduling_models.py:73
+#: scheduling/templates/scheduling/calendar.html:239
+#: scheduling/templates/scheduling/view_schedule.html:88
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:77
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:85
+msgid "AI "
+msgstr ""
+
+#: ai/templates/ai/index.html:88
+#: ai/templates/ai/run_production_optimization.html:11
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:89 ai/templates/ai/run_auto_scheduling.html:11
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:95
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:97
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:123
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:131
+msgid "AI "
+msgstr ""
+
+#: ai/templates/ai/index.html:134
+#: ai/templates/ai/run_production_anomaly_detection.html:11
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:135 ai/templates/ai/run_defect_detection.html:11
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:141
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:143
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/index.html:169
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_auto_scheduling.html:6
+msgid " - MES "
+msgstr ""
+
+#: ai/templates/ai/run_auto_scheduling.html:23
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_auto_scheduling.html:27
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_auto_scheduling.html:30
+#: ai/templates/ai/run_defect_detection.html:30
+#: ai/templates/ai/run_demand_prediction.html:30
+#: ai/templates/ai/run_production_anomaly_detection.html:30
+#: ai/templates/ai/run_production_optimization.html:30
+#: ai/templates/ai/run_production_prediction.html:30
+#: ai/templates/ai/run_quality_prediction.html:34
+#: equip/templates/equip/edit_equipment.html:50
+#: equip/templates/equip/log_event.html:32
+#: process/templates/process/add_operator.html:62
+#: process/templates/process/add_operator_skill.html:43
+#: process/templates/process/add_process_name.html:42
+#: process/templates/process/add_product_route.html:71
+#: process/templates/process/edit_operator.html:93
+#: process/templates/process/edit_operator_skill.html:46
+#: process/templates/process/edit_process_name.html:42
+#: process/templates/process/edit_product_route.html:112
+#: scheduling/templates/scheduling/calendar.html:120
+#: scheduling/templates/scheduling/calendar.html:148
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_auto_scheduling.html:31
+#: ai/templates/ai/run_defect_detection.html:31
+#: ai/templates/ai/run_demand_prediction.html:31
+#: ai/templates/ai/run_production_anomaly_detection.html:31
+#: ai/templates/ai/run_production_optimization.html:31
+#: ai/templates/ai/run_production_prediction.html:31
+#: ai/templates/ai/run_quality_prediction.html:35
+#: equip/templates/equip/edit_equipment.html:51
+#: equip/templates/equip/import_equipment.html:43
+#: equip/templates/equip/log_event.html:33
+#: kanban/templates/kanban/delivery_schedule.html:41
+#: kanban/templates/kanban/equipment_status.html:59
+#: kanban/templates/kanban/material_stock.html:41
+#: kanban/templates/kanban/production_progress.html:130
+#: kanban/templates/kanban/quality_monitoring.html:41
+#: process/templates/process/product_routes.html:41
+#: process/templates/process/view_product_route.html:25
+#: quality/templates/quality/aoi_test_report.html:44
+#: quality/templates/quality/defective_products.html:53
+#: quality/templates/quality/final_inspection.html:44
+#: quality/templates/quality/inspection_items.html:42
+#: quality/templates/quality/inspection_records.html:46
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_defect_detection.html:6
+msgid " - MES "
+msgstr ""
+
+#: ai/templates/ai/run_defect_detection.html:23
+#: ai/templates/ai/run_demand_prediction.html:23
+#: ai/templates/ai/run_quality_prediction.html:23
+#: kanban/templates/kanban/delivery_schedule.html:19
+#: kanban/templates/kanban/index.html:45 kanban/templates/kanban/index.html:111
+#: kanban/templates/kanban/index.html:176
+#: kanban/templates/kanban/production_progress.html:47
+#: kanban/templates/kanban/quality_monitoring.html:18
+#: quality/templates/quality/aoi_test_report.html:19
+#: quality/templates/quality/defective_products.html:28
+#: quality/templates/quality/final_inspection.html:19
+#: quality/templates/quality/index.html:75
+#: quality/templates/quality/index.html:110
+#: quality/templates/quality/index.html:144
+#: quality/templates/quality/index.html:178
+#: quality/templates/quality/inspection_records.html:20
+#: scheduling/templates/scheduling/schedule_auto.html:218
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_defect_detection.html:27
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_demand_prediction.html:6
+msgid " - MES "
+msgstr ""
+
+#: ai/templates/ai/run_demand_prediction.html:27
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_production_anomaly_detection.html:6
+msgid " - MES "
+msgstr ""
+
+#: ai/templates/ai/run_production_anomaly_detection.html:23
+#: ai/templates/ai/run_production_optimization.html:23
+#: ai/templates/ai/run_production_prediction.html:23
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_production_anomaly_detection.html:27
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_production_optimization.html:6
+msgid " - MES "
+msgstr ""
+
+#: ai/templates/ai/run_production_optimization.html:27
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_production_prediction.html:6
+msgid " - MES "
+msgstr ""
+
+#: ai/templates/ai/run_production_prediction.html:27
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_quality_prediction.html:6
+msgid " - MES "
+msgstr ""
+
+#: ai/templates/ai/run_quality_prediction.html:27
+msgid ""
+msgstr ""
+
+#: ai/templates/ai/run_quality_prediction.html:31
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/add_equipment.html:6
+msgid " - MES "
+msgstr ""
+
+#: equip/templates/equip/add_equipment.html:21
+#: equip/templates/equip/index.html:31
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/add_equipment_type.html:6
+msgid " - MES "
+msgstr ""
+
+#: equip/templates/equip/add_equipment_type.html:12
+#: equip/templates/equip/add_equipment_type.html:58
+#: equip/templates/equip/equipment_types.html:27
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/add_equipment_type.html:13
+#: equip/templates/equip/edit_equipment_type.html:13
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/add_equipment_type.html:27
+#: equip/templates/equip/edit_equipment_type.html:27
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/add_equipment_type.html:35
+#: equip/templates/equip/edit_equipment_type.html:35
+#: equip/templates/equip/equipment_types.html:33
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/add_equipment_type.html:37
+#: equip/templates/equip/edit_equipment_type.html:37
+msgid "SMT"
+msgstr ""
+
+#: equip/templates/equip/add_equipment_type.html:42
+#: equip/templates/equip/edit_equipment_type.html:42
+#: equip/templates/equip/equipment_types.html:35
+#: kanban/templates/kanban/equipment_status.html:40
+#: kanban/templates/kanban/index.html:83
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/add_equipment_type.html:46
+#: equip/templates/equip/edit_equipment_type.html:46
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/add_equipment_type.html:53
+#: equip/templates/equip/edit_equipment_type.html:53
+#: equip/templates/equip/equipment_types.html:34
+#: equip/templates/equip/log_event.html:29
+#: process/templates/process/add_process_name.html:31
+#: process/templates/process/edit_process_name.html:31
+#: scheduling/scheduling_models.py:58
+#: scheduling/templates/scheduling/calendar.html:117
+#: scheduling/templates/scheduling/calendar.html:211
+#: scheduling/templates/scheduling/calendar.html:237
+#: scheduling/templates/scheduling/view_schedule.html:86
+#: scheduling/templates/scheduling/view_schedule.html:170
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/add_equipment_type.html:55
+#: equip/templates/equip/edit_equipment_type.html:55
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/confirm_import.html:6
+msgid " - MES "
+msgstr ""
+
+#: equip/templates/equip/confirm_import.html:11
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/confirm_import.html:14
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/confirm_import.html:20
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/confirm_import.html:25
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/confirm_import.html:26
+#: process/templates/process/add_operator.html:63
+#: process/templates/process/add_operator_skill.html:44
+#: process/templates/process/add_process_name.html:43
+#: process/templates/process/add_product_route.html:72
+#: process/templates/process/edit_operator.html:94
+#: process/templates/process/edit_operator_skill.html:47
+#: process/templates/process/edit_process_name.html:43
+#: process/templates/process/edit_product_route.html:113
+#: process/templates/process/import_operators.html:35
+#: process/templates/process/import_operators.html:66
+#: process/templates/process/import_process_names.html:35
+#: process/templates/process/import_process_names.html:48
+#: process/templates/process/import_product_routes.html:66
+#: process/templates/process/import_product_routes.html:79
+#: scheduling/templates/scheduling/import_events.html:49
+#: scheduling/templates/scheduling/import_events.html:62
+#: scheduling/templates/scheduling/schedule_auto.html:257
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/confirm_import.html:27
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment.html:6
+msgid " - MES "
+msgstr ""
+
+#: equip/templates/equip/edit_equipment.html:11
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment.html:23
+#: equip/templates/equip/index.html:41
+#: kanban/templates/kanban/equipment_status.html:38
+#: kanban/templates/kanban/index.html:81
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment.html:27
+#: equip/templates/equip/index.html:43
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment.html:31 templates/home.html:118
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment.html:33
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment.html:34
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment.html:35
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment.html:39
+#: equip/templates/equip/index.html:42
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment.html:41
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment.html:48
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment_type.html:6
+msgid " - MES "
+msgstr ""
+
+#: equip/templates/equip/edit_equipment_type.html:12
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/edit_equipment_type.html:58
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/equipment_detail.html:6
+msgid " - MES "
+msgstr ""
+
+#: equip/templates/equip/equipment_detail.html:11
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/equipment_types.html:6
+msgid " - MES "
+msgstr ""
+
+#: equip/templates/equip/equipment_types.html:12
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/equipment_types.html:13
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/equipment_types.html:37
+#: equip/templates/equip/index.html:45
+#: process/templates/process/product_routes.html:86
+#: scheduling/templates/scheduling/view_schedule.html:90
+#: scheduling/templates/scheduling/work_hours.html:27
+#: scheduling/templates/scheduling/work_hours.html:52
+#: scheduling/templates/scheduling/work_hours.html:84
+#: scheduling/templates/scheduling/work_hours.html:108
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/equipment_types.html:47
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/equipment_types.html:49
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/equipment_types.html:54
+#: equip/templates/equip/index.html:58
+#: process/templates/process/product_routes.html:100
+#: scheduling/templates/scheduling/calendar.html:243
+#: scheduling/templates/scheduling/view_schedule.html:115
+#: scheduling/templates/scheduling/work_hours.html:34
+#: scheduling/templates/scheduling/work_hours.html:59
+#: scheduling/templates/scheduling/work_hours.html:365
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/equipment_types.html:55
+#: equip/templates/equip/index.html:59
+#: process/templates/process/product_routes.html:101
+#: scheduling/templates/scheduling/calendar.html:244
+#: scheduling/templates/scheduling/view_schedule.html:116
+#: scheduling/templates/scheduling/work_hours.html:366
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/equipment_types.html:60
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/import_equipment.html:6
+msgid " - MES "
+msgstr ""
+
+#: equip/templates/equip/import_equipment.html:11
+#: equip/templates/equip/index.html:34
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/import_equipment.html:39
+msgid " Excel "
+msgstr ""
+
+#: equip/templates/equip/import_equipment.html:42
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/index.html:6
+msgid " - MES "
+msgstr ""
+
+#: equip/templates/equip/index.html:20 templates/home.html:79
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/index.html:33
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/index.html:52
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/index.html:56
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/index.html:65
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/log_event.html:6
+msgid " - MES "
+msgstr ""
+
+#: equip/templates/equip/log_event.html:11
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/log_event.html:16 scheduling/scheduling_models.py:86
+#: scheduling/scheduling_models.py:87
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/log_event.html:18
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/log_event.html:19
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/log_event.html:20
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/log_event.html:21 scheduling/scheduling_models.py:51
+#: scheduling/templates/scheduling/calendar.html:46
+#: scheduling/templates/scheduling/calendar.html:104
+#: scheduling/templates/scheduling/calendar.html:190
+msgid ""
+msgstr ""
+
+#: equip/templates/equip/log_event.html:25
+msgid " (: HH:MM:SS)"
+msgstr ""
+
+#: kanban/templates/kanban/delivery_schedule.html:6
+msgid " - MES "
+msgstr ""
+
+#: kanban/templates/kanban/delivery_schedule.html:11
+#: kanban/templates/kanban/index.html:30 kanban/templates/kanban/index.html:169
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/delivery_schedule.html:18
+#: kanban/templates/kanban/index.html:175
+#: scheduling/templates/scheduling/view_schedule.html:77
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/delivery_schedule.html:20
+#: kanban/templates/kanban/index.html:177
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/delivery_schedule.html:21
+#: kanban/templates/kanban/index.html:178
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/delivery_schedule.html:22
+#: kanban/templates/kanban/index.html:49 kanban/templates/kanban/index.html:179
+#: kanban/templates/kanban/production_progress.html:51
+#: quality/templates/quality/aoi_test_report.html:24
+#: quality/templates/quality/defective_products.html:33
+#: quality/templates/quality/final_inspection.html:24
+#: quality/templates/quality/index.html:46
+#: quality/templates/quality/index.html:80
+#: quality/templates/quality/index.html:115
+#: quality/templates/quality/index.html:149
+#: quality/templates/quality/index.html:183
+#: quality/templates/quality/inspection_items.html:23
+#: quality/templates/quality/inspection_records.html:25
+#: scheduling/company_view_models.py:10
+#: scheduling/process_interval_settings.py:10
+#: scheduling/production_safety_settings.py:10
+#: scheduling/scheduling_models.py:29 scheduling/scheduling_models.py:74
+#: scheduling/templates/scheduling/calendar.html:240
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/delivery_schedule.html:36
+#: kanban/templates/kanban/index.html:193
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/equipment_status.html:6
+msgid " - MES "
+msgstr ""
+
+#: kanban/templates/kanban/equipment_status.html:11
+#: kanban/templates/kanban/index.html:27 kanban/templates/kanban/index.html:75
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/equipment_status.html:19
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/equipment_status.html:21
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/equipment_status.html:27
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/equipment_status.html:39
+#: kanban/templates/kanban/index.html:82
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/equipment_status.html:41
+#: kanban/templates/kanban/index.html:84 kanban/templates/kanban/index.html:115
+#: kanban/templates/kanban/index.html:147
+#: kanban/templates/kanban/material_stock.html:22
+#: kanban/templates/kanban/quality_monitoring.html:22
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/equipment_status.html:54
+#: kanban/templates/kanban/index.html:97 templates/home.html:129
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:6
+msgid " - MES "
+msgstr ""
+
+#: kanban/templates/kanban/index.html:20 templates/home.html:28
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:23
+#: quality/templates/quality/index.html:23
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:26 kanban/templates/kanban/index.html:37
+#: kanban/templates/kanban/production_progress.html:16
+#: kanban/templates/kanban/production_progress.html:20
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:28 kanban/templates/kanban/index.html:105
+#: kanban/templates/kanban/quality_monitoring.html:11
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:29 kanban/templates/kanban/index.html:137
+#: kanban/templates/kanban/material_stock.html:11
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:35
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:43
+#: kanban/templates/kanban/production_progress.html:45
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:44
+#: kanban/templates/kanban/production_progress.html:46
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:46
+#: kanban/templates/kanban/production_progress.html:48
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:47
+#: kanban/templates/kanban/production_progress.html:49
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:48
+#: kanban/templates/kanban/production_progress.html:50
+#, python-format
+msgid " (%%)"
+msgstr ""
+
+#: kanban/templates/kanban/index.html:67
+#: kanban/templates/kanban/production_progress.html:75 templates/home.html:107
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:112
+#: kanban/templates/kanban/quality_monitoring.html:19
+#, python-format
+msgid " (%%)"
+msgstr ""
+
+#: kanban/templates/kanban/index.html:113
+#: kanban/templates/kanban/quality_monitoring.html:20
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:114
+#: kanban/templates/kanban/quality_monitoring.html:21
+#: quality/templates/quality/defective_products.html:30
+#: quality/templates/quality/index.html:112
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:129
+#: kanban/templates/kanban/quality_monitoring.html:36 templates/home.html:149
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:143
+#: kanban/templates/kanban/material_stock.html:18
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:144
+#: kanban/templates/kanban/material_stock.html:19
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:145
+#: kanban/templates/kanban/material_stock.html:20
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:146
+#: kanban/templates/kanban/material_stock.html:21
+#: scheduling/scheduling_models.py:32 scheduling/scheduling_models.py:33
+#: scheduling/scheduling_models.py:42
+#: scheduling/templates/scheduling/calendar.html:83
+#: scheduling/templates/scheduling/calendar.html:139
+#: scheduling/templates/scheduling/calendar.html:167
+#: scheduling/templates/scheduling/calendar.html:230
+#: scheduling/templates/scheduling/view_schedule.html:46
+#: scheduling/templates/scheduling/view_schedule.html:80
+#: scheduling/templates/scheduling/view_schedule.html:144
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/index.html:161
+#: kanban/templates/kanban/material_stock.html:36
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/material_stock.html:6
+msgid " - MES "
+msgstr ""
+
+#: kanban/templates/kanban/production_progress.html:6
+msgid " - MES "
+msgstr ""
+
+#: kanban/templates/kanban/production_progress.html:28
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/production_progress.html:30
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/production_progress.html:31
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/production_progress.html:34
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/production_progress.html:88
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/production_progress.html:94
+#: kanban/templates/kanban/production_progress.html:99
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/production_progress.html:113
+#: kanban/templates/kanban/production_progress.html:124
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/production_progress.html:119
+msgid ""
+msgstr ""
+
+#: kanban/templates/kanban/quality_monitoring.html:6
+msgid " - MES "
+msgstr ""
+
+#: process/templates/process/add_operator.html:6
+#: process/templates/process/add_operator.html:11
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/add_operator.html:27
+#: process/templates/process/edit_operator.html:33
+#: process/templates/process/import_operators.html:44
+#: process/templates/process/import_operators.html:51
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_operator.html:43
+#: process/templates/process/add_operator.html:93
+#: process/templates/process/add_operator_skill.html:31
+#: process/templates/process/add_process_name.html:27
+#: process/templates/process/add_product_route.html:35
+#: process/templates/process/add_product_route.html:111
+#: process/templates/process/edit_operator.html:51
+#: process/templates/process/edit_operator.html:72
+#: process/templates/process/edit_operator_skill.html:35
+#: process/templates/process/edit_process_name.html:27
+#: process/templates/process/import_operators.html:46
+#: process/templates/process/import_operators.html:53
+#: scheduling/templates/scheduling/view_schedule.html:79
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_operator.html:45
+#: process/templates/process/add_operator.html:95
+#: process/templates/process/add_operator_skill.html:33
+#: process/templates/process/add_product_route.html:37
+#: process/templates/process/add_product_route.html:113
+#: process/templates/process/edit_operator.html:53
+#: process/templates/process/edit_operator.html:74
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_operator.html:52
+#: process/templates/process/add_operator.html:102
+#: process/templates/process/add_operator_skill.html:40
+#: process/templates/process/edit_operator.html:60
+#: process/templates/process/edit_operator.html:81
+#: process/templates/process/edit_operator_skill.html:43
+#: process/templates/process/import_operators.html:47
+#: process/templates/process/import_operators.html:54
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_operator.html:56
+#: process/templates/process/add_operator.html:106
+#: process/templates/process/add_product_route.html:65
+#: process/templates/process/add_product_route.html:141
+#: process/templates/process/edit_operator.html:64
+#: process/templates/process/edit_operator.html:85
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_operator.html:61
+#: process/templates/process/edit_operator.html:92
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_operator_skill.html:6
+#: process/templates/process/add_operator_skill.html:11
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/add_operator_skill.html:27
+#: process/templates/process/edit_operator_skill.html:27
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_process_name.html:6
+#: process/templates/process/add_process_name.html:11
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/add_process_name.html:35
+#: process/templates/process/edit_process_name.html:35
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_product_route.html:6
+#: process/templates/process/add_product_route.html:11
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/add_product_route.html:27
+#: process/templates/process/edit_product_route.html:27
+#: process/templates/process/import_product_routes.html:58
+#: process/templates/process/product_routes.html:85
+#: process/templates/process/view_product_route.html:24
+#: scheduling/templates/scheduling/schedule_auto.html:217
+#: scheduling/templates/scheduling/view_schedule.html:35
+#: scheduling/templates/scheduling/view_schedule.html:78
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_product_route.html:44
+#: process/templates/process/add_product_route.html:120
+#: process/templates/process/import_product_routes.html:58
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_product_route.html:48
+#: process/templates/process/add_product_route.html:124
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_product_route.html:56
+#: process/templates/process/add_product_route.html:132
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_product_route.html:58
+#: process/templates/process/add_product_route.html:134
+msgid ""
+msgstr ""
+
+#: process/templates/process/add_product_route.html:70
+#: process/templates/process/edit_product_route.html:111
+msgid ""
+msgstr ""
+
+#: process/templates/process/edit_operator.html:12
+#: process/templates/process/edit_operator.html:17
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/edit_operator_skill.html:6
+#: process/templates/process/edit_operator_skill.html:11
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/edit_process_name.html:6
+#: process/templates/process/edit_process_name.html:11
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/edit_product_route.html:6
+#: process/templates/process/edit_product_route.html:11
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/import_operators.html:6
+#: process/templates/process/import_operators.html:11
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/import_operators.html:24
+msgid ""
+msgstr ""
+
+#: process/templates/process/import_operators.html:30
+#: process/templates/process/import_process_names.html:30
+#: process/templates/process/import_product_routes.html:61
+#: scheduling/templates/scheduling/import_events.html:44
+msgid ""
+msgstr ""
+
+#: process/templates/process/import_operators.html:34
+#: process/templates/process/import_process_names.html:34
+#: process/templates/process/import_product_routes.html:65
+#: scheduling/templates/scheduling/import_events.html:48
+msgid ""
+msgstr ""
+
+#: process/templates/process/import_operators.html:41
+msgid ""
+msgstr ""
+
+#: process/templates/process/import_operators.html:42
+msgid " Excel .xlsx "
+msgstr ""
+
+#: process/templates/process/import_operators.html:45
+#: process/templates/process/import_operators.html:52
+msgid ""
+msgstr ""
+
+#: process/templates/process/import_operators.html:49
+msgid ""
+msgstr ""
+
+#: process/templates/process/import_operators.html:57
+msgid ""
+msgstr ""
+
+#: process/templates/process/import_operators.html:62
+#: process/templates/process/import_process_names.html:44
+#: process/templates/process/import_product_routes.html:75
+msgid " Excel "
+msgstr ""
+
+#: process/templates/process/import_operators.html:65
+#: process/templates/process/import_process_names.html:47
+#: process/templates/process/import_product_routes.html:78
+#: scheduling/templates/scheduling/import_events.html:61
+msgid ""
+msgstr ""
+
+#: process/templates/process/import_process_names.html:6
+#: process/templates/process/import_process_names.html:11
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/import_process_names.html:24
+msgid ""
+msgstr ""
+
+#: process/templates/process/import_product_routes.html:6
+#: process/templates/process/import_product_routes.html:11
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/import_product_routes.html:55
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:6
+#: process/templates/process/product_routes.html:19
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/product_routes.html:15
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:34
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:36
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:37
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:50
+msgid "..."
+msgstr ""
+
+#: process/templates/process/product_routes.html:51
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:53
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:61
+msgid " "
+msgstr ""
+
+#: process/templates/process/product_routes.html:65
+msgid " "
+msgstr ""
+
+#: process/templates/process/product_routes.html:75
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:95
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:99
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:102
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:111
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:111
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:112
+msgid ""
+msgstr ""
+
+#: process/templates/process/product_routes.html:115
+msgid ""
+msgstr ""
+
+#: process/templates/process/view_product_route.html:6
+#: process/templates/process/view_product_route.html:11
+msgid "MES  - "
+msgstr ""
+
+#: process/templates/process/view_product_route.html:56
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/aoi_test_report.html:6
+msgid "AOI  - MES "
+msgstr ""
+
+#: quality/templates/quality/aoi_test_report.html:11
+#: quality/templates/quality/index.html:30
+#: quality/templates/quality/index.html:172
+msgid "AOI "
+msgstr ""
+
+#: quality/templates/quality/aoi_test_report.html:20
+#: quality/templates/quality/index.html:179
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/aoi_test_report.html:21
+#: quality/templates/quality/index.html:180
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/aoi_test_report.html:22
+#: quality/templates/quality/index.html:181
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/aoi_test_report.html:39
+#: quality/templates/quality/index.html:198
+msgid " AOI "
+msgstr ""
+
+#: quality/templates/quality/defective_products.html:6
+msgid " - MES "
+msgstr ""
+
+#: quality/templates/quality/defective_products.html:16
+#: quality/templates/quality/defective_products.html:20
+#: quality/templates/quality/index.html:28
+#: quality/templates/quality/index.html:104
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/defective_products.html:29
+#: quality/templates/quality/index.html:111
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/defective_products.html:31
+#: quality/templates/quality/index.html:113
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/defective_products.html:48
+#: quality/templates/quality/index.html:130
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/final_inspection.html:6
+msgid "/ - MES "
+msgstr ""
+
+#: quality/templates/quality/final_inspection.html:11
+#: quality/templates/quality/index.html:29
+#: quality/templates/quality/index.html:138
+msgid "/"
+msgstr ""
+
+#: quality/templates/quality/final_inspection.html:20
+#: quality/templates/quality/index.html:76
+#: quality/templates/quality/index.html:145
+#: quality/templates/quality/inspection_records.html:21
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/final_inspection.html:21
+#: quality/templates/quality/index.html:146
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/final_inspection.html:22
+#: quality/templates/quality/index.html:78
+#: quality/templates/quality/index.html:147
+#: quality/templates/quality/inspection_records.html:23
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/final_inspection.html:39
+#: quality/templates/quality/index.html:164
+msgid "/"
+msgstr ""
+
+#: quality/templates/quality/index.html:6
+msgid " - MES "
+msgstr ""
+
+#: quality/templates/quality/index.html:20 templates/home.html:48
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/index.html:26
+#: quality/templates/quality/index.html:36
+#: quality/templates/quality/inspection_items.html:11
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/index.html:27
+#: quality/templates/quality/index.html:68
+#: quality/templates/quality/inspection_records.html:11
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/index.html:34
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/index.html:42
+#: quality/templates/quality/inspection_items.html:19
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/index.html:43
+#: quality/templates/quality/inspection_items.html:20
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/index.html:44
+#: quality/templates/quality/inspection_items.html:21
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/index.html:60
+#: quality/templates/quality/inspection_items.html:37
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/index.html:74
+#: quality/templates/quality/inspection_records.html:19
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/index.html:77
+#: quality/templates/quality/inspection_records.html:22
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/index.html:96
+#: quality/templates/quality/inspection_records.html:41
+msgid ""
+msgstr ""
+
+#: quality/templates/quality/inspection_items.html:6
+msgid " - MES "
+msgstr ""
+
+#: quality/templates/quality/inspection_records.html:6
+msgid " - MES "
+msgstr ""
+
+#: scheduling/company_view_models.py:6
+#: scheduling/templates/scheduling/company_view.html:39
+#: scheduling/templates/scheduling/schedule_auto.html:216
+msgid ""
+msgstr ""
+
+#: scheduling/company_view_models.py:7
+#: scheduling/templates/scheduling/company_view.html:40
+msgid "MES"
+msgstr ""
+
+#: scheduling/company_view_models.py:8
+#: scheduling/templates/scheduling/company_view.html:41
+msgid ""
+msgstr ""
+
+#: scheduling/company_view_models.py:13 scheduling/company_view_models.py:14
+#: scheduling/templates/scheduling/company_view.html:11
+#: scheduling/templates/scheduling/index.html:115
+msgid ""
+msgstr ""
+
+#: scheduling/process_interval_settings.py:7
+#: scheduling/templates/scheduling/work_hours.html:51
+#: scheduling/templates/scheduling/work_hours.html:296
+msgid ""
+msgstr ""
+
+#: scheduling/process_interval_settings.py:13
+#: scheduling/process_interval_settings.py:14
+msgid ""
+msgstr ""
+
+#: scheduling/production_safety_settings.py:7
+#: scheduling/templates/scheduling/work_hours.html:26
+#: scheduling/templates/scheduling/work_hours.html:274
+msgid ""
+msgstr ""
+
+#: scheduling/production_safety_settings.py:13
+#: scheduling/production_safety_settings.py:14
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:6
+#: scheduling/templates/scheduling/work_hours.html:76
+#: scheduling/templates/scheduling/work_hours.html:175
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:8
+#: scheduling/templates/scheduling/work_hours.html:77
+#: scheduling/templates/scheduling/work_hours.html:179
+#: scheduling/templates/scheduling/work_hours.html:227
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:11
+#: scheduling/templates/scheduling/work_hours.html:78
+#: scheduling/templates/scheduling/work_hours.html:183
+#: scheduling/templates/scheduling/work_hours.html:231
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:14
+#: scheduling/templates/scheduling/work_hours.html:79
+#: scheduling/templates/scheduling/work_hours.html:187
+#: scheduling/templates/scheduling/work_hours.html:235
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:17
+#: scheduling/templates/scheduling/work_hours.html:80
+#: scheduling/templates/scheduling/work_hours.html:194
+#: scheduling/templates/scheduling/work_hours.html:242
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:20
+#: scheduling/templates/scheduling/work_hours.html:81
+#: scheduling/templates/scheduling/work_hours.html:196
+#: scheduling/templates/scheduling/work_hours.html:244
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:23
+#: scheduling/templates/scheduling/work_hours.html:82
+#: scheduling/templates/scheduling/work_hours.html:200
+#: scheduling/templates/scheduling/work_hours.html:248
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:26
+#: scheduling/templates/scheduling/work_hours.html:83
+#: scheduling/templates/scheduling/work_hours.html:204
+#: scheduling/templates/scheduling/work_hours.html:252
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:44
+#: scheduling/templates/scheduling/calendar.html:89
+#: scheduling/templates/scheduling/calendar.html:173
+#: scheduling/templates/scheduling/calendar.html:231
+#: scheduling/templates/scheduling/view_schedule.html:150
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:45
+#: scheduling/templates/scheduling/view_schedule.html:81
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:46
+#: scheduling/templates/scheduling/view_schedule.html:82
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:48
+#: scheduling/templates/scheduling/calendar.html:45
+#: scheduling/templates/scheduling/calendar.html:103
+#: scheduling/templates/scheduling/calendar.html:187
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:49
+#: scheduling/templates/scheduling/calendar.html:188
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:50
+#: scheduling/templates/scheduling/calendar.html:189
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:52
+#: scheduling/templates/scheduling/calendar.html:191
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:53
+#: scheduling/templates/scheduling/calendar.html:192
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:56
+#: scheduling/templates/scheduling/calendar.html:101
+#: scheduling/templates/scheduling/calendar.html:185
+#: scheduling/templates/scheduling/calendar.html:234
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:59
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:60
+#: scheduling/templates/scheduling/calendar.html:204
+#: scheduling/templates/scheduling/calendar.html:236
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:62
+#: scheduling/templates/scheduling/calendar.html:53
+#: scheduling/templates/scheduling/calendar.html:110
+#: scheduling/templates/scheduling/calendar.html:198
+#: scheduling/templates/scheduling/view_schedule.html:55
+#: scheduling/templates/scheduling/view_schedule.html:164
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:63
+#: scheduling/templates/scheduling/calendar.html:54
+#: scheduling/templates/scheduling/calendar.html:111
+#: scheduling/templates/scheduling/calendar.html:199
+#: scheduling/templates/scheduling/view_schedule.html:56
+#: scheduling/templates/scheduling/view_schedule.html:165
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:64
+#: scheduling/templates/scheduling/calendar.html:55
+#: scheduling/templates/scheduling/calendar.html:112
+#: scheduling/templates/scheduling/calendar.html:200
+#: scheduling/templates/scheduling/view_schedule.html:57
+#: scheduling/templates/scheduling/view_schedule.html:166
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:70
+#: scheduling/templates/scheduling/calendar.html:108
+#: scheduling/templates/scheduling/calendar.html:196
+#: scheduling/templates/scheduling/calendar.html:235
+#: scheduling/templates/scheduling/view_schedule.html:52
+#: scheduling/templates/scheduling/view_schedule.html:85
+#: scheduling/templates/scheduling/view_schedule.html:162
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:72
+#: scheduling/templates/scheduling/calendar.html:238
+#: scheduling/templates/scheduling/view_schedule.html:87
+msgid ""
+msgstr ""
+
+#: scheduling/scheduling_models.py:76
+msgid "ID"
+msgstr ""
+
+#: scheduling/scheduling_models.py:79
+msgid "ID"
+msgstr ""
+
+#: scheduling/scheduling_models.py:82
+msgid "ID"
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:6
+#: scheduling/templates/scheduling/calendar.html:11
+msgid "MES  - "
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:14
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:15
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:21
+#: scheduling/templates/scheduling/calendar.html:76
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:24
+#: scheduling/templates/scheduling/calendar.html:132
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:26
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:27
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:28
+#: scheduling/templates/scheduling/company_view.html:26
+#: scheduling/templates/scheduling/schedule_management.html:60
+#: scheduling/templates/scheduling/view_schedule.html:25
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:36
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:38
+#: scheduling/templates/scheduling/view_schedule.html:48
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:42
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:44
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:50
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:52
+#: scheduling/templates/scheduling/view_schedule.html:54
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:85
+#: scheduling/templates/scheduling/calendar.html:169
+#: scheduling/templates/scheduling/calendar.html:358
+#: scheduling/templates/scheduling/view_schedule.html:146
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:93
+#: scheduling/templates/scheduling/calendar.html:177
+#: scheduling/templates/scheduling/calendar.html:232
+#: scheduling/templates/scheduling/view_schedule.html:154
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:97
+#: scheduling/templates/scheduling/calendar.html:181
+#: scheduling/templates/scheduling/calendar.html:233
+#: scheduling/templates/scheduling/view_schedule.html:158
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:141
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:145
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:160
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:206
+#: scheduling/templates/scheduling/calendar.html:364
+#: scheduling/templates/scheduling/work_hours.html:189
+#: scheduling/templates/scheduling/work_hours.html:237
+#: scheduling/templates/scheduling/work_hours.html:359
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:207
+#: scheduling/templates/scheduling/calendar.html:364
+#: scheduling/templates/scheduling/work_hours.html:190
+#: scheduling/templates/scheduling/work_hours.html:238
+#: scheduling/templates/scheduling/work_hours.html:359
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:214
+#: scheduling/templates/scheduling/view_schedule.html:173
+#: scheduling/templates/scheduling/work_hours.html:207
+#: scheduling/templates/scheduling/work_hours.html:255
+#: scheduling/templates/scheduling/work_hours.html:277
+#: scheduling/templates/scheduling/work_hours.html:299
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:226
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:245
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:304
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:310
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:316
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:322
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:353
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:363
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:365
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:366
+#: scheduling/templates/scheduling/calendar.html:367
+#: scheduling/templates/scheduling/calendar.html:368
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:470
+#: scheduling/views/add_event.py:87
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:479
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:499
+#: scheduling/views/add_overtime.py:78
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:508
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:519
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:534
+#: scheduling/templates/scheduling/view_schedule.html:345
+#: scheduling/views/edit_event.py:86
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:543
+#: scheduling/templates/scheduling/view_schedule.html:354
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:577
+#: scheduling/templates/scheduling/view_schedule.html:320
+#: scheduling/templates/scheduling/work_hours.html:497
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:631
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:660
+#: scheduling/templates/scheduling/view_schedule.html:241
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:663
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:684
+#: scheduling/templates/scheduling/view_schedule.html:251
+#: scheduling/views/delete_event.py:33
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/calendar.html:693
+#: scheduling/templates/scheduling/view_schedule.html:259
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/company_view.html:6
+msgid " - "
+msgstr ""
+
+#: scheduling/templates/scheduling/company_view.html:25
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/company_view.html:32
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/company_view.html:55
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/company_view.html:74
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/company_view.html:77
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/company_view.html:82
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/import_events.html:6
+#: scheduling/templates/scheduling/import_events.html:11
+msgid "MES  - "
+msgstr ""
+
+#: scheduling/templates/scheduling/import_events.html:14
+msgid "CSV "
+msgstr ""
+
+#: scheduling/templates/scheduling/import_events.html:15
+msgid "CSV Subject, Start Date, End Date, All Day Event"
+msgstr ""
+
+#: scheduling/templates/scheduling/import_events.html:16
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/import_events.html:38
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/import_events.html:58
+msgid " CSV "
+msgstr ""
+
+#: scheduling/templates/scheduling/import_events.html:95
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/index.html:6
+#: scheduling/templates/scheduling/index.html:49
+#: scheduling/templates/scheduling/schedule_management.html:6
+#: scheduling/templates/scheduling/schedule_management.html:47
+msgid "MES  - "
+msgstr ""
+
+#: scheduling/templates/scheduling/index.html:66
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/index.html:67
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/index.html:79
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/index.html:80
+#: scheduling/templates/scheduling/index.html:93
+#: scheduling/templates/scheduling/index.html:106
+#: scheduling/templates/scheduling/index.html:116 templates/home.html:109
+#: templates/home.html:131 templates/home.html:151
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/index.html:83
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/index.html:92
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/index.html:105
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:6
+#: scheduling/templates/scheduling/schedule_auto.html:110
+msgid "MES  - "
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:201
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:204
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:210
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:219
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:220
+#: scheduling/templates/scheduling/view_schedule.html:89
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:237
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:247
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:253
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:256
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:370
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:370
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:394
+#: scheduling/templates/scheduling/schedule_auto.html:405
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_auto.html:400
+#: scheduling/templates/scheduling/schedule_auto.html:412
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_management.html:84
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_management.html:97
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_management.html:110
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_management.html:123
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_management.html:133
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/schedule_management.html:136
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/view_schedule.html:6
+#: scheduling/templates/scheduling/view_schedule.html:11
+msgid "MES  - "
+msgstr ""
+
+#: scheduling/templates/scheduling/view_schedule.html:26
+#: scheduling/templates/scheduling/work_hours.html:160
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/view_schedule.html:27
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/view_schedule.html:43
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/view_schedule.html:67
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/view_schedule.html:83
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/view_schedule.html:84
+msgid " ()"
+msgstr ""
+
+#: scheduling/templates/scheduling/view_schedule.html:126
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/view_schedule.html:137
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/view_schedule.html:331
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:6
+#: scheduling/templates/scheduling/work_hours.html:11
+msgid "MES  - "
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:14
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:20
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:45
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:70
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:92
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:100
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:106
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:107
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:168
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:219
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:267
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:289
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:377
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:399
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:404
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:422
+#: scheduling/views/delete_unit.py:38
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:435
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:453
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:470
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:479
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:525
+#: scheduling/views/add_unit.py:93
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:539
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:571
+#: scheduling/views/update_unit_work_hours.py:76
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:585
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:647
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:656
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:688
+msgid ""
+msgstr ""
+
+#: scheduling/templates/scheduling/work_hours.html:697
+msgid ""
+msgstr ""
+
+#: scheduling/views/add_event.py:35 scheduling/views/edit_event.py:36
+msgid ""
+msgstr ""
+
+#: scheduling/views/add_event.py:50 scheduling/views/edit_event.py:51
+msgid " YYYY-MM-DDTHH:MM "
+msgstr ""
+
+#: scheduling/views/add_event.py:61 scheduling/views/add_overtime.py:37
+#: scheduling/views/delete_unit.py:41 scheduling/views/edit_event.py:62
+msgid ""
+msgstr ""
+
+#: scheduling/views/add_event.py:91
+msgid ""
+msgstr ""
+
+#: scheduling/views/add_overtime.py:28
+msgid ""
+msgstr ""
+
+#: scheduling/views/add_overtime.py:46
+msgid " YYYY-MM-DD "
+msgstr ""
+
+#: scheduling/views/add_overtime.py:82
+msgid ""
+msgstr ""
+
+#: scheduling/views/add_unit.py:34
+msgid ""
+msgstr ""
+
+#: scheduling/views/add_unit.py:41
+msgid ""
+msgstr ""
+
+#: scheduling/views/add_unit.py:70
+#: scheduling/views/update_unit_work_hours.py:79
+msgid " HH:MM "
+msgstr ""
+
+#: scheduling/views/add_unit.py:97
+msgid ""
+msgstr ""
+
+#: scheduling/views/calendar.py:29
+msgid ""
+msgstr ""
+
+#: scheduling/views/company_view.py:33
+msgid ""
+msgstr ""
+
+#: scheduling/views/delete_event.py:36 scheduling/views/edit_event.py:89
+msgid ""
+msgstr ""
+
+#: scheduling/views/delete_event.py:42
+msgid ""
+msgstr ""
+
+#: scheduling/views/delete_unit.py:47
+msgid ""
+msgstr ""
+
+#: scheduling/views/edit_event.py:95
+msgid ""
+msgstr ""
+
+#: scheduling/views/import_events.py:29
+msgid " CSV "
+msgstr ""
+
+#: scheduling/views/import_events.py:35
+msgid " CSV"
+msgstr ""
+
+#: scheduling/views/import_events.py:45
+msgid " CSV  UTF-8 "
+msgstr ""
+
+#: scheduling/views/import_events.py:62
+msgid "CSV : {', '.join(missing_headers)}"
+msgstr ""
+
+#: scheduling/views/import_events.py:161
+#, python-brace-format
+msgid " {created_count} "
+msgstr ""
+
+#: scheduling/views/import_events.py:165
+msgid ": {'; '.join(errors)}"
+msgstr ""
+
+#: scheduling/views/import_events.py:177
+msgid ""
+msgstr ""
+
+#: scheduling/views/index.py:41
+msgid ""
+msgstr ""
+
+#: scheduling/views/schedule_auto.py:54
+msgid ""
+msgstr ""
+
+#: scheduling/views/schedule_auto.py:90
+msgid ""
+msgstr ""
+
+#: scheduling/views/schedule_auto.py:347
+msgid ""
+msgstr ""
+
+#: scheduling/views/schedule_auto.py:381
+msgid ""
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:119
+#, python-brace-format
+msgid " {oid} "
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:135
+msgid " {order.product_id} {idx+1}{pname}"
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:155
+#, python-brace-format
+msgid " {oid}  ID"
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:178
+#, python-brace-format
+msgid " {oid}  ID"
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:195
+#, python-brace-format
+msgid " {oid} "
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:236
+#, python-brace-format
+msgid " {oid} "
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:241
+msgid ""
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:245
+msgid ""
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:254
+msgid ""
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:317
+msgid ""
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:327
+msgid ""
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:339
+msgid " SMT "
+msgstr ""
+
+#: scheduling/views/schedule_semi_auto.py:516
+msgid ""
+msgstr ""
+
+#: scheduling/views/update_order_schedule.py:24
+msgid ""
+msgstr ""
+
+#: scheduling/views/update_order_schedule.py:33
+msgid ""
+msgstr ""
+
+#: scheduling/views/update_order_schedule.py:47
+msgid ""
+msgstr ""
+
+#: scheduling/views/update_order_schedule.py:50
+#: scheduling/views/update_order_schedule.py:55
+msgid ""
+msgstr ""
+
+#: scheduling/views/update_unit_work_hours.py:35
+msgid ""
+msgstr ""
+
+#: scheduling/views/update_unit_work_hours.py:86
+msgid ""
+msgstr ""
+
+#: scheduling/views/view_schedule.py:122
+msgid ""
+msgstr ""
+
+#: scheduling/views/work_hours.py:46
+msgid ""
+msgstr ""
+
+#: system/models.py:16
+msgid ""
+msgstr ""
+
+#: system/models.py:20
+msgid ""
+msgstr ""
+
+#: system/models.py:24
+msgid "TLS"
+msgstr ""
+
+#: system/models.py:30
+msgid ""
+msgstr ""
+
+#: system/models.py:36
+msgid ""
+msgstr ""
+
+#: system/models.py:42
+msgid ""
+msgstr ""
+
+#: templates/home.html:6 templates/home.html:14
+msgid "MES "
+msgstr ""
+
+#: templates/home.html:16
+msgid "MES"
+msgstr ""
+
+#: templates/home.html:22
+msgid ""
+msgstr ""
+
+#: templates/home.html:29
+msgid ""
+msgstr ""
+
+#: templates/home.html:30 templates/home.html:40 templates/home.html:50
+#: templates/home.html:60 templates/home.html:71 templates/home.html:81
+msgid ""
+msgstr ""
+
+#: templates/home.html:38
+msgid ""
+msgstr ""
+
+#: templates/home.html:39
+msgid ""
+msgstr ""
+
+#: templates/home.html:49
+msgid ""
+msgstr ""
+
+#: templates/home.html:58
+msgid ""
+msgstr ""
+
+#: templates/home.html:59
+msgid ""
+msgstr ""
+
+#: templates/home.html:69
+msgid ""
+msgstr ""
+
+#: templates/home.html:70
+msgid ""
+msgstr ""
+
+#: templates/home.html:80
+msgid ""
+msgstr ""
+
+#: templates/home.html:88
+msgid ""
+msgstr ""
+
+#: templates/home.html:94
+msgid ""
+msgstr ""
+
+#: templates/home.html:99
+msgid ""
+msgstr ""
+
+#: templates/home.html:140
+msgid ""
+msgstr ""
+
+#: templates/home.html:146
+msgid ""
+msgstr ""
+
+#: workorder/views/orders.py:55
+msgid ""
+msgstr ""
+
+#: workorder/workorder_dispatch/forms.py:116
+#: workorder/workorder_dispatch/models.py:123
+msgid ""
+msgstr ""
+
+#: workorder/workorder_dispatch/forms.py:134
+msgid ""
+msgstr ""
+
+#: workorder/workorder_dispatch/forms.py:199
+msgid ""
+msgstr ""
+
+#: workorder/workorder_dispatch/forms.py:319
+msgid ""
+msgstr ""
+
+#: workorder/workorder_dispatch/forms.py:324
+msgid ""
+msgstr ""
+
+#: workorder/workorder_dispatch/forms.py:334
+msgid ": {\", \".join(invalid_numbers)}"
+msgstr ""

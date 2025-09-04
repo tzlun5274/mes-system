@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}用戶工作權限管理 - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .permission-card {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        transition: all 0.3s ease;
+    }
+    .permission-card:hover {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        transform: translateY(-2px);
+    }
+    .permission-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 0.375rem 0.375rem 0 0;
+    }
+    .permission-body {
+        padding: 1.5rem;
+    }
+    .permission-summary {
+        background-color: #f8f9fa;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .permission-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .permission-item:last-child {
+        border-bottom: none;
+    }
+    .permission-label {
+        font-weight: 500;
+        color: #495057;
+    }
+    .permission-value {
+        color: #6c757d;
+    }
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .status-active {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    .status-inactive {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    .search-section {
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .filter-group {
+        margin-bottom: 1rem;
+    }
+    .stats-cards {
+        margin-bottom: 2rem;
+    }
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        text-align: center;
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    .stat-label {
+        font-size: 0.875rem;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+        <li class="breadcrumb-item active" aria-current="page">用戶工作權限管理</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-user-shield mr-2"></i>用戶工作權限管理
+        </h1>
+        <div>
+            <a href="{% url 'system:bulk_work_permissions' %}" class="btn btn-info">
+                <i class="fas fa-users-cog mr-2"></i>批量權限管理
+            </a>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row stats-cards">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.total_users }}</div>
+                <div class="stat-label">總用戶數</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.configured_users }}</div>
+                <div class="stat-label">已設定權限用戶</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.onsite_reporting_users|add:stats.fill_work_users }}</div>
+                <div class="stat-label">啟用中的權限</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.restricted_operators|add:stats.restricted_processes|add:stats.restricted_equipments }}</div>
+                <div class="stat-label">受限用戶數</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 搜尋和篩選 -->
+    <div class="search-section">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="search" class="form-label">搜尋用戶</label>
+                <input type="text" class="form-control" id="search" name="search" 
+                       value="{{ request.GET.search }}" placeholder="用戶名稱、郵箱...">
+            </div>
+            <div class="col-md-3">
+                <label for="permission_type" class="form-label">權限類型</label>
+                <select class="form-select" id="permission_type" name="permission_type">
+                    <option value="">全部類型</option>
+                    <option value="fill_work" {% if request.GET.permission_type == 'fill_work' %}selected{% endif %}>補登填報</option>
+                    <option value="onsite_reporting" {% if request.GET.permission_type == 'onsite_reporting' %}selected{% endif %}>現場報工</option>
+                    <option value="smt_reporting" {% if request.GET.permission_type == 'smt_reporting' %}selected{% endif %}>SMT報工</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="data_scope" class="form-label">資料範圍</label>
+                <select class="form-select" id="data_scope" name="data_scope">
+                    <option value="">全部範圍</option>
+                    <option value="all" {% if request.GET.data_scope == 'all' %}selected{% endif %}>全部資料</option>
+                    <option value="own" {% if request.GET.data_scope == 'own' %}selected{% endif %}>個人資料</option>
+                    <option value="department" {% if request.GET.data_scope == 'department' %}selected{% endif %}>部門資料</option>
+                    <option value="custom" {% if request.GET.data_scope == 'custom' %}selected{% endif %}>自訂範圍</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search mr-2"></i>搜尋
+                    </button>
+                    <a href="{% url 'system:user_work_permissions_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-undo mr-2"></i>重置
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 權限列表 -->
+    {% if page_obj %}
+        <div class="row">
+            {% for permission in page_obj %}
+            <div class="col-lg-6 col-xl-4 mb-4">
+                <div class="permission-card">
+                    <div class="permission-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">{{ permission.user.get_full_name|default:permission.user.username }}</h5>
+                            <span class="status-badge {% if permission.is_active %}status-active{% else %}status-inactive{% endif %}">
+                                {% if permission.is_active %}啟用{% else %}停用{% endif %}
+                            </span>
+                        </div>
+                        <small class="opacity-75">{{ permission.user.email }}</small>
+                    </div>
+                    <div class="permission-body">
+                        <div class="permission-summary">
+                            <h6 class="mb-2">權限摘要</h6>
+                            <div class="permission-item">
+                                <span class="permission-label">補登填報</span>
+                                <span class="permission-value">
+                                    {% if permission.can_fill_work %}
+                                        <i class="fas fa-check text-success"></i> 允許
+                                    {% else %}
+                                        <i class="fas fa-times text-danger"></i> 禁止
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="permission-item">
+                                <span class="permission-label">現場報工</span>
+                                <span class="permission-value">
+                                    {% if permission.can_onsite_reporting %}
+                                        <i class="fas fa-check text-success"></i> 允許
+                                    {% else %}
+                                        <i class="fas fa-times text-danger"></i> 禁止
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="permission-item">
+                                <span class="permission-label">SMT報工</span>
+                                <span class="permission-value">
+                                    {% if permission.can_smt_reporting %}
+                                        <i class="fas fa-check text-success"></i> 允許
+                                    {% else %}
+                                        <i class="fas fa-times text-danger"></i> 禁止
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="permission-item">
+                                <span class="permission-label">資料範圍</span>
+                                <span class="permission-value">{{ permission.get_data_scope_display }}</span>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'system:user_work_permissions' permission.user.id %}" 
+                               class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-edit mr-2"></i>編輯權限
+                            </a>
+                            <a href="{% url 'system:user_permissions' permission.user.id %}" 
+                               class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-shield-alt mr-2"></i>系統權限
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 分頁 -->
+        {% if is_paginated %}
+        <nav aria-label="分頁導航" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.permission_type %}&permission_type={{ request.GET.permission_type }}{% endif %}{% if request.GET.data_scope %}&data_scope={{ request.GET.data_scope }}{% endif %}">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.permission_type %}&permission_type={{ request.GET.permission_type }}{% endif %}{% if request.GET.data_scope %}&data_scope={{ request.GET.data_scope }}{% endif %}">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.permission_type %}&permission_type={{ request.GET.permission_type }}{% endif %}{% if request.GET.data_scope %}&data_scope={{ request.GET.data_scope }}{% endif %}">{{ num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.permission_type %}&permission_type={{ request.GET.permission_type }}{% endif %}{% if request.GET.data_scope %}&data_scope={{ request.GET.data_scope }}{% endif %}">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.permission_type %}&permission_type={{ request.GET.permission_type }}{% endif %}{% if request.GET.data_scope %}&data_scope={{ request.GET.data_scope }}{% endif %}">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+    {% else %}
+        <!-- 無資料顯示 -->
+        <div class="text-center py-5">
+            <i class="fas fa-user-shield fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">暫無用戶工作權限設定</h4>
+            <p class="text-muted">尚未有用戶設定工作權限，您可以為用戶設定權限來控制他們在現場報工和補登填報時的操作範圍。</p>
+            <a href="{% url 'system:bulk_work_permissions' %}" class="btn btn-primary">
+                <i class="fas fa-plus mr-2"></i>開始設定權限
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 自動提交搜尋表單
+    $('#search, #permission_type, #data_scope').on('change', function() {
+        if ($(this).attr('id') === 'search') {
+            // 搜尋欄位延遲提交
+            clearTimeout(window.searchTimeout);
+            window.searchTimeout = setTimeout(function() {
+                $('form').submit();
+            }, 500);
+        } else {
+            // 其他欄位立即提交
+            $('form').submit();
+        }
+    });
+
+    // 初始化工具提示
+    $('[data-toggle="tooltip"]').tooltip();
+});
+</script>
+{% endblock %}

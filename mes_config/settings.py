@@ -15,11 +15,11 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-fallback-key-for-development-only')
 
 # 開發/生產環境設定
-DEBUG = env.bool('DEBUG', default=False)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+DEBUG = env.bool('DEBUG', default=True)
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', '0.0.0.0', '*'])
 
 # API 基礎 URL
-SITE_URL = f"http://{env('HOST_IP', default='localhost')}:8000"
+SITE_URL = f"http://{env('HOST_IP', default='localhost')}:{env('DJANGO_PORT', default='8000')}"
 
 # 已安裝的應用
 INSTALLED_APPS = [
@@ -73,47 +73,87 @@ MIDDLEWARE = [
 if DEBUG:
     # 開發環境：允許所有來源
     CORS_ALLOWED_ORIGINS = [
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
+        f"http://localhost:{env('DJANGO_PORT', default='8000')}",
+        f"http://127.0.0.1:{env('DJANGO_PORT', default='8000')}",
         f"http://{env('HOST_IP', default='localhost')}",
     ]
-    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_ALL_ORIGINS = env.bool("CORS_ALLOW_ALL_ORIGINS", default=True)
 else:
     # 生產環境：只允許指定來源
     CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[
         f"https://{env('HOST_IP', default='localhost')}",
     ])
-    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOW_ALL_ORIGINS = env.bool("CORS_ALLOW_ALL_ORIGINS", default=False)
 
-CORS_ALLOW_CREDENTIALS = True  # 允許傳遞 cookie（如 sessionid）
+CORS_ALLOW_CREDENTIALS = env.bool("CORS_ALLOW_CREDENTIALS", default=True)  # 允許傳遞 cookie（如 sessionid）
 
 # 安全設定（根據環境自動調整）
 if DEBUG:
     # 開發環境安全設定
-    SECURE_CONTENT_TYPE_NOSNIFF = False
-    SECURE_BROWSER_XSS_FILTER = False
-    SECURE_REFERRER_POLICY = 'no-referrer-when-downgrade'
-    SESSION_COOKIE_SECURE = False
-    CSRF_COOKIE_SECURE = False
+    SECURE_CONTENT_TYPE_NOSNIFF = env.bool("SECURE_CONTENT_TYPE_NOSNIFF", default=False)
+    SECURE_BROWSER_XSS_FILTER = env.bool("SECURE_BROWSER_XSS_FILTER", default=False)
+    SECURE_REFERRER_POLICY = env("SECURE_REFERRER_POLICY", default='no-referrer-when-downgrade')
+    SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=False)
+    CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)
 else:
     # 生產環境安全設定
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    CSRF_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_HTTPONLY = True
+    SECURE_CONTENT_TYPE_NOSNIFF = env.bool("SECURE_CONTENT_TYPE_NOSNIFF", default=True)
+    SECURE_BROWSER_XSS_FILTER = env.bool("SECURE_BROWSER_XSS_FILTER", default=True)
+    SECURE_REFERRER_POLICY = env("SECURE_REFERRER_POLICY", default='strict-origin-when-cross-origin')
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True)
+    SECURE_HSTS_PRELOAD = env.bool("SECURE_HSTS_PRELOAD", default=True)
+    SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=True)
+    CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=True)
+    CSRF_COOKIE_HTTPONLY = env.bool("CSRF_COOKIE_HTTPONLY", default=True)
+    SESSION_COOKIE_HTTPONLY = env.bool("SESSION_COOKIE_HTTPONLY", default=True)
+
+# 表單設定
+WIDGET_ATTRS = {
+    'default': {
+        'class': 'form-control',
+    },
+    'password': {
+        'class': 'form-control',
+        'type': 'password',
+    },
+    'email': {
+        'class': 'form-control',
+        'type': 'email',
+    },
+    'number': {
+        'class': 'form-control',
+        'type': 'number',
+    },
+    'date': {
+        'class': 'form-control',
+        'type': 'date',
+    },
+    'datetime': {
+        'class': 'form-control',
+        'type': 'datetime-local',
+    },
+    'textarea': {
+        'class': 'form-control',
+        'rows': 3,
+    },
+    'select': {
+        'class': 'form-select',
+    },
+    'checkbox': {
+        'class': 'form-check-input',
+    },
+    'radio': {
+        'class': 'form-check-input',
+    },
+}
 
 # 報表清理設定
-REPORT_FILE_RETENTION_DAYS = 7  # 報表檔案保留天數
-REPORT_LOG_RETENTION_DAYS = 30  # 報表執行日誌保留天數
+REPORT_FILE_RETENTION_DAYS = env.int("REPORT_FILE_RETENTION_DAYS", default=7)  # 報表檔案保留天數
+REPORT_LOG_RETENTION_DAYS = env.int("REPORT_LOG_RETENTION_DAYS", default=30)  # 報表執行日誌保留天數
 
 # URL 配置
-ROOT_URLCONF = "mes_config.urls"
+ROOT_URLCONF = env("ROOT_URLCONF", default="mes_config.urls")
 
 # 模板設置
 TEMPLATES = [
@@ -134,7 +174,7 @@ TEMPLATES = [
 ]
 
 # WSGI 應用
-WSGI_APPLICATION = "mes_config.wsgi.application"
+WSGI_APPLICATION = env("WSGI_APPLICATION", default="mes_config.wsgi.application")
 
 # 保留原本的 PostgreSQL 資料庫設定
 DATABASES = {
@@ -167,73 +207,89 @@ AUTH_PASSWORD_VALIDATORS = [
 # 國際化和時區設置
 LANGUAGE_CODE = env("LANGUAGE_CODE", default="zh-hant")
 TIME_ZONE = env("TIME_ZONE", default="Asia/Taipei")
-USE_I18N = True
-USE_TZ = True
+USE_I18N = env.bool("USE_I18N", default=True)
+USE_TZ = env.bool("USE_TZ", default=True)
+
+# 支援的語言設定
+LANGUAGES = [
+    ('zh-hant', '繁體中文'),
+    ('en', 'English'),
+]
+
+# 翻譯文件目錄設定
+LOCALE_PATHS = [
+    os.path.join(BASE_DIR, 'locale'),
+]
 
 # 編碼設定
-DEFAULT_CHARSET = "utf-8"
-FILE_CHARSET = "utf-8"
+DEFAULT_CHARSET = env("DEFAULT_CHARSET", default="utf-8")
+FILE_CHARSET = env("FILE_CHARSET", default="utf-8")
 
-# 靜態檔案設定（開發模式下自動處理）
-STATIC_URL = "/static/"
+# 根據環境設定靜態檔案
 if DEBUG:
+    # 開發環境：使用 STATICFILES_DIRS
     STATICFILES_DIRS = [
         os.path.join(BASE_DIR, "static"),
     ]
-    STATIC_ROOT = None
+    # 開發環境也需要 STATIC_ROOT 用於 collectstatic 命令
+    STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 else:
+    # 生產環境：使用 STATIC_ROOT
     STATICFILES_DIRS = []
     STATIC_ROOT = env("STATIC_ROOT", default=os.path.join(BASE_DIR, "staticfiles"))
 
+# 靜態檔案 URL 設定
+STATIC_URL = env("STATIC_URL", default="/static/")
+
 # 媒體檔案設定
-MEDIA_URL = "/media/"
+MEDIA_URL = env("MEDIA_URL", default="/media/")
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # 自動主鍵字段設置
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+DEFAULT_AUTO_FIELD = env("DEFAULT_AUTO_FIELD", default="django.db.models.BigAutoField")
 
 # Celery 配置：使用環境變數
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/0")
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=f"redis://localhost:{env('REDIS_PORT', default='6379')}/0")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=f"redis://localhost:{env('REDIS_PORT', default='6379')}/0")
 CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = "Asia/Taipei"
+CELERY_TASK_SERIALIZER = env("CELERY_TASK_SERIALIZER", default="json")
+CELERY_RESULT_SERIALIZER = env("CELERY_RESULT_SERIALIZER", default="json")
+CELERY_TIMEZONE = env("TIME_ZONE", default="Asia/Taipei")
 
 # 認證和重定向設置
-LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/home/"
-LOGOUT_REDIRECT_URL = "/accounts/login/"
+LOGIN_URL = env("LOGIN_URL", default="/accounts/login/")
+LOGIN_REDIRECT_URL = env("LOGIN_REDIRECT_URL", default="/home/")
+LOGOUT_REDIRECT_URL = env("LOGOUT_REDIRECT_URL", default="/accounts/login/")
 
 # Session 設定 - 使用資料庫儲存 session (避免額外依賴)
-SESSION_ENGINE = "django.contrib.sessions.backends.db"
+SESSION_ENGINE = env("SESSION_ENGINE", default="django.contrib.sessions.backends.db")
 
 # 會話超時設定 (預設 30 分鐘)
-SESSION_COOKIE_AGE = 30 * 60  # 30 分鐘 * 60 秒
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # 瀏覽器關閉時不立即過期
-SESSION_SAVE_EVERY_REQUEST = True  # 每次請求都更新會話
+SESSION_COOKIE_AGE = env.int("SESSION_COOKIE_AGE", default=30 * 60)  # 30 分鐘 * 60 秒
+SESSION_EXPIRE_AT_BROWSER_CLOSE = env.bool("SESSION_EXPIRE_AT_BROWSER_CLOSE", default=False)  # 瀏覽器關閉時不立即過期
+SESSION_SAVE_EVERY_REQUEST = env.bool("SESSION_SAVE_EVERY_REQUEST", default=True)  # 每次請求都更新會話
 
 # Session 安全設定
 SESSION_COOKIE_SECURE = False  # 開發環境設為 False，生產環境應設為 True
-SESSION_COOKIE_HTTPONLY = True  # 防止 XSS 攻擊
-SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF 保護
+SESSION_COOKIE_HTTPONLY = env.bool("SESSION_COOKIE_HTTPONLY", default=True)  # 防止 XSS 攻擊
+SESSION_COOKIE_SAMESITE = env("SESSION_COOKIE_SAMESITE", default='Lax')  # CSRF 保護
 
 # Session 資料庫連線設定
-SESSION_COOKIE_DOMAIN = None
-SESSION_COOKIE_PATH = '/'
+SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=None)
+SESSION_COOKIE_PATH = env("SESSION_COOKIE_PATH", default='/')
 
 # 改善 session 處理的設定
-SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
+SESSION_SERIALIZER = env("SESSION_SERIALIZER", default='django.contrib.sessions.serializers.JSONSerializer')
 
 # 文件上傳設置
-DATA_UPLOAD_MAX_MEMORY_SIZE = None
-FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440
-FILE_UPLOAD_TEMP_DIR = os.path.join(BASE_DIR, "tmp")
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DATA_UPLOAD_MAX_MEMORY_SIZE", default=None)
+FILE_UPLOAD_MAX_MEMORY_SIZE = env.int("FILE_UPLOAD_MAX_MEMORY_SIZE", default=2621440)
+FILE_UPLOAD_TEMP_DIR = env("FILE_UPLOAD_TEMP_DIR", default=os.path.join(BASE_DIR, "tmp"))
 
 # 日誌設置（根據 DEBUG 設定自動調整）
 
 # 日誌目錄設定
-LOG_DIR = os.path.join(BASE_DIR, "logs")
+LOG_DIR = env("LOG_DIR", default=os.path.join(BASE_DIR, "logs"))
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # 統一日誌路徑配置
@@ -271,13 +327,13 @@ LOGGING = {
         "mes_file": {
             "level": "INFO",
             "class": "logging.FileHandler",
-            "filename": "/var/log/mes/mes.log",
+            "filename": os.path.join(env("LOG_BASE_DIR", default="/var/log/mes"), "mes.log"),
             "formatter": "detailed",
         },
         "workorder_file": {
             "level": "INFO",
             "class": "logging.FileHandler",
-            "filename": "/var/log/mes/workorder.log",
+            "filename": os.path.join(env("LOG_BASE_DIR", default="/var/log/mes"), "workorder.log"),
             "formatter": "detailed",
         },
     },
@@ -319,20 +375,16 @@ else:
     LOGGING["loggers"]["erp_integration"]["level"] = "INFO"
 
 # 只需要設置 EMAIL_BACKEND，具體郵件設定從資料庫讀取
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
 
 # Debug Toolbar 設置
-INTERNAL_IPS = [
-    "127.0.0.1",
-    "localhost",
-    "192.168.1.21",  # 添加您的 IP
-]
+INTERNAL_IPS = env.list("INTERNAL_IPS", default=["127.0.0.1", "localhost"])
 
 # 安全設置
 if DEBUG:
     SECURE_CROSS_ORIGIN_OPENER_POLICY = None  # 開發環境禁用 COOP 檢查
 else:
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"  # 生產環境啟用 COOP 檢查
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = env("SECURE_CROSS_ORIGIN_OPENER_POLICY", default="same-origin")  # 生產環境啟用 COOP 檢查
 
 # 添加正確的 MIME 類型
 mimetypes.add_type("text/css", ".css")
@@ -340,7 +392,7 @@ mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("image/x-icon", ".ico")
 
 # 日期格式設定 - 支援多種輸入格式，統一輸出為標準格式
-DATE_FORMAT = 'Y-m-d'
+DATE_FORMAT = env("DATE_FORMAT", default='Y-m-d')
 DATE_INPUT_FORMATS = [
     '%Y-%m-%d',     # 2025-08-12 (ISO標準)
     '%Y/%m/%d',     # 2025/08/12
@@ -353,7 +405,7 @@ DATE_INPUT_FORMATS = [
     '%m-%d-%Y',     # 08-12-2025 (美式)
     '%m.%d.%Y',     # 08.12.2025 (美式)
 ]
-DATETIME_FORMAT = 'Y-m-d H:i:s'
+DATETIME_FORMAT = env("DATETIME_FORMAT", default='Y-m-d H:i:s')
 DATETIME_INPUT_FORMATS = [
     '%Y-%m-%d %H:%M:%S',    # 2025-08-12 14:30:00
     '%Y-%m-%d %H:%M',       # 2025-08-12 14:30
@@ -370,7 +422,7 @@ DATETIME_INPUT_FORMATS = [
     '%m/%d/%Y %H:%M:%S',    # 08/12/2025 14:30:00 (美式)
     '%m/%d/%Y %H:%M',       # 08/12/2025 14:30 (美式)
 ]
-TIME_FORMAT = 'H:i'
+TIME_FORMAT = env("TIME_FORMAT", default='H:i')
 TIME_INPUT_FORMATS = [
     '%H:%M:%S',     # 14:30:00
     '%H:%M',        # 14:30

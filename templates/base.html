@@ -15,6 +15,9 @@
     <!-- 全域樣式 -->
     <link rel="stylesheet" href="{% static 'css/global.css' %}">
     
+    <!-- 表格標題樣式 -->
+    <link rel="stylesheet" href="{% static 'css/table-headers.css' %}">
+    
     <!-- 基礎樣式 -->
     <style>
         body { 
@@ -279,10 +282,8 @@
     {% block breadcrumb %}
     {% endblock %}
     
-    <div class="container">
-        {% block content %}
-        {% endblock %}
-    </div>
+    {% block content %}
+    {% endblock %}
     
     <!-- jQuery 已移除，改用原生 JavaScript -->
     

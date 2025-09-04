@@ -10,7 +10,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
 from django.views import View
-from system.models import EmailConfig
+# from system.models import EmailConfig  # 暫時註解，重新創建中
 import logging
 import smtplib
 

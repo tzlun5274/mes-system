@@ -45,6 +45,7 @@ from .views.consistency_check_views import (
 
 
 app_name = "workorder"
+module_display_name = "工單管理"
 
 urlpatterns = [
     # 工單管理基本功能 - 使用新的類別視圖

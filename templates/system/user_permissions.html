@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-user-key me-2"></i>{{ title }}
+                    </h5>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'system:user_list' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-arrow-left me-1"></i>返回用戶列表
+                        </a>
+                        <a href="{% url 'system:permission_assign' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus me-1"></i>分配權限
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- 用戶資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-user me-2"></i>用戶資訊
+                                    </h6>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <strong>用戶名：</strong><br>
+                                            <span class="text-primary">{{ target_user.username }}</span>
+                                        </div>
+                                        <div class="col-6">
+                                            <strong>郵箱：</strong><br>
+                                            <span>{{ target_user.email|default:"未設定" }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-6">
+                                            <strong>姓名：</strong><br>
+                                            <span>{{ target_user.first_name }} {{ target_user.last_name|default:"" }}</span>
+                                        </div>
+                                        <div class="col-6">
+                                            <strong>狀態：</strong><br>
+                                            {% if target_user.is_active %}
+                                                <span class="badge bg-success">啟用</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">停用</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-6">
+                                            <strong>角色：</strong><br>
+                                            {% if target_user.is_superuser %}
+                                                <span class="badge bg-danger">超級用戶</span>
+                                            {% elif target_user.is_staff %}
+                                                <span class="badge bg-warning">員工</span>
+                                            {% else %}
+                                                <span class="badge bg-info">一般用戶</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-6">
+                                            <strong>最後登入：</strong><br>
+                                            <span>{{ target_user.last_login|date:"Y-m-d H:i"|default:"從未登入" }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-key me-2"></i>權限統計
+                                    </h6>
+                                    <div class="row text-center">
+                                        <div class="col-4">
+                                            <h4>{{ user_permissions.count }}</h4>
+                                            <small>已分配權限</small>
+                                        </div>
+                                        <div class="col-4">
+                                            <h4>{{ permissions_by_module|length }}</h4>
+                                            <small>涉及模組</small>
+                                        </div>
+                                        <div class="col-4">
+                                            <h4>{{ target_user.user_permissions.count }}</h4>
+                                            <small>總權限數</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 權限管理表單 -->
+                    <form method="post" id="permissionsForm">
+                        {% csrf_token %}
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-cogs me-2"></i>權限設定
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                {% for module_name, permissions in permissions_by_module.items %}
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <div class="form-check">
+                                            <input class="form-check-input module-checkbox" type="checkbox" 
+                                                   id="module_{{ forloop.counter }}" 
+                                                   data-module="{{ module_name }}">
+                                            <label class="form-check-label" for="module_{{ forloop.counter }}">
+                                                <strong>{{ module_name }}</strong>
+                                                <span class="badge bg-secondary ms-2">{{ permissions|length }}</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            {% for perm in permissions %}
+                                            <div class="col-md-6 col-lg-4 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input permission-checkbox" 
+                                                           type="checkbox" 
+                                                           name="permissions" 
+                                                           value="{{ perm.id }}" 
+                                                           id="perm_{{ perm.id }}"
+                                                           data-module="{{ module_name }}"
+                                                           {% if perm.is_assigned %}checked{% endif %}>
+                                                    <label class="form-check-label" for="perm_{{ perm.id }}">
+                                                        <strong>{{ perm.name }}</strong>
+                                                        <br>
+                                                        <small class="text-muted">{{ perm.codename }}</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- 操作按鈕 -->
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>儲存權限設定
+                            </button>
+                            <a href="{% url 'system:user_list' %}" class="btn btn-secondary btn-lg ms-2">
+                                <i class="fas fa-times me-2"></i>取消
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 模組全選功能
+    const moduleCheckboxes = document.querySelectorAll('.module-checkbox');
+    moduleCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const moduleName = this.dataset.module;
+            const permissionCheckboxes = document.querySelectorAll(
+                `.permission-checkbox[data-module="${moduleName}"]`
+            );
+            
+            permissionCheckboxes.forEach(permCheckbox => {
+                permCheckbox.checked = this.checked;
+            });
+        });
+    });
+
+    // 權限變更時更新模組狀態
+    const permissionCheckboxes = document.querySelectorAll('.permission-checkbox');
+    permissionCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            updateModuleCheckbox(this.dataset.module);
+        });
+    });
+
+    function updateModuleCheckbox(moduleName) {
+        const moduleCheckbox = document.querySelector(`.module-checkbox[data-module="${moduleName}"]`);
+        const permissionCheckboxes = document.querySelectorAll(
+            `.permission-checkbox[data-module="${moduleName}"]`
+        );
+        
+        const checkedCount = Array.from(permissionCheckboxes).filter(cb => cb.checked).length;
+        const totalCount = permissionCheckboxes.length;
+        
+        if (checkedCount === 0) {
+            moduleCheckbox.checked = false;
+            moduleCheckbox.indeterminate = false;
+        } else if (checkedCount === totalCount) {
+            moduleCheckbox.checked = true;
+            moduleCheckbox.indeterminate = false;
+        } else {
+            moduleCheckbox.checked = false;
+            moduleCheckbox.indeterminate = true;
+        }
+    }
+
+    // 初始化模組狀態
+    const modules = Array.from(moduleCheckboxes).map(cb => cb.dataset.module);
+    modules.forEach(moduleName => {
+        updateModuleCheckbox(moduleName);
+    });
+
+    // 表單提交確認
+    document.getElementById('permissionsForm').addEventListener('submit', function(e) {
+        const checkedPermissions = document.querySelectorAll('.permission-checkbox:checked');
+        if (checkedPermissions.length === 0) {
+            if (!confirm('確定要移除所有權限嗎？這將導致用戶無法訪問系統功能。')) {
+                e.preventDefault();
+                return false;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

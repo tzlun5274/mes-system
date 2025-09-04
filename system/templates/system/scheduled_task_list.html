@@ -32,6 +32,15 @@
 
 {% block content %}
 <div class="container-fluid">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">定時任務管理</li>
+        </ol>
+    </nav>
+    
     <div class="row">
         <div class="col-12">
             <div class="card">

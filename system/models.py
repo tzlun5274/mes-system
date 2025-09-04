@@ -2,23 +2,53 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils.translation import gettext_lazy as _
 
 User = get_user_model()
 
 
 class EmailConfig(models.Model):
-    email_host = models.CharField(max_length=100, blank=True, default="")
-    email_port = models.IntegerField(default=25)
-    email_use_tls = models.BooleanField(default=True)
-    email_host_user = models.CharField(max_length=100, blank=True, default="")
-    email_host_password = models.CharField(max_length=100, blank=True, default="")
-    default_from_email = models.EmailField(max_length=254, blank=True, default="")
+    """郵件主機設定"""
+    email_host = models.CharField(
+        max_length=100, 
+        blank=True, 
+        default="",
+        verbose_name=_("郵件主機")
+    )
+    email_port = models.IntegerField(
+        default=25,
+        verbose_name=_("郵件埠號")
+    )
+    email_use_tls = models.BooleanField(
+        default=True,
+        verbose_name=_("使用TLS加密")
+    )
+    email_host_user = models.CharField(
+        max_length=100, 
+        blank=True, 
+        default="",
+        verbose_name=_("郵件帳號")
+    )
+    email_host_password = models.CharField(
+        max_length=100, 
+        blank=True, 
+        default="",
+        verbose_name=_("郵件密碼")
+    )
+    default_from_email = models.EmailField(
+        max_length=254, 
+        blank=True, 
+        default="",
+        verbose_name=_("預設寄件者郵箱")
+    )
 
     class Meta:
         default_permissions = ()  # 禁用默認權限
+        verbose_name = "郵件主機設定"
+        verbose_name_plural = "郵件主機設定"
 
     def __str__(self):
-        return "Email Configuration"
+        return "郵件主機設定"
 
 
 class BackupSchedule(models.Model):
@@ -37,7 +67,8 @@ class BackupSchedule(models.Model):
     )
     backup_time = models.TimeField(
         verbose_name="備份時間", 
-        help_text="每天執行備份的時間"
+        help_text="每天執行備份的時間",
+        default="02:00:00"
     )
     retention_days = models.IntegerField(
         default=30, 
@@ -407,187 +438,10 @@ class ReportSyncSettings(models.Model):
         return f"{self.get_sync_type_display()} - {self.get_sync_frequency_display()}"
 
 
-class UserWorkPermission(models.Model):
-    """
-    使用者工作權限模型
-    定義每個使用者可以針對哪些作業員和工序進行填報報工
-    """
-    
-    # 關聯使用者
-    user = models.ForeignKey(
-        User, 
-        on_delete=models.CASCADE, 
-        verbose_name="使用者",
-        related_name="work_permissions"
-    )
-    
-    # 作業員編號（支援多個，用逗號分隔）
-    operator_codes = models.TextField(
-        verbose_name="作業員編號",
-        help_text="可操作的作業員編號，多個用逗號分隔，留空表示可操作所有作業員"
-    )
-    
-    # 工序名稱（支援多個，用逗號分隔）
-    process_names = models.TextField(
-        verbose_name="工序名稱",
-        help_text="可操作的工序名稱，多個用逗號分隔，留空表示可操作所有工序"
-    )
-    
-    # 設備名稱（支援多個，用逗號分隔）
-    equipment_names = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name="設備名稱",
-        help_text="可操作的設備名稱，多個用逗號分隔，留空表示可操作所有設備"
-    )
-    
-    # 是否禁用所有設備
-    disable_all_equipment = models.BooleanField(
-        default=False,
-        verbose_name="禁用所有設備",
-        help_text="勾選此項將禁用該使用者的所有設備操作權限"
-    )
-    
-    # 權限類型
-    PERMISSION_TYPES = [
-        ('fill_work', '填報報工'),
-        ('onsite_reporting', '現場報工'),
-        ('both', '填報報工 + 現場報工'),
-    ]
-    
-    permission_type = models.CharField(
-        max_length=20,
-        choices=PERMISSION_TYPES,
-        default='both',
-        verbose_name="權限類型"
-    )
-    
-    # 是否啟用
-    is_active = models.BooleanField(
-        default=True,
-        verbose_name="啟用狀態"
-    )
-    
-    # 備註
-    notes = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name="備註"
-    )
-    
-    # 系統欄位
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        verbose_name="建立者",
-        related_name="created_work_permissions"
-    )
-    
-    class Meta:
-        verbose_name = "使用者工作權限"
-        verbose_name_plural = "使用者工作權限"
-        db_table = "system_user_work_permission"
-        unique_together = ['user', 'permission_type']
-    
-    def __str__(self):
-        return f"{self.user.username} - {self.get_permission_type_display()}"
-    
-    def get_operator_codes_list(self):
-        """獲取作業員編號列表"""
-        if not self.operator_codes:
-            return []
-        return [code.strip() for code in self.operator_codes.split(',') if code.strip()]
-    
-    def get_process_names_list(self):
-        """獲取工序名稱列表"""
-        if not self.process_names:
-            return []
-        return [name.strip() for name in self.process_names.split(',') if name.strip()]
-    
-    def get_equipment_names_list(self):
-        """獲取設備名稱列表"""
-        if not self.equipment_names:
-            return []
-        return [name.strip() for name in self.equipment_names.split(',') if name.strip()]
-    
-    def can_operate_operator(self, operator_code):
-        """檢查是否可以操作指定作業員"""
-        if not self.is_active:
-            return False
-        
-        # 如果沒有設定作業員限制，表示可以操作所有作業員
-        if not self.operator_codes:
-            return True
-        
-        return operator_code in self.get_operator_codes_list()
-    
-    def can_operate_process(self, process_name):
-        """檢查是否可以操作指定工序"""
-        if not self.is_active:
-            return False
-        
-        # 如果沒有設定工序限制，表示可以操作所有工序
-        if not self.process_names:
-            return True
-        
-        return process_name in self.get_process_names_list()
-    
-    def can_operate_equipment(self, equipment_name):
-        """檢查是否可以操作指定設備"""
-        if not self.is_active:
-            return False
-        
-        # 如果禁用所有設備，則無法操作任何設備
-        if self.disable_all_equipment:
-            return False
-        
-        # 如果沒有設定設備限制，表示可以操作所有設備
-        if not self.equipment_names:
-            return True
-        
-        return equipment_name in self.get_equipment_names_list()
-    
-    def can_fill_work(self):
-        """檢查是否可以進行填報報工"""
-        return self.is_active and self.permission_type in ['fill_work', 'both']
-    
-    def can_onsite_reporting(self):
-        """檢查是否可以進行現場報工"""
-        return self.is_active and self.permission_type in ['onsite_reporting', 'both']
-    
-    @classmethod
-    def get_user_permission(cls, user, permission_type='both'):
-        """獲取使用者的工作權限"""
-        try:
-            return cls.objects.get(user=user, permission_type=permission_type, is_active=True)
-        except cls.DoesNotExist:
-            return None
-    
-    @classmethod
-    def check_user_permission(cls, user, operator_code=None, process_name=None, equipment_name=None, permission_type='both'):
-        """檢查使用者是否有權限進行操作"""
-        permission = cls.get_user_permission(user, permission_type)
-        
-        if not permission:
-            return False
-        
-        # 檢查作業員權限
-        if operator_code and not permission.can_operate_operator(operator_code):
-            return False
-        
-        # 檢查工序權限
-        if process_name and not permission.can_operate_process(process_name):
-            return False
-        
-        # 檢查設備權限
-        if equipment_name and not permission.can_operate_equipment(equipment_name):
-            return False
-        
-        return True
+
+
+
+
 
 
 # 完工判斷設定已整合到 workorder.company_order.models.SystemConfig
@@ -906,6 +760,281 @@ class OrderSyncLog(models.Model):
         else:
             hours = self.duration_seconds / 3600
             return f"{hours:.1f} 小時"
+
+
+class UserPermissionDetail(models.Model):
+    """使用者權限細分設定"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="使用者")
+    
+    # 作業員權限細分
+    can_operate_all_operators = models.BooleanField(default=True, verbose_name="可操作全部作業員")
+    allowed_operators = models.JSONField(default=list, blank=True, verbose_name="可操作作業員列表")
+    
+    # 工序權限細分
+    can_operate_all_processes = models.BooleanField(default=True, verbose_name="可操作全部工序")
+    allowed_processes = models.JSONField(default=list, blank=True, verbose_name="可操作工序列表")
+    
+    # 設備權限細分
+    can_operate_all_equipments = models.BooleanField(default=True, verbose_name="可操作全部設備")
+    allowed_equipments = models.JSONField(default=list, blank=True, verbose_name="可操作設備列表")
+    
+    # 報工類型權限
+    can_fill_work = models.BooleanField(default=True, verbose_name="可填報報工")
+    can_onsite_reporting = models.BooleanField(default=True, verbose_name="可現場報工")
+    can_smt_reporting = models.BooleanField(default=False, verbose_name="可SMT報工")
+    
+    # 模組訪問權限
+    can_access_equip = models.BooleanField(default=True, verbose_name="可訪問設備管理")
+    can_access_workorder = models.BooleanField(default=True, verbose_name="可訪問工單管理")
+    can_access_quality = models.BooleanField(default=True, verbose_name="可訪問品質管理")
+    can_access_material = models.BooleanField(default=True, verbose_name="可訪問物料管理")
+    can_access_scheduling = models.BooleanField(default=True, verbose_name="可訪問排程管理")
+    can_access_process = models.BooleanField(default=True, verbose_name="可訪問製程管理")
+    can_access_reporting = models.BooleanField(default=True, verbose_name="可訪問報表管理")
+    can_access_kanban = models.BooleanField(default=True, verbose_name="可訪問看板管理")
+    can_access_ai = models.BooleanField(default=True, verbose_name="可訪問AI管理")
+    
+    # 功能級權限
+    can_view = models.BooleanField(default=True, verbose_name="可查看")
+    can_add = models.BooleanField(default=True, verbose_name="可新增")
+    can_edit = models.BooleanField(default=True, verbose_name="可編輯")
+    can_delete = models.BooleanField(default=False, verbose_name="可刪除")
+    can_export = models.BooleanField(default=True, verbose_name="可匯出")
+    can_import = models.BooleanField(default=False, verbose_name="可匯入")
+    can_approve = models.BooleanField(default=False, verbose_name="可審核")
+    
+    # 資料級權限
+    DATA_SCOPE_CHOICES = [
+        ('own', '自己的資料'),
+        ('department', '部門資料'),
+        ('company', '公司資料'),
+        ('all', '所有資料'),
+    ]
+    data_scope = models.CharField(
+        max_length=20, 
+        choices=DATA_SCOPE_CHOICES, 
+        default='own', 
+        verbose_name="資料範圍"
+    )
+    
+    # 特殊權限
+    can_manage_users = models.BooleanField(default=False, verbose_name="可管理使用者")
+    can_manage_permissions = models.BooleanField(default=False, verbose_name="可管理權限")
+    can_view_logs = models.BooleanField(default=False, verbose_name="可查看日誌")
+    can_system_config = models.BooleanField(default=False, verbose_name="可系統設定")
+    
+    # 時間限制權限
+    can_access_24h = models.BooleanField(default=True, verbose_name="24小時存取權限")
+    can_access_worktime = models.BooleanField(default=True, verbose_name="工作時間存取權限")
+    work_start_time = models.TimeField(null=True, blank=True, verbose_name="工作開始時間")
+    work_end_time = models.TimeField(null=True, blank=True, verbose_name="工作結束時間")
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="創建時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    
+    class Meta:
+        verbose_name = "使用者權限細分"
+        verbose_name_plural = "使用者權限細分"
+        unique_together = ['user']
+        db_table = 'system_user_permission_detail'
+    
+    def __str__(self):
+        return f"{self.user.username} 的權限細分設定"
+    
+    def get_operator_permissions(self):
+        """獲取作業員權限描述"""
+        if self.can_operate_all_operators:
+            return "全部作業員"
+        elif self.allowed_operators:
+            return f"指定作業員 ({len(self.allowed_operators)} 個)"
+        else:
+            return "無權限"
+    
+    def get_process_permissions(self):
+        """獲取工序權限描述"""
+        if self.can_operate_all_processes:
+            return "全部工序"
+        elif self.allowed_processes:
+            return f"指定工序 ({len(self.allowed_processes)} 個)"
+        else:
+            return "無權限"
+    
+    def get_equipment_permissions(self):
+        """獲取設備權限描述"""
+        if self.can_operate_all_equipments:
+            return "全部設備"
+        elif self.allowed_equipments:
+            return f"指定設備 ({len(self.allowed_equipments)} 個)"
+        else:
+            return "無權限"
+    
+    def get_permission_summary(self):
+        """獲取權限摘要"""
+        summary = []
+        if self.can_access_equip:
+            summary.append("設備管理")
+        if self.can_access_workorder:
+            summary.append("工單管理")
+        if self.can_access_quality:
+            summary.append("品質管理")
+        if self.can_access_material:
+            summary.append("物料管理")
+        if self.can_access_scheduling:
+            summary.append("排程管理")
+        if self.can_access_process:
+            summary.append("製程管理")
+        if self.can_access_reporting:
+            summary.append("報表管理")
+        if self.can_access_kanban:
+            summary.append("看板管理")
+        if self.can_access_ai:
+            summary.append("AI管理")
+        
+        return ", ".join(summary) if summary else "無模組權限"
+    
+    def has_permission(self, permission_name):
+        """檢查是否有特定權限"""
+        permission_map = {
+            'view': self.can_view,
+            'add': self.can_add,
+            'edit': self.can_edit,
+            'delete': self.can_delete,
+            'export': self.can_export,
+            'import': self.can_import,
+            'approve': self.can_approve,
+        }
+        return permission_map.get(permission_name, False)
+
+
+class UserWorkPermission(models.Model):
+    """用戶工作權限細分表 - 控制報工時的操作範圍"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="用戶")
+    
+    # 作業員權限控制
+    can_operate_all_operators = models.BooleanField(default=True, verbose_name="可操作所有作業員")
+    allowed_operators = models.JSONField(default=list, blank=True, verbose_name="允許的作業員ID列表")
+    
+    # 工序權限控制
+    can_operate_all_processes = models.BooleanField(default=True, verbose_name="可操作所有工序")
+    allowed_processes = models.JSONField(default=list, blank=True, verbose_name="允許的工序ID列表")
+    
+    # 設備權限控制
+    can_operate_all_equipments = models.BooleanField(default=True, verbose_name="可操作所有設備")
+    allowed_equipments = models.JSONField(default=list, blank=True, verbose_name="允許的設備ID列表")
+    
+    # 報工功能權限
+    can_fill_work = models.BooleanField(default=True, verbose_name="可進行補登填報")
+    can_onsite_reporting = models.BooleanField(default=True, verbose_name="可進行現場報工")
+    can_smt_reporting = models.BooleanField(default=True, verbose_name="可進行SMT報工")
+    
+    # 資料範圍控制
+    data_scope = models.CharField(
+        max_length=20, 
+        choices=[
+            ('all', '全部資料'),
+            ('own', '僅自己的資料'),
+            ('department', '部門資料'),
+            ('custom', '自定義範圍')
+        ],
+        default='all',
+        verbose_name="資料範圍"
+    )
+    
+    # 操作權限
+    can_view = models.BooleanField(default=True, verbose_name="可查看")
+    can_add = models.BooleanField(default=True, verbose_name="可新增")
+    can_edit = models.BooleanField(default=True, verbose_name="可編輯")
+    can_delete = models.BooleanField(default=False, verbose_name="可刪除")
+    
+    # 審核權限
+    can_approve = models.BooleanField(default=False, verbose_name="可審核")
+    can_reject = models.BooleanField(default=False, verbose_name="可駁回")
+    
+    # 特殊權限
+    can_override_limits = models.BooleanField(default=False, verbose_name="可超越限制")
+    can_export_data = models.BooleanField(default=True, verbose_name="可匯出資料")
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+
+    class Meta:
+        verbose_name = "用戶工作權限"
+        verbose_name_plural = "用戶工作權限"
+        db_table = 'system_user_work_permission'
+
+    def __str__(self):
+        return f"{self.user.username} 的工作權限"
+
+    def get_allowed_operators_display(self):
+        """獲取允許的作業員顯示名稱"""
+        if self.can_operate_all_operators:
+            return "所有作業員"
+        
+        try:
+            from process.models import Operator
+            operators = Operator.objects.filter(id__in=self.allowed_operators)
+            return ", ".join([op.name for op in operators])
+        except:
+            return "無權限"
+    
+    def get_allowed_processes_display(self):
+        """獲取允許的工序顯示名稱"""
+        if self.can_operate_all_processes:
+            return "所有工序"
+        
+        try:
+            from process.models import ProcessName
+            processes = ProcessName.objects.filter(id__in=self.allowed_processes)
+            return ", ".join([proc.name for proc in processes])
+        except:
+            return "無權限"
+    
+    def get_allowed_equipments_display(self):
+        """獲取允許的設備顯示名稱"""
+        if self.can_operate_all_equipments:
+            return "所有設備"
+        
+        try:
+            from equip.models import Equipment
+            equipments = Equipment.objects.filter(id__in=self.allowed_equipments)
+            return ", ".join([eq.name for eq in equipments])
+        except:
+            return "無權限"
+
+    def check_operator_permission(self, operator_id):
+        """檢查是否有操作指定作業員的權限"""
+        if self.can_operate_all_operators:
+            return True
+        return operator_id in self.allowed_operators
+
+    def check_process_permission(self, process_id):
+        """檢查是否有操作指定工序的權限"""
+        if self.can_operate_all_processes:
+            return True
+        return process_id in self.allowed_processes
+
+    def check_equipment_permission(self, equipment_id):
+        """檢查是否有操作指定設備的權限"""
+        if self.can_operate_all_equipments:
+            return True
+        return equipment_id in self.allowed_equipments
+
+    def get_permission_summary(self):
+        """獲取權限摘要"""
+        summary = []
+        
+        if self.can_fill_work:
+            summary.append("補登填報")
+        if self.can_onsite_reporting:
+            summary.append("現場報工")
+        if self.can_smt_reporting:
+            summary.append("SMT報工")
+        
+        summary.append(f"作業員: {self.get_allowed_operators_display()}")
+        summary.append(f"工序: {self.get_allowed_processes_display()}")
+        summary.append(f"設備: {self.get_allowed_equipments_display()}")
+        
+        return " | ".join(summary)
 
 
 

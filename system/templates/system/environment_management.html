@@ -90,6 +90,15 @@
 
 {% block content %}
 <div class="container-fluid">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">關於系統</li>
+        </ol>
+    </nav>
+    
     <div class="row">
         <div class="col-12">
             <div class="card">
@@ -261,20 +270,22 @@
 
 {% block extra_js %}
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // 清理日誌確認
-    $('form').on('submit', function(e) {
-        var action = $(this).find('input[name="action"]').val();
-        if (action !== 'clean_logs') return;
-        
-        var days = $(this).find('select[name="days"]').val();
-        var dryRun = $(this).find('input[name="dry_run"]').is(':checked');
-        
-        if (!dryRun) {
-            if (!confirm('確定要清理 ' + days + ' 天前的日誌檔案嗎？\n\n此操作無法復原！')) {
-                e.preventDefault();
+    document.querySelectorAll('form').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            var action = this.querySelector('input[name="action"]').value;
+            if (action !== 'clean_logs') return;
+            
+            var days = this.querySelector('select[name="days"]').value;
+            var dryRun = this.querySelector('input[name="dry_run"]').checked;
+            
+            if (!dryRun) {
+                if (!confirm('確定要清理 ' + days + ' 天前的日誌檔案嗎？\n\n此操作無法復原！')) {
+                    e.preventDefault();
+                }
             }
-        }
+        });
     });
 });
 </script>

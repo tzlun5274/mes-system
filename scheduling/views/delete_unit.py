@@ -2,8 +2,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.utils.translation import gettext as _
-from scheduling.scheduling_models import Unit
-from ..utils import log_user_operation
+from ..models import Unit
+# from ..utils import log_user_operation  # 暫時註解掉，避免導入錯誤
 import logging
 
 logger = logging.getLogger("scheduling.views")
@@ -28,12 +28,12 @@ def delete_unit(request, unit_id):
             )
         unit.delete()
 
-        log_user_operation(
-            username=request.user.username,
-            module="scheduling",
-            action=f"刪除單位：{unit_name} (ID: {unit_id})",
-            ip_address=request.META.get("REMOTE_ADDR"),
-        )
+        # log_user_operation(  # 暫時註解掉，避免導入錯誤
+        #     username=request.user.username,
+        #     module="scheduling",
+        #     action=f"刪除單位：{unit_id}",
+        #     ip_address=request.META.get("REMOTE_ADDR"),
+        # )
 
         messages.success(request, _("單位刪除成功！"))
         return JsonResponse({"status": "success", "message": "單位刪除成功"})

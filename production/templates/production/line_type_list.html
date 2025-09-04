@@ -11,6 +11,25 @@
             <i class="fas fa-tags"></i> 產線類型列表
         </h1>
         <div>
+            <div class="btn-group me-2" role="group">
+                <button type="button" class="btn btn-success btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-download"></i> 匯出產線類型列表
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="exportLineTypes('excel')">
+                        <i class="fas fa-file-excel"></i> 匯出 Excel
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportLineTypes('csv')">
+                        <i class="fas fa-file-csv"></i> 匯出 CSV
+                    </a></li>
+                </ul>
+            </div>
+            
+            <div class="btn-group me-2" role="group">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#importTypeModal">
+                    <i class="fas fa-upload"></i> 匯入產線類型列表
+                </button>
+            </div>
             <a href="{% url 'production:line_type_create' %}" class="btn btn-primary btn-sm">
                 <i class="fas fa-plus"></i> 新增類型
             </a>
@@ -153,6 +172,47 @@
         </div>
     </div>
 </div>
+
+<!-- 匯入產線類型 Modal -->
+<div class="modal fade" id="importTypeModal" tabindex="-1" aria-labelledby="importTypeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importTypeModalLabel">匯入產線類型列表</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'production:import_line_types' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">選擇檔案</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".csv,.xlsx,.xls" required>
+                        <div class="form-text">支援 CSV 和 Excel 檔案格式</div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <h6>匯入格式說明：</h6>
+                        <p class="mb-1"><strong>必要欄位：</strong>類型編號、類型名稱</p>
+                        <p class="mb-1"><strong>描述：</strong>可選欄位</p>
+                        <p class="mb-0"><strong>狀態：</strong>啟用 或 停用</p>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <small>
+                            <i class="fas fa-exclamation-triangle"></i>
+                            注意：匯入會根據類型編號更新現有資料，如果類型編號不存在則會新增
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">開始匯入</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -163,5 +223,31 @@ $(document).ready(function() {
         $(this).closest('form').submit();
     });
 });
+
+function exportLineTypes(format) {
+    // 生成檔案名稱
+    const now = new Date();
+    const timestamp = now.getFullYear().toString() + 
+                     String(now.getMonth() + 1).padStart(2, '0') + 
+                     String(now.getDate()).padStart(2, '0') + '_' +
+                     String(now.getHours()).padStart(2, '0') + 
+                     String(now.getMinutes()).padStart(2, '0') + 
+                     String(now.getSeconds()).padStart(2, '0');
+    
+    // 根據格式設定正確的副檔名
+    const extension = format === 'excel' ? 'xlsx' : format;
+    const filename = `產線類型列表_${timestamp}.${extension}`;
+    
+    // 創建下載連結
+    const link = document.createElement('a');
+    link.href = `{% url 'production:export_line_types' %}?format=${format}`;
+    link.download = filename;
+    link.style.display = 'none';
+    
+    // 添加到頁面並觸發下載
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
 </script>
 {% endblock %} 

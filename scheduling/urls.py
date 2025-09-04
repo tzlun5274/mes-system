@@ -17,6 +17,7 @@ from .views.unified_scheduling import (
 )
 
 app_name = "scheduling"
+module_display_name = "排程管理"
 
 urlpatterns = [
     path("", views.index, name="index"),

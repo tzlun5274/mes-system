@@ -103,6 +103,7 @@ class OperatorOnsiteReportForm(forms.Form):
     )
 
     def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
         # 動態載入選項
         self.load_dynamic_choices()
@@ -122,32 +123,59 @@ class OperatorOnsiteReportForm(forms.Form):
                 (product_code, product_code) for product_code in workorders if product_code
             ]
 
-            # 載入作業員選項
-            operators = Operator.objects.all().order_by('name')
+            # 載入作業員選項 - 使用權限過濾
+            from system.services import PermissionFilterService
+            if self.request:
+                operators = PermissionFilterService.filter_operators(self.request)
+            else:
+                # 沒有請求物件，載入所有作業員
+                from process.models import Operator
+                operators = Operator.objects.all().order_by('name')
+            
             self.fields['operator'].choices = [('', '請選擇作業員')] + [
                 (operator.name, operator.name) for operator in operators
             ]
 
-            # 載入工序選項（從工單工序中取得）
+            # 載入工序選項（從工單工序中取得）- 使用權限過濾
             from workorder.models import WorkOrderProcess
-            processes = WorkOrderProcess.objects.values_list('process_name', flat=True).distinct().order_by('process_name')
+            from system.services import PermissionFilterService
+            if self.request:
+                processes = PermissionFilterService.filter_processes(self.request)
+            else:
+                # 沒有請求物件，載入所有工序
+                from process.models import ProcessName
+                processes = ProcessName.objects.all().order_by('name')
+            
+            process_names = processes.values_list('name', flat=True).distinct().order_by('name')
             self.fields['process'].choices = [('', '請選擇工序')] + [
-                (process_name, process_name) for process_name in processes if process_name
+                (process_name, process_name) for process_name in process_names if process_name
             ]
 
-            # 載入設備選項
-            equipments = Equipment.objects.all().order_by('name')
+            # 載入設備選項 - 使用權限過濾
+            from system.services import PermissionFilterService
+            if self.request:
+                equipments = PermissionFilterService.filter_equipments(self.request)
+            else:
+                # 沒有請求物件，載入所有設備
+                from equip.models import Equipment
+                equipments = Equipment.objects.all().order_by('name')
+            
             self.fields['equipment'].choices = [('', '請選擇設備')] + [
                 (equipment.name, equipment.name) for equipment in equipments
             ]
 
+            # 載入工單選項
+            workorders = WorkOrder.objects.filter(status__in=['pending', 'in_progress']).order_by('workorder_number')
+            self.fields['workorder'].choices = [('', '請選擇工單號碼')] + [
+                (workorder.workorder_number, workorder.workorder_number) for workorder in workorders
+            ]
+
         except Exception as e:
             # 如果載入失敗，設定空選項
-            self.fields['company_name'].choices = [('', '載入失敗')]
-            self.fields['product_id'].choices = [('', '載入失敗')]
-            self.fields['operator'].choices = [('', '載入失敗')]
-            self.fields['process'].choices = [('', '載入失敗')]
-            self.fields['equipment'].choices = [('', '載入失敗')]
+            self.fields['operator'].choices = [('', '載入作業員失敗')]
+            self.fields['process'].choices = [('', '載入工序失敗')]
+            self.fields['equipment'].choices = [('', '載入設備失敗')]
+            self.fields['workorder'].choices = [('', '載入工單失敗')]
 
 
 # ==================== 現場報工視圖 ====================
@@ -318,7 +346,7 @@ def operator_onsite_report_create(request):
             return redirect('workorder:onsite_reporting:operator_onsite_report_create')
     
     # GET 請求：顯示新增頁面
-    form = OperatorOnsiteReportForm()
+    form = OperatorOnsiteReportForm(request=request)
     
     context = {
         'report_type': 'operator',

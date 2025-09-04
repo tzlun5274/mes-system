@@ -16,17 +16,17 @@
     </nav>
     
     <h2 class="mb-4 text-primary"><i class="bi bi-gear"></i> 系統管理首頁</h2>
-    <p class="text-secondary mb-4">這裡可以設定系統基本功能，管理用戶、群組、權限、備份與操作紀錄。每個功能都有清楚的中文說明，操作簡單，適合不懂程式的人。</p>
+    <p class="text-secondary mb-4">這裡可以設定系統基本功能，管理用戶、權限、備份與操作紀錄。每個功能都有清楚的中文說明，操作簡單，適合不懂程式的人。</p>
         <div class="row row-cols-1 row-cols-md-2 g-4">
-        <!-- 關於系統 -->
+        <!-- 系統管理看板 -->
         <div class="col">
             <div class="card h-100 shadow-sm">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> 關於系統</h5>
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-tachometer"></i> 系統管理看板</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">查看系統版本資訊、運行狀態、日誌檔案，了解系統基本資訊。</p>
-                    <a href="{% url 'system:environment_management' %}" class="btn btn-danger"><i class="bi bi-info-circle"></i> 關於系統</a>
+                    <p class="card-text">統一的系統管理介面，整合環境狀態、日誌管理、系統配置等功能。</p>
+                    <a href="{% url 'system:system_dashboard' %}" class="btn btn-primary"><i class="bi bi-tachometer"></i> 進入看板</a>
                 </div>
             </div>
         </div>
@@ -42,30 +42,8 @@
                 </div>
             </div>
         </div>
-        <!-- 資料庫備份 -->
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0"><i class="bi bi-hdd"></i> 資料庫備份</h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">手動備份系統資料庫，確保資料安全。</p>
-                    <a href="{% url 'system:backup' %}" class="btn btn-success"><i class="bi bi-download"></i> 資料庫備份</a>
-                </div>
-            </div>
-        </div>
-        <!-- 自動備份設定 -->
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> 自動備份設定</h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">設定自動備份排程，讓系統每天自動備份。</p>
-                    <a href="{% url 'system:backup_schedule' %}" class="btn btn-warning text-dark"><i class="bi bi-clock"></i> 自動備份設定</a>
-                </div>
-            </div>
-        </div>
+
+
         <!-- 用戶管理 -->
         <div class="col">
             <div class="card h-100 shadow-sm">
@@ -79,19 +57,7 @@
                 </div>
             </div>
         </div>
-        <!-- 群組管理 -->
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-secondary text-white">
-                    <h5 class="mb-0"><i class="bi bi-people-fill"></i> 群組管理</h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">管理用戶群組，設定群組權限，方便批量管理。</p>
-                    <a href="{% url 'system:group_list' %}" class="btn btn-secondary"><i class="bi bi-collection"></i> 群組管理</a>
-                    <a href="{% url 'system:group_add' %}" class="btn btn-outline-secondary ms-2"><i class="bi bi-plus-circle"></i> 新增群組</a>
-                </div>
-            </div>
-        </div>
+
         <!-- 權限管理 -->
         <div class="col">
             <div class="card h-100 shadow-sm">
@@ -99,75 +65,54 @@
                     <h5 class="mb-0"><i class="bi bi-shield-check"></i> 權限管理</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">查看和管理系統權限，分配權限給群組或用戶。</p>
+                    <p class="card-text">查看和管理系統權限，分配權限給用戶。</p>
                     <a href="{% url 'system:permission_list' %}" class="btn btn-dark"><i class="bi bi-shield"></i> 權限管理</a>
                     <a href="{% url 'system:permission_assign' %}" class="btn btn-outline-dark ms-2"><i class="bi bi-person-check"></i> 權限分配</a>
                 </div>
             </div>
         </div>
-        <!-- 操作紀錄管理 -->
+
+        
+        <!-- 用戶工作權限管理 -->
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-header bg-info text-white">
-                    <h5 class="mb-0"><i class="bi bi-journal-text"></i> 操作紀錄管理</h5>
+                    <h5 class="mb-0"><i class="bi bi-person-gear"></i> 用戶工作權限管理</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">查看和管理系統操作紀錄，包含登入、資料變更等活動。</p>
-                    <a href="{% url 'system:operation_log_manage' %}" class="btn btn-info"><i class="bi bi-journal-text"></i> 操作紀錄</a>
-                    <a href="{% url 'system:clean_operation_logs' %}" class="btn btn-outline-info ms-2"><i class="bi bi-trash"></i> 清理紀錄</a>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 工單管理設定 -->
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> 工單管理設定</h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">管理工單完工判斷和資料轉移設定，包含自動完工檢查、資料轉移排程等。</p>
-                    <a href="{% url 'system:workorder_settings' %}" class="btn btn-warning text-dark"><i class="bi bi-gear"></i> 工單管理設定</a>
+                    <p class="card-text">管理用戶在現場報工和補登填報時的操作權限，包含作業員、工序、設備的選擇限制。</p>
+                    <a href="{% url 'system:user_work_permissions_list' %}" class="btn btn-info"><i class="bi bi-gear"></i> 工作權限管理</a>
                 </div>
             </div>
         </div>
 
-        <!-- 使用者工作權限管理 -->
+
+
+        <!-- 系統備份管理 -->
         <div class="col">
             <div class="card h-100 shadow-sm">
                 <div class="card-header bg-success text-white">
-                    <h5 class="mb-0"><i class="bi bi-person-check"></i> 使用者工作權限管理</h5>
+                    <h5 class="mb-0"><i class="bi bi-cloud-arrow-up"></i> 系統備份管理</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">設定使用者可以針對哪些作業員和工序進行填報報工，控制操作權限。</p>
-                    <a href="{% url 'system:user_work_permission_list' %}" class="btn btn-success"><i class="bi bi-list"></i> 權限列表</a>
-                    <a href="{% url 'system:user_work_permission_add' %}" class="btn btn-outline-success ms-2"><i class="bi bi-plus-circle"></i> 新增權限</a>
+                    <p class="card-text">完整的資料庫備份管理，包含手動備份、自動備份排程、備份檔案下載和資料還原功能。</p>
+                    <a href="{% url 'system:backup' %}" class="btn btn-success"><i class="bi bi-download"></i> 手動備份</a>
+                    <a href="{% url 'system:backup_schedule' %}" class="btn btn-outline-success ms-2"><i class="bi bi-clock"></i> 備份排程</a>
+                    <a href="{% url 'system:restore_database' %}" class="btn btn-outline-warning ms-2"><i class="bi bi-arrow-clockwise"></i> 資料還原</a>
                 </div>
             </div>
         </div>
 
-        <!-- 報表清理設定 -->
+        <!-- 操作日誌管理 -->
         <div class="col">
             <div class="card h-100 shadow-sm">
-                <div class="card-header bg-purple text-white">
-                    <h5 class="mb-0"><i class="bi bi-broom"></i> 報表清理設定</h5>
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="bi bi-journal-text"></i> 操作日誌管理</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">管理報表檔案和執行日誌的自動清理，設定保留天數，手動執行清理操作。</p>
-                    <a href="{% url 'system:report_cleanup_settings' %}" class="btn btn-purple"><i class="bi bi-gear"></i> 清理設定</a>
-                </div>
-            </div>
-        </div>
-
-        <!-- 訂單同步設定 -->
-        <div class="col">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> 訂單同步設定</h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">管理訂單資料的自動同步，設定同步間隔、清理規則，手動執行同步操作。</p>
-                    <a href="{% url 'system:order_sync_settings' %}" class="btn btn-primary"><i class="bi bi-gear"></i> 同步設定</a>
+                    <p class="card-text">查看和管理系統操作日誌，包含登入記錄、資料變更、權限操作等活動追蹤。</p>
+                    <a href="{% url 'system:operation_log_manage' %}" class="btn btn-secondary"><i class="bi bi-journal-text"></i> 操作日誌</a>
+                    <a href="{% url 'system:clean_operation_logs' %}" class="btn btn-outline-secondary ms-2"><i class="bi bi-trash"></i> 清理日誌</a>
                 </div>
             </div>
         </div>

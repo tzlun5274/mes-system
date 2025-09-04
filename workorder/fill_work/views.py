@@ -39,6 +39,134 @@ from workorder.models import WorkOrder
 from workorder.services.production_sync_service import ProductionReportSyncService
 
 
+# ==================== 權限過濾工具函數 ====================
+
+def get_user_filtered_operators(user, request=None):
+    """
+    根據使用者權限獲取過濾後的作業員列表
+    
+    Args:
+        user: 使用者物件
+        request: HTTP請求物件（可選，用於獲取權限設定）
+    
+    Returns:
+        QuerySet: 過濾後的作業員查詢集
+    """
+    try:
+        # 檢查用戶權限
+        if user.is_superuser or user.is_staff:
+            # 超級管理員和管理員可以看到所有作業員
+            return Operator.objects.all().order_by('name')
+        
+        # 嘗試從用戶物件獲取權限設定
+        try:
+            from system.models import UserWorkPermission
+            permission_detail = UserWorkPermission.objects.get(user=user)
+            if permission_detail.can_operate_all_operators:
+                return Operator.objects.all().order_by('name')
+            elif permission_detail.allowed_operators:
+                # 將字符串ID轉換為整數
+                operator_ids = [int(op_id) for op_id in permission_detail.allowed_operators if str(op_id).isdigit()]
+                if operator_ids:
+                    return Operator.objects.filter(id__in=operator_ids).order_by('name')
+                else:
+                    return Operator.objects.none()
+            else:
+                return Operator.objects.none()
+        except UserWorkPermission.DoesNotExist:
+            pass
+        
+        # 預設顯示全部作業員
+        return Operator.objects.all().order_by('name')
+    except Exception:
+        # 發生錯誤時，預設顯示全部
+        return Operator.objects.all().order_by('name')
+
+
+def get_user_filtered_processes(user, request=None):
+    """
+    根據使用者權限獲取過濾後的工序列表
+    
+    Args:
+        user: 使用者物件
+        request: HTTP請求物件（可選，用於獲取權限設定）
+    
+    Returns:
+        QuerySet: 過濾後的工序查詢集
+    """
+    try:
+        # 檢查用戶權限
+        if user.is_superuser or user.is_staff:
+            # 超級管理員和管理員可以看到所有工序
+            return ProcessName.objects.all().order_by('name')
+        
+        # 嘗試從用戶物件獲取權限設定
+        try:
+            from system.models import UserWorkPermission
+            permission_detail = UserWorkPermission.objects.get(user=user)
+            if permission_detail.can_operate_all_processes:
+                return ProcessName.objects.all().order_by('name')
+            elif permission_detail.allowed_processes:
+                # 將字符串ID轉換為整數
+                process_ids = [int(proc_id) for proc_id in permission_detail.allowed_processes if str(proc_id).isdigit()]
+                if process_ids:
+                    return ProcessName.objects.filter(id__in=process_ids).order_by('name')
+                else:
+                    return ProcessName.objects.none()
+            else:
+                return ProcessName.objects.none()
+        except UserWorkPermission.DoesNotExist:
+            pass
+        
+        # 預設顯示全部工序
+        return ProcessName.objects.all().order_by('name')
+    except Exception:
+        # 發生錯誤時，預設顯示全部
+        return ProcessName.objects.all().order_by('name')
+
+
+def get_user_filtered_equipments(user, request=None):
+    """
+    根據使用者權限獲取過濾後的設備列表
+    
+    Args:
+        user: 使用者物件
+        request: HTTP請求物件（可選，用於獲取權限設定）
+    
+    Returns:
+        QuerySet: 過濾後的設備查詢集
+    """
+    try:
+        # 檢查用戶權限
+        if user.is_superuser or user.is_staff:
+            # 超級管理員和管理員可以看到所有設備
+            return Equipment.objects.all().order_by('name')
+        
+        # 嘗試從用戶物件獲取權限設定
+        try:
+            from system.models import UserWorkPermission
+            permission_detail = UserWorkPermission.objects.get(user=user)
+            if permission_detail.can_operate_all_equipments:
+                return Equipment.objects.all().order_by('name')
+            elif permission_detail.allowed_equipments:
+                # 將字符串ID轉換為整數
+                equipment_ids = [int(eq_id) for eq_id in permission_detail.allowed_equipments if str(eq_id).isdigit()]
+                if equipment_ids:
+                    return Equipment.objects.filter(id__in=equipment_ids).order_by('name')
+                else:
+                    return Equipment.objects.none()
+            else:
+                return Equipment.objects.none()
+        except UserWorkPermission.DoesNotExist:
+            pass
+        
+        # 預設顯示全部設備
+        return Equipment.objects.all().order_by('name')
+    except Exception:
+        # 發生錯誤時，預設顯示全部
+        return Equipment.objects.all().order_by('name')
+
+
 # ==================== 表單類別定義 ====================
 
 class OperatorBackfillForm(ModelForm):
@@ -130,14 +258,24 @@ class OperatorBackfillForm(ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
-        # 過濾工序，排除SMT相關
-        self.fields['process'].queryset = ProcessName.objects.exclude(name__icontains='SMT')
+        
+        # 過濾工序，排除SMT相關，並根據使用者權限過濾
+        if self.user:
+            # 根據使用者權限過濾工序
+            filtered_processes = get_user_filtered_processes(self.user, self.request)
+            # 排除SMT相關工序
+            self.fields['process'].queryset = filtered_processes.exclude(name__icontains='SMT')
+        else:
+            # 沒有使用者資訊，預設排除SMT相關
+            self.fields['process'].queryset = ProcessName.objects.exclude(name__icontains='SMT')
         
         # 設定 planned_quantity 可留空
         self.fields['planned_quantity'].required = False
         
-        # 載入選項
+        # 載入選項（根據使用者權限過濾）
         self.fields['company_name'].choices = self.get_company_choices()
         self.fields['operator'].choices = self.get_operator_choices()
         self.fields['equipment'].choices = self.get_equipment_choices()
@@ -169,19 +307,37 @@ class OperatorBackfillForm(ModelForm):
     def get_operator_choices(self):
         choices = [("", "請選擇作業員")]
         try:
-            from process.models import Operator
-            operators = Operator.objects.all().order_by('name')
+            if self.user:
+                # 根據使用者權限過濾作業員
+                operators = get_user_filtered_operators(self.user, self.request)
+                print(f"DEBUG: User {self.user.username} filtered operators: {[op.name for op in operators]}")
+            else:
+                # 沒有使用者資訊，顯示全部
+                operators = Operator.objects.all().order_by('name')
+                print("DEBUG: No user, showing all operators")
+            
             for operator in operators:
                 choices.append((operator.name, operator.name))
-        except ImportError:
+            print(f"DEBUG: Final operator choices: {choices}")
+        except ImportError as e:
+            print(f"DEBUG: ImportError in get_operator_choices: {e}")
+            pass
+        except Exception as e:
+            print(f"DEBUG: Exception in get_operator_choices: {e}")
             pass
         return choices
     
     def get_equipment_choices(self):
         choices = [("", "請選擇使用的設備")]
         try:
-            from equip.models import Equipment
-            equipments = Equipment.objects.exclude(name__icontains='SMT').order_by('name')
+            if self.user:
+                # 根據使用者權限過濾設備，並排除SMT相關
+                filtered_equipments = get_user_filtered_equipments(self.user, self.request)
+                equipments = filtered_equipments.exclude(name__icontains='SMT')
+            else:
+                # 沒有使用者資訊，預設排除SMT相關
+                equipments = Equipment.objects.exclude(name__icontains='SMT').order_by('name')
+            
             for equipment in equipments:
                 choices.append((equipment.name, equipment.name))
         except ImportError:
@@ -315,14 +471,24 @@ class OperatorRDBackfillForm(ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
-        # 過濾工序，排除SMT相關
-        self.fields['process'].queryset = ProcessName.objects.exclude(name__icontains='SMT')
+        
+        # 過濾工序，排除SMT相關，並根據使用者權限過濾
+        if self.user:
+            # 根據使用者權限過濾工序
+            filtered_processes = get_user_filtered_processes(self.user, self.request)
+            # 排除SMT相關工序
+            self.fields['process'].queryset = filtered_processes.exclude(name__icontains='SMT')
+        else:
+            # 沒有使用者資訊，預設排除SMT相關
+            self.fields['process'].queryset = ProcessName.objects.exclude(name__icontains='SMT')
         
         # 設定planned_quantity為非必填
         self.fields['planned_quantity'].required = False
         
-        # 載入選項
+        # 載入選項（根據使用者權限過濾）
         self.fields['company_name'].choices = self.get_company_choices()
         self.fields['operator'].choices = self.get_operator_choices()
         self.fields['equipment'].choices = self.get_equipment_choices()
@@ -361,8 +527,14 @@ class OperatorRDBackfillForm(ModelForm):
     def get_operator_choices(self):
         choices = [("", "請選擇作業員")]
         try:
-            # 排除SMT相關的作業員，因為SMT是設備/產線，不是人員
-            operators = Operator.objects.exclude(name__icontains='SMT').order_by('name')
+            if self.user:
+                # 根據使用者權限過濾作業員，並排除SMT相關
+                operators = get_user_filtered_operators(self.user, self.request)
+                operators = operators.exclude(name__icontains='SMT')
+            else:
+                # 沒有使用者資訊，預設排除SMT相關
+                operators = Operator.objects.exclude(name__icontains='SMT').order_by('name')
+            
             for o in operators:
                 choices.append((o.name, o.name))
         except Exception:
@@ -370,12 +542,18 @@ class OperatorRDBackfillForm(ModelForm):
         return choices
     
     def get_equipment_choices(self):
-        """獲取設備選項（排除SMT相關設備）"""
+        """獲取設備選項（根據使用者權限過濾，並排除SMT相關設備）"""
         choices = [("", "請選擇使用的設備")]
         
         try:
-            from equip.models import Equipment
-            equipments = Equipment.objects.exclude(name__icontains='SMT').order_by('name')
+            if self.user:
+                # 根據使用者權限過濾設備，並排除SMT相關
+                filtered_equipments = get_user_filtered_equipments(self.user, self.request)
+                equipments = filtered_equipments.exclude(name__icontains='SMT')
+            else:
+                # 沒有使用者資訊，預設排除SMT相關
+                equipments = Equipment.objects.exclude(name__icontains='SMT').order_by('name')
+            
             for equipment in equipments:
                 choices.append((equipment.name, equipment.name))
         except ImportError:
@@ -494,12 +672,23 @@ class SMTBackfillForm(ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
-        # 過濾工序，只顯示SMT相關
-        self.fields['process'].queryset = ProcessName.objects.filter(name__icontains='SMT')
+        
+        # 過濾工序，只顯示SMT相關，並根據使用者權限過濾
+        if self.user:
+            # 根據使用者權限過濾工序
+            filtered_processes = get_user_filtered_processes(self.user, self.request)
+            # 只顯示SMT相關工序
+            self.fields['process'].queryset = filtered_processes.filter(name__icontains='SMT')
+        else:
+            # 沒有使用者資訊，預設只顯示SMT相關
+            self.fields['process'].queryset = ProcessName.objects.filter(name__icontains='SMT')
+        
         # planned_quantity 非必填
         self.fields['planned_quantity'].required = False
-        # 載入選項
+        # 載入選項（根據使用者權限過濾）
         self.fields['company_name'].choices = self.get_company_choices()
         self.fields['equipment'].choices = self.get_equipment_choices()
         
@@ -528,8 +717,14 @@ class SMTBackfillForm(ModelForm):
     def get_operator_choices(self):
         choices = [("", "請選擇作業員")]
         try:
-            # 排除SMT相關的作業員，因為SMT是設備/產線，不是人員
-            operators = Operator.objects.exclude(name__icontains='SMT').order_by('name')
+            if self.user:
+                # 根據使用者權限過濾作業員，並排除SMT相關
+                operators = get_user_filtered_operators(self.user, self.request)
+                operators = operators.exclude(name__icontains='SMT')
+            else:
+                # 沒有使用者資訊，預設排除SMT相關
+                operators = Operator.objects.exclude(name__icontains='SMT').order_by('name')
+            
             for o in operators:
                 choices.append((o.name, o.name))
         except Exception:
@@ -539,7 +734,14 @@ class SMTBackfillForm(ModelForm):
     def get_equipment_choices(self):
         choices = [("", "請選擇使用的設備")]
         try:
-            equipments = Equipment.objects.filter(name__icontains='SMT').order_by('name')
+            if self.user:
+                # 根據使用者權限過濾設備，並只顯示SMT相關
+                filtered_equipments = get_user_filtered_equipments(self.user, self.request)
+                equipments = filtered_equipments.filter(name__icontains='SMT')
+            else:
+                # 沒有使用者資訊，預設只顯示SMT相關
+                equipments = Equipment.objects.filter(name__icontains='SMT').order_by('name')
+            
             for e in equipments:
                 choices.append((e.name, e.name))
         except Exception:
@@ -638,13 +840,23 @@ class SMTRDBackfillForm(ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        self.request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
-        # 過濾工序，只顯示SMT相關
-        self.fields['process'].queryset = ProcessName.objects.filter(name__icontains='SMT')
+        
+        # 過濾工序，只顯示SMT相關，並根據使用者權限過濾
+        if self.user:
+            # 根據使用者權限過濾工序
+            filtered_processes = get_user_filtered_processes(self.user, self.request)
+            # 只顯示SMT相關工序
+            self.fields['process'].queryset = filtered_processes.filter(name__icontains='SMT')
+        else:
+            # 沒有使用者資訊，預設只顯示SMT相關
+            self.fields['process'].queryset = ProcessName.objects.filter(name__icontains='SMT')
         
         # planned_quantity 非必填
         self.fields['planned_quantity'].required = False
-        # 載入選項
+        # 載入選項（根據使用者權限過濾）
         self.fields['company_name'].choices = self.get_company_choices()
         self.fields['operator'].choices = self.get_operator_choices()
         self.fields['equipment'].choices = self.get_equipment_choices()
@@ -689,7 +901,14 @@ class SMTRDBackfillForm(ModelForm):
     def get_equipment_choices(self):
         choices = [("", "請選擇使用的設備")]
         try:
-            equipments = Equipment.objects.filter(name__icontains='SMT').order_by('name')
+            if self.user:
+                # 根據使用者權限過濾設備，並只顯示SMT相關
+                filtered_equipments = get_user_filtered_equipments(self.user, self.request)
+                equipments = filtered_equipments.filter(name__icontains='SMT')
+            else:
+                # 沒有使用者資訊，預設只顯示SMT相關
+                equipments = Equipment.objects.filter(name__icontains='SMT').order_by('name')
+            
             for e in equipments:
                 choices.append((e.name, e.name))
         except Exception:
@@ -779,6 +998,13 @@ class OperatorBackfillCreateView(LoginRequiredMixin, CreateView):
     form_class = OperatorBackfillForm
     success_url = reverse_lazy('workorder:fill_work:operator_index')
     
+    def get_form_kwargs(self):
+        """傳遞請求物件給表單"""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['request'] = self.request
+        return kwargs
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['hours_range'] = [f"{h:02d}" for h in range(0, 24)]
@@ -822,6 +1048,13 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
     template_name = 'workorder/fill_work/operator_rd_backfill_form.html'
     form_class = OperatorRDBackfillForm
     success_url = reverse_lazy('workorder:fill_work:operator_index')
+    
+    def get_form_kwargs(self):
+        """傳遞請求物件給表單"""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['request'] = self.request
+        return kwargs
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -982,6 +1215,13 @@ class SMTBackfillCreateView(LoginRequiredMixin, CreateView):
     form_class = SMTBackfillForm
     success_url = reverse_lazy('workorder:fill_work:smt_index')
     
+    def get_form_kwargs(self):
+        """傳遞請求物件給表單"""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['request'] = self.request
+        return kwargs
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['hours_range'] = [f"{h:02d}" for h in range(0, 24)]
@@ -1025,6 +1265,13 @@ class SMTRDBackfillCreateView(LoginRequiredMixin, CreateView):
     template_name = 'workorder/fill_work/smt_rd_backfill_form.html'
     form_class = SMTRDBackfillForm
     success_url = reverse_lazy('workorder:fill_work:smt_index')
+    
+    def get_form_kwargs(self):
+        """傳遞請求物件給表單"""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['request'] = self.request
+        return kwargs
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

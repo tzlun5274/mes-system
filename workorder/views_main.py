@@ -4764,9 +4764,15 @@ def get_operator_list_unified(request):
     """統一作業員清單API"""
     try:
         from process.models import Operator
+        from workorder.fill_work.views import get_user_filtered_operators
         
-        # 取得所有作業員
-        operators = Operator.objects.values('name').distinct().order_by('name')
+        # 根據使用者權限過濾作業員
+        if request.user.is_authenticated:
+            filtered_operators = get_user_filtered_operators(request.user, request)
+            operators = filtered_operators.values('name').distinct().order_by('name')
+        else:
+            # 未登入用戶，返回空列表
+            operators = Operator.objects.none().values('name')
         
         return JsonResponse({
             'success': True,
@@ -4783,32 +4789,31 @@ def get_process_list_unified(request):
     """統一工序清單API"""
     try:
         from process.models import ProcessName
+        from workorder.fill_work.views import get_user_filtered_processes
         
         # 取得表單類型參數
         form_type = request.GET.get('form_type', 'operator')  # 預設為作業員表單
         
-        # 取得所有工序
-        processes = ProcessName.objects.values('name').distinct().order_by('name')
+        # 根據使用者權限過濾工序
+        if request.user.is_authenticated:
+            filtered_processes_queryset = get_user_filtered_processes(request.user, request)
+        else:
+            # 未登入用戶，返回空列表
+            filtered_processes_queryset = ProcessName.objects.none()
         
-        # 根據表單類型過濾工序
-        filtered_processes = []
-        for process in processes:
-            process_name = process['name']
-            should_include = True
-            
-            if form_type == 'smt':
-                # SMT表單：只顯示包含SMT的工序
-                should_include = 'SMT' in process_name.upper()
-            else:
-                # 作業員表單：排除包含SMT的工序
-                should_include = 'SMT' not in process_name.upper()
-            
-            if should_include:
-                filtered_processes.append(process)
+        # 根據表單類型進一步過濾工序
+        if form_type == 'smt':
+            # SMT表單：只顯示包含SMT的工序
+            filtered_processes_queryset = filtered_processes_queryset.filter(name__icontains='SMT')
+        else:
+            # 作業員表單：排除包含SMT的工序
+            filtered_processes_queryset = filtered_processes_queryset.exclude(name__icontains='SMT')
+        
+        processes = filtered_processes_queryset.values('name').distinct().order_by('name')
         
         return JsonResponse({
             'success': True,
-            'processes': filtered_processes
+            'processes': list(processes)
         })
     except Exception as e:
         return JsonResponse({
@@ -4821,32 +4826,31 @@ def get_equipment_list_unified(request):
     """統一設備清單API"""
     try:
         from equip.models import Equipment
+        from workorder.fill_work.views import get_user_filtered_equipments
         
         # 取得表單類型參數
         form_type = request.GET.get('form_type', 'operator')  # 預設為作業員表單
         
-        # 取得所有設備
-        equipments = Equipment.objects.values('name').distinct().order_by('name')
+        # 根據使用者權限過濾設備
+        if request.user.is_authenticated:
+            filtered_equipments_queryset = get_user_filtered_equipments(request.user, request)
+        else:
+            # 未登入用戶，返回空列表
+            filtered_equipments_queryset = Equipment.objects.none()
         
-        # 根據表單類型過濾設備
-        filtered_equipments = []
-        for equipment in equipments:
-            equipment_name = equipment['name']
-            should_include = True
-            
-            if form_type == 'smt':
-                # SMT表單：只顯示包含SMT的設備
-                should_include = 'SMT' in equipment_name.upper()
-            else:
-                # 作業員表單：排除包含SMT的設備
-                should_include = 'SMT' not in equipment_name.upper()
-            
-            if should_include:
-                filtered_equipments.append(equipment)
+        # 根據表單類型進一步過濾設備
+        if form_type == 'smt':
+            # SMT表單：只顯示包含SMT的設備
+            filtered_equipments_queryset = filtered_equipments_queryset.filter(name__icontains='SMT')
+        else:
+            # 作業員表單：排除包含SMT的設備
+            filtered_equipments_queryset = filtered_equipments_queryset.exclude(name__icontains='SMT')
+        
+        equipments = filtered_equipments_queryset.values('name').distinct().order_by('name')
         
         return JsonResponse({
             'success': True,
-            'equipments': filtered_equipments
+            'equipments': list(equipments)
         })
     except Exception as e:
         return JsonResponse({

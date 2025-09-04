@@ -399,13 +399,13 @@ class OperatorProcessCapacityScore(models.Model):
     
     def calculate_total_score(self):
         """計算總評分（包含主管評分）"""
-        # 生產效率權重：80%
+        # 生產效率權重：70%
         # 生產效率 = 產能評分（基於產能比率計算）
-        production_score = self.capacity_score * Decimal('0.80')
+        production_score = self.capacity_score * Decimal('0.70')
         
-        # 主管評分權重：20%
+        # 主管評分權重：30%
         # 如果主管已主動評分，使用實際評分；否則使用預設80分
-        supervisor_weighted = self.supervisor_score * Decimal('0.20')
+        supervisor_weighted = self.supervisor_score * Decimal('0.30')
         total = production_score + supervisor_weighted
         
         return total
@@ -426,8 +426,7 @@ class OperatorProcessCapacityScore(models.Model):
         if not self.capacity_score:
             self.capacity_score = self.calculate_capacity_score()
         
-        if not self.quality_score:
-            self.quality_score = self.calculate_quality_score()
+        # 品質評分不再自動計算，由主管手動評分
         
         if not self.total_score:
             self.total_score = self.calculate_total_score()

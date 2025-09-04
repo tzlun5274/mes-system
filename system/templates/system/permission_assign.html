@@ -7,6 +7,16 @@
 
 {% block content %}
 <div class="container-fluid mt-4">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'system:permission_list' %}">權限管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">權限分配</li>
+        </ol>
+    </nav>
+    
     <div class="row">
         <div class="col-12">
             <div class="card">
@@ -23,7 +33,7 @@
                 <div class="card-body">
                     <div class="alert alert-info" role="alert">
                         <i class="bi bi-info-circle"></i> 
-                        在這裡您可以將權限分配給群組或用戶，也可以移除已分配的權限。選擇權限、目標（群組或用戶）和操作類型。
+                        在這裡您可以將權限分配給用戶，也可以移除已分配的權限。選擇權限、目標用戶和操作類型。
                     </div>
 
                     <form method="post" id="permissionForm">
@@ -61,30 +71,14 @@
                                         <div class="mb-3">
                                             <label class="form-label">目標類型：</label>
                                             <div class="form-check">
-                                                <input class="form-check-input" type="radio" name="target_type" id="target_group" value="group" checked>
-                                                <label class="form-check-label" for="target_group">
-                                                    群組
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="radio" name="target_type" id="target_user" value="user">
+                                                <input class="form-check-input" type="radio" name="target_type" id="target_user" value="user" checked>
                                                 <label class="form-check-label" for="target_user">
                                                     用戶
                                                 </label>
                                             </div>
                                         </div>
                                         
-                                        <div class="mb-3" id="group_select">
-                                            <label for="group_id" class="form-label">群組：</label>
-                                            <select class="form-select" id="group_id" name="group_id">
-                                                <option value="">請選擇群組</option>
-                                                {% for group in groups %}
-                                                <option value="{{ group.id }}">{{ group.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        
-                                        <div class="mb-3" id="user_select" style="display: none;">
+                                        <div class="mb-3" id="user_select">
                                             <label for="user_id" class="form-label">用戶：</label>
                                             <select class="form-select" id="user_id" name="user_id">
                                                 <option value="">請選擇用戶</option>
@@ -139,16 +133,14 @@
                                 <div class="col-md-6">
                                     <h6><i class="bi bi-plus-circle text-success"></i> 分配權限</h6>
                                     <ul>
-                                        <li>將選定的權限分配給指定的群組或用戶</li>
-                                        <li>群組成員會自動繼承群組的權限</li>
+                                        <li>將選定的權限分配給指定的用戶</li>
                                         <li>用戶可以直接擁有個人權限</li>
                                     </ul>
                                 </div>
                                 <div class="col-md-6">
                                     <h6><i class="bi bi-dash-circle text-danger"></i> 移除權限</h6>
                                     <ul>
-                                        <li>從指定的群組或用戶移除選定的權限</li>
-                                        <li>移除群組權限會影響所有群組成員</li>
+                                        <li>從指定的用戶移除選定的權限</li>
                                         <li>移除用戶權限只影響該用戶</li>
                                     </ul>
                                 </div>
@@ -163,38 +155,10 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 切換目標類型
-    const targetGroup = document.getElementById('target_group');
-    const targetUser = document.getElementById('target_user');
-    const groupSelect = document.getElementById('group_select');
-    const userSelect = document.getElementById('user_select');
-    const groupId = document.getElementById('group_id');
-    const userId = document.getElementById('user_id');
-
-    targetGroup.addEventListener('change', function() {
-        if (this.checked) {
-            groupSelect.style.display = 'block';
-            userSelect.style.display = 'none';
-            userId.value = '';
-            groupId.required = true;
-            userId.required = false;
-        }
-    });
-
-    targetUser.addEventListener('change', function() {
-        if (this.checked) {
-            groupSelect.style.display = 'none';
-            userSelect.style.display = 'block';
-            groupId.value = '';
-            groupId.required = false;
-            userId.required = true;
-        }
-    });
-
     // 表單驗證
     document.getElementById('permissionForm').addEventListener('submit', function(e) {
         const permissionId = document.getElementById('permission_id').value;
-        const targetType = document.querySelector('input[name="target_type"]:checked').value;
+        const userId = document.getElementById('user_id').value;
         
         if (!permissionId) {
             e.preventDefault();
@@ -202,13 +166,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        if (targetType === 'group' && !groupId.value) {
-            e.preventDefault();
-            alert('請選擇群組！');
-            return;
-        }
-
-        if (targetType === 'user' && !userId.value) {
+        if (!userId) {
             e.preventDefault();
             alert('請選擇用戶！');
             return;

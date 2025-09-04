@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}評分儀表板{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-chart-line"></i> 評分儀表板
+                    </h4>
+                    <p class="card-text">作業員評分統計與分析</p>
+                </div>
+                <div class="card-body">
+                    <!-- 統計卡片 -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="mb-0">{{ operator_stats.total_records|default:0 }}</h4>
+                                            <p class="mb-0">總評分記錄</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-clipboard-list fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="mb-0">{{ operator_stats.avg_capacity_score|floatformat:1|default:"0.0" }}</h4>
+                                            <p class="mb-0">平均產能分數</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-tachometer-alt fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="mb-0">{{ operator_stats.scored_by_supervisor|default:0 }}</h4>
+                                            <p class="mb-0">已主管評分</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-user-tie fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="mb-0">{{ operator_stats.avg_total_score|floatformat:1|default:"0.0" }}</h4>
+                                            <p class="mb-0">平均總分</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-star fa-2x"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 主管評分統計 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title">
+                                        <i class="fas fa-user-tie"></i> 主管評分統計
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="text-center">
+                                                <h3 class="text-primary">{{ operator_stats.scored_by_supervisor|default:0 }}</h3>
+                                                <p class="text-muted">已主管評分</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="text-center">
+                                                <h3 class="text-secondary">
+                                                    {{ operator_stats.total_records|default:0|add:"-"|add:operator_stats.scored_by_supervisor|default:0|add:"0" }}
+                                                </h3>
+                                                <p class="text-muted">待主管評分</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title">
+                                        <i class="fas fa-percentage"></i> 評分完成率
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if operator_stats.total_records %}
+                                        {% widthratio operator_stats.scored_by_supervisor operator_stats.total_records 100 as completion_rate %}
+                                        <div class="text-center">
+                                            <h3 class="text-success">{{ completion_rate }}%</h3>
+                                            <p class="text-muted">主管評分完成率</p>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center">
+                                            <h3 class="text-muted">0%</h3>
+                                            <p class="text-muted">無評分記錄</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 等級分布圖表 -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title">
+                                        <i class="fas fa-chart-pie"></i> 等級分布
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if grade_distribution %}
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <canvas id="gradeChart" width="400" height="200"></canvas>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>等級</th>
+                                                                <th>數量</th>
+                                                                <th>比例</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for grade in grade_distribution %}
+                                                                <tr>
+                                                                    <td>
+                                                                        <span class="badge bg-{% if grade.overall_grade == 'A' %}success{% elif grade.overall_grade == 'B' %}info{% elif grade.overall_grade == 'C' %}warning{% else %}secondary{% endif %}">
+                                                                            {{ grade.overall_grade|default:"未評分" }}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td>{{ grade.count }}</td>
+                                                                    <td>
+                                                                        {% widthratio grade.count operator_stats.total_records 100 %}%
+                                                                    </td>
+                                                                </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center text-muted">
+                                            <i class="fas fa-chart-pie fa-3x mb-3"></i>
+                                            <p>暫無等級分布資料</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 快速操作 -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title">
+                                        <i class="fas fa-cogs"></i> 快速操作
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3 mb-2">
+                                            <a href="{% url 'reporting:score_period_management' %}" class="btn btn-outline-primary btn-block">
+                                                <i class="fas fa-calendar-alt"></i> 評分週期管理
+                                            </a>
+                                        </div>
+                                        <div class="col-md-3 mb-2">
+                                            <a href="{% url 'reporting:operator_score_list' %}" class="btn btn-outline-success btn-block">
+                                                <i class="fas fa-list"></i> 作業員評分列表
+                                            </a>
+                                        </div>
+                                        <div class="col-md-3 mb-2">
+                                            <a href="{% url 'reporting:operator_score_list' %}" class="btn btn-outline-info btn-block">
+                                                <i class="fas fa-edit"></i> 作業員評分管理
+                                            </a>
+                                        </div>
+                                        <div class="col-md-3 mb-2">
+                                            <a href="{% url 'reporting:index' %}" class="btn btn-outline-secondary btn-block">
+                                                <i class="fas fa-arrow-left"></i> 返回報表首頁
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 等級分布圖表
+    {% if grade_distribution %}
+        const ctx = document.getElementById('gradeChart').getContext('2d');
+        const gradeData = {
+            labels: [
+                {% for grade in grade_distribution %}
+                    '{{ grade.overall_grade|default:"未評分" }}',
+                {% endfor %}
+            ],
+            datasets: [{
+                data: [
+                    {% for grade in grade_distribution %}
+                        {{ grade.count }},
+                    {% endfor %}
+                ],
+                backgroundColor: [
+                    '#28a745',  // A級 - 綠色
+                    '#17a2b8',  // B級 - 藍色
+                    '#ffc107',  // C級 - 黃色
+                    '#6c757d',  // 其他 - 灰色
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        };
+
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: gradeData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    {% endif %}
+});
+</script>
+{% endblock %}

@@ -41,7 +41,12 @@ class Equipment(models.Model):
     class Meta:
         verbose_name = "設備"
         verbose_name_plural = "設備"
-        default_permissions = ()
+        permissions = [
+            ("can_view_equipment", "可以查看設備"),
+            ("can_add_equipment", "可以添加設備"),
+            ("can_edit_equipment", "可以編輯設備"),
+            ("can_delete_equipment", "可以刪除設備"),
+        ]
         ordering = ["name"]
 
     def __str__(self):
@@ -63,7 +68,12 @@ class EquipOperationLog(models.Model):
     class Meta:
         verbose_name = "設備操作日誌"
         verbose_name_plural = "設備操作日誌"
-        default_permissions = ()
+        permissions = [
+            ("can_view_equipoperationlog", "可以查看設備操作日誌"),
+            ("can_add_equipoperationlog", "可以添加設備操作日誌"),
+            ("can_edit_equipoperationlog", "可以編輯設備操作日誌"),
+            ("can_delete_equipoperationlog", "可以刪除設備操作日誌"),
+        ]
         ordering = ["-timestamp"]
 
     def __str__(self):

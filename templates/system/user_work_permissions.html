@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'system:user_list' %}">用戶管理</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'system:user_work_permissions_list' %}">工作權限管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
+        </ol>
+    </nav>
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-user-cog me-2"></i>{{ title }}
+                    </h5>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'system:user_list' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-arrow-left me-1"></i>返回用戶列表
+                        </a>
+                        <a href="{% url 'system:user_work_permissions_list' %}" class="btn btn-outline-info btn-sm">
+                            <i class="fas fa-list me-1"></i>權限列表
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- 用戶資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-user me-2"></i>用戶資訊
+                                    </h6>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <strong>用戶名：</strong><br>
+                                            <span class="text-primary">{{ target_user.username }}</span>
+                                        </div>
+                                        <div class="col-6">
+                                            <strong>郵箱：</strong><br>
+                                            <span>{{ target_user.email|default:"未設定" }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-6">
+                                            <strong>姓名：</strong><br>
+                                            <span>{{ target_user.first_name }} {{ target_user.last_name|default:"" }}</span>
+                                        </div>
+                                        <div class="col-6">
+                                            <strong>狀態：</strong><br>
+                                            {% if target_user.is_active %}
+                                                <span class="badge bg-success">啟用</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">停用</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-chart-bar me-2"></i>權限統計
+                                    </h6>
+                                    <div class="row text-center">
+                                        <div class="col-4">
+                                            <h4>{{ stats.allowed_operators_count }}</h4>
+                                            <small>允許作業員</small>
+                                        </div>
+                                        <div class="col-4">
+                                            <h4>{{ stats.allowed_processes_count }}</h4>
+                                            <small>允許工序</small>
+                                        </div>
+                                        <div class="col-4">
+                                            <h4>{{ stats.allowed_equipments_count }}</h4>
+                                            <small>允許設備</small>
+                                        </div>
+                                    </div>
+                                    <div class="row text-center mt-2">
+                                        <div class="col-4">
+                                            <small>總計: {{ stats.total_operators }}</small>
+                                        </div>
+                                        <div class="col-4">
+                                            <small>總計: {{ stats.total_processes }}</small>
+                                        </div>
+                                        <div class="col-4">
+                                            <small>總計: {{ stats.total_equipments }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 權限設定表單 -->
+                    <form method="post" id="workPermissionsForm">
+                        {% csrf_token %}
+                        
+                        <!-- 報工功能權限 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-clipboard-list me-2"></i>報工功能權限
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.can_fill_work }}
+                                            <label class="form-check-label" for="{{ form.can_fill_work.id_for_label }}">
+                                                可進行補登填報
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.can_onsite_reporting }}
+                                            <label class="form-check-label" for="{{ form.can_onsite_reporting.id_for_label }}">
+                                                可進行現場報工
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.can_smt_reporting }}
+                                            <label class="form-check-label" for="{{ form.can_smt_reporting.id_for_label }}">
+                                                可進行SMT報工
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 作業員權限控制 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <div class="form-check">
+                                    {{ form.can_operate_all_operators }}
+                                    <label class="form-check-label" for="{{ form.can_operate_all_operators.id_for_label }}">
+                                        <strong>可操作所有作業員</strong>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="card-body" id="operatorsSection">
+                                <div class="row">
+                                    {% for choice in form.operator_choices %}
+                                    <div class="col-md-3 mb-2">
+                                        <div class="form-check">
+                                            {{ choice.tag }}
+                                            <label class="form-check-label" for="{{ choice.data.attrs.id }}">
+                                                {{ choice.choice_label }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 工序權限控制 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <div class="form-check">
+                                    {{ form.can_operate_all_processes }}
+                                    <label class="form-check-label" for="{{ form.can_operate_all_processes.id_for_label }}">
+                                        <strong>可操作所有工序</strong>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="card-body" id="processesSection">
+                                <div class="row">
+                                    {% for choice in form.process_choices %}
+                                    <div class="col-md-3 mb-2">
+                                        <div class="form-check">
+                                            {{ choice.tag }}
+                                            <label class="form-check-label" for="{{ choice.data.attrs.id }}">
+                                                {{ choice.choice_label }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 設備權限控制 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <div class="form-check">
+                                    {{ form.can_operate_all_equipments }}
+                                    <label class="form-check-label" for="{{ form.can_operate_all_equipments.id_for_label }}">
+                                        <strong>可操作所有設備</strong>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="card-body" id="equipmentsSection">
+                                <div class="row">
+                                    {% for choice in form.equipment_choices %}
+                                    <div class="col-md-3 mb-2">
+                                        <div class="form-check">
+                                            {{ choice.tag }}
+                                            <label class="form-check-label" for="{{ choice.data.attrs.id }}">
+                                                {{ choice.choice_label }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 資料範圍控制 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-database me-2"></i>資料範圍控制
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="{{ form.data_scope.id_for_label }}" class="form-label">資料範圍</label>
+                                        {{ form.data_scope }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 操作權限 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-tools me-2"></i>操作權限
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            {{ form.can_view }}
+                                            <label class="form-check-label" for="{{ form.can_view.id_for_label }}">
+                                                可查看
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            {{ form.can_add }}
+                                            <label class="form-check-label" for="{{ form.can_add.id_for_label }}">
+                                                可新增
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            {{ form.can_edit }}
+                                            <label class="form-check-label" for="{{ form.can_edit.id_for_label }}">
+                                                可編輯
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            {{ form.can_delete }}
+                                            <label class="form-check-label" for="{{ form.can_delete.id_for_label }}">
+                                                可刪除
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 審核權限 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-check-circle me-2"></i>審核權限
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.can_approve }}
+                                            <label class="form-check-label" for="{{ form.can_approve.id_for_label }}">
+                                                可審核
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.can_reject }}
+                                            <label class="form-check-label" for="{{ form.can_reject.id_for_label }}">
+                                                可駁回
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.can_override_limits }}
+                                            <label class="form-check-label" for="{{ form.can_override_limits.id_for_label }}">
+                                                可超越限制
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 特殊權限 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-star me-2"></i>特殊權限
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            {{ form.can_export_data }}
+                                            <label class="form-check-label" for="{{ form.can_export_data.id_for_label }}">
+                                                可匯出資料
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 操作按鈕 -->
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>儲存權限設定
+                            </button>
+                            <a href="{% url 'system:user_list' %}" class="btn btn-secondary btn-lg ms-2">
+                                <i class="fas fa-times me-2"></i>取消
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 控制選擇區域的顯示/隱藏
+    function toggleSection(checkboxId, sectionId) {
+        const checkbox = document.getElementById(checkboxId);
+        const section = document.getElementById(sectionId);
+        
+        if (checkbox && section) {
+            function updateSection() {
+                if (checkbox.checked) {
+                    section.style.display = 'none';
+                } else {
+                    section.style.display = 'block';
+                }
+            }
+            
+            checkbox.addEventListener('change', updateSection);
+            updateSection(); // 初始化狀態
+        }
+    }
+    
+    // 綁定事件
+    toggleSection('{{ form.can_operate_all_operators.id_for_label }}', 'operatorsSection');
+    toggleSection('{{ form.can_operate_all_processes.id_for_label }}', 'processesSection');
+    toggleSection('{{ form.can_operate_all_equipments.id_for_label }}', 'equipmentsSection');
+    
+    // 表單驗證
+    document.getElementById('workPermissionsForm').addEventListener('submit', function(e) {
+        const canOperateAllOperators = document.getElementById('{{ form.can_operate_all_operators.id_for_label }}').checked;
+        const canOperateAllProcesses = document.getElementById('{{ form.can_operate_all_processes.id_for_label }}').checked;
+        const canOperateAllEquipments = document.getElementById('{{ form.can_operate_all_equipments.id_for_label }}').checked;
+        
+        // 檢查是否至少有一種報工功能被啟用
+        const canFillWork = document.getElementById('{{ form.can_fill_work.id_for_label }}').checked;
+        const canOnsiteReporting = document.getElementById('{{ form.can_onsite_reporting.id_for_label }}').checked;
+        const canSmtReporting = document.getElementById('{{ form.can_smt_reporting.id_for_label }}').checked;
+        
+        if (!canFillWork && !canOnsiteReporting && !canSmtReporting) {
+            if (!confirm('您已停用所有報工功能，這將導致用戶無法進行任何報工操作。確定要繼續嗎？')) {
+                e.preventDefault();
+                return false;
+            }
+        }
+        
+        // 檢查是否至少有一種操作權限被啟用
+        const canView = document.getElementById('{{ form.can_view.id_for_label }}').checked;
+        const canAdd = document.getElementById('{{ form.can_add.id_for_label }}').checked;
+        const canEdit = document.getElementById('{{ form.can_edit.id_for_label }}').checked;
+        
+        if (!canView && !canAdd && !canEdit) {
+            if (!confirm('您已停用所有操作權限，這將導致用戶無法進行任何操作。確定要繼續嗎？')) {
+                e.preventDefault();
+                return false;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

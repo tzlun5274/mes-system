@@ -1,0 +1,88 @@
+/* 表格標題顏色樣式 */
+/* 確保所有表格標題都有顏色，不要有白色底的標題欄 */
+
+/* 主要表格標題樣式 */
+.table thead:not([class*="table-"]) {
+    background-color: #007bff !important;
+    color: white !important;
+}
+
+/* 各種顏色的表格標題 */
+.table thead.table-primary {
+    background-color: #007bff !important;
+    color: white !important;
+}
+
+.table thead.table-secondary {
+    background-color: #6c757d !important;
+    color: white !important;
+}
+
+.table thead.table-success {
+    background-color: #28a745 !important;
+    color: white !important;
+}
+
+.table thead.table-danger {
+    background-color: #dc3545 !important;
+    color: white !important;
+}
+
+.table thead.table-warning {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+}
+
+.table thead.table-info {
+    background-color: #17a2b8 !important;
+    color: white !important;
+}
+
+.table thead.table-light {
+    background-color: #f8f9fa !important;
+    color: #212529 !important;
+}
+
+.table thead.table-dark {
+    background-color: #343a40 !important;
+    color: white !important;
+}
+
+/* 卡片標題樣式 */
+.card-header:not([class*="bg-"]) {
+    background-color: #007bff !important;
+    color: white !important;
+}
+
+/* 確保所有標題欄都有顏色 */
+.card-header.bg-light {
+    background-color: #007bff !important;
+    color: white !important;
+}
+
+/* 表格標題文字樣式 */
+.table thead th {
+    font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* 卡片標題文字樣式 */
+.card-header h3,
+.card-header h4,
+.card-header h5,
+.card-header h6 {
+    margin-bottom: 0;
+    font-weight: 600;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+    .table thead th {
+        font-size: 0.9rem;
+        padding: 0.5rem;
+    }
+    
+    .card-header {
+        padding: 0.75rem;
+    }
+}

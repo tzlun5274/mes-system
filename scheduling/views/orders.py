@@ -1,6 +1,7 @@
 # 這個檔案負責訂單管理頁面的後端邏輯
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from ..order_management import order_query_manager, order_analytics
 from ..models import OrderMain
 
@@ -24,25 +25,54 @@ def order_list(request):
     filters = {k: v for k, v in filters.items() if v}
     # 查詢訂單
     orders, stats = order_query_manager.get_orders_with_filters(filters)
+    
     # 匯出Excel
     if request.GET.get("export") == "excel":
         return order_query_manager.export_orders_to_csv(orders, "orders.csv")
+    
+    # 分頁設定
+    page = request.GET.get('page', 1)
+    per_page = request.GET.get('per_page', 20)  # 每頁顯示數量，預設20筆
+    
+    try:
+        per_page = int(per_page)
+        if per_page < 1:
+            per_page = 20
+        elif per_page > 100:  # 限制最大每頁數量
+            per_page = 100
+    except ValueError:
+        per_page = 20
+    
+    # 建立分頁器
+    paginator = Paginator(orders, per_page)
+    
+    try:
+        orders_page = paginator.page(page)
+    except PageNotAnInteger:
+        # 如果頁碼不是整數，顯示第一頁
+        orders_page = paginator.page(1)
+    except EmptyPage:
+        # 如果頁碼超出範圍，顯示最後一頁
+        orders_page = paginator.page(paginator.num_pages)
+    
     # 取得篩選選項
     filter_options = order_query_manager.get_filter_options()
     # 取得訂單摘要
     order_summary = order_analytics.get_order_summary()
     # 取得交期分析
     delivery_analysis = order_analytics.get_delivery_analysis()
+    
     # 建立匯出查詢字串
     export_querystring = ""
     for k, v in filters.items():
         if v and k != "order_by":
             export_querystring += f"&{k}={v}"
+    
     return render(
         request,
         "scheduling/order_list.html",
         {
-            "orders": orders,
+            "orders": orders_page,
             "stats": stats,
             "order_summary": order_summary,
             "delivery_analysis": delivery_analysis,
@@ -51,6 +81,15 @@ def order_list(request):
             "export_querystring": export_querystring,
             "filters": filters,
             "order_by": order_by,
+            "per_page": per_page,
+            "total_pages": paginator.num_pages,
+            "current_page": orders_page.number,
+            "has_previous": orders_page.has_previous(),
+            "has_next": orders_page.has_next(),
+            "previous_page_number": orders_page.previous_page_number() if orders_page.has_previous() else None,
+            "next_page_number": orders_page.next_page_number() if orders_page.has_next() else None,
+            "page_range": orders_page.paginator.page_range,
+            "total_count": paginator.count,
         },
     )
 

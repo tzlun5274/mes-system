@@ -153,7 +153,7 @@
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
             <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'system:workorder_settings' %}">工單管理設定</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
             <li class="breadcrumb-item active" aria-current="page">自動審核定時任務管理</li>
         </ol>
     </nav>
@@ -231,7 +231,7 @@
                                 <i class="fas fa-ellipsis-v"></i>
                             </button>
                             <div class="dropdown-menu dropdown-menu-right">
-                                <a class="dropdown-item" href="{% url 'system:auto_approval_task_detail' task.id %}">
+                                <a class="dropdown-item" href="#" onclick="alert('此功能已移除，請使用系統管理功能')">
                                     <i class="fas fa-edit mr-2"></i>編輯
                                 </a>
                                 <form method="post" style="display: inline;">
