@@ -33,11 +33,12 @@ class UserChangeFormCustom(UserChangeForm):
     first_name = forms.CharField(max_length=30, required=False, label="名字")
     last_name = forms.CharField(max_length=30, required=False, label="姓氏")
     is_active = forms.BooleanField(required=False, label="啟用帳號")
-    is_staff = forms.BooleanField(required=False, label="員工權限")
+    is_staff = forms.BooleanField(required=False, label="管理員權限")
+    is_superuser = forms.BooleanField(required=False, label="超級用戶")
     
     class Meta:
         model = User
-        fields = ("username", "email", "first_name", "last_name", "is_active", "is_staff")
+        fields = ("username", "email", "first_name", "last_name", "is_active", "is_staff", "is_superuser")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

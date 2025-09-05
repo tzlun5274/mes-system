@@ -16,6 +16,7 @@ urlpatterns = [
     # 用戶管理相關路由
     path("user/list/", views.user_list, name="user_list"),
     path("user/add/", views.user_add, name="user_add"),
+    path("user/detail/<int:user_id>/", views.user_detail, name="user_detail"),
     path("user/edit/<int:user_id>/", views.user_edit, name="user_edit"),
     path("user/edit/<int:user_id>/password/", views.user_change_password, name="user_change_password"),
     path("user/delete/<int:user_id>/", views.user_delete, name="user_delete"),
@@ -43,6 +44,7 @@ urlpatterns = [
     
     # 用戶資料匯入匯出
     path("user/export/", views.export_users, name="user_export"),
+    path("user/export/excel/", views.export_users_excel, name="user_export_excel"),
     path("user/import/", views.import_users, name="user_import"),
     
     # 操作日誌管理

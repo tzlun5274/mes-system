@@ -115,7 +115,7 @@ class OperationLogConfig(models.Model):
     )
     max_file_size = models.IntegerField(
         default=10,
-        verbose_name="最大檔案大小(MB)",
+        verbose_name=_("最大檔案大小(MB)"),
         help_text="單個日誌檔案的最大大小"
     )
     is_active = models.BooleanField(
@@ -781,7 +781,7 @@ class UserPermissionDetail(models.Model):
     # 報工類型權限
     can_fill_work = models.BooleanField(default=True, verbose_name="可填報報工")
     can_onsite_reporting = models.BooleanField(default=True, verbose_name="可現場報工")
-    can_smt_reporting = models.BooleanField(default=False, verbose_name="可SMT報工")
+    can_smt_reporting = models.BooleanField(default=False, verbose_name=_("可SMT報工"))
     
     # 模組訪問權限
     can_access_equip = models.BooleanField(default=True, verbose_name="可訪問設備管理")
@@ -792,7 +792,7 @@ class UserPermissionDetail(models.Model):
     can_access_process = models.BooleanField(default=True, verbose_name="可訪問製程管理")
     can_access_reporting = models.BooleanField(default=True, verbose_name="可訪問報表管理")
     can_access_kanban = models.BooleanField(default=True, verbose_name="可訪問看板管理")
-    can_access_ai = models.BooleanField(default=True, verbose_name="可訪問AI管理")
+    can_access_ai = models.BooleanField(default=True, verbose_name=_("可訪問AI管理"))
     
     # 功能級權限
     can_view = models.BooleanField(default=True, verbose_name="可查看")
@@ -912,20 +912,20 @@ class UserWorkPermission(models.Model):
     
     # 作業員權限控制
     can_operate_all_operators = models.BooleanField(default=True, verbose_name="可操作所有作業員")
-    allowed_operators = models.JSONField(default=list, blank=True, verbose_name="允許的作業員ID列表")
+    allowed_operators = models.JSONField(default=list, blank=True, verbose_name=_("允許的作業員ID列表"))
     
     # 工序權限控制
     can_operate_all_processes = models.BooleanField(default=True, verbose_name="可操作所有工序")
-    allowed_processes = models.JSONField(default=list, blank=True, verbose_name="允許的工序ID列表")
+    allowed_processes = models.JSONField(default=list, blank=True, verbose_name=_("允許的工序ID列表"))
     
     # 設備權限控制
     can_operate_all_equipments = models.BooleanField(default=True, verbose_name="可操作所有設備")
-    allowed_equipments = models.JSONField(default=list, blank=True, verbose_name="允許的設備ID列表")
+    allowed_equipments = models.JSONField(default=list, blank=True, verbose_name=_("允許的設備ID列表"))
     
     # 報工功能權限
     can_fill_work = models.BooleanField(default=True, verbose_name="可進行補登填報")
     can_onsite_reporting = models.BooleanField(default=True, verbose_name="可進行現場報工")
-    can_smt_reporting = models.BooleanField(default=True, verbose_name="可進行SMT報工")
+    can_smt_reporting = models.BooleanField(default=True, verbose_name=_("可進行SMT報工"))
     
     # 資料範圍控制
     data_scope = models.CharField(

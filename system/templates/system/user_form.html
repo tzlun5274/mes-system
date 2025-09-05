@@ -1,38 +1,473 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% load static %}
 
 {% block title %}
-{{ title }} - MES 系統
+{% if user_obj %}編輯用戶 - {{ user_obj.username }}{% else %}新增用戶{% endif %} - MES 系統
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #007bff;
+    }
+    .form-section h5 {
+        color: #007bff;
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+    .form-label {
+        font-weight: 600;
+        color: #495057;
+    }
+    .form-control:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+    .avatar-preview {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: linear-gradient(45deg, #007bff, #0056b3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 2rem;
+        font-weight: bold;
+        margin: 0 auto 1rem;
+    }
+    .permission-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    .permission-card:hover {
+        border-color: #007bff;
+        box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
+    }
+    .permission-card .card-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 0.75rem 1rem;
+    }
+    .permission-card .card-body {
+        padding: 1rem;
+    }
+    .form-check-input:checked {
+        background-color: #007bff;
+        border-color: #007bff;
+    }
+    .btn-save {
+        background: linear-gradient(45deg, #28a745, #20c997);
+        border: none;
+        border-radius: 25px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+    }
+    .btn-cancel {
+        background: linear-gradient(45deg, #6c757d, #495057);
+        border: none;
+        border-radius: 25px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+    }
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+    .help-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{% url 'home' %}">
+                <i class="fas fa-home"></i> 首頁
+            </a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'system:index' %}">系統管理</a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'system:user_list' %}">用戶管理</a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">
+            {% if user_obj %}編輯用戶{% else %}新增用戶{% endif %}
+        </li>
+    </ol>
+</nav>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <!-- 麵包屑導航 -->
-    <nav aria-label="breadcrumb" class="mb-3">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'system:user_list' %}">用戶管理</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
-        </ol>
-    </nav>
-    
-    <h2>{{ title }}</h2>
-    <hr>
-    <div class="card">
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-user{% if user_obj %}-edit{% else %}-plus{% endif %} me-2"></i>
+                        {% if user_obj %}編輯用戶{% else %}新增用戶{% endif %}
+                    </h4>
+                </div>
+                
         <div class="card-body">
-            <form method="post">
+                    <form method="post" id="userForm" novalidate>
                 {% csrf_token %}
-                <table class="table">
-                    {{ form.as_table }}
-                </table>
-                <button type="submit" class="btn btn-primary">提交</button>
-                <a href="{% url 'system:user_list' %}" class="btn btn-secondary">返回</a>
-                {% if user_id %}
-                <a href="{% url 'system:user_change_password' user_id %}" class="btn btn-warning">更改密碼</a>
+                        
+                        <!-- 基本資訊區塊 -->
+                        <div class="form-section">
+                            <h5><i class="fas fa-user me-2"></i>基本資訊</h5>
+                            <div class="row">
+                                <div class="col-md-4 text-center">
+                                    <div class="avatar-preview" id="avatarPreview">
+                                        {% if user_obj %}
+                                            {{ user_obj.username|first|upper }}
+                                        {% else %}
+                                            ?
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted">用戶頭像預覽</small>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="{{ form.username.id_for_label }}" class="form-label required-field">
+                                                {{ form.username.label }}
+                                            </label>
+                                            <input type="text" name="{{ form.username.name }}" value="{{ form.username.value|default:'' }}" class="form-control" placeholder="請輸入用戶名稱" id="{{ form.username.id_for_label }}">
+                                            {% if form.username.errors %}
+                                                <div class="invalid-feedback d-block">
+                                                    {{ form.username.errors.0 }}
+                                                </div>
+                                            {% endif %}
+                                            <div class="help-text">用戶名稱必須唯一，用於登入系統</div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="{{ form.email.id_for_label }}" class="form-label required-field">
+                                                {{ form.email.label }}
+                                            </label>
+                                            <input type="email" name="{{ form.email.name }}" value="{{ form.email.value|default:'' }}" class="form-control" placeholder="請輸入電子郵件" id="{{ form.email.id_for_label }}">
+                                            {% if form.email.errors %}
+                                                <div class="invalid-feedback d-block">
+                                                    {{ form.email.errors.0 }}
+                                                </div>
+                                            {% endif %}
+                                            <div class="help-text">用於接收系統通知和密碼重設</div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="{{ form.first_name.id_for_label }}" class="form-label">
+                                                {{ form.first_name.label }}
+                                            </label>
+                                            <input type="text" name="{{ form.first_name.name }}" value="{{ form.first_name.value|default:'' }}" class="form-control" placeholder="請輸入名字" id="{{ form.first_name.id_for_label }}">
+                                            {% if form.first_name.errors %}
+                                                <div class="invalid-feedback d-block">
+                                                    {{ form.first_name.errors.0 }}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="{{ form.last_name.id_for_label }}" class="form-label">
+                                                {{ form.last_name.label }}
+                                            </label>
+                                            <input type="text" name="{{ form.last_name.name }}" value="{{ form.last_name.value|default:'' }}" class="form-control" placeholder="請輸入姓氏" id="{{ form.last_name.id_for_label }}">
+                                            {% if form.last_name.errors %}
+                                                <div class="invalid-feedback d-block">
+                                                    {{ form.last_name.errors.0 }}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 密碼設定區塊 -->
+                        {% if not user_obj %}
+                        <div class="form-section">
+                            <h5><i class="fas fa-key me-2"></i>密碼設定</h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.password1.id_for_label }}" class="form-label required-field">
+                                        {{ form.password1.label }}
+                                    </label>
+                                    <input type="password" name="{{ form.password1.name }}" class="form-control" placeholder="請輸入密碼" id="{{ form.password1.id_for_label }}">
+                                    {% if form.password1.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.password1.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="help-text">密碼長度至少8個字符</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.password2.id_for_label }}" class="form-label required-field">
+                                        {{ form.password2.label }}
+                                    </label>
+                                    <input type="password" name="{{ form.password2.name }}" class="form-control" placeholder="請再次輸入密碼" id="{{ form.password2.id_for_label }}">
+                                    {% if form.password2.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.password2.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="help-text">請再次輸入相同的密碼</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- 權限設定區塊 -->
+                        <div class="form-section">
+                            <h5><i class="fas fa-shield-alt me-2"></i>權限設定</h5>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="permission-card">
+                                        <div class="card-header">
+                                            <div class="form-check form-switch">
+                                                <input type="checkbox" name="{{ form.is_active.name }}" {% if form.is_active.value %}checked{% endif %} class="form-check-input" id="{{ form.is_active.id_for_label }}">
+                                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                                    <strong>帳號啟用</strong>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                啟用後用戶可以登入系統
+                                            </small>
+                                            <div class="mt-2">
+                                                <span class="badge {% if form.is_active.value %}bg-success{% else %}bg-danger{% endif %}">
+                                                    {% if form.is_active.value %}已啟用{% else %}已停用{% endif %}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="permission-card">
+                                        <div class="card-header">
+                                            <div class="form-check form-switch">
+                                                <input type="checkbox" name="{{ form.is_staff.name }}" {% if form.is_staff.value %}checked{% endif %} class="form-check-input" id="{{ form.is_staff.id_for_label }}">
+                                                <label class="form-check-label" for="{{ form.is_staff.id_for_label }}">
+                                                    <strong>管理員權限</strong>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                允許存取系統管理後台
+                                            </small>
+                                            <div class="mt-2">
+                                                <span class="badge {% if form.is_staff.value %}bg-warning{% else %}bg-secondary{% endif %}">
+                                                    {% if form.is_staff.value %}管理員{% else %}未設定{% endif %}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="permission-card">
+                                        <div class="card-header">
+                                            <div class="form-check form-switch">
+                                                <input type="checkbox" name="{{ form.is_superuser.name }}" {% if form.is_superuser.value %}checked{% endif %} class="form-check-input" id="{{ form.is_superuser.id_for_label }}">
+                                                <label class="form-check-label" for="{{ form.is_superuser.id_for_label }}">
+                                                    <strong>超級用戶</strong>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <small class="text-muted">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                擁有系統所有權限，請謹慎設定
+                                            </small>
+                                            <div class="mt-2">
+                                                <span class="badge {% if form.is_superuser.value %}bg-info{% else %}bg-secondary{% endif %}">
+                                                    {% if form.is_superuser.value %}超級用戶{% else %}未設定{% endif %}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 權限說明 -->
+                            <div class="alert alert-info mt-3">
+                                <h6><i class="fas fa-lightbulb me-2"></i>權限說明</h6>
+                                <ul class="mb-0">
+                                    <li><strong>帳號啟用：</strong>控制用戶是否可以登入系統</li>
+                                    <li><strong>管理員權限：</strong>允許用戶存取系統管理功能，如用戶管理、系統設定等</li>
+                                    <li><strong>超級用戶：</strong>擁有系統的最高權限，可以執行所有操作</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- 其他設定區塊 -->
+                        <div class="form-section">
+                            <h5><i class="fas fa-cog me-2"></i>其他設定</h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.date_joined.id_for_label }}" class="form-label">
+                                        {{ form.date_joined.label }}
+                                    </label>
+                                    <input type="text" name="{{ form.date_joined.name }}" value="{{ form.date_joined.value|default:'' }}" class="form-control" readonly id="{{ form.date_joined.id_for_label }}">
+                                    <div class="help-text">用戶註冊時間</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.last_login.id_for_label }}" class="form-label">
+                                        {{ form.last_login.label }}
+                                    </label>
+                                    <input type="text" name="{{ form.last_login.name }}" value="{{ form.last_login.value|default:'' }}" class="form-control" readonly id="{{ form.last_login.id_for_label }}">
+                                    <div class="help-text">最後登入時間</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 表單錯誤顯示 -->
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>表單錯誤：</strong>
+                            <ul class="mb-0">
+                                {% for error in form.non_field_errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        <!-- 操作按鈕 -->
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-save text-white me-3">
+                                <i class="fas fa-save me-2"></i>
+                                {% if user_obj %}更新用戶{% else %}建立用戶{% endif %}
+                            </button>
+                            <a href="{% url 'system:user_list' %}" class="btn btn-cancel text-white">
+                                <i class="fas fa-times me-2"></i>取消
+                            </a>
+                            {% if user_obj %}
+                            <a href="{% url 'system:user_change_password' user_obj.id %}" class="btn btn-warning ms-3">
+                                <i class="fas fa-key me-2"></i>修改密碼
+                            </a>
                 {% endif %}
+                        </div>
             </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 用戶名稱變更時更新頭像預覽
+    const usernameField = document.getElementById('{{ form.username.id_for_label }}');
+    const avatarPreview = document.getElementById('avatarPreview');
+    
+    if (usernameField && avatarPreview) {
+        usernameField.addEventListener('input', function() {
+            const username = this.value.trim();
+            if (username) {
+                avatarPreview.textContent = username.charAt(0).toUpperCase();
+            } else {
+                avatarPreview.textContent = '?';
+            }
+        });
+    }
+
+    // 密碼強度檢查
+    const password1Field = document.getElementById('{{ form.password1.id_for_label }}');
+    const password2Field = document.getElementById('{{ form.password2.id_for_label }}');
+    
+    if (password1Field) {
+        password1Field.addEventListener('input', function() {
+            const password = this.value;
+            const strength = checkPasswordStrength(password);
+            updatePasswordStrengthIndicator(strength);
+        });
+    }
+    
+    if (password2Field) {
+        password2Field.addEventListener('input', function() {
+            const password1 = password1Field.value;
+            const password2 = this.value;
+            
+            if (password2 && password1 !== password2) {
+                this.setCustomValidity('密碼不一致');
+            } else {
+                this.setCustomValidity('');
+            }
+        });
+    }
+
+    // 表單驗證
+    const form = document.getElementById('userForm');
+    form.addEventListener('submit', function(e) {
+        if (!form.checkValidity()) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    });
+
+    // 權限設定提示
+    const superuserCheckbox = document.getElementById('{{ form.is_superuser.id_for_label }}');
+    if (superuserCheckbox) {
+        superuserCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                if (!confirm('確定要設定為超級用戶嗎？超級用戶擁有系統的所有權限。')) {
+                    this.checked = false;
+                }
+            }
+        });
+    }
+});
+
+function checkPasswordStrength(password) {
+    let strength = 0;
+    
+    if (password.length >= 8) strength++;
+    if (/[a-z]/.test(password)) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^A-Za-z0-9]/.test(password)) strength++;
+    
+    return strength;
+}
+
+function updatePasswordStrengthIndicator(strength) {
+    // 這裡可以添加密碼強度指示器的更新邏輯
+    console.log('密碼強度:', strength);
+}
+
+// 自動儲存草稿功能
+let autoSaveTimeout;
+function autoSave() {
+    clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = setTimeout(() => {
+        const formData = new FormData(document.getElementById('userForm'));
+        // 這裡可以實現自動儲存到 localStorage 或發送到伺服器
+        console.log('自動儲存草稿...');
+    }, 2000);
+}
+
+// 監聽表單變更
+document.querySelectorAll('input, select, textarea').forEach(field => {
+    field.addEventListener('change', autoSave);
+});
+</script>
 {% endblock %}

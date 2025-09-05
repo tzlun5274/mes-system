@@ -1,99 +1,451 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% load static %}
+{% load i18n %}
 
-{% block title %}
-用戶管理 - MES 系統
+{% block title %}MES - 用戶管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(45deg, #007bff, #0056b3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 16px;
+    }
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+    }
+    .stats-card .card-body {
+        padding: 1.5rem;
+    }
+    .search-box {
+        border-radius: 25px;
+        border: 2px solid #e9ecef;
+        padding: 0.5rem 1rem;
+        transition: all 0.3s ease;
+    }
+    .search-box:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+    .filter-btn {
+        border-radius: 20px;
+        margin: 0 2px;
+    }
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+    .action-buttons .btn {
+        margin: 0 2px;
+        border-radius: 15px;
+    }
+</style>
 {% endblock %}
 
-{% block extra_head %}
-<script src="{% static 'bootstrap/bootstrap.bundle.min.js' %}"></script>
-{% endblock %}
-
-{% block breadcrumb %}
-<nav aria-label="breadcrumb" class="mb-3">
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'home' %}">
+                <i class="fas fa-home"></i> 首頁
+            </a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'system:index' %}">系統管理</a>
+        </li>
         <li class="breadcrumb-item active" aria-current="page">用戶管理</li>
     </ol>
 </nav>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2>用戶管理</h2>
-    <hr>
-    <div class="card">
-        <div class="card-header">
-            <a href="{% url 'system:user_add' %}" class="btn btn-primary btn-sm">新增用戶</a>
-            <a href="{% url 'system:user_export' %}" class="btn btn-success btn-sm ms-2">匯出用戶</a>
-            <button type="button" class="btn btn-info btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#importModal">匯入用戶</button>
-            <a href="{% url 'system:index' %}" class="btn btn-secondary btn-sm float-right">返回系統管理</a>
-        </div>
-        <div class="card-body">
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-{% if message.tags == 'success' %}success{% else %}danger{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-            <table class="table table-striped">
-                <thead class="table-primary">
-                    <tr>
-                        <th>用戶名</th>
-                        <th>Email</th>
-                        <th>最後登入</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for user in users %}
-                    <tr>
-                        <td>{{ user.username }}</td>
-                        <td>{{ user.email }}</td>
-                        <td>{{ user.last_login|date:"Y-m-d H:i:s" }}</td>
-                        <td>
-                            <a href="{% url 'system:user_edit' user.id %}" class="btn btn-info btn-sm">編輯</a>
-                            <a href="{% url 'system:user_change_password' user.id %}" class="btn btn-warning btn-sm">更改密碼</a>
-                            <form action="{% url 'system:user_delete' user.id %}" method="post" style="display:inline;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('確定刪除用戶 {{ user.username }}？');">刪除</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="4">無用戶資料</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- 匯入用戶 Modal -->
-    <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="importModalLabel">匯入用戶</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="container-fluid">
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-2x mb-2"></i>
+                    <h4 class="mb-1">{{ total_users }}</h4>
+                    <p class="mb-0">總用戶數</p>
                 </div>
-                <div class="modal-body">
-                    <form method="post" enctype="multipart/form-data" action="{% url 'system:user_import' %}">
-                        {% csrf_token %}
-                        <div class="form-group">
-                            <label for="csv_file">上傳 CSV 或 Excel 文件</label>
-                            <input type="file" name="csv_file" id="csv_file" class="form-control-file" accept=".csv,.xlsx" required>
-                            <small class="form-text text-muted">支援 .csv 或 .xlsx 文件，應包含以下欄位：username, email, password（可選）。未提供密碼的用戶將使用預設密碼 123456。</small>
-                        </div>
-                        <button type="submit" class="btn btn-primary">匯入</button>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    </form>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <i class="fas fa-user-check fa-2x mb-2"></i>
+                    <h4 class="mb-1">{{ active_users_count }}</h4>
+                    <p class="mb-0">啟用用戶</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <i class="fas fa-user-shield fa-2x mb-2"></i>
+                    <h4 class="mb-1">{{ staff_users_count }}</h4>
+                    <p class="mb-0">管理員</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="card-body text-center">
+                    <i class="fas fa-crown fa-2x mb-2"></i>
+                    <h4 class="mb-1">{{ super_users_count }}</h4>
+                    <p class="mb-0">超級用戶</p>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- 主要內容卡片 -->
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h4 class="mb-0">
+                        <i class="fas fa-users me-2"></i>用戶管理
+                    </h4>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'system:user_add' %}" class="btn btn-light">
+                            <i class="fas fa-plus me-1"></i>新增用戶
+                        </a>
+                        <a href="{% url 'system:user_export' %}" class="btn btn-outline-light">
+                            <i class="fas fa-file-csv me-1"></i>匯出CSV
+                        </a>
+                        <a href="{% url 'system:user_export_excel' %}" class="btn btn-outline-light">
+                            <i class="fas fa-file-excel me-1"></i>匯出Excel
+                        </a>
+                        <button type="button" class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#importModal">
+                            <i class="fas fa-upload me-1"></i>匯入用戶
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <!-- 搜尋和篩選 -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <form method="get" class="d-flex">
+                        <input type="text" 
+                               name="search" 
+                               class="form-control search-box me-2" 
+                               placeholder="搜尋用戶名稱、電子郵件或姓名..."
+                               value="{{ search_query }}">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </form>
+                </div>
+                <div class="col-md-6">
+                    <div class="btn-group" role="group">
+                        <a href="?status=all" 
+                           class="btn filter-btn {% if status_filter == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                            全部 ({{ total_users }})
+                        </a>
+                        <a href="?status=active" 
+                           class="btn filter-btn {% if status_filter == 'active' %}btn-success{% else %}btn-outline-success{% endif %}">
+                            啟用 ({{ active_users_count }})
+                        </a>
+                        <a href="?status=inactive" 
+                           class="btn filter-btn {% if status_filter == 'inactive' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+                            停用 ({{ inactive_users }})
+                        </a>
+                        <a href="?status=staff" 
+                           class="btn filter-btn {% if status_filter == 'staff' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+                            管理員 ({{ staff_users_count }})
+                        </a>
+                        <a href="?status=superuser" 
+                           class="btn filter-btn {% if status_filter == 'superuser' %}btn-info{% else %}btn-outline-info{% endif %}">
+                            超級用戶 ({{ super_users_count }})
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 用戶列表 -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="5%">頭像</th>
+                            <th width="15%">用戶名稱</th>
+                            <th width="20%">姓名</th>
+                            <th width="20%">電子郵件</th>
+                            <th width="10%">狀態</th>
+                            <th width="10%">權限</th>
+                            <th width="15%">最後登入</th>
+                            <th width="15%">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>
+                                <div class="user-avatar">
+                                    {{ user.username|first|upper }}
+                                </div>
+                            </td>
+                            <td>
+                                <strong>{{ user.username }}</strong>
+                            </td>
+                            <td>
+                                {% if user.first_name or user.last_name %}
+                                    {{ user.first_name }} {{ user.last_name }}
+                                {% else %}
+                                    <span class="text-muted">未設定</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.email %}
+                                    <a href="mailto:{{ user.email }}" class="text-decoration-none">
+                                        {{ user.email }}
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">未設定</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.is_active %}
+                                    <span class="badge bg-success status-badge">
+                                        <i class="fas fa-check me-1"></i>啟用
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger status-badge">
+                                        <i class="fas fa-times me-1"></i>停用
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.is_superuser %}
+                                    <span class="badge bg-info status-badge">
+                                        <i class="fas fa-crown me-1"></i>超級用戶
+                                    </span>
+                                {% elif user.is_staff %}
+                                    <span class="badge bg-warning status-badge">
+                                        <i class="fas fa-user-shield me-1"></i>管理員
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary status-badge">
+                                        <i class="fas fa-user me-1"></i>一般用戶
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.last_login %}
+                                    <small class="text-muted">
+                                        {{ user.last_login|date:"Y-m-d H:i" }}
+                                    </small>
+                                {% else %}
+                                    <span class="text-muted">從未登入</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    <a href="{% url 'system:user_detail' user.id %}" 
+                                       class="btn btn-sm btn-outline-info" 
+                                       title="查看詳情">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'system:user_edit' user.id %}" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       title="編輯">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'system:user_change_password' user.id %}" 
+                                       class="btn btn-sm btn-outline-warning" 
+                                       title="修改密碼">
+                                        <i class="fas fa-key"></i>
+                                    </a>
+                                    {% if not user.is_superuser or user.id != request.user.id %}
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-danger" 
+                                            onclick="confirmDelete({{ user.id }}, '{{ user.username }}')"
+                                            title="刪除">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">沒有找到符合條件的用戶</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分頁 -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="用戶列表分頁">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter != 'all' %}&status={{ status_filter }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter != 'all' %}&status={{ status_filter }}{% endif %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter != 'all' %}&status={{ status_filter }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter != 'all' %}&status={{ status_filter }}{% endif %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter != 'all' %}&status={{ status_filter }}{% endif %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
 </div>
+
+<!-- 匯入用戶模態框 -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importModalLabel">
+                    <i class="fas fa-upload me-2"></i>匯入用戶
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="關閉"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data" action="{% url 'system:user_import' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="importFile" class="form-label">選擇檔案</label>
+                        <input type="file" class="form-control" id="importFile" name="file" accept=".csv,.xlsx,.xls" required>
+                        <div class="form-text">支援 CSV、Excel 格式檔案</div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>匯入格式說明：</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>第一行必須是標題行</li>
+                            <li>必要欄位：username, email, first_name, last_name</li>
+                            <li>可選欄位：is_active, is_staff, is_superuser</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload me-1"></i>開始匯入
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 刪除確認模態框 -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>確認刪除
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="關閉"></button>
+            </div>
+            <div class="modal-body">
+                <p>您確定要刪除用戶 <strong id="deleteUsername"></strong> 嗎？</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-warning me-2"></i>
+                    <strong>警告：</strong>此操作無法復原，該用戶的所有相關資料將被永久刪除。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <form id="deleteForm" method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i>確認刪除
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDelete(userId, username) {
+    document.getElementById('deleteUsername').textContent = username;
+    document.getElementById('deleteForm').action = '{% url "system:user_delete" 0 %}'.replace('0', userId);
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+// 搜尋框自動提交
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.querySelector('input[name="search"]');
+    let searchTimeout;
+    
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            if (this.value.length > 2 || this.value.length === 0) {
+                this.form.submit();
+            }
+        }, 500);
+    });
+});
+
+// 檔案上傳預覽
+document.getElementById('importFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const fileSize = (file.size / 1024 / 1024).toFixed(2);
+        console.log(`選擇檔案: ${file.name}, 大小: ${fileSize} MB`);
+    }
+});
+</script>
 {% endblock %}

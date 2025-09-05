@@ -1,10 +1,14 @@
 import logging
+import csv
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User, Permission
 from django.contrib import messages
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, SetPasswordForm
 from django import forms
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill
+from openpyxl.utils import get_column_letter
 from .forms import (
     UserCreationFormCustom,
     UserChangeFormCustom,
@@ -185,15 +189,25 @@ def user_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # 計算統計數據
+    all_users = User.objects.all()
+    active_users_count = all_users.filter(is_active=True).count()
+    staff_users_count = all_users.filter(is_staff=True).count()
+    super_users_count = all_users.filter(is_superuser=True).count()
+    
     context = {
+        'users': page_obj,
         'page_obj': page_obj,
         'search_query': search_query,
         'status_filter': status_filter,
-        'total_users': users.count(),
-        'active_users': users.filter(is_active=True).count(),
-        'inactive_users': users.filter(is_active=False).count(),
-        'staff_users': users.filter(is_staff=True).count(),
-        'superusers': users.filter(is_superuser=True).count(),
+        'total_users': all_users.count(),
+        'active_users_count': active_users_count,
+        'staff_users_count': staff_users_count,
+        'super_users_count': super_users_count,
+        'active_users': all_users.filter(is_active=True).count(),
+        'inactive_users': all_users.filter(is_active=False).count(),
+        'staff_users': all_users.filter(is_staff=True).count(),
+        'superusers': all_users.filter(is_superuser=True).count(),
     }
     
     return render(request, "system/user_list.html", context)
@@ -233,6 +247,20 @@ def user_add(request):
 
 @login_required
 @user_passes_test(superuser_required, login_url="/accounts/login/")
+def user_detail(request, user_id):
+    """用戶詳情頁面"""
+    user = get_object_or_404(User, id=user_id)
+    
+    context = {
+        "user_obj": user,
+        "title": f"用戶詳情 - {user.username}"
+    }
+    
+    return render(request, "system/user_detail.html", context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
 def user_edit(request, user_id):
     """編輯用戶頁面"""
     user = get_object_or_404(User, id=user_id)
@@ -255,6 +283,7 @@ def user_edit(request, user_id):
         "title": f"編輯用戶 - {user.username}",
         "submit_text": "更新用戶",
         "user_id": user_id,
+        "user_obj": user,
         "target_user": user
     }
     
@@ -283,6 +312,7 @@ def user_change_password(request, user_id):
         "form": form,
         "title": f"更改用戶 {user.username} 的密碼",
         "user_id": user_id,
+        "user_obj": user,
         "target_user": user,
         "submit_text": "更改密碼"
     }
@@ -892,21 +922,90 @@ def export_users(request):
     response["Content-Disposition"] = 'attachment; filename="users_export.csv"'
     response.write("\ufeff".encode("utf8"))
     writer = csv.writer(response)
-    writer.writerow(["username", "email", "last_login"])
-    users = User.objects.all()
+    writer.writerow(["用戶名稱", "電子郵件", "姓名", "是否啟用", "是否為員工", "是否為超級用戶", "預設密碼"])
+    users = User.objects.all().order_by('username')
     for user in users:
         writer.writerow(
             [
                 user.username,
                 user.email,
-                (
-                    user.last_login.strftime("%Y-%m-%d %H:%M:%S")
-                    if user.last_login
-                    else ""
-                ),
+                f"{user.first_name} {user.last_name}".strip() or "",
+                "是" if user.is_active else "否",
+                "是" if user.is_staff else "否",
+                "是" if user.is_superuser else "否",
+                "123456",  # 預設密碼
             ]
         )
     logger.info(f"用戶數據匯出成功，由 {request.user.username} 執行")
+    return response
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def export_users_excel(request):
+    """匯出用戶資料為Excel格式"""
+    # 創建工作簿
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "用戶資料"
+    
+    # 設定標題行
+    headers = [
+        "用戶名稱", "電子郵件", "姓名", "是否啟用", "是否為員工", 
+        "是否為超級用戶", "預設密碼"
+    ]
+    
+    # 設定標題行樣式
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    
+    # 寫入標題行
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+    
+    # 獲取用戶資料
+    users = User.objects.all().order_by('username')
+    
+    # 寫入資料行
+    for row, user in enumerate(users, 2):
+        ws.cell(row=row, column=1, value=user.username)
+        ws.cell(row=row, column=2, value=user.email)
+        ws.cell(row=row, column=3, value=f"{user.first_name} {user.last_name}".strip() or "")
+        ws.cell(row=row, column=4, value="是" if user.is_active else "否")
+        ws.cell(row=row, column=5, value="是" if user.is_staff else "否")
+        ws.cell(row=row, column=6, value="是" if user.is_superuser else "否")
+        ws.cell(row=row, column=7, value="123456")  # 預設密碼
+    
+    # 自動調整欄寬
+    for col in range(1, len(headers) + 1):
+        column_letter = get_column_letter(col)
+        max_length = 0
+        for row in range(1, ws.max_row + 1):
+            cell_value = ws[f"{column_letter}{row}"].value
+            if cell_value:
+                max_length = max(max_length, len(str(cell_value)))
+        adjusted_width = min(max_length + 2, 50)  # 最大寬度限制為50
+        ws.column_dimensions[column_letter].width = adjusted_width
+    
+    # 設定資料行對齊方式
+    for row in range(2, ws.max_row + 1):
+        for col in range(1, len(headers) + 1):
+            ws.cell(row=row, column=col).alignment = Alignment(horizontal="left", vertical="center")
+    
+    # 創建HTTP響應
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="users_export.xlsx"'
+    
+    # 儲存工作簿到響應
+    wb.save(response)
+    
+    logger.info(f"用戶Excel資料匯出成功，由 {request.user.username} 執行")
     return response
 
 

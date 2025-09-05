@@ -1,0 +1,516 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}用戶詳情 - {{ user_obj.username }} - MES 系統{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    .profile-avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 3rem;
+        font-weight: bold;
+        margin: 0 auto 1rem;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+    }
+    .info-card {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+        transition: transform 0.3s ease;
+    }
+    .info-card:hover {
+        transform: translateY(-2px);
+    }
+    .info-card .card-header {
+        background: linear-gradient(45deg, #007bff, #0056b3);
+        color: white;
+        border-radius: 15px 15px 0 0;
+        border: none;
+        padding: 1rem 1.5rem;
+    }
+    .info-card .card-body {
+        padding: 1.5rem;
+    }
+    .info-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f8f9fa;
+    }
+    .info-item:last-child {
+        border-bottom: none;
+    }
+    .info-label {
+        font-weight: 600;
+        color: #495057;
+        min-width: 120px;
+    }
+    .info-value {
+        color: #6c757d;
+        text-align: right;
+        flex: 1;
+    }
+    .status-badge {
+        font-size: 0.875rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+    }
+    .activity-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border-left: 4px solid #007bff;
+        background: #f8f9fa;
+        margin-bottom: 0.5rem;
+        border-radius: 0 8px 8px 0;
+    }
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #007bff;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+    }
+    .permission-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        margin: 0.25rem;
+        border-radius: 15px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .btn-action {
+        border-radius: 20px;
+        padding: 0.5rem 1.5rem;
+        font-weight: 600;
+        margin: 0 0.25rem;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .stat-item {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid #007bff;
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #007bff;
+        margin-bottom: 0.5rem;
+    }
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{% url 'home' %}">
+                <i class="fas fa-home"></i> 首頁
+            </a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'system:index' %}">系統管理</a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'system:user_list' %}">用戶管理</a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">用戶詳情</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 用戶頭像和基本資訊 -->
+    <div class="profile-header">
+        <div class="row align-items-center">
+            <div class="col-md-3 text-center">
+                <div class="profile-avatar">
+                    {{ user_obj.username|first|upper }}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h2 class="mb-2">{{ user_obj.username }}</h2>
+                <p class="mb-1">
+                    {% if user_obj.first_name or user_obj.last_name %}
+                        {{ user_obj.first_name }} {{ user_obj.last_name }}
+                    {% else %}
+                        <span class="text-light">未設定姓名</span>
+                    {% endif %}
+                </p>
+                {% if user_obj.email %}
+                    <p class="mb-0">
+                        <i class="fas fa-envelope me-2"></i>
+                        <a href="mailto:{{ user_obj.email }}" class="text-light text-decoration-none">
+                            {{ user_obj.email }}
+                        </a>
+                    </p>
+                {% endif %}
+            </div>
+            <div class="col-md-3 text-end">
+                <div class="btn-group-vertical">
+                    <a href="{% url 'system:user_edit' user_obj.id %}" class="btn btn-light btn-action mb-2">
+                        <i class="fas fa-edit me-2"></i>編輯用戶
+                    </a>
+                    <a href="{% url 'system:user_change_password' user_obj.id %}" class="btn btn-warning btn-action mb-2">
+                        <i class="fas fa-key me-2"></i>修改密碼
+                    </a>
+                    {% if not user_obj.is_superuser or user_obj.id != request.user.id %}
+                    <button type="button" class="btn btn-danger btn-action" onclick="confirmDelete({{ user_obj.id }}, '{{ user_obj.username }}')">
+                        <i class="fas fa-trash me-2"></i>刪除用戶
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="stats-grid">
+        <div class="stat-item">
+            <div class="stat-number">{{ user_obj.date_joined|date:"Y-m-d" }}</div>
+            <div class="stat-label">註冊日期</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">
+                {% if user_obj.last_login %}
+                    {{ user_obj.last_login|date:"Y-m-d" }}
+                {% else %}
+                    從未登入
+                {% endif %}
+            </div>
+            <div class="stat-label">最後登入</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">
+                {% if user_obj.is_active %}
+                    <span class="text-success">啟用</span>
+                {% else %}
+                    <span class="text-danger">停用</span>
+                {% endif %}
+            </div>
+            <div class="stat-label">帳號狀態</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">
+                {% if user_obj.is_superuser %}
+                    <span class="text-info">超級用戶</span>
+                {% elif user_obj.is_staff %}
+                    <span class="text-warning">管理員</span>
+                {% else %}
+                    <span class="text-secondary">一般用戶</span>
+                {% endif %}
+            </div>
+            <div class="stat-label">權限等級</div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 基本資訊 -->
+        <div class="col-lg-6">
+            <div class="info-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user me-2"></i>基本資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="info-item">
+                        <span class="info-label">用戶名稱</span>
+                        <span class="info-value">{{ user_obj.username }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">電子郵件</span>
+                        <span class="info-value">
+                            {% if user_obj.email %}
+                                <a href="mailto:{{ user_obj.email }}">{{ user_obj.email }}</a>
+                            {% else %}
+                                <span class="text-muted">未設定</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">姓名</span>
+                        <span class="info-value">
+                            {% if user_obj.first_name or user_obj.last_name %}
+                                {{ user_obj.first_name }} {{ user_obj.last_name }}
+                            {% else %}
+                                <span class="text-muted">未設定</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">註冊時間</span>
+                        <span class="info-value">{{ user_obj.date_joined|date:"Y-m-d H:i:s" }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">最後登入</span>
+                        <span class="info-value">
+                            {% if user_obj.last_login %}
+                                {{ user_obj.last_login|date:"Y-m-d H:i:s" }}
+                            {% else %}
+                                <span class="text-muted">從未登入</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 權限資訊 -->
+        <div class="col-lg-6">
+            <div class="info-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shield-alt me-2"></i>權限資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="info-item">
+                        <span class="info-label">帳號狀態</span>
+                        <span class="info-value">
+                            {% if user_obj.is_active %}
+                                <span class="badge bg-success status-badge">
+                                    <i class="fas fa-check me-1"></i>啟用
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger status-badge">
+                                    <i class="fas fa-times me-1"></i>停用
+                                </span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">管理員權限</span>
+                        <span class="info-value">
+                            {% if user_obj.is_staff %}
+                                <span class="badge bg-warning status-badge">
+                                    <i class="fas fa-user-shield me-1"></i>是
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary status-badge">
+                                    <i class="fas fa-user me-1"></i>否
+                                </span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">超級用戶</span>
+                        <span class="info-value">
+                            {% if user_obj.is_superuser %}
+                                <span class="badge bg-info status-badge">
+                                    <i class="fas fa-crown me-1"></i>是
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary status-badge">
+                                    <i class="fas fa-user me-1"></i>否
+                                </span>
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">權限摘要</span>
+                        <span class="info-value">
+                            {% if user_obj.is_superuser %}
+                                <span class="permission-badge bg-info text-white">所有權限</span>
+                            {% elif user_obj.is_staff %}
+                                <span class="permission-badge bg-warning text-white">管理員權限</span>
+                            {% else %}
+                                <span class="permission-badge bg-secondary text-white">一般用戶權限</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近活動 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="info-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>最近活動
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-1">帳號建立</h6>
+                            <p class="mb-0 text-muted">
+                                用戶帳號於 {{ user_obj.date_joined|date:"Y-m-d H:i:s" }} 建立
+                            </p>
+                        </div>
+                    </div>
+                    
+                    {% if user_obj.last_login %}
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-sign-in-alt"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-1">最後登入</h6>
+                            <p class="mb-0 text-muted">
+                                最後登入時間：{{ user_obj.last_login|date:"Y-m-d H:i:s" }}
+                            </p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-1">從未登入</h6>
+                            <p class="mb-0 text-muted">
+                                此用戶尚未登入過系統
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if user_obj.is_active %}
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-1">帳號啟用</h6>
+                            <p class="mb-0 text-muted">
+                                帳號目前處於啟用狀態
+                            </p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="activity-item">
+                        <div class="activity-icon">
+                            <i class="fas fa-ban"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-1">帳號停用</h6>
+                            <p class="mb-0 text-muted">
+                                帳號目前處於停用狀態，無法登入系統
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 刪除確認模態框 -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>確認刪除用戶
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="關閉"></button>
+            </div>
+            <div class="modal-body">
+                <p>您確定要刪除用戶 <strong id="deleteUsername"></strong> 嗎？</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-warning me-2"></i>
+                    <strong>警告：</strong>此操作無法復原，該用戶的所有相關資料將被永久刪除。
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>注意：</strong>如果該用戶有相關的工作記錄或報表，這些資料也會受到影響。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <form id="deleteForm" method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i>確認刪除
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDelete(userId, username) {
+    document.getElementById('deleteUsername').textContent = username;
+    document.getElementById('deleteForm').action = '{% url "system:user_delete" 0 %}'.replace('0', userId);
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+// 頁面載入完成後的初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 添加動畫效果
+    const cards = document.querySelectorAll('.info-card');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            card.style.transition = 'all 0.5s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+
+    // 統計項目動畫
+    const statNumbers = document.querySelectorAll('.stat-number');
+    statNumbers.forEach(stat => {
+        if (stat.textContent.match(/^\d+$/)) {
+            const finalNumber = parseInt(stat.textContent);
+            let currentNumber = 0;
+            const increment = finalNumber / 50;
+            const timer = setInterval(() => {
+                currentNumber += increment;
+                if (currentNumber >= finalNumber) {
+                    stat.textContent = finalNumber;
+                    clearInterval(timer);
+                } else {
+                    stat.textContent = Math.floor(currentNumber);
+                }
+            }, 30);
+        }
+    });
+});
+</script>
+{% endblock %}
