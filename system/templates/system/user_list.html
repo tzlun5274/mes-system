@@ -72,6 +72,25 @@
 
 {% block content %}
 <div class="container-fluid">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'home' %}">
+                    <i class="fas fa-home"></i> 首頁
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'system:index' %}">
+                    <i class="fas fa-cog"></i> 系統管理
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+                <i class="fas fa-users"></i> 用戶管理
+            </li>
+        </ol>
+    </nav>
+    
     <!-- 統計卡片 -->
     <div class="row mb-4">
         <div class="col-md-3">
@@ -137,13 +156,13 @@
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <div class="card-body">
+                    </div>
+                </div>
+                
+                <div class="card-body">
             <!-- 搜尋和篩選 -->
-            <div class="row mb-3">
-                <div class="col-md-6">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
                     <form method="get" class="d-flex">
                         <input type="text" 
                                name="search" 
@@ -151,11 +170,11 @@
                                placeholder="搜尋用戶名稱、電子郵件或姓名..."
                                value="{{ search_query }}">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-search"></i>
-                        </button>
+                                    <i class="fas fa-search"></i>
+                                </button>
                     </form>
-                </div>
-                <div class="col-md-6">
+                        </div>
+                        <div class="col-md-6">
                     <div class="btn-group" role="group">
                         <a href="?status=all" 
                            class="btn filter-btn {% if status_filter == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">
@@ -177,12 +196,12 @@
                            class="btn filter-btn {% if status_filter == 'superuser' %}btn-info{% else %}btn-outline-info{% endif %}">
                             超級用戶 ({{ super_users_count }})
                         </a>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
 
             <!-- 用戶列表 -->
-            <div class="table-responsive">
+                    <div class="table-responsive">
                 <table class="table table-hover">
                     <thead class="table-light">
                         <tr>
@@ -194,23 +213,23 @@
                             <th width="10%">權限</th>
                             <th width="15%">最後登入</th>
                             <th width="15%">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for user in users %}
-                        <tr>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
                             <td>
                                 <div class="user-avatar">
                                     {{ user.username|first|upper }}
                                 </div>
                             </td>
-                            <td>
-                                <strong>{{ user.username }}</strong>
-                            </td>
-                            <td>
-                                {% if user.first_name or user.last_name %}
-                                    {{ user.first_name }} {{ user.last_name }}
-                                {% else %}
+                                    <td>
+                                        <strong>{{ user.username }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if user.first_name or user.last_name %}
+                                            {{ user.first_name }} {{ user.last_name }}
+                                        {% else %}
                                     <span class="text-muted">未設定</span>
                                 {% endif %}
                             </td>
@@ -221,44 +240,44 @@
                                     </a>
                                 {% else %}
                                     <span class="text-muted">未設定</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if user.is_active %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.is_active %}
                                     <span class="badge bg-success status-badge">
                                         <i class="fas fa-check me-1"></i>啟用
                                     </span>
-                                {% else %}
+                                        {% else %}
                                     <span class="badge bg-danger status-badge">
                                         <i class="fas fa-times me-1"></i>停用
                                     </span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if user.is_superuser %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.is_superuser %}
                                     <span class="badge bg-info status-badge">
                                         <i class="fas fa-crown me-1"></i>超級用戶
                                     </span>
-                                {% elif user.is_staff %}
+                                        {% elif user.is_staff %}
                                     <span class="badge bg-warning status-badge">
                                         <i class="fas fa-user-shield me-1"></i>管理員
                                     </span>
-                                {% else %}
+                                        {% else %}
                                     <span class="badge bg-secondary status-badge">
                                         <i class="fas fa-user me-1"></i>一般用戶
                                     </span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if user.last_login %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.last_login %}
                                     <small class="text-muted">
-                                        {{ user.last_login|date:"Y-m-d H:i" }}
+                                            {{ user.last_login|date:"Y-m-d H:i" }}
                                     </small>
-                                {% else %}
+                                        {% else %}
                                     <span class="text-muted">從未登入</span>
-                                {% endif %}
-                            </td>
-                            <td>
+                                        {% endif %}
+                                    </td>
+                                    <td>
                                 <div class="action-buttons">
                                     <a href="{% url 'system:user_detail' user.id %}" 
                                        class="btn btn-sm btn-outline-info" 
@@ -268,13 +287,13 @@
                                     <a href="{% url 'system:user_edit' user.id %}" 
                                        class="btn btn-sm btn-outline-primary" 
                                        title="編輯">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
+                                                <i class="fas fa-edit"></i>
+                                            </a>
                                     <a href="{% url 'system:user_change_password' user.id %}" 
                                        class="btn btn-sm btn-outline-warning" 
                                        title="修改密碼">
-                                        <i class="fas fa-key"></i>
-                                    </a>
+                                                <i class="fas fa-key"></i>
+                                            </a>
                                     {% if not user.is_superuser or user.id != request.user.id %}
                                     <button type="button" 
                                             class="btn btn-sm btn-outline-danger" 
@@ -282,21 +301,21 @@
                                             title="刪除">
                                         <i class="fas fa-trash"></i>
                                     </button>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
                             <td colspan="8" class="text-center py-4">
                                 <i class="fas fa-users fa-3x text-muted mb-3"></i>
                                 <p class="text-muted">沒有找到符合條件的用戶</p>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
 
             <!-- 分頁 -->
             {% if page_obj.has_other_pages %}
@@ -369,8 +388,10 @@
                         <strong>匯入格式說明：</strong>
                         <ul class="mb-0 mt-2">
                             <li>第一行必須是標題行</li>
-                            <li>必要欄位：username, email, first_name, last_name</li>
-                            <li>可選欄位：is_active, is_staff, is_superuser</li>
+                            <li>欄位順序：用戶名稱, 電子郵件, 姓名, 是否啟用, 是否為員工, 是否為超級用戶, 預設密碼</li>
+                            <li>是否啟用/是否為員工/是否為超級用戶：填寫「是」或「否」</li>
+                            <li>支援 CSV 和 Excel (.xlsx) 格式</li>
+                            <li>建議先匯出範例檔案，再修改後匯入</li>
                         </ul>
                     </div>
                 </div>
@@ -446,6 +467,44 @@ document.getElementById('importFile').addEventListener('change', function(e) {
         const fileSize = (file.size / 1024 / 1024).toFixed(2);
         console.log(`選擇檔案: ${file.name}, 大小: ${fileSize} MB`);
     }
+});
+
+// 匯入表單提交處理
+document.querySelector('#importModal form').addEventListener('submit', function(e) {
+    console.log('🔍 匯入表單提交事件觸發');
+    const fileInput = document.getElementById('importFile');
+    
+    if (!fileInput.files[0]) {
+        console.log('❌ 沒有選擇檔案');
+        e.preventDefault();
+        alert('請選擇要匯入的檔案！');
+        return false;
+    }
+    
+    const file = fileInput.files[0];
+    console.log('📁 選擇的檔案:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified
+    });
+    
+    console.log('🚀 開始提交匯入表單...');
+    console.log('📤 表單 action:', this.action);
+    console.log('📤 表單 method:', this.method);
+    console.log('📤 表單 enctype:', this.enctype);
+    
+    // 顯示載入狀態
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>匯入中...';
+    submitBtn.disabled = true;
+    
+    // 5秒後恢復按鈕狀態（防止卡住）
+    setTimeout(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }, 5000);
 });
 </script>
 {% endblock %}

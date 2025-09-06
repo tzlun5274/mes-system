@@ -46,6 +46,7 @@ urlpatterns = [
     path("user/export/", views.export_users, name="user_export"),
     path("user/export/excel/", views.export_users_excel, name="user_export_excel"),
     path("user/import/", views.import_users, name="user_import"),
+    path("user/test-import/", views.test_import, name="test_import"),
     
     # 操作日誌管理
     path("operation_log_manage/", views.operation_log_manage, name="operation_log_manage"),
@@ -69,6 +70,19 @@ urlpatterns = [
     
     # 訂單同步設定
     path("order_sync_settings/", views.order_sync_settings, name="order_sync_settings"),
+    path("manual_order_sync/", views.manual_order_sync, name="manual_order_sync"),
+    
+    # 工單設定
+    path("workorder_settings/", views.workorder_settings, name="workorder_settings"),
+    path("execute_auto_allocation/", views.execute_auto_allocation, name="execute_auto_allocation"),
+    path("execute_completion_check/", views.execute_completion_check, name="execute_completion_check"),
+    path("execute_data_transfer/", views.execute_data_transfer, name="execute_data_transfer"),
+    path("add_auto_approval_task/", views.add_auto_approval_task, name="add_auto_approval_task"),
+    path("delete_auto_approval_task/", views.delete_auto_approval_task, name="delete_auto_approval_task"),
+    path("execute_specific_auto_approval_task/", views.execute_specific_auto_approval_task, name="execute_specific_auto_approval_task"),
+    path("execute_all_auto_approval_tasks/", views.execute_all_auto_approval_tasks, name="execute_all_auto_approval_tasks"),
+    path("enable_auto_completion/", views.enable_auto_completion, name="enable_auto_completion"),
+    path("disable_auto_completion/", views.disable_auto_completion, name="disable_auto_completion"),
     
     # 報表設定
     path("report_settings/", views.report_settings, name="report_settings"),

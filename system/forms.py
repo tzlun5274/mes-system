@@ -219,25 +219,25 @@ class UserWorkPermissionForm(forms.ModelForm):
         return instance
 
 
-# class OrderSyncSettingsForm(forms.ModelForm):
-#     """訂單同步設定表單"""
-#     
-#     class Meta:
-#         model = OrderSyncSettings
-#         fields = [
-#             'sync_enabled', 'sync_interval_minutes',
-#             'cleanup_enabled', 'cleanup_interval_hours', 'cleanup_retention_days',
-#             'status_update_enabled', 'status_update_interval_minutes'
-#         ]
-#         widgets = {
-#             'sync_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-#             'sync_interval_minutes': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 1, 'max': 1440}),
-#             'cleanup_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-#             'cleanup_interval_hours': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 168}),
-#             'cleanup_retention_days': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 365}),
-#             'status_update_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-#             'status_update_interval_minutes': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 1440}),
-#         }
+class OrderSyncSettingsForm(forms.ModelForm):
+    """訂單同步設定表單"""
+    
+    class Meta:
+        model = OrderSyncSettings
+        fields = [
+            'sync_enabled', 'sync_interval_minutes',
+            'cleanup_enabled', 'cleanup_interval_hours', 'cleanup_retention_days',
+            'status_update_enabled', 'status_update_interval_minutes'
+        ]
+        widgets = {
+            'sync_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'sync_interval_minutes': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 1440}),
+            'cleanup_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'cleanup_interval_hours': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 168}),
+            'cleanup_retention_days': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 365}),
+            'status_update_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'status_update_interval_minutes': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 1440}),
+        }
 # 
 #     
 #     def clean_sync_interval_minutes(self):

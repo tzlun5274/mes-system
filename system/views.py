@@ -15,8 +15,8 @@ from .forms import (
     OperationLogConfigForm,
     EmailConfigForm,
     UserWorkPermissionForm,
-    BackupScheduleForm
-    # OrderSyncSettingsForm
+    BackupScheduleForm,
+    OrderSyncSettingsForm
 )
 from .models import (
     EmailConfig, 
@@ -1011,15 +1011,48 @@ def export_users_excel(request):
 
 @login_required
 @user_passes_test(superuser_required, login_url="/accounts/login/")
+def test_import(request):
+    """測試匯入功能頁面"""
+    return render(request, "system/test_import.html")
+
+
+@login_required
 def import_users(request):
+    # 直接寫入檔案來確認函數被調用
+    with open('/tmp/import_debug.txt', 'a') as f:
+        f.write(f"匯入函數被調用: {request.method} - {request.user.username} - {request.path}\n")
+    
+    logger.info(f"🔍 匯入用戶請求: {request.method}")
+    logger.info(f"🔍 請求用戶: {request.user.username}")
+    logger.info(f"🔍 請求路徑: {request.path}")
+    logger.info(f"🔍 用戶是否為超級用戶: {request.user.is_superuser}")
+    
+    # 手動檢查權限
+    if not request.user.is_superuser:
+        with open('/tmp/import_debug.txt', 'a') as f:
+            f.write(f"權限不足: {request.user.username}\n")
+        logger.error(f"❌ 用戶 {request.user.username} 沒有超級用戶權限")
+        messages.error(request, "您沒有權限執行此操作！")
+        return redirect("system:user_list")
+    
     if request.method == "POST":
-        if "csv_file" not in request.FILES:
-            logger.error("未上傳文件")
+        with open('/tmp/import_debug.txt', 'a') as f:
+            f.write(f"POST 請求處理開始\n")
+        logger.info(f"📤 POST 請求，FILES: {list(request.FILES.keys())}")
+        logger.info(f"📤 POST 請求，POST: {list(request.POST.keys())}")
+        
+        if "file" not in request.FILES:
+            with open('/tmp/import_debug.txt', 'a') as f:
+                f.write(f"沒有檔案上傳\n")
+            logger.error("❌ 未上傳文件")
             messages.error(request, "請上傳一個文件！")
             return redirect("system:user_list")
-        csv_file = request.FILES["csv_file"]
+            
+        csv_file = request.FILES["file"]
+        logger.info(f"📁 上傳檔案: {csv_file.name}, 大小: {csv_file.size} bytes")
+        
         if not (csv_file.name.endswith(".csv") or csv_file.name.endswith(".xlsx")):
-            logger.error(f"上傳文件格式錯誤: {csv_file.name}")
+            logger.error(f"❌ 上傳文件格式錯誤: {csv_file.name}")
             messages.error(request, "請上傳 .csv 或 .xlsx 格式的文件！")
             return redirect("system:user_list")
         try:
@@ -1030,58 +1063,107 @@ def import_users(request):
                 decoded_file = csv_file.read().decode("utf-8-sig")
                 csv_reader = csv.DictReader(decoded_file.splitlines())
                 for row in csv_reader:
-                    username = row.get("username")
-                    email = row.get("email", "")
-                    password = (
-                        str(row.get("password", default_password))
-                        if row.get("password") is not None
-                        else default_password
-                    )
+                    # 完全匹配匯出格式
+                    username = row.get("用戶名稱")
+                    email = row.get("電子郵件", "")
+                    full_name = row.get("姓名", "")
+                    is_active = row.get("是否啟用") == "是"
+                    is_staff = row.get("是否為員工") == "是"
+                    is_superuser = row.get("是否為超級用戶") == "是"
+                    password = str(row.get("預設密碼", default_password)) if row.get("預設密碼") is not None else default_password
+                    
                     if not username:
                         continue
                     
-                    # 允許 email 為空，使用空字串
-                    if not email or email.strip() == "":
-                        email = ""
+                    # 處理姓名分割
+                    first_name = ""
+                    last_name = ""
+                    if full_name:
+                        name_parts = full_name.strip().split()
+                        if len(name_parts) >= 1:
+                            first_name = name_parts[0]
+                        if len(name_parts) >= 2:
+                            last_name = " ".join(name_parts[1:])
                     
+                    # 創建或更新用戶
                     user, created = User.objects.get_or_create(username=username)
-                    user.email = email
+                    user.email = email or ""
+                    user.first_name = first_name
+                    user.last_name = last_name
+                    user.is_active = is_active
+                    user.is_staff = is_staff
+                    user.is_superuser = is_superuser
+                    
                     if created or password != default_password:
                         user.set_password(password)
+                    
                     user.save()
+                    
                     if created:
                         created_count += 1
                     else:
                         updated_count += 1
             else:
+                with open('/tmp/import_debug.txt', 'a') as f:
+                    f.write(f"處理 Excel 檔案: {csv_file.name}\n")
                 wb = openpyxl.load_workbook(csv_file)
                 ws = wb.active
                 headers = [cell.value for cell in ws[1]]
-                for row in ws.iter_rows(min_row=2, values_only=True):
+                with open('/tmp/import_debug.txt', 'a') as f:
+                    f.write(f"Excel 標題行: {headers}\n")
+                for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), 2):
                     row_data = dict(zip(headers, row))
-                    username = row_data.get("username")
-                    email = row_data.get("email", "")
-                    password = (
-                        str(row_data.get("password", default_password))
-                        if row_data.get("password") is not None
-                        else default_password
-                    )
+                    with open('/tmp/import_debug.txt', 'a') as f:
+                        f.write(f"第 {row_num} 行資料: {row_data}\n")
+                    # 完全匹配匯出格式
+                    username = row_data.get("用戶名稱")
+                    email = row_data.get("電子郵件", "")
+                    full_name = row_data.get("姓名", "")
+                    is_active = row_data.get("是否啟用") == "是"
+                    is_staff = row_data.get("是否為員工") == "是"
+                    is_superuser = row_data.get("是否為超級用戶") == "是"
+                    password = str(row_data.get("預設密碼", default_password)) if row_data.get("預設密碼") is not None else default_password
+                    
+                    with open('/tmp/import_debug.txt', 'a') as f:
+                        f.write(f"解析結果 - username: {username}, email: {email}, is_active: {is_active}, is_staff: {is_staff}, is_superuser: {is_superuser}\n")
+                    
                     if not username:
+                        with open('/tmp/import_debug.txt', 'a') as f:
+                            f.write(f"跳過第 {row_num} 行：沒有用戶名稱\n")
                         continue
                     
-                    # 允許 email 為空，使用空字串
-                    if not email or email.strip() == "":
-                        email = ""
+                    # 處理姓名分割
+                    first_name = ""
+                    last_name = ""
+                    if full_name:
+                        name_parts = full_name.strip().split()
+                        if len(name_parts) >= 1:
+                            first_name = name_parts[0]
+                        if len(name_parts) >= 2:
+                            last_name = " ".join(name_parts[1:])
                     
+                    # 創建或更新用戶
                     user, created = User.objects.get_or_create(username=username)
-                    user.email = email
+                    user.email = email or ""
+                    user.first_name = first_name
+                    user.last_name = last_name
+                    user.is_active = is_active
+                    user.is_staff = is_staff
+                    user.is_superuser = is_superuser
+                    
                     if created or password != default_password:
                         user.set_password(password)
+                    
                     user.save()
+                    
                     if created:
                         created_count += 1
+                        with open('/tmp/import_debug.txt', 'a') as f:
+                            f.write(f"✅ 新增用戶: {username}\n")
                     else:
                         updated_count += 1
+                        with open('/tmp/import_debug.txt', 'a') as f:
+                            f.write(f"🔄 更新用戶: {username}\n")
             logger.info(
                 f"用戶匯入完成：新增 {created_count} 個，更新 {updated_count} 個"
             )
@@ -1089,9 +1171,23 @@ def import_users(request):
                 request,
                 f"用戶匯入完成：新增 {created_count} 個，更新 {updated_count} 個",
             )
+            # 測試：返回 JSON 而不是重定向
+            from django.http import JsonResponse
+            return JsonResponse({
+                'status': 'success',
+                'message': f'用戶匯入完成：新增 {created_count} 個，更新 {updated_count} 個',
+                'created_count': created_count,
+                'updated_count': updated_count
+            })
         except Exception as e:
             logger.error(f"用戶匯入失敗: {str(e)}")
             messages.error(request, f"用戶匯入失敗：{str(e)}")
+            # 測試：返回 JSON 錯誤而不是重定向
+            from django.http import JsonResponse
+            return JsonResponse({
+                'status': 'error',
+                'message': f'用戶匯入失敗：{str(e)}'
+            }, status=400)
         return redirect("system:user_list")
     return redirect("system:user_list")
 
@@ -1713,9 +1809,19 @@ def permission_assign(request):
             permissions_by_module[module_name] = []
         permissions_by_module[module_name].append(perm)
     
+    # 處理GET參數中的預選權限
+    selected_permission_id = request.GET.get('permission')
+    selected_permission = None
+    if selected_permission_id:
+        try:
+            selected_permission = Permission.objects.get(id=selected_permission_id)
+        except Permission.DoesNotExist:
+            pass
+    
     context = {
         "permissions_by_module": permissions_by_module,
         "users": users,
+        "selected_permission": selected_permission,
         "title": "權限分配"
     }
     
@@ -2246,7 +2352,7 @@ def order_sync_settings(request):
         )
         
         if request.method == 'POST':
-            # form = OrderSyncSettingsForm(request.POST, instance=settings_obj)
+            form = OrderSyncSettingsForm(request.POST, instance=settings_obj)
             if form.is_valid():
                 form.save()
                 messages.success(request, "訂單同步設定已更新！")
@@ -2260,8 +2366,7 @@ def order_sync_settings(request):
                 logger.info(f"訂單同步設定由 {request.user.username} 更新")
                 return redirect('system:order_sync_settings')
         else:
-            # form = OrderSyncSettingsForm(instance=settings_obj)
-            pass
+            form = OrderSyncSettingsForm(instance=settings_obj)
         
         # 取得最近的同步日誌
         recent_logs = OrderSyncLog.objects.all()[:10]
@@ -2434,6 +2539,538 @@ def get_order_sync_task_status():
     except Exception as e:
         logger.error(f"取得訂單同步任務狀態失敗: {str(e)}")
         return {}
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def workorder_settings(request):
+    """
+    工單管理設定頁面
+    管理工單系統相關設定，包含審核流程、定時任務和完工判斷等
+    """
+    from workorder.models import SystemConfig
+    from django_celery_beat.models import PeriodicTask
+    
+    if request.method == "POST":
+        # 處理表單提交
+        auto_approval = request.POST.get('auto_approval') == 'on'
+        notification_enabled = request.POST.get('notification_enabled') == 'on'
+        audit_log_enabled = request.POST.get('audit_log_enabled') == 'on'
+        max_file_size = request.POST.get('max_file_size', 10)
+        session_timeout = request.POST.get('session_timeout', 30)
+        
+        # 自動審核設定
+        auto_approve_work_hours = request.POST.get('auto_approve_work_hours') == 'on'
+        max_work_hours = float(request.POST.get('max_work_hours', 12.0))
+        auto_approve_defect_rate = request.POST.get('auto_approve_defect_rate') == 'on'
+        max_defect_rate = float(request.POST.get('max_defect_rate', 5.0))
+        auto_approve_overtime = request.POST.get('auto_approve_overtime') == 'on'
+        max_overtime_hours = float(request.POST.get('max_overtime_hours', 4.0))
+        exclude_operators = request.POST.get('exclude_operators', '')
+        exclude_processes = request.POST.get('exclude_processes', '')
+        
+        # 定時任務設定
+        auto_allocation_enabled = request.POST.get('auto_allocation_enabled') == 'on'
+        auto_allocation_interval = int(request.POST.get('auto_allocation_interval', 30))
+        
+        # 完工判斷設定
+        completion_check_enabled = request.POST.get('completion_check_enabled') == 'on'
+        completion_check_interval = int(request.POST.get('completion_check_interval', 30))
+        packaging_process_name = request.POST.get('packaging_process_name', '出貨包裝')
+        data_transfer_enabled = request.POST.get('data_transfer_enabled') == 'on'
+        transfer_batch_size = int(request.POST.get('transfer_batch_size', 50))
+        transfer_retention_days = int(request.POST.get('transfer_retention_days', 365))
+        
+        # 更新系統設定
+        SystemConfig.objects.update_or_create(key="auto_approval", defaults={"value": str(auto_approval)})
+        SystemConfig.objects.update_or_create(key="notification_enabled", defaults={"value": str(notification_enabled)})
+        SystemConfig.objects.update_or_create(key="audit_log_enabled", defaults={"value": str(audit_log_enabled)})
+        SystemConfig.objects.update_or_create(key="max_file_size", defaults={"value": str(max_file_size)})
+        SystemConfig.objects.update_or_create(key="session_timeout", defaults={"value": str(session_timeout)})
+        
+        # 儲存自動審核設定
+        SystemConfig.objects.update_or_create(key="auto_approve_work_hours", defaults={"value": str(auto_approve_work_hours)})
+        SystemConfig.objects.update_or_create(key="max_work_hours", defaults={"value": str(max_work_hours)})
+        SystemConfig.objects.update_or_create(key="auto_approve_defect_rate", defaults={"value": str(auto_approve_defect_rate)})
+        SystemConfig.objects.update_or_create(key="max_defect_rate", defaults={"value": str(max_defect_rate)})
+        SystemConfig.objects.update_or_create(key="auto_approve_overtime", defaults={"value": str(auto_approve_overtime)})
+        SystemConfig.objects.update_or_create(key="max_overtime_hours", defaults={"value": str(max_overtime_hours)})
+        SystemConfig.objects.update_or_create(key="exclude_operators", defaults={"value": exclude_operators})
+        SystemConfig.objects.update_or_create(key="exclude_processes", defaults={"value": exclude_processes})
+        
+        # 更新完工判斷設定
+        SystemConfig.objects.update_or_create(key="completion_check_enabled", defaults={"value": str(completion_check_enabled)})
+        SystemConfig.objects.update_or_create(key="completion_check_interval", defaults={"value": str(completion_check_interval)})
+        SystemConfig.objects.update_or_create(key="packaging_process_name", defaults={"value": packaging_process_name})
+        SystemConfig.objects.update_or_create(key="data_transfer_enabled", defaults={"value": str(data_transfer_enabled)})
+        SystemConfig.objects.update_or_create(key="transfer_batch_size", defaults={"value": str(transfer_batch_size)})
+        SystemConfig.objects.update_or_create(key="transfer_retention_days", defaults={"value": str(transfer_retention_days)})
+        
+        # 更新定時任務設定
+        try:
+            from django_celery_beat.models import IntervalSchedule
+            # 自動分配定時任務
+            auto_allocation_task = PeriodicTask.objects.get(name='自動分配任務')
+            auto_allocation_task.enabled = auto_allocation_enabled
+            if auto_allocation_interval != auto_allocation_task.interval.every:
+                interval_schedule, _ = IntervalSchedule.objects.get_or_create(
+                    every=auto_allocation_interval,
+                    period=IntervalSchedule.MINUTES,
+                )
+                auto_allocation_task.interval = interval_schedule
+            auto_allocation_task.save()
+        except PeriodicTask.DoesNotExist:
+            # 自動創建缺失的定時任務
+            try:
+                from django_celery_beat.models import IntervalSchedule
+                interval_schedule, _ = IntervalSchedule.objects.get_or_create(
+                    every=auto_allocation_interval,
+                    period=IntervalSchedule.MINUTES,
+                )
+                PeriodicTask.objects.create(
+                    name='自動分配任務',
+                    task='workorder.tasks.auto_allocation_task',
+                    interval=interval_schedule,
+                    enabled=auto_allocation_enabled
+                )
+                messages.info(request, "已自動創建缺失的定時任務：自動分配任務")
+            except Exception as create_error:
+                messages.warning(request, f"無法創建定時任務：{str(create_error)}")
+        
+        messages.success(request, "工單管理設定已成功更新！")
+        return redirect('system:workorder_settings')
+    
+    # 取得現有設定
+    def get_config(key, default_value, value_type=str):
+        try:
+            value = SystemConfig.objects.get(key=key).value
+            if value_type == bool:
+                return value == "True"
+            elif value_type == int:
+                return int(value)
+            elif value_type == float:
+                return float(value)
+            return value
+        except (SystemConfig.DoesNotExist, ValueError):
+            return default_value
+    
+    # 基本設定
+    auto_approval = get_config("auto_approval", False, bool)
+    notification_enabled = get_config("notification_enabled", True, bool)
+    audit_log_enabled = get_config("audit_log_enabled", True, bool)
+    max_file_size = get_config("max_file_size", 10, int)
+    session_timeout = get_config("session_timeout", 30, int)
+    
+    # 自動審核設定
+    auto_approve_work_hours = get_config("auto_approve_work_hours", True, bool)
+    max_work_hours = get_config("max_work_hours", 12.0, float)
+    auto_approve_defect_rate = get_config("auto_approve_defect_rate", True, bool)
+    max_defect_rate = get_config("max_defect_rate", 5.0, float)
+    auto_approve_overtime = get_config("auto_approve_overtime", False, bool)
+    max_overtime_hours = get_config("max_overtime_hours", 4.0, float)
+    exclude_operators_text = get_config("exclude_operators", "")
+    exclude_processes_text = get_config("exclude_processes", "")
+    
+    # 完工判斷設定
+    completion_check_enabled = get_config("completion_check_enabled", True, bool)
+    completion_check_interval = get_config("completion_check_interval", 30, int)
+    packaging_process_name = get_config("packaging_process_name", "出貨包裝")
+    data_transfer_enabled = get_config("data_transfer_enabled", True, bool)
+    transfer_batch_size = get_config("transfer_batch_size", 50, int)
+    transfer_retention_days = get_config("transfer_retention_days", 365, int)
+    
+    # 取得定時任務狀態
+    try:
+        auto_allocation_task = PeriodicTask.objects.get(name='自動分配任務')
+        auto_allocation_task.interval_minutes = auto_allocation_task.interval.every
+    except PeriodicTask.DoesNotExist:
+        auto_allocation_task = type('obj', (object,), {
+            'enabled': False,
+            'interval_minutes': 30,
+            'last_run': None
+        })
+    
+    context = {
+        # 基本設定
+        'auto_approval': auto_approval,
+        'notification_enabled': notification_enabled,
+        'audit_log_enabled': audit_log_enabled,
+        'max_file_size': max_file_size,
+        'session_timeout': session_timeout,
+        
+        # 自動審核設定
+        'auto_approve_work_hours': auto_approve_work_hours,
+        'max_work_hours': max_work_hours,
+        'auto_approve_defect_rate': auto_approve_defect_rate,
+        'max_defect_rate': max_defect_rate,
+        'auto_approve_overtime': auto_approve_overtime,
+        'max_overtime_hours': max_overtime_hours,
+        'exclude_operators_text': exclude_operators_text,
+        'exclude_processes_text': exclude_processes_text,
+        
+        # 完工判斷設定
+        'completion_check_enabled': completion_check_enabled,
+        'completion_check_interval': completion_check_interval,
+        'packaging_process_name': packaging_process_name,
+        'data_transfer_enabled': data_transfer_enabled,
+        'transfer_batch_size': transfer_batch_size,
+        'transfer_retention_days': transfer_retention_days,
+        
+        # 定時任務狀態
+        'auto_allocation_task': auto_allocation_task,
+    }
+    
+    return render(request, 'system/workorder_settings.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_auto_allocation(request):
+    """
+    手動執行自動分配
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from workorder.tasks import auto_allocation_task
+        
+        result = auto_allocation_task.delay()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'自動分配任務已啟動，任務ID: {result.id}'
+        })
+        
+    except Exception as e:
+        logger.error(f"手動執行自動分配失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'執行失敗: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_completion_check(request):
+    """
+    手動執行完工檢查
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from workorder.tasks import completion_check_task
+        
+        result = completion_check_task.delay()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'完工檢查任務已啟動，任務ID: {result.id}'
+        })
+        
+    except Exception as e:
+        logger.error(f"手動執行完工檢查失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'執行失敗: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_data_transfer(request):
+    """
+    手動執行資料轉移
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from workorder.tasks import data_transfer_task
+        
+        result = data_transfer_task.delay()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'資料轉移任務已啟動，任務ID: {result.id}'
+        })
+        
+    except Exception as e:
+        logger.error(f"手動執行資料轉移失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'執行失敗: {str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def add_auto_approval_task(request):
+    """
+    新增自動審核定時任務 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from system.models import ScheduledTask
+        from datetime import datetime
+        
+        name = request.POST.get('name', '新自動審核任務')
+        execution_type = request.POST.get('execution_type', 'interval')
+        
+        if execution_type == 'interval':
+            interval_minutes = int(request.POST.get('interval_minutes', 30))
+            
+            if interval_minutes < 5 or interval_minutes > 1440:
+                return JsonResponse({
+                    'success': False,
+                    'message': '執行間隔必須在 5-1440 分鐘之間'
+                })
+            
+            # 建立間隔執行任務
+            new_task = ScheduledTask.objects.create(
+                name=name,
+                task_type='auto_approve',
+                task_function='system.tasks.auto_approve_work_reports',
+                execution_type='interval',
+                interval_minutes=interval_minutes,
+                is_enabled=True,
+                description=f'自動審核定時任務 - {name}'
+            )
+        elif execution_type == 'fixed_time':
+            fixed_time_str = request.POST.get('fixed_time', '')
+            if not fixed_time_str:
+                return JsonResponse({
+                    'success': False,
+                    'message': '固定時間執行必須設定執行時間'
+                })
+            
+            try:
+                fixed_time = datetime.strptime(fixed_time_str, '%H:%M').time()
+            except ValueError:
+                return JsonResponse({
+                    'success': False,
+                    'message': '時間格式錯誤，請使用 HH:MM 格式'
+                })
+            
+            # 建立固定時間執行任務
+            new_task = ScheduledTask.objects.create(
+                name=name,
+                task_type='auto_approve',
+                task_function='system.tasks.auto_approve_work_reports',
+                execution_type='fixed_time',
+                fixed_time=fixed_time,
+                is_enabled=True,
+                description=f'自動審核定時任務 - {name}'
+            )
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': '不支援的執行類型'
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'成功新增自動審核定時任務：{name}',
+            'task_id': new_task.id
+        })
+        
+    except Exception as e:
+        logger.error(f"新增自動審核定時任務失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'新增失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def delete_auto_approval_task(request):
+    """
+    刪除自動審核定時任務 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from system.models import ScheduledTask
+        
+        task_id = request.POST.get('task_id')
+        if not task_id:
+            return JsonResponse({
+                'success': False,
+                'message': '缺少任務 ID'
+            })
+        
+        try:
+            task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
+            task_name = task.name
+            task.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'成功刪除自動審核定時任務：{task_name}'
+            })
+        except ScheduledTask.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': '找不到指定的任務'
+            })
+        
+    except Exception as e:
+        logger.error(f"刪除自動審核定時任務失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'刪除失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_specific_auto_approval_task(request):
+    """
+    執行指定的自動審核定時任務 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from system.models import ScheduledTask
+        
+        task_id = request.POST.get('task_id')
+        if not task_id:
+            return JsonResponse({
+                'success': False,
+                'message': '缺少任務 ID'
+            })
+        
+        try:
+            task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
+            
+            # 執行任務
+            from system.tasks import auto_approve_work_reports
+            result = auto_approve_work_reports.delay()
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'成功啟動自動審核定時任務：{task.name}',
+                'task_id': result.id
+            })
+        except ScheduledTask.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': '找不到指定的任務'
+            })
+        
+    except Exception as e:
+        logger.error(f"執行自動審核定時任務失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'執行失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_all_auto_approval_tasks(request):
+    """
+    執行所有自動審核定時任務 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from system.models import ScheduledTask
+        
+        # 取得所有啟用的自動審核定時任務
+        tasks = ScheduledTask.objects.filter(task_type='auto_approve', is_enabled=True)
+        
+        if not tasks.exists():
+            return JsonResponse({
+                'success': False,
+                'message': '沒有啟用的自動審核定時任務'
+            })
+        
+        # 執行所有任務
+        from system.tasks import auto_approve_work_reports
+        result = auto_approve_work_reports.delay()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'成功啟動所有自動審核定時任務，共 {tasks.count()} 個',
+            'task_id': result.id
+        })
+        
+    except Exception as e:
+        logger.error(f"執行所有自動審核定時任務失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'執行失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def enable_auto_completion(request):
+    """
+    啟用自動完工功能 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from workorder.models import SystemConfig
+        
+        # 啟用自動完工功能
+        SystemConfig.objects.update_or_create(
+            key="auto_completion_enabled",
+            defaults={"value": "True"}
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': '自動完工功能已啟用'
+        })
+        
+    except Exception as e:
+        logger.error(f"啟用自動完工功能失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'啟用失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def disable_auto_completion(request):
+    """
+    停用自動完工功能 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from workorder.models import SystemConfig
+        
+        # 停用自動完工功能
+        SystemConfig.objects.update_or_create(
+            key="auto_completion_enabled",
+            defaults={"value": "False"}
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': '自動完工功能已停用'
+        })
+        
+    except Exception as e:
+        logger.error(f"停用自動完工功能失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'停用失敗：{str(e)}'
+        })
 
 
 @login_required

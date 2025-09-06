@@ -5,18 +5,35 @@
 權限詳情 - MES 系統
 {% endblock %}
 
-{% block content %}
-<div class="container-fluid mt-4">
-    <!-- 麵包屑導航 -->
+{% block breadcrumb %}
+<div class="container-fluid" style="background-color: #f8f9fa; padding: 10px; border-bottom: 1px solid #dee2e6;">
     <nav aria-label="breadcrumb" class="mb-3">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'system:index' %}">系統管理</a></li>
-            <li class="breadcrumb-item"><a href="{% url 'system:permission_list' %}">權限管理</a></li>
-            <li class="breadcrumb-item active" aria-current="page">權限詳情</li>
+        <ol class="breadcrumb" style="background-color: transparent; padding: 0; margin: 0;">
+            <li class="breadcrumb-item">
+                <a href="{% url 'home' %}" style="color: #007bff; text-decoration: none;">
+                    <i class="fas fa-home"></i> 首頁
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'system:index' %}" style="color: #007bff; text-decoration: none;">
+                    <i class="fas fa-cog"></i> 系統管理
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'system:permission_list' %}" style="color: #007bff; text-decoration: none;">
+                    <i class="fas fa-shield-alt"></i> 權限管理
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page" style="color: #6c757d;">
+                <i class="fas fa-info-circle"></i> 權限詳情
+            </li>
         </ol>
     </nav>
-    
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
     <div class="row">
         <div class="col-12">
             <div class="card">

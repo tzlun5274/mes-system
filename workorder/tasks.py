@@ -113,6 +113,79 @@ def auto_allocation_task():
         }
 
 @shared_task
+def completion_check_task():
+    """
+    定時任務：自動完工檢查
+    """
+    try:
+        from workorder.services.completion_service import FillWorkCompletionService
+        
+        # 獲取所有進行中的工單
+        from workorder.models import WorkOrder
+        active_workorders = WorkOrder.objects.filter(status='in_progress')
+        
+        completed_count = 0
+        for workorder in active_workorders:
+            try:
+                if FillWorkCompletionService.check_and_complete_workorder(workorder.id):
+                    completed_count += 1
+            except Exception as e:
+                logger.error(f"檢查工單 {workorder.id} 完工狀態失敗: {str(e)}")
+        
+        logger.info(f"完工檢查任務完成，共檢查 {active_workorders.count()} 個工單，完工 {completed_count} 個")
+        return {
+            'success': True,
+            'message': f'完工檢查完成，共完工 {completed_count} 個工單',
+            'checked_count': active_workorders.count(),
+            'completed_count': completed_count
+        }
+        
+    except Exception as e:
+        logger.error(f"完工檢查任務執行失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'完工檢查任務執行失敗: {str(e)}',
+            'checked_count': 0,
+            'completed_count': 0
+        }
+
+@shared_task
+def data_transfer_task():
+    """
+    定時任務：資料轉移
+    """
+    try:
+        from workorder.models import CompletedWorkOrder
+        from workorder.services.completion_service import FillWorkCompletionService
+        
+        # 獲取所有已完工但未轉移的工單
+        completed_workorders = CompletedWorkOrder.objects.filter(is_transferred=False)
+        
+        transferred_count = 0
+        for completed_workorder in completed_workorders:
+            try:
+                # 執行資料轉移
+                if FillWorkCompletionService.transfer_completed_workorder(completed_workorder.id):
+                    transferred_count += 1
+            except Exception as e:
+                logger.error(f"轉移工單 {completed_workorder.id} 失敗: {str(e)}")
+        
+        logger.info(f"資料轉移任務完成，共轉移 {transferred_count} 個工單")
+        return {
+            'success': True,
+            'message': f'資料轉移完成，共轉移 {transferred_count} 個工單',
+            'transferred_count': transferred_count
+        }
+        
+    except Exception as e:
+        logger.error(f"資料轉移任務執行失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'資料轉移任務執行失敗: {str(e)}',
+            'transferred_count': 0
+        }
+
+@shared_task
 def auto_dispatch_workorders():
     """
     定時任務：自動批次派工

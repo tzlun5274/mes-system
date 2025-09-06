@@ -215,7 +215,7 @@
                                 <span class="status-indicator {% if task_status.sync.enabled %}status-active{% else %}status-inactive{% endif %}"></span>
                                 狀態: {% if task_status.sync.enabled %}啟用{% else %}停用{% endif %}
                             </p>
-                            <p class="mb-0 small">間隔: {{ task_status.sync.interval.every }} 分鐘</p>
+                            <p class="mb-0 small">間隔: {% if task_status.sync.interval %}{{ task_status.sync.interval.every }}{% else %}未設定{% endif %} 分鐘</p>
                         {% else %}
                             <p class="mb-0 text-muted">任務未設定</p>
                         {% endif %}
@@ -229,7 +229,7 @@
                                 <span class="status-indicator {% if task_status.cleanup.enabled %}status-active{% else %}status-inactive{% endif %}"></span>
                                 狀態: {% if task_status.cleanup.enabled %}啟用{% else %}停用{% endif %}
                             </p>
-                            <p class="mb-0 small">間隔: {{ task_status.cleanup.interval.every }} 分鐘</p>
+                            <p class="mb-0 small">間隔: {% if task_status.cleanup.interval %}{{ task_status.cleanup.interval.every }}{% else %}未設定{% endif %} 分鐘</p>
                         {% else %}
                             <p class="mb-0 text-muted">任務未設定</p>
                         {% endif %}
@@ -243,7 +243,7 @@
                                 <span class="status-indicator {% if task_status.status_update.enabled %}status-active{% else %}status-inactive{% endif %}"></span>
                                 狀態: {% if task_status.status_update.enabled %}啟用{% else %}停用{% endif %}
                             </p>
-                            <p class="mb-0 small">間隔: {{ task_status.status_update.interval.every }} 分鐘</p>
+                            <p class="mb-0 small">間隔: {% if task_status.status_update.interval %}{{ task_status.status_update.interval.every }}{% else %}未設定{% endif %} 分鐘</p>
                         {% else %}
                             <p class="mb-0 text-muted">任務未設定</p>
                         {% endif %}
@@ -265,7 +265,15 @@
                         <div class="card-body text-center">
                             <h5 class="card-title">資料同步</h5>
                             <p class="card-text">
-                                <span class="badge {{ settings.get_sync_status_class }}">{{ settings.get_sync_status_display }}</span>
+                                {% if settings.last_sync_status == '成功' %}
+                                    <span class="badge bg-success">{{ settings.get_sync_status_display }}</span>
+                                {% elif settings.last_sync_status == '失敗' %}
+                                    <span class="badge bg-danger">{{ settings.get_sync_status_display }}</span>
+                                {% elif settings.last_sync_status == '執行中' %}
+                                    <span class="badge bg-warning">{{ settings.get_sync_status_display }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ settings.get_sync_status_display }}</span>
+                                {% endif %}
                             </p>
                             {% if settings.last_sync_time %}
                                 <small class="text-muted">上次同步: {{ settings.last_sync_time|date:"Y-m-d H:i:s" }}</small>

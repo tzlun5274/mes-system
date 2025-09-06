@@ -117,6 +117,32 @@
             </div>
         </div>
 
+        <!-- 訂單同步設定 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> 訂單同步設定</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">設定訂單資料的自動同步功能，包含國內訂單、國外訂單的同步排程和手動同步操作。</p>
+                    <a href="{% url 'system:order_sync_settings' %}" class="btn btn-warning"><i class="bi bi-gear"></i> 同步設定</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 工單設定 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> 工單設定</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">管理工單系統相關設定，包含審核流程、定時任務、完工判斷和系統參數配置。</p>
+                    <a href="{% url 'system:workorder_settings' %}" class="btn btn-success"><i class="bi bi-gear"></i> 工單設定</a>
+                </div>
+            </div>
+        </div>
+
 
 
 

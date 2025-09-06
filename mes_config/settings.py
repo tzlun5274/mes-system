@@ -40,9 +40,9 @@ INSTALLED_APPS = [
     "workorder",
     "workorder.company_order.apps.CompanyOrderConfig",
     "workorder.workorder_dispatch.apps.WorkOrderDispatchConfig",
-    "workorder.fill_work.apps.FillWorkConfig",
     "workorder.onsite_reporting.apps.OnsiteReportingConfig",
     "workorder.workorder_completed.apps.WorkOrderCompletedConfig",
+    "workorder.fill_work.apps.FillWorkConfig",
             # 移除 production_monitoring，改用派工單監控資料
 
     "kanban.apps.KanbanConfig",
