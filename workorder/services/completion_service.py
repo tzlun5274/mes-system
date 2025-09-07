@@ -1381,19 +1381,24 @@ class FillWorkCompletionService:
                 except Exception as e:
                     logger.error(f"轉移填報記錄失敗 (ID: {report.id}): {str(e)}")
             
-            # 更新已完工工單的統計資料
+            # 更新已完工工單的統計資料 - 從已轉移的記錄重新計算
             if transferred_count > 0:
-                total_work_hours = sum(report.work_hours for report in fill_work_reports)
-                total_overtime_hours = sum(report.overtime_hours for report in fill_work_reports)
-                total_good_quantity = sum(report.work_quantity for report in fill_work_reports)
-                total_defect_quantity = sum(report.defect_quantity for report in fill_work_reports)
+                # 從已轉移的 CompletedProductionReport 記錄重新計算統計資料
+                completed_reports = CompletedProductionReport.objects.filter(
+                    completed_workorder_id=completed_workorder.id
+                )
+                
+                total_work_hours = sum(report.work_hours for report in completed_reports)
+                total_overtime_hours = sum(report.overtime_hours for report in completed_reports)
+                total_good_quantity = sum(report.work_quantity for report in completed_reports)
+                total_defect_quantity = sum(report.defect_quantity for report in completed_reports)
                 
                 completed_workorder.total_work_hours = total_work_hours
                 completed_workorder.total_overtime_hours = total_overtime_hours
                 completed_workorder.total_all_hours = total_work_hours + total_overtime_hours
                 completed_workorder.total_good_quantity = total_good_quantity
                 completed_workorder.total_defect_quantity = total_defect_quantity
-                completed_workorder.total_report_count = transferred_count
+                completed_workorder.total_report_count = completed_reports.count()
                 completed_workorder.save()
                 
                 logger.info(f"工單 {workorder.order_number} 統計資料已更新：工作時數 {total_work_hours}h，加班時數 {total_overtime_hours}h")

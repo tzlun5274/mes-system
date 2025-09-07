@@ -54,17 +54,33 @@ class CompletedWorkOrderListView(LoginRequiredMixin, ListView):
         queryset = self.get_queryset()
         context['total_completed'] = queryset.count()
         
-        # 為每個工單添加公司名稱
+        # 為每個工單添加公司名稱和重新計算工作時數
         try:
             from erp_integration.models import CompanyConfig
             company_configs = {config.company_code: config.company_name 
                              for config in CompanyConfig.objects.all()}
             
             for workorder in context['completed_workorders']:
+                # 添加公司名稱顯示
                 workorder.company_name_display = (
                     workorder.company_name or 
                     company_configs.get(workorder.company_code, workorder.company_code)
                 )
+                
+                # 重新計算工作時數（從報工記錄動態計算）
+                from workorder.models import CompletedProductionReport
+                production_reports = CompletedProductionReport.objects.filter(
+                    completed_workorder_id=workorder.id
+                )
+                
+                # 動態計算統計資料
+                workorder.total_work_hours = sum(report.work_hours for report in production_reports)
+                workorder.total_overtime_hours = sum(report.overtime_hours for report in production_reports)
+                workorder.total_all_hours = workorder.total_work_hours + workorder.total_overtime_hours
+                workorder.total_good_quantity = sum(report.work_quantity for report in production_reports)
+                workorder.total_defect_quantity = sum(report.defect_quantity for report in production_reports)
+                workorder.total_report_count = production_reports.count()
+                
         except Exception:
             # 如果查詢公司配置失敗，使用公司代號作為備用
             for workorder in context['completed_workorders']:
