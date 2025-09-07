@@ -119,13 +119,19 @@ class Command(BaseCommand):
             )
 
             if workorder_created:
-                self.stdout.write(
-                    self.style.SUCCESS(f'✓ 建立工單: {workorder.order_number}')
-                )
+                if workorder:
+                    self.stdout.write(
+                        self.style.SUCCESS(f'✓ 建立工單: {workorder.order_number}')
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS(f'✓ 建立工單: {fill_work.workorder}')
+                    )
             else:
-                self.stdout.write(
-                    self.style.WARNING(f'○ 工單已存在: {workorder.order_number}')
-                )
+                if workorder:
+                    self.stdout.write(
+                        self.style.WARNING(f'○ 工單已存在: {workorder.order_number}')
+                    )
 
             # 查找或建立派工單
             dispatch, dispatch_created = self.find_or_create_dispatch(
@@ -133,13 +139,19 @@ class Command(BaseCommand):
             )
 
             if dispatch_created:
-                self.stdout.write(
-                    self.style.SUCCESS(f'✓ 建立派工單: {dispatch.order_number}')
-                )
+                if dispatch:
+                    self.stdout.write(
+                        self.style.SUCCESS(f'✓ 建立派工單: {dispatch.order_number}')
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS(f'✓ 建立派工單: {fill_work.workorder}')
+                    )
             else:
-                self.stdout.write(
-                    self.style.WARNING(f'○ 派工單已存在: {dispatch.order_number}')
-                )
+                if dispatch:
+                    self.stdout.write(
+                        self.style.WARNING(f'○ 派工單已存在: {dispatch.order_number}')
+                    )
 
         except Exception as e:
             self.stdout.write(
@@ -182,6 +194,11 @@ class Command(BaseCommand):
 
     def find_or_create_dispatch(self, workorder, fill_work, dry_run, force):
         """查找或建立派工單"""
+        # 如果是試運行模式且工單為None，直接返回
+        if dry_run and workorder is None:
+            self.stdout.write(f'[試運行] 將建立派工單: {fill_work.workorder}')
+            return None, True
+        
         # 查找現有派工單
         existing_dispatch = WorkOrderDispatch.objects.filter(
             company_code=workorder.company_code,

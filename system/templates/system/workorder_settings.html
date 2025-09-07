@@ -612,9 +612,10 @@
                             <small class="form-text text-muted">建議設定：30-60分鐘</small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">出貨包裝工序名稱</label>
-                            <input type="text" class="form-control" name="packaging_process_name" 
-                                   value="{{ packaging_process_name }}" placeholder="例如：出貨包裝">
+                            <label class="form-label">完工判斷工序設定</label>
+                            <select class="form-select" name="packaging_process_name" id="packaging_process_name">
+                                <option value="">請選擇工序...</option>
+                            </select>
                             <small class="form-text text-muted">用於完工判斷的工序名稱</small>
                         </div>
                     </div>
@@ -822,7 +823,76 @@
 
 {% block extra_js %}
 <script>
+// 載入工序選項
+function loadProcessOptions() {
+    const select = document.getElementById('packaging_process_name');
+    const currentValue = '{{ packaging_process_name }}';
+    
+    // 顯示載入中
+    select.innerHTML = '<option value="">載入中...</option>';
+    
+    // 通過API獲取工序列表
+    fetch('/system/api/processes/', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        credentials: 'same-origin'  // 確保包含認證 cookies
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        // 清空選項
+        select.innerHTML = '<option value="">請選擇工序...</option>';
+        
+        // 添加工序選項
+        if (data.success && data.processes) {
+            data.processes.forEach(process => {
+                const option = document.createElement('option');
+                option.value = process.name;
+                option.textContent = process.name;
+                
+                // 設定當前值
+                if (process.name === currentValue) {
+                    option.selected = true;
+                }
+                
+                select.appendChild(option);
+            });
+        } else {
+            // 如果API失敗，添加預設選項
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '出貨包裝';
+            defaultOption.textContent = '出貨包裝';
+            if (currentValue === '出貨包裝') {
+                defaultOption.selected = true;
+            }
+            select.appendChild(defaultOption);
+        }
+    })
+    .catch(error => {
+        console.error('載入工序選項失敗:', error);
+        // 載入失敗時顯示預設選項
+        select.innerHTML = '<option value="">載入失敗</option>';
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '出貨包裝';
+        defaultOption.textContent = '出貨包裝';
+        if (currentValue === '出貨包裝') {
+            defaultOption.selected = true;
+        }
+        select.appendChild(defaultOption);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // 載入工序選項
+    loadProcessOptions();
+    
     // 表單提交處理
     document.querySelector('form').addEventListener('submit', function(e) {
         // 顯示載入中

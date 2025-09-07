@@ -91,4 +91,7 @@ urlpatterns = [
     # 報表設定
     path("report_settings/", views.report_settings, name="report_settings"),
     path("manual_sync_reports/", views.manual_sync_reports, name="manual_sync_reports"),
+    
+    # API 端點
+    path("api/processes/", views.get_processes_api, name="get_processes_api"),
 ]

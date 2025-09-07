@@ -2314,6 +2314,54 @@ def report_settings(request):
 
 @login_required
 @user_passes_test(superuser_required, login_url="/accounts/login/")
+def get_processes_api(request):
+    """
+    獲取工序列表 API
+    用於完工判斷工序設定的下拉選單
+    """
+    if request.method != 'GET':
+        return JsonResponse({'success': False, 'message': '只支援 GET 請求'})
+    
+    try:
+        from process.models import ProcessName
+        
+        # 獲取所有工序名稱
+        processes = ProcessName.objects.all().order_by('name')
+        
+        # 轉換為API格式
+        process_list = []
+        for process in processes:
+            process_list.append({
+                'id': process.id,
+                'name': process.name,
+                'description': process.description or ''
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'processes': process_list,
+            'total': len(process_list)
+        })
+        
+    except ImportError:
+        # 如果工序模組不存在，返回預設選項
+        return JsonResponse({
+            'success': True,
+            'processes': [
+                {'id': 1, 'name': '出貨包裝', 'description': '出貨包裝工序'}
+            ],
+            'total': 1
+        })
+    except Exception as e:
+        logger.error(f"獲取工序列表失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'獲取工序列表失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
 def manual_sync_reports(request):
     """
     手動同步報表頁面
