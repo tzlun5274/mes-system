@@ -62,6 +62,11 @@ class FillWorkCompletionService:
                 except WorkOrder.MultipleObjectsReturned:
                     logger.error(f"派工單 {dispatch.company_code}-{dispatch.order_number}-{dispatch.product_code} 對應多個工單，資料不一致，跳過")
                     continue
+                
+                # 排除條件：跳過工單號碼是「RD樣品」的工單
+                if workorder.order_number == 'RD樣品':
+                    logger.info(f"工單 {workorder.order_number} 是RD樣品工單，跳過完工判斷")
+                    continue
                 try:
                     # 1. 完工判斷：檢查是否滿足完工條件
                     packaging_quantity = cls._get_packaging_quantity(workorder)
@@ -352,6 +357,25 @@ class FillWorkCompletionService:
         """
         try:
             workorder = WorkOrder.objects.get(id=workorder_id)
+            
+            # 排除條件：跳過工單號碼是「RD樣品」的工單
+            if workorder.order_number == 'RD樣品':
+                logger.info(f"工單 {workorder.order_number} 是RD樣品工單，跳過完工摘要檢查")
+                return {
+                    'can_complete': False,
+                    'completion_status': {
+                        'status': 'skipped',
+                        'reason': 'RD樣品工單不進行完工判斷',
+                        'packaging_quantity': 0,
+                        'planned_quantity': workorder.quantity,
+                        'completion_rate': 0.0
+                    },
+                    'workorder_info': {
+                        'order_number': workorder.order_number,
+                        'product_code': workorder.product_code,
+                        'company_code': workorder.company_code
+                    }
+                }
             
             # 查找對應的派工單
             dispatch = WorkOrderDispatch.objects.filter(
@@ -1408,6 +1432,17 @@ class FillWorkCompletionService:
                     'workorder_number': fillwork_instance.workorder
                 }
             
+            # 排除條件：跳過工單號碼是「RD樣品」的工單
+            if workorder.order_number == 'RD樣品':
+                logger.info(f"工單 {workorder.order_number} 是RD樣品工單，跳過智能自動完工檢查")
+                return {
+                    'success': True,
+                    'message': f'工單 {workorder.order_number} 是RD樣品工單，跳過自動完工檢查',
+                    'workorder_number': workorder.order_number,
+                    'is_completed': False,
+                    'skipped': True
+                }
+            
             # 檢查工單是否已經完工
             if workorder.status == 'completed':
                 logger.info(f"工單 {workorder.order_number} 已經完工")
@@ -1610,82 +1645,69 @@ class FillWorkCompletionService:
                 # 1. 獲取工單
                 workorder = WorkOrder.objects.get(id=workorder_id)
                 
-                # 2. 檢查工單狀態
-                if workorder.status == 'completed':
-                    return {
-                        'success': True,
-                        'message': f'工單 {workorder.order_number} 已經是完工狀態',
-                        'workorder_number': workorder.order_number,
-                        'was_already_completed': True
-                    }
-                
                 logger.info(f"開始強制完工工單 {workorder.order_number}，原因：{force_reason}")
                 
-                # 3. 先執行完工流程（設定正確的完工時間）
+                # 2. 先執行完工流程（設定正確的完工時間）
                 cls._complete_workorder(workorder)
                 # 重新載入工單以確保獲取最新的完工時間
                 workorder.refresh_from_db()
                 
-                # 4. 調用資料轉移服務
+                # 3. 使用與正常完工相同的資料轉移邏輯
                 try:
-                    completed_workorder = cls.transfer_workorder_to_completed(workorder_id, workorder)
+                    completed_workorder = cls._transfer_single_workorder(workorder)
                     
-                    # 4. 自動生成報表資料
-                    try:
-                        from reporting.models import CompletedWorkOrderAnalysis
-                        # 使用 CompletedWorkOrderAnalysis 替代 CompletedWorkOrderReportData
-                        logger.info(f"工單 {workorder.order_number} 強制完工報表資料自動生成完成")
-                    except Exception as e:
-                        logger.warning(f"工單 {workorder.order_number} 強制完工報表資料生成失敗: {str(e)}")
-                    
-                    # 獲取完工時的統計資料
-                    original_packaging_quantity = 0
-                    target_quantity = workorder.quantity
-                    original_completion_rate = 0.0
-                    
-                    # 從派工單獲取統計資料
-                    from workorder.workorder_dispatch.models import WorkOrderDispatch
-                    dispatch = WorkOrderDispatch.objects.filter(
-                        order_number=workorder.order_number,
-                        product_code=workorder.product_code,
-                        company_code=workorder.company_code
-                    ).first()
-                    
-                    if dispatch:
-                        # 強制更新派工單統計資料
-                        dispatch.update_all_statistics()
-                        dispatch.refresh_from_db()  # 重新從資料庫載入最新資料
+                    if completed_workorder:
+                        # 4. 更新派工單狀態為已完工（如果存在）
+                        from workorder.workorder_dispatch.models import WorkOrderDispatch
+                        dispatch = WorkOrderDispatch.objects.filter(
+                            order_number=workorder.order_number,
+                            product_code=workorder.product_code,
+                            company_code=workorder.company_code
+                        ).first()
                         
-                        # 使用派工單的統計欄位
-                        original_packaging_quantity = dispatch.packaging_total_quantity
-                        original_completion_rate = float(dispatch.completion_rate)
+                        if dispatch:
+                            dispatch.status = 'completed'
+                            dispatch.production_end_date = timezone.now()
+                            dispatch.save()
                         
-                        logger.info(f"強制完工統計資料 - 派工單ID: {dispatch.id}, 出貨包裝數量: {original_packaging_quantity}")
+                        # 5. 更新工單狀態為已完工
+                        workorder.status = 'completed'
+                        workorder.completed_at = timezone.now()
+                        workorder.save()
+                        
+                        # 6. 使用與正常完工相同的資料清除邏輯
+                        cls._cleanup_production_data(workorder)
+                        workorder.delete()
+                        
+                        # 7. 獲取完工時的統計資料
+                        original_packaging_quantity = 0
+                        target_quantity = workorder.quantity
+                        original_completion_rate = 0.0
+                        
+                        if dispatch:
+                            original_packaging_quantity = dispatch.packaging_total_quantity
+                            original_completion_rate = float(dispatch.completion_rate)
+                        
+                        result = {
+                            'success': True,
+                            'message': f'工單 {workorder.order_number} 強制完工成功，已轉移所有相關資料',
+                            'workorder_number': workorder.order_number,
+                            'force_reason': force_reason,
+                            'completed_workorder_id': completed_workorder.id,
+                            'was_already_completed': False,
+                            'original_packaging_quantity': original_packaging_quantity,
+                            'target_quantity': target_quantity,
+                            'original_completion_rate': original_completion_rate
+                        }
+                        
+                        logger.info(f"工單 {workorder.order_number} 強制完工流程執行完成")
+                        return result
                     else:
-                        # 如果沒有派工單，從填報記錄計算
-                        from workorder.fill_work.models import FillWork
-                        fillwork_records = FillWork.objects.filter(
-                            workorder=workorder.order_number,
-                            product_id=workorder.product_code,
-                            approval_status='approved'
-                        )
-                        original_packaging_quantity = sum(record.work_quantity or 0 for record in fillwork_records)
-                        logger.info(f"強制完工統計資料 - 從填報記錄計算, 出貨包裝數量: {original_packaging_quantity}")
-                    
-                    result = {
-                        'success': True,
-                        'message': f'工單 {workorder.order_number} 強制完工成功，已轉移所有相關資料',
-                        'workorder_number': workorder.order_number,
-                        'force_reason': force_reason,
-                        'completed_workorder_id': completed_workorder.id,
-                        'was_already_completed': False,
-                        'original_packaging_quantity': original_packaging_quantity,
-                        'target_quantity': target_quantity,
-                        'original_completion_rate': original_completion_rate
-                    }
-                    
-                    logger.info(f"工單 {workorder.order_number} 強制完工流程執行完成")
-                    return result
+                        return {
+                            'success': False,
+                            'message': f'工單 {workorder.order_number} 資料轉移失敗',
+                            'workorder_number': workorder.order_number
+                        }
                     
                 except Exception as transfer_error:
                     logger.error(f"資料轉移失敗: {str(transfer_error)}")

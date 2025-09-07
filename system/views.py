@@ -2772,14 +2772,24 @@ def execute_auto_allocation(request):
         return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
     
     try:
-        from workorder.tasks import auto_allocation_task
+        from workorder.services.auto_allocation_service import AutoAllocationService
         
-        result = auto_allocation_task.delay()
+        # 直接執行分配邏輯，不使用 Celery 任務
+        service = AutoAllocationService()
+        result = service.allocate_all_pending_workorders()
         
-        return JsonResponse({
-            'success': True,
-            'message': f'自動分配任務已啟動，任務ID: {result.id}'
-        })
+        if result.get('success', False):
+            return JsonResponse({
+                'success': True,
+                'message': f'手動分配完成：{result.get("message", "分配完成")}',
+                'allocated_count': result.get('total_allocated_reports', 0),
+                'total_quantity': result.get('total_allocated_quantity', 0)
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': f'手動分配失敗：{result.get("message", "未知錯誤")}'
+            })
         
     except Exception as e:
         logger.error(f"手動執行自動分配失敗: {str(e)}")
