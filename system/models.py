@@ -264,6 +264,7 @@ class ScheduledTask(models.Model):
         ('data_backup', '資料備份'),
         ('report_generation', '報表生成'),
         ('data_cleanup', '資料清理'),
+        ('completion_check', '完工判斷'),
     ]
     
     # 執行類型選項

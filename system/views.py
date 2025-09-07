@@ -2791,25 +2791,29 @@ def execute_auto_allocation(request):
 
 @login_required
 @user_passes_test(superuser_required, login_url="/accounts/login/")
-def execute_completion_check(request):
+def execute_workorder_archive(request):
     """
-    手動執行完工檢查
+    手動執行工單歸檔 - 一鍵歸檔（完工判斷+資料轉移+資料清除）
     """
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
     
     try:
-        from workorder.tasks import completion_check_task
+        from workorder.services.completion_service import FillWorkCompletionService
         
-        result = completion_check_task.delay()
+        # 執行完整的工單歸檔流程
+        result = FillWorkCompletionService.archive_workorders()
         
         return JsonResponse({
             'success': True,
-            'message': f'完工檢查任務已啟動，任務ID: {result.id}'
+            'message': result.get('message', '工單歸檔完成'),
+            'total_checked': result.get('total_checked', 0),
+            'archived_count': result.get('archived_count', 0),
+            'error_count': result.get('error_count', 0)
         })
         
     except Exception as e:
-        logger.error(f"手動執行完工檢查失敗: {str(e)}")
+        logger.error(f"手動執行工單歸檔失敗: {str(e)}")
         return JsonResponse({
             'success': False,
             'message': f'執行失敗: {str(e)}'
@@ -2818,29 +2822,128 @@ def execute_completion_check(request):
 
 @login_required
 @user_passes_test(superuser_required, login_url="/accounts/login/")
-def execute_data_transfer(request):
+def get_completion_task(request):
     """
-    手動執行資料轉移
+    獲取完工判斷定時任務詳情
     """
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
     
     try:
-        from workorder.tasks import data_transfer_task
+        task_id = request.POST.get('task_id')
+        if not task_id:
+            return JsonResponse({'success': False, 'message': '缺少任務ID'})
         
-        result = data_transfer_task.delay()
+        from system.models import ScheduledTask
+        task = ScheduledTask.objects.get(id=task_id, task_type='completion_check')
         
         return JsonResponse({
             'success': True,
-            'message': f'資料轉移任務已啟動，任務ID: {result.id}'
+            'task': {
+                'id': task.id,
+                'name': task.name,
+                'fixed_time': task.fixed_time.strftime('%H:%M') if task.fixed_time else '',
+                'is_enabled': task.is_enabled
+            }
         })
         
+    except ScheduledTask.DoesNotExist:
+        return JsonResponse({'success': False, 'message': '任務不存在'})
     except Exception as e:
-        logger.error(f"手動執行資料轉移失敗: {str(e)}")
+        logger.error(f"獲取完工判斷任務詳情失敗: {str(e)}")
+        return JsonResponse({'success': False, 'message': f'獲取失敗: {str(e)}'})
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def update_completion_task(request):
+    """
+    更新完工判斷定時任務
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        task_id = request.POST.get('task_id')
+        name = request.POST.get('name', '').strip()
+        fixed_time = request.POST.get('fixed_time', '')
+        enabled = request.POST.get('enabled', 'false') == 'true'
+        
+        if not task_id:
+            return JsonResponse({'success': False, 'message': '缺少任務ID'})
+        
+        if not name:
+            return JsonResponse({'success': False, 'message': '請輸入任務名稱'})
+        
+        if not fixed_time:
+            return JsonResponse({'success': False, 'message': '請設定執行時間'})
+        
+        from system.models import ScheduledTask
+        from datetime import datetime
+        
+        task = ScheduledTask.objects.get(id=task_id, task_type='completion_check')
+        
+        # 解析時間
+        time_obj = datetime.strptime(fixed_time, '%H:%M').time()
+        
+        # 更新 ScheduledTask
+        task.name = name
+        task.fixed_time = time_obj
+        task.is_enabled = enabled
+        task.save()
+        
+        # 更新對應的 Celery Beat 任務
+        from django_celery_beat.models import PeriodicTask, CrontabSchedule
+        
+        # 查找對應的 PeriodicTask
+        periodic_task_name = f"Celery_{task.name}"
+        try:
+            periodic_task = PeriodicTask.objects.get(name=periodic_task_name)
+            
+            # 更新 crontab 排程
+            crontab, created = CrontabSchedule.objects.get_or_create(
+                hour=time_obj.hour,
+                minute=time_obj.minute,
+                day_of_week='*',
+                day_of_month='*',
+                month_of_year='*'
+            )
+            
+            # 更新 PeriodicTask
+            periodic_task.crontab = crontab
+            periodic_task.enabled = enabled
+            periodic_task.save()
+            
+        except PeriodicTask.DoesNotExist:
+            # 如果找不到對應的 PeriodicTask，創建一個新的
+            crontab, created = CrontabSchedule.objects.get_or_create(
+                hour=time_obj.hour,
+                minute=time_obj.minute,
+                day_of_week='*',
+                day_of_month='*',
+                month_of_year='*'
+            )
+            
+            PeriodicTask.objects.create(
+                name=periodic_task_name,
+                task='workorder.tasks.workorder_archive_task',
+                crontab=crontab,
+                enabled=enabled,
+                description=f'自動執行工單歸檔任務 - {name}'
+            )
+        
         return JsonResponse({
-            'success': False,
-            'message': f'執行失敗: {str(e)}'
+            'success': True,
+            'message': f'任務「{name}」更新成功'
         })
+        
+    except ScheduledTask.DoesNotExist:
+        return JsonResponse({'success': False, 'message': '任務不存在'})
+    except ValueError as e:
+        return JsonResponse({'success': False, 'message': '時間格式錯誤'})
+    except Exception as e:
+        logger.error(f"更新完工判斷任務失敗: {str(e)}")
+        return JsonResponse({'success': False, 'message': f'更新失敗: {str(e)}'})
 
 
 @login_required
@@ -3138,7 +3241,7 @@ def add_completion_task(request):
                 'message': f'任務名稱 "{name}" 已存在'
             })
         
-        # 創建新任務
+        # 創建 ScheduledTask 記錄
         task = ScheduledTask.objects.create(
             name=name,
             task_type='completion_check',
@@ -3146,6 +3249,37 @@ def add_completion_task(request):
             is_enabled=True,
             created_by=request.user.username
         )
+        
+        # 創建真正的 Celery Beat 定時任務
+        from django_celery_beat.models import PeriodicTask, CrontabSchedule
+        from datetime import datetime
+        
+        # 解析時間
+        time_obj = datetime.strptime(fixed_time, '%H:%M').time()
+        
+        # 創建 crontab 排程（每天固定時間執行）
+        crontab, created = CrontabSchedule.objects.get_or_create(
+            hour=time_obj.hour,
+            minute=time_obj.minute,
+            day_of_week='*',
+            day_of_month='*',
+            month_of_year='*'
+        )
+        
+        # 創建 PeriodicTask
+        periodic_task, created = PeriodicTask.objects.get_or_create(
+            name=f"Celery_{name}",
+            defaults={
+                'task': 'workorder.tasks.workorder_archive_task',
+                'crontab': crontab,
+                'enabled': True,
+                'description': f'自動執行工單歸檔任務 - {name}'
+            }
+        )
+        
+        # 關聯 ScheduledTask 和 PeriodicTask
+        task.task_function = 'workorder.tasks.workorder_archive_task'
+        task.save()
         
         return JsonResponse({
             'success': True,
@@ -3211,15 +3345,29 @@ def execute_completion_task(request):
         return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
     
     try:
-        from workorder.tasks import completion_check_task
+        from workorder.tasks import workorder_archive_task
         from django.utils import timezone
+        from system.models import ScheduledTask
         
-        # 執行完工檢查任務
-        result = completion_check_task.delay()
+        # 獲取任務ID（如果有的話）
+        task_id = request.POST.get('task_id')
+        
+        # 執行工單歸檔任務
+        result = workorder_archive_task.delay()
+        
+        # 更新定時任務的最後執行時間
+        if task_id:
+            try:
+                scheduled_task = ScheduledTask.objects.get(id=task_id, task_type='completion_check')
+                scheduled_task.last_run_at = timezone.now()
+                scheduled_task.save()
+                logger.info(f"已更新定時任務 {scheduled_task.name} 的最後執行時間")
+            except ScheduledTask.DoesNotExist:
+                logger.warning(f"找不到定時任務 ID: {task_id}")
         
         return JsonResponse({
             'success': True,
-            'message': '自動完工檢查任務已啟動',
+            'message': '自動工單歸檔任務已啟動',
             'task_id': result.id
         })
         

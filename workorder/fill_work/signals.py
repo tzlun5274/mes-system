@@ -65,12 +65,26 @@ def fill_work_post_save(sender, instance, created, **kwargs):
     except Exception as e:
         logger.error(f"更新派工單統計資料失敗：{str(e)}")
     
-    # 檢查是否為出貨包裝工序且已核准，觸發完工判斷
+    # 檢查是否為出貨包裝工序且已核准，觸發智能自動完工
     if (instance.approval_status == 'approved' and 
         instance.process and 
         instance.process.name == "出貨包裝"):
         
-        logger.info(f"出貨包裝填報記錄已核准，觸發完工判斷檢查：{instance.workorder}")
+        # 檢查智能自動完工功能是否啟用
+        try:
+            from workorder.models import SystemConfig
+            auto_completion_config = SystemConfig.objects.filter(key="auto_completion_enabled").first()
+            auto_completion_enabled = auto_completion_config and auto_completion_config.value == "True"
+            
+            if not auto_completion_enabled:
+                logger.debug("智能自動完工功能未啟用，跳過自動完工檢查")
+                return
+                
+        except Exception as e:
+            logger.error(f"檢查智能自動完工設定失敗：{str(e)}")
+            return
+        
+        logger.info(f"出貨包裝填報記錄已核准，觸發智能自動完工檢查：{instance.workorder}")
         
         try:
             # 查找對應的工單
@@ -102,14 +116,14 @@ def fill_work_post_save(sender, instance, created, **kwargs):
                 ).first()
             
             if workorder:
-                # 觸發完工判斷
+                # 觸發智能自動完工檢查
                 from workorder.services.completion_service import FillWorkCompletionService
-                success = FillWorkCompletionService.check_and_complete_workorder(workorder.id)
+                result = FillWorkCompletionService.auto_check_completion_on_fillwork_submit(instance)
                 
-                if success:
-                    logger.info(f"工單 {workorder.order_number} 完工判斷成功，已標記為完工")
+                if result.get('success') and result.get('is_completed'):
+                    logger.info(f"工單 {workorder.order_number} 智能自動完工成功")
                 else:
-                    logger.debug(f"工單 {workorder.order_number} 尚未達到完工條件")
+                    logger.debug(f"工單 {workorder.order_number} 尚未達到完工條件：{result.get('message', '')}")
             else:
                 logger.warning(f"找不到對應的工單：{instance.workorder} - {instance.product_id}")
                 

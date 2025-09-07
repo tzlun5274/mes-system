@@ -75,8 +75,9 @@ urlpatterns = [
     # 工單設定
     path("workorder_settings/", views.workorder_settings, name="workorder_settings"),
     path("execute_auto_allocation/", views.execute_auto_allocation, name="execute_auto_allocation"),
-    path("execute_completion_check/", views.execute_completion_check, name="execute_completion_check"),
-    path("execute_data_transfer/", views.execute_data_transfer, name="execute_data_transfer"),
+    path("execute_workorder_archive/", views.execute_workorder_archive, name="execute_workorder_archive"),
+    path("get_completion_task/", views.get_completion_task, name="get_completion_task"),
+    path("update_completion_task/", views.update_completion_task, name="update_completion_task"),
     path("add_auto_approval_task/", views.add_auto_approval_task, name="add_auto_approval_task"),
     path("delete_auto_approval_task/", views.delete_auto_approval_task, name="delete_auto_approval_task"),
     path("execute_specific_auto_approval_task/", views.execute_specific_auto_approval_task, name="execute_specific_auto_approval_task"),

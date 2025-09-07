@@ -24,80 +24,166 @@ class FillWorkCompletionService:
     PACKAGING_PROCESS_NAME = "出貨包裝"
     
     @classmethod
-    def check_and_complete_workorder(cls, workorder_id):
+    def archive_workorders(cls):
         """
-        檢查並完成工單（核心完工判斷方法）
-        直接使用派工單監控資料判斷完工條件
+        工單歸檔服務：合併完工判斷、資料轉移與清除的完整流程
+        觸發條件：出貨包裝累積數量 >= 預計生產數量
+        執行動作：
+        1. 完工判斷：將符合條件的工單狀態變更為 completed
+        2. 資料轉移：立即將該工單的所有相關資料轉移至已完工表格
+        3. 資料清除：確認轉移成功後，立即從原始表格中刪除已轉移的資料
         
-        Args:
-            workorder_id: 工單ID
-            
         Returns:
-            bool: 是否成功完工
+            dict: 歸檔結果統計
         """
         try:
-            with transaction.atomic():
-                # 1. 獲取工單
-                workorder = WorkOrder.objects.get(id=workorder_id)
-                
-                # 2. 檢查工單狀態
-                if workorder.status == 'completed':
-                    logger.info(f"工單 {workorder.order_number} 已經是完工狀態")
-                    return True
-                
-                # 3. 檢查工單狀態是否為 pending 或 in_progress
-                if workorder.status not in ['pending', 'in_progress']:
-                    logger.warning(f"工單 {workorder.order_number} 狀態為 {workorder.status}，不進行完工判斷")
-                    return False
-                
-                # 3. 查找對應的派工單並獲取監控資料
-                dispatch = WorkOrderDispatch.objects.filter(
-                    order_number=workorder.order_number,
-                    product_code=workorder.product_code,
-                    company_code=workorder.company_code
-                ).first()
-                
-                if not dispatch:
-                    logger.warning(f"工單 {workorder.order_number} 找不到對應的派工單")
-                    return False
-                
-                # 4. 更新派工單的監控資料
-                dispatch.update_all_statistics()
-                
-                # 5. 判斷完工條件（直接使用派工單監控資料）
-                # 簡化條件：只要 can_complete 為 True 就完工
-                if dispatch.can_complete:
-                    logger.info(f"工單 {workorder.order_number} 達到完工條件：出貨包裝數量={dispatch.packaging_total_quantity}, 目標數量={dispatch.planned_quantity}, 實際完成數量={dispatch.total_quantity}")
+            logger.info("開始執行工單歸檔流程")
+            
+            # 獲取所有進行中的派工單（真正在生產中的工單）
+            from workorder.workorder_dispatch.models import WorkOrderDispatch
+            active_dispatches = WorkOrderDispatch.objects.filter(status='in_production')
+            
+            total_checked = active_dispatches.count()
+            archived_count = 0
+            error_count = 0
+            errors = []
+            
+            for dispatch in active_dispatches:
+                # 通過公司名稱+工單號碼+產品編號獲取對應的工單（唯一性條件）
+                try:
+                    workorder = WorkOrder.objects.get(
+                        company_code=dispatch.company_code,
+                        order_number=dispatch.order_number,
+                        product_code=dispatch.product_code
+                    )
+                except WorkOrder.DoesNotExist:
+                    logger.warning(f"派工單 {dispatch.company_code}-{dispatch.order_number}-{dispatch.product_code} 對應的工單不存在，跳過")
+                    continue
+                except WorkOrder.MultipleObjectsReturned:
+                    logger.error(f"派工單 {dispatch.company_code}-{dispatch.order_number}-{dispatch.product_code} 對應多個工單，資料不一致，跳過")
+                    continue
+                try:
+                    # 1. 完工判斷：檢查是否滿足完工條件
+                    packaging_quantity = cls._get_packaging_quantity(workorder)
+                    planned_quantity = workorder.quantity
                     
-                    # 6. 執行完工流程
-                    cls._complete_workorder(workorder)
-                    completed_workorder = cls.transfer_workorder_to_completed(workorder_id)
-                    
-                    # 7. 自動生成報表資料
-                    try:
-                        from reporting.models import CompletedWorkOrderAnalysis
-                        # 使用 CompletedWorkOrderAnalysis 替代 CompletedWorkOrderReportData
-                        logger.info(f"工單 {workorder.order_number} 報表資料自動生成完成")
-                    except Exception as e:
-                        logger.warning(f"工單 {workorder.order_number} 報表資料生成失敗: {str(e)}")
-                    
-                    logger.info(f"工單 {workorder.order_number} 完工流程執行完成")
-                    return True
-                else:
-                    if dispatch.total_quantity == 0:
-                        logger.debug(f"工單 {workorder.order_number} 尚未達到完工條件：實際完成數量為0")
+                    if packaging_quantity >= planned_quantity:
+                        logger.info(f"工單 {workorder.order_number} 達到歸檔條件：出貨包裝累積數量={packaging_quantity} >= 預計生產數量={planned_quantity}")
+                        
+                        # 2. 資料轉移：轉移工單到已完工工單表
+                        completed_workorder = cls._transfer_single_workorder(workorder)
+                        
+                        if completed_workorder:
+                            # 3. 更新派工單狀態為已完工
+                            dispatch.status = 'completed'
+                            dispatch.production_end_date = timezone.now()
+                            dispatch.save()
+                            
+                            # 4. 更新工單狀態為已完工
+                            workorder.status = 'completed'
+                            workorder.completed_at = timezone.now()
+                            workorder.save()
+                            
+                            # 5. 資料清除：清理原始工單資料
+                            cls._cleanup_production_data(workorder)
+                            workorder.delete()
+                            
+                            archived_count += 1
+                            logger.info(f"工單 {workorder.order_number} 歸檔完成")
+                        else:
+                            error_count += 1
+                            errors.append(f"工單 {workorder.order_number}: 資料轉移失敗")
                     else:
-                        logger.debug(f"工單 {workorder.order_number} 尚未達到完工條件：出貨包裝數量={dispatch.packaging_total_quantity}, 目標數量={dispatch.planned_quantity}")
-                    return False
-                    
-        except WorkOrder.DoesNotExist:
-            logger.error(f"工單 {workorder_id} 不存在")
-            return False
+                        logger.debug(f"工單 {workorder.order_number} 尚未達到歸檔條件：出貨包裝累積數量={packaging_quantity} < 預計生產數量={planned_quantity}")
+                        
+                except Exception as e:
+                    error_count += 1
+                    error_msg = f"工單 {workorder.order_number} 歸檔失敗: {str(e)}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+            
+            result = {
+                'total_checked': total_checked,
+                'archived_count': archived_count,
+                'error_count': error_count,
+                'errors': errors[:10],  # 只返回前10個錯誤
+                'message': f'工單歸檔完成：檢查 {total_checked} 個工單，成功歸檔 {archived_count} 個，錯誤 {error_count} 個'
+            }
+            
+            logger.info(f"工單歸檔流程完成：{result['message']}")
+            return result
+            
         except Exception as e:
-            logger.error(f"檢查工單 {workorder_id} 完工狀態失敗: {str(e)}")
-            import traceback
-            logger.error(f"詳細錯誤堆疊: {traceback.format_exc()}")
-            return False
+            error_msg = f"執行工單歸檔流程失敗: {str(e)}"
+            logger.error(error_msg)
+            return {
+                'error': error_msg,
+                'total_checked': 0,
+                'archived_count': 0,
+                'error_count': 1
+            }
+    
+    @classmethod
+    def _transfer_single_workorder(cls, workorder):
+        """
+        轉移單一工單到已完工工單表
+        
+        Args:
+            workorder: WorkOrder 實例
+            
+        Returns:
+            CompletedWorkOrder: 已完工工單實例，如果失敗則返回 None
+        """
+        try:
+            # 檢查是否已經存在於已完工工單表中
+            existing = CompletedWorkOrder.objects.filter(
+                order_number=workorder.order_number,
+                product_code=workorder.product_code,
+                company_code=workorder.company_code
+            ).first()
+            
+            if existing:
+                logger.debug(f"工單 {workorder.order_number} 已存在於已完工工單表，跳過轉移")
+                return existing
+            
+            # 獲取公司名稱
+            company_name = ""
+            if workorder.company_code:
+                from erp_integration.models import CompanyConfig
+                company_config = CompanyConfig.objects.filter(company_code=workorder.company_code).first()
+                if company_config:
+                    company_name = company_config.company_name
+            
+            # 轉移工單到已完工工單表
+            completed_workorder = CompletedWorkOrder.objects.create(
+                original_workorder_id=workorder.id,
+                company_code=workorder.company_code,
+                company_name=company_name,
+                order_number=workorder.order_number,
+                product_code=workorder.product_code,
+                planned_quantity=workorder.quantity,
+                completed_quantity=workorder.quantity,
+                status='completed',
+                started_at=workorder.created_at,
+                completed_at=workorder.completed_at or timezone.now(),
+                production_record_id=None
+            )
+            
+            # 轉移填報記錄
+            cls._transfer_fill_work_reports(workorder, completed_workorder)
+            
+            # 轉移現場報工記錄
+            cls._transfer_onsite_records(workorder, completed_workorder)
+            
+            # 轉移工序記錄
+            cls._transfer_process_records(workorder, completed_workorder)
+            
+            logger.info(f"工單 {workorder.order_number} 資料轉移完成")
+            return completed_workorder
+            
+        except Exception as e:
+            logger.error(f"轉移工單 {workorder.order_number} 失敗: {str(e)}")
+            return None
     
     @classmethod
     def _get_last_packaging_end_time(cls, workorder):
@@ -1038,7 +1124,10 @@ class FillWorkCompletionService:
     @classmethod
     def transfer_completed_workorders(cls):
         """
-        將已完工的工單轉移到已完工工單表
+        資料轉移程式：偵測到「已完工」的工單後，將其所有詳細資料完整轉移至已完工工單資料庫
+        觸發條件：工單狀態為「已完工」
+        執行動作：完整轉移工單資料到已完工工單資料庫
+        執行方式：支援排程自動執行與手動執行
         
         Returns:
             dict: 轉移結果統計
@@ -1128,6 +1217,84 @@ class FillWorkCompletionService:
                 'total_found': 0,
                 'transferred_count': 0,
                 'skipped_count': 0,
+                'error_count': 1
+            }
+    
+    @classmethod
+    def cleanup_transferred_workorders(cls):
+        """
+        資料清理程式：在資料成功轉移後，自動從原始工單資料庫中刪除已轉移的工單資料
+        觸發條件：工單已成功轉移到已完工工單資料庫
+        執行動作：從原始工單資料庫中刪除已轉移的工單資料
+        執行方式：支援排程自動執行與手動執行
+        
+        Returns:
+            dict: 清理結果統計
+        """
+        try:
+            logger.info("開始執行已轉移工單資料清理")
+            
+            # 查找所有已轉移的工單（在已完工工單表中存在，但在原始工單表中仍存在）
+            transferred_workorders = []
+            
+            # 獲取所有已完工工單表中的工單
+            completed_workorders = CompletedWorkOrder.objects.all()
+            
+            for completed_wo in completed_workorders:
+                # 檢查原始工單是否仍存在
+                original_workorder = WorkOrder.objects.filter(
+                    order_number=completed_wo.order_number,
+                    product_code=completed_wo.product_code,
+                    company_code=completed_wo.company_code
+                ).first()
+                
+                if original_workorder:
+                    transferred_workorders.append(original_workorder)
+            
+            total_found = len(transferred_workorders)
+            deleted_count = 0
+            error_count = 0
+            errors = []
+            
+            for workorder in transferred_workorders:
+                try:
+                    # 清理相關的生產中資料
+                    cls._cleanup_production_data(workorder)
+                    
+                    # 刪除原始工單記錄
+                    workorder.delete()
+                    deleted_count += 1
+                    
+                    logger.info(f"工單 {workorder.order_number} 資料清理完成")
+                    
+                except Exception as e:
+                    error_count += 1
+                    error_msg = f"工單 {workorder.order_number} 清理失敗: {str(e)}"
+                    logger.error(error_msg)
+                    errors.append({
+                        'workorder_id': workorder.id,
+                        'order_number': workorder.order_number,
+                        'error': str(e)
+                    })
+            
+            result = {
+                'total_found': total_found,
+                'deleted_count': deleted_count,
+                'error_count': error_count,
+                'errors': errors[:10],  # 只返回前10個錯誤
+                'message': f'資料清理完成：找到 {total_found} 個已轉移工單，成功清理 {deleted_count} 個，錯誤 {error_count} 個'
+            }
+            
+            logger.info(f"已轉移工單資料清理完成：{result['message']}")
+            return result
+            
+        except Exception as e:
+            error_msg = f"執行已轉移工單資料清理失敗: {str(e)}"
+            logger.error(error_msg)
+            return {
+                'error': error_msg,
+                'total_found': 0,
+                'deleted_count': 0,
                 'error_count': 1
             }
     
@@ -1255,23 +1422,55 @@ class FillWorkCompletionService:
             completion_summary = cls.get_completion_summary(workorder.id)
             
             if completion_summary.get('can_complete', False):
-                # 執行完工流程
-                cls._complete_workorder(workorder)
-                
-                # 自動轉移到已完工工單表
+                # 執行智能自動完工流程（使用新的歸檔邏輯）
                 try:
-                    cls.transfer_completed_workorders()
-                    logger.info(f"工單 {workorder.order_number} 自動完工並轉移成功")
+                    # 查找對應的派工單
+                    from workorder.workorder_dispatch.models import WorkOrderDispatch
+                    dispatch = WorkOrderDispatch.objects.filter(
+                        company_code=workorder.company_code,
+                        order_number=workorder.order_number,
+                        product_code=workorder.product_code,
+                        status='in_production'
+                    ).first()
+                    
+                    if dispatch:
+                        # 執行完整的歸檔流程
+                        result = cls.archive_workorders()
+                        
+                        if result.get('archived_count', 0) > 0:
+                            logger.info(f"工單 {workorder.order_number} 智能自動完工並歸檔成功")
+                            return {
+                                'success': True,
+                                'message': f'工單 {workorder.order_number} 智能自動完工並歸檔成功',
+                                'workorder_number': workorder.order_number,
+                                'is_completed': True,
+                                'completion_summary': completion_summary
+                            }
+                        else:
+                            logger.warning(f"工單 {workorder.order_number} 歸檔失敗")
+                            return {
+                                'success': False,
+                                'message': f'工單 {workorder.order_number} 歸檔失敗',
+                                'workorder_number': workorder.order_number,
+                                'is_completed': False
+                            }
+                    else:
+                        logger.warning(f"找不到對應的派工單：{workorder.order_number}")
+                        return {
+                            'success': False,
+                            'message': f'找不到對應的派工單：{workorder.order_number}',
+                            'workorder_number': workorder.order_number,
+                            'is_completed': False
+                        }
+                        
                 except Exception as e:
-                    logger.error(f"自動轉移工單失敗：{str(e)}")
-                
-                return {
-                    'success': True,
-                    'message': f'工單 {workorder.order_number} 自動完工成功',
-                    'workorder_number': workorder.order_number,
-                    'is_completed': True,
-                    'completion_summary': completion_summary
-                }
+                    logger.error(f"智能自動完工失敗：{str(e)}")
+                    return {
+                        'success': False,
+                        'message': f'智能自動完工失敗：{str(e)}',
+                        'workorder_number': workorder.order_number,
+                        'is_completed': False
+                    }
             else:
                 # 未達到完工條件
                 reason = completion_summary.get('completion_status', {}).get('reason', '未知原因')
