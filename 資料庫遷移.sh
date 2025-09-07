@@ -190,7 +190,7 @@ for table in "${CORE_TABLES[@]}"; do
 done
 
 # 檢查專案關鍵表
-PROJECT_TABLES=("workorder_workorder" "system_systemconfig" "erp_integration_erpconfig")
+PROJECT_TABLES=("workorder_workorder" "workorder_system_config" "erp_integration_erpconfig")
 
 for table in "${PROJECT_TABLES[@]}"; do
     if python3 manage.py shell -c "from django.db import connection; cursor = connection.cursor(); cursor.execute('SELECT 1 FROM $table LIMIT 1'); print('$table 表存在')" > /dev/null 2>&1; then

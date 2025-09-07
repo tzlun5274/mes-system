@@ -70,7 +70,7 @@
                     <i class="fas fa-search text-primary me-2"></i>
                     相符性檢查詳細資料
                 </h2>
-                <a href="{% url 'workorder:consistency_check_home' %}" class="btn btn-outline-secondary">
+                <a href="{% url 'workorder:maintenance:consistency_check_home' %}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left"></i> 返回檢查首頁
                 </a>
             </div>
@@ -133,11 +133,11 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div class="export-buttons">
-                    <a href="{% url 'workorder:consistency_check_export' %}?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=csv" 
+                    <a href="{% url 'workorder:maintenance:consistency_check_export' %}?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=csv" 
                        class="btn btn-success">
                         <i class="fas fa-download"></i> 匯出 CSV
                     </a>
-                    <a href="{% url 'workorder:consistency_check_export' %}?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=excel" 
+                    <a href="{% url 'workorder:maintenance:consistency_check_export' %}?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=excel" 
                        class="btn btn-success">
                         <i class="fas fa-file-excel"></i> 匯出 Excel
                     </a>
@@ -540,7 +540,7 @@ document.addEventListener('DOMContentLoaded', function() {
             params.append('fix_data', JSON.stringify(fixData));
         }
         
-        fetch('{% url "workorder:consistency_check_ajax" %}', {
+        fetch('{% url "workorder:maintenance:consistency_check_ajax" %}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -693,7 +693,7 @@ document.addEventListener('DOMContentLoaded', function() {
             params.append('fix_data', JSON.stringify(fixData));
         }
         
-        fetch('{% url "workorder:consistency_check_ajax" %}', {
+        fetch('{% url "workorder:maintenance:consistency_check_ajax" %}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',

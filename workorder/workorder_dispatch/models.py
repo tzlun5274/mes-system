@@ -328,15 +328,23 @@ class WorkOrderDispatch(models.Model):
     
     def _update_completion_status(self):
         """更新完工判斷"""
-        # 根據完工判斷資料轉移設計規範
-        # 出貨包裝累計達到預計生產數量就觸發完工機制
+        # 簡化完工判斷邏輯：只要出貨包裝數量 >= 計劃數量就完工
+        # 不依賴複雜的統計資料，直接比較數量
         if (self.packaging_total_quantity >= self.planned_quantity and 
             self.planned_quantity > 0):
             self.completion_threshold_met = True
             self.can_complete = True
+            # 記錄完工判斷日誌
+            import logging
+            logger = logging.getLogger('workorder')
+            logger.info(f"派工單 {self.order_number} 達到完工條件：出貨包裝數量={self.packaging_total_quantity}, 計劃數量={self.planned_quantity}")
         else:
             self.completion_threshold_met = False
             self.can_complete = False
+            # 記錄未完工原因
+            import logging
+            logger = logging.getLogger('workorder')
+            logger.debug(f"派工單 {self.order_number} 未達到完工條件：出貨包裝數量={self.packaging_total_quantity}, 計劃數量={self.planned_quantity}")
     
     def _get_company_name(self):
         """取得公司名稱"""

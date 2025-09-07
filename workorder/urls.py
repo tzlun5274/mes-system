@@ -12,12 +12,13 @@ from .views.workorder_views import (
 )
 
 
-from .views.workorder_clear_views import (
-    WorkOrderClearView, WorkOrderClearAjaxView
-)
-from .views.workorder_import_views import (
-    workorder_import_page, workorder_import_file, download_workorder_template
-)
+# 維護功能已移至 maintenance 模組
+# from .views.workorder_clear_views import (
+#     WorkOrderClearView, WorkOrderClearAjaxView
+# )
+# from .views.workorder_import_views import (
+#     workorder_import_page, workorder_import_file, download_workorder_template
+# )
 
 from .views.completed_workorder_views import (
     CompletedWorkOrderListView, CompletedWorkOrderDetailView,
@@ -29,19 +30,18 @@ from .views.rollback_views import (
 )
 from .views import api_views
 # 自動分配功能已移除
-from .views.auto_management_views import (
-    AutoManagementConfigListView, AutoManagementConfigCreateView,
-    AutoManagementConfigUpdateView, AutoManagementConfigDeleteView,
-    execute_auto_function, toggle_auto_function
-)
-
-from .views.completion_automation_views import (
-    CompletionAutomationManagementView
-)
-from .views.consistency_check_views import (
-    ConsistencyCheckHomeView, ConsistencyCheckAjaxView, ConsistencyCheckDetailView,
-    ConsistencyCheckExportView, ConsistencyCheckFixView
-)
+# 完工自動化管理功能已簡化，移除複雜的視圖
+# from .views.completion_automation_views import (
+#     CompletionAutomationManagementView,
+#     AutoManagementConfigListView, AutoManagementConfigCreateView,
+#     AutoManagementConfigUpdateView, AutoManagementConfigDeleteView,
+#     execute_auto_function, toggle_auto_function
+# )
+# 相符性檢查功能已移至 maintenance 模組
+# from .views.consistency_check_views import (
+#     ConsistencyCheckHomeView, ConsistencyCheckAjaxView, ConsistencyCheckDetailView,
+#     ConsistencyCheckExportView, ConsistencyCheckFixView
+# )
 
 
 app_name = "workorder"
@@ -72,31 +72,32 @@ urlpatterns = [
     
 
     
-    # 工單清除功能
-    path("clear-workorders/", WorkOrderClearView.as_view(), name="clear_workorders"),
-    path("clear-workorders-ajax/", WorkOrderClearAjaxView.as_view(), name="clear_workorders_ajax"),
+    # 工單清除功能已移至 maintenance 模組
+    # path("clear-workorders/", WorkOrderClearView.as_view(), name="clear_workorders"),
+    # path("clear-workorders-ajax/", WorkOrderClearAjaxView.as_view(), name="clear_workorders_ajax"),
     
-    path("import/", workorder_import_page, name="workorder_import"),
-    path("import/file/", workorder_import_file, name="workorder_import_file"),
-    path("import/template/", download_workorder_template, name="download_workorder_template"),
+    # Excel匯入工單功能已移至 maintenance 模組
+    # path("import/", workorder_import_page, name="workorder_import"),
+    # path("import/file/", workorder_import_file, name="workorder_import_file"),
+    # path("import/template/", download_workorder_template, name="download_workorder_template"),
     
-    # 完工自動化管理
-    path("completion-automation/", CompletionAutomationManagementView.as_view(), name="completion_automation_management"),
+    # 完工自動化管理功能已簡化
+    # path("completion-automation/", CompletionAutomationManagementView.as_view(), name="completion_automation_management"),
     
-    # 相符性檢查功能
-    path("consistency-check/", ConsistencyCheckHomeView.as_view(), name="consistency_check_home"),
-    path("consistency-check/ajax/", ConsistencyCheckAjaxView.as_view(), name="consistency_check_ajax"),
-    path("consistency-check/detail/", ConsistencyCheckDetailView.as_view(), name="consistency_check_detail"),
-    path("consistency-check/export/", ConsistencyCheckExportView.as_view(), name="consistency_check_export"),
-    path("consistency-check/fix/", ConsistencyCheckFixView.as_view(), name="consistency_check_fix"),
+    # 相符性檢查功能已移至 maintenance 模組
+    # path("consistency-check/", ConsistencyCheckHomeView.as_view(), name="consistency_check_home"),
+    # path("consistency-check/ajax/", ConsistencyCheckAjaxView.as_view(), name="consistency_check_ajax"),
+    # path("consistency-check/detail/", ConsistencyCheckDetailView.as_view(), name="consistency_check_detail"),
+    # path("consistency-check/export/", ConsistencyCheckExportView.as_view(), name="consistency_check_export"),
+    # path("consistency-check/fix/", ConsistencyCheckFixView.as_view(), name="consistency_check_fix"),
     
-    # 自動管理功能設定
-    path("auto-management/", AutoManagementConfigListView.as_view(), name="auto_management_config_list"),
-    path("auto-management/create/", AutoManagementConfigCreateView.as_view(), name="auto_management_config_create"),
-    path("auto-management/edit/<int:pk>/", AutoManagementConfigUpdateView.as_view(), name="auto_management_config_update"),
-    path("auto-management/delete/<int:pk>/", AutoManagementConfigDeleteView.as_view(), name="auto_management_config_delete"),
-    path("static/api/auto-management/execute/", execute_auto_function, name="execute_auto_function"),
-    path("static/api/auto-management/toggle/", toggle_auto_function, name="toggle_auto_function"),
+    # 自動管理功能設定已簡化
+    # path("auto-management/", AutoManagementConfigListView.as_view(), name="auto_management_config_list"),
+    # path("auto-management/create/", AutoManagementConfigCreateView.as_view(), name="auto_management_config_create"),
+    # path("auto-management/edit/<int:pk>/", AutoManagementConfigUpdateView.as_view(), name="auto_management_config_update"),
+    # path("auto-management/delete/<int:pk>/", AutoManagementConfigDeleteView.as_view(), name="auto_management_config_delete"),
+    # path("static/api/auto-management/execute/", execute_auto_function, name="execute_auto_function"),
+    # path("static/api/auto-management/toggle/", toggle_auto_function, name="toggle_auto_function"),
     
     # 自動分配功能已移除
     
@@ -163,6 +164,9 @@ urlpatterns = [
     
     # 派工單子模組
     path("dispatch/", include(('workorder.workorder_dispatch.urls', 'workorder_dispatch'))),
+    
+    # 系統維護功能子模組
+    path("maintenance/", include(('workorder.maintenance.urls', 'maintenance'))),
     
     # 報工管理子模組（已移除新的報工管理系統）
     # path("work-reporting/", include("work_reporting_management.urls", namespace="work_reporting_management")),

@@ -539,6 +539,35 @@
                         </div>
                     </div>
                     
+                    <!-- 新增自動完工定時任務模態框 -->
+                    <div class="modal fade" id="addCompletionTaskModal" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">新增自動完工定時任務</h5>
+                                    <button type="button" class="close" onclick="hideAddCompletionTaskModal()">
+                                        <span>&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="form-group">
+                                        <label for="completionTaskName">任務名稱</label>
+                                        <input type="text" class="form-control" id="completionTaskName" placeholder="例如：每日完工檢查">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="completionTaskFixedTime">固定執行時間</label>
+                                        <input type="time" class="form-control" id="completionTaskFixedTime" value="18:00">
+                                        <small class="form-text text-muted">每天固定時間執行完工檢查</small>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" onclick="hideAddCompletionTaskModal()">取消</button>
+                                    <button type="button" class="btn btn-primary" onclick="addNewCompletionTask()">新增</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- 手動執行按鈕 -->
                     <div class="row mt-3">
                         <div class="col-md-12">
@@ -589,6 +618,74 @@
                             <small class="form-text text-muted">用於完工判斷的工序名稱</small>
                         </div>
                     </div>
+                </div>
+            </div>
+            
+            <!-- 自動完工定時任務管理 -->
+            <div class="setting-item">
+                <div class="setting-header">
+                    <div>
+                        <div class="setting-title">自動完工定時任務</div>
+                        <div class="setting-description">設定每天固定時間執行完工檢查</div>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addCompletionTaskModal">
+                        <i class="fas fa-plus mr-1"></i>新增任務
+                    </button>
+                </div>
+                
+                <div class="mt-3">
+                    {% if completion_tasks %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>任務名稱</th>
+                                        <th>執行時間</th>
+                                        <th>狀態</th>
+                                        <th>最後執行</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for task in completion_tasks %}
+                                    <tr>
+                                        <td>{{ task.name }}</td>
+                                        <td>{{ task.fixed_time }}</td>
+                                        <td>
+                                            {% if task.is_enabled %}
+                                                <span class="badge bg-success">啟用</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">停用</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if task.last_executed %}
+                                                {{ task.last_executed|date:"Y-m-d H:i" }}
+                                            {% else %}
+                                                <span class="text-muted">尚未執行</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                    onclick="executeCompletionTask({{ task.id }})">
+                                                <i class="fas fa-play"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                    onclick="deleteCompletionTask({{ task.id }})">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-clock fa-2x mb-2"></i>
+                            <p>尚未設定自動完工定時任務</p>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -747,6 +844,128 @@ function hideAddTaskModal() {
     if (bootstrapModal) {
         bootstrapModal.hide();
     }
+}
+
+// 顯示新增自動完工定時任務模態框
+function showAddCompletionTaskModal() {
+    const modal = document.getElementById('addCompletionTaskModal');
+    const bootstrapModal = new bootstrap.Modal(modal, {
+        backdrop: true,
+        keyboard: true
+    });
+    bootstrapModal.show();
+}
+
+// 隱藏新增自動完工定時任務模態框
+function hideAddCompletionTaskModal() {
+    const modal = document.getElementById('addCompletionTaskModal');
+    const bootstrapModal = bootstrap.Modal.getInstance(modal);
+    if (bootstrapModal) {
+        bootstrapModal.hide();
+    }
+}
+
+// 新增自動完工定時任務
+function addNewCompletionTask() {
+    const name = document.getElementById('completionTaskName').value.trim();
+    const fixedTime = document.getElementById('completionTaskFixedTime').value;
+    
+    if (!name) {
+        alert('請輸入任務名稱！');
+        return;
+    }
+    
+    if (!fixedTime) {
+        alert('請設定固定執行時間！');
+        return;
+    }
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:add_completion_task" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `name=${encodeURIComponent(name)}&fixed_time=${fixedTime}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            const modal = document.getElementById('addCompletionTaskModal');
+            const bootstrapModal = bootstrap.Modal.getInstance(modal);
+            if (bootstrapModal) {
+                bootstrapModal.hide();
+            }
+            location.reload(); // 重新載入頁面以顯示新任務
+        } else {
+            alert('新增失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('新增失敗：網路錯誤');
+    });
+}
+
+// 執行自動完工定時任務
+function executeCompletionTask(taskId) {
+    if (!confirm('確定要執行此自動完工定時任務嗎？')) {
+        return;
+    }
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:execute_completion_task" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `task_id=${taskId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+        } else {
+            alert('執行失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('執行失敗：網路錯誤');
+    });
+}
+
+// 刪除自動完工定時任務
+function deleteCompletionTask(taskId) {
+    if (!confirm('確定要刪除此自動完工定時任務嗎？')) {
+        return;
+    }
+    
+    // 發送 AJAX 請求
+    fetch('{% url "system:delete_completion_task" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `task_id=${taskId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload(); // 重新載入頁面以更新任務列表
+        } else {
+            alert('刪除失敗：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('刪除失敗：網路錯誤');
+    });
 }
 
 // 切換執行類型設定

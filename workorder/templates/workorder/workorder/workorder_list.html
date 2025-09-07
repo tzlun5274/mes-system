@@ -158,7 +158,7 @@
                         <br>
                         可檢查、統計、修正。
                     </p>
-                    <a href="{% url 'workorder:consistency_check_home' %}" class="btn btn-danger">
+                    <a href="{% url 'workorder:maintenance:consistency_check_home' %}" class="btn btn-danger">
                         <i class="fas fa-search"></i> 開始檢查
                     </a>
                 </div>
@@ -177,7 +177,7 @@
                         <br>
                         可備份、清除、重新匯入。
                     </p>
-                    <a href="{% url 'workorder:clear_workorders' %}" class="btn btn-dark">
+                    <a href="{% url 'workorder:maintenance:clear_workorders' %}" class="btn btn-dark">
                         <i class="fas fa-trash-alt"></i>
                         清除工單
                     </a>
@@ -197,7 +197,7 @@
                         <br>
                         支援Excel和CSV格式，自動識別公司代號。
                     </p>
-                    <a href="{% url 'workorder:workorder_import' %}" class="btn btn-success">
+                    <a href="{% url 'workorder:maintenance:workorder_import' %}" class="btn btn-success">
                         <i class="fas fa-upload"></i> Excel匯入工單
                     </a>
                 </div>

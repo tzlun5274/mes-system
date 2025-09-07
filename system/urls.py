@@ -83,6 +83,9 @@ urlpatterns = [
     path("execute_all_auto_approval_tasks/", views.execute_all_auto_approval_tasks, name="execute_all_auto_approval_tasks"),
     path("enable_auto_completion/", views.enable_auto_completion, name="enable_auto_completion"),
     path("disable_auto_completion/", views.disable_auto_completion, name="disable_auto_completion"),
+    path("add_completion_task/", views.add_completion_task, name="add_completion_task"),
+    path("delete_completion_task/", views.delete_completion_task, name="delete_completion_task"),
+    path("execute_completion_task/", views.execute_completion_task, name="execute_completion_task"),
     
     # 報表設定
     path("report_settings/", views.report_settings, name="report_settings"),

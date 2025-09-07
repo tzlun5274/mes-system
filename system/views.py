@@ -2581,6 +2581,11 @@ def workorder_settings(request):
         transfer_batch_size = int(request.POST.get('transfer_batch_size', 50))
         transfer_retention_days = int(request.POST.get('transfer_retention_days', 365))
         
+        # 自動完工定時任務設定
+        completion_task_name = request.POST.get('completion_task_name', '')
+        completion_fixed_time = request.POST.get('completion_fixed_time', '')
+        completion_task_enabled = request.POST.get('completion_task_enabled') == 'on'
+        
         # 更新系統設定
         SystemConfig.objects.update_or_create(key="auto_approval", defaults={"value": str(auto_approval)})
         SystemConfig.objects.update_or_create(key="notification_enabled", defaults={"value": str(notification_enabled)})
@@ -2605,6 +2610,34 @@ def workorder_settings(request):
         SystemConfig.objects.update_or_create(key="data_transfer_enabled", defaults={"value": str(data_transfer_enabled)})
         SystemConfig.objects.update_or_create(key="transfer_batch_size", defaults={"value": str(transfer_batch_size)})
         SystemConfig.objects.update_or_create(key="transfer_retention_days", defaults={"value": str(transfer_retention_days)})
+        
+        # 處理自動完工定時任務
+        if completion_task_name and completion_fixed_time:
+            try:
+                # 檢查是否已存在完工判斷定時任務
+                existing_task = ScheduledTask.objects.filter(
+                    task_type='completion_check',
+                    name=completion_task_name
+                ).first()
+                
+                if existing_task:
+                    # 更新現有任務
+                    existing_task.fixed_time = completion_fixed_time
+                    existing_task.is_enabled = completion_task_enabled
+                    existing_task.save()
+                else:
+                    # 創建新任務
+                    ScheduledTask.objects.create(
+                        name=completion_task_name,
+                        task_type='completion_check',
+                        fixed_time=completion_fixed_time,
+                        is_enabled=completion_task_enabled,
+                        created_by=request.user.username
+                    )
+                    
+            except Exception as e:
+                logger.error(f"處理自動完工定時任務失敗: {str(e)}")
+                messages.error(request, f"處理自動完工定時任務失敗：{str(e)}")
         
         # 更新定時任務設定
         try:
@@ -2679,6 +2712,9 @@ def workorder_settings(request):
     transfer_batch_size = get_config("transfer_batch_size", 50, int)
     transfer_retention_days = get_config("transfer_retention_days", 365, int)
     
+    # 自動完工定時任務
+    completion_tasks = ScheduledTask.objects.filter(task_type='completion_check').order_by('-created_at')
+    
     # 取得定時任務狀態
     try:
         auto_allocation_task = PeriodicTask.objects.get(name='自動分配任務')
@@ -2715,6 +2751,9 @@ def workorder_settings(request):
         'data_transfer_enabled': data_transfer_enabled,
         'transfer_batch_size': transfer_batch_size,
         'transfer_retention_days': transfer_retention_days,
+        
+        # 自動完工定時任務
+        'completion_tasks': completion_tasks,
         
         # 定時任務狀態
         'auto_allocation_task': auto_allocation_task,
@@ -3070,6 +3109,125 @@ def disable_auto_completion(request):
         return JsonResponse({
             'success': False,
             'message': f'停用失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def add_completion_task(request):
+    """
+    新增自動完工定時任務 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        name = request.POST.get('name')
+        fixed_time = request.POST.get('fixed_time')
+        
+        if not name or not fixed_time:
+            return JsonResponse({
+                'success': False,
+                'message': '任務名稱和固定時間為必填欄位'
+            })
+        
+        # 檢查任務名稱是否重複
+        if ScheduledTask.objects.filter(name=name, task_type='completion_check').exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'任務名稱 "{name}" 已存在'
+            })
+        
+        # 創建新任務
+        task = ScheduledTask.objects.create(
+            name=name,
+            task_type='completion_check',
+            fixed_time=fixed_time,
+            is_enabled=True,
+            created_by=request.user.username
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'自動完工定時任務 "{name}" 創建成功',
+            'task_id': task.id
+        })
+        
+    except Exception as e:
+        logger.error(f"新增自動完工定時任務失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'創建失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def delete_completion_task(request):
+    """
+    刪除自動完工定時任務 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        task_id = request.POST.get('task_id')
+        
+        if not task_id:
+            return JsonResponse({
+                'success': False,
+                'message': '任務ID為必填欄位'
+            })
+        
+        task = ScheduledTask.objects.get(id=task_id, task_type='completion_check')
+        task_name = task.name
+        task.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'自動完工定時任務 "{task_name}" 刪除成功'
+        })
+        
+    except ScheduledTask.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': '找不到指定的任務'
+        })
+    except Exception as e:
+        logger.error(f"刪除自動完工定時任務失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'刪除失敗：{str(e)}'
+        })
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_completion_task(request):
+    """
+    執行自動完工定時任務 API
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': '只支援 POST 請求'})
+    
+    try:
+        from workorder.tasks import completion_check_task
+        from django.utils import timezone
+        
+        # 執行完工檢查任務
+        result = completion_check_task.delay()
+        
+        return JsonResponse({
+            'success': True,
+            'message': '自動完工檢查任務已啟動',
+            'task_id': result.id
+        })
+        
+    except Exception as e:
+        logger.error(f"執行自動完工檢查任務失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'執行失敗：{str(e)}'
         })
 
 

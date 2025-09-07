@@ -253,7 +253,7 @@
     
     <!-- 下載範本 -->
     <div class="text-center mb-4">
-        <a href="{% url 'workorder:download_workorder_template' %}" class="btn btn-template">
+        <a href="{% url 'workorder:maintenance:download_workorder_template' %}" class="btn btn-template">
             <i class="fas fa-download"></i>
             下載匯入範本
         </a>
@@ -384,7 +384,7 @@ document.addEventListener('DOMContentLoaded', function() {
             progressText.textContent = `上傳中... ${Math.round(progress)}%`;
         }, 200);
         
-        fetch('{% url "workorder:workorder_import_file" %}', {
+        fetch('{% url "workorder:maintenance:workorder_import_file" %}', {
             method: 'POST',
             body: formData
         })

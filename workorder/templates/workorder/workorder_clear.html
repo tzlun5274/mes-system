@@ -242,7 +242,7 @@ function executeClear() {
     formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
     
     // 發送AJAX請求
-    fetch('{% url "workorder:clear_workorders_ajax" %}', {
+    fetch('{% url "workorder:maintenance:clear_workorders_ajax" %}', {
         method: 'POST',
         body: formData
     })
@@ -340,7 +340,7 @@ function showResult(data) {
         <div class="alert alert-warning mt-3">
             <h6><i class="fas fa-info-circle"></i> 下一步</h6>
             <p>現在您可以重新匯入工單資料了。</p>
-            <a href="{% url 'workorder:workorder_import' %}" class="btn btn-primary">
+            <a href="{% url 'workorder:maintenance:workorder_import' %}" class="btn btn-primary">
                 <i class="fas fa-upload"></i>
                 匯入工單資料
             </a>

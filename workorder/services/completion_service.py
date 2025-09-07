@@ -65,10 +65,11 @@ class FillWorkCompletionService:
                 dispatch.update_all_statistics()
                 
                 # 5. 判斷完工條件（直接使用派工單監控資料）
-                if dispatch.can_complete and dispatch.total_quantity > 0:
+                # 簡化條件：只要 can_complete 為 True 就完工
+                if dispatch.can_complete:
                     logger.info(f"工單 {workorder.order_number} 達到完工條件：出貨包裝數量={dispatch.packaging_total_quantity}, 目標數量={dispatch.planned_quantity}, 實際完成數量={dispatch.total_quantity}")
                     
-                                    # 6. 執行完工流程
+                    # 6. 執行完工流程
                     cls._complete_workorder(workorder)
                     completed_workorder = cls.transfer_workorder_to_completed(workorder_id)
                     
