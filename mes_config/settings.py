@@ -22,36 +22,47 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', '0.
 SITE_URL = f"http://{env('HOST_IP', default='localhost')}:{env('DJANGO_PORT', default='8000')}"
 
 # 已安裝的應用
+# 注意：應用程式順序很重要，被依賴的應用程式必須在前面
 INSTALLED_APPS = [
+    # Django 核心應用
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.humanize",
+    
+    # 第三方應用
     "corsheaders",  # 添加 django-cors-headers
     "django_celery_beat",  # 添加 Celery Beat 支援
-    "equip",
-    "material",
-    "process",
-    "scheduling.apps.SchedulingConfig",
-    "quality",
+    
+    # 基礎模組（無依賴）
     "system",
+    "erp_integration.apps.ErpIntegrationConfig",
+    
+    # 核心業務模組（按依賴順序排列）
+    "process",  # 製程管理 - 被其他模組依賴
+    "equip",    # 設備管理
+    "material", # 物料管理
+    "quality",  # 品質管理
+    
+    # 工單相關模組（依賴 process）
     "workorder",
     "workorder.company_order.apps.CompanyOrderConfig",
     "workorder.workorder_dispatch.apps.WorkOrderDispatchConfig",
     "workorder.onsite_reporting.apps.OnsiteReportingConfig",
     "workorder.workorder_completed.apps.WorkOrderCompletedConfig",
-    "workorder.fill_work.apps.FillWorkConfig",
-            # 移除 production_monitoring，改用派工單監控資料
-
-    "kanban.apps.KanbanConfig",
-    "erp_integration.apps.ErpIntegrationConfig",
-    "ai.apps.AiConfig",
+    "workorder.fill_work.apps.FillWorkConfig",  # 依賴 process.ProcessName
+    
+    # 生產和排程模組
     "production",
+    "scheduling.apps.SchedulingConfig",
+    
+    # 其他功能模組
+    "kanban.apps.KanbanConfig",
+    "ai.apps.AiConfig",
     "reporting",
-    # "work_reporting_management",  # 已移除新的報工管理系統
-    "django.contrib.humanize",
 ]
 
 # 中間件設置

@@ -1171,23 +1171,11 @@ def import_users(request):
                 request,
                 f"用戶匯入完成：新增 {created_count} 個，更新 {updated_count} 個",
             )
-            # 測試：返回 JSON 而不是重定向
-            from django.http import JsonResponse
-            return JsonResponse({
-                'status': 'success',
-                'message': f'用戶匯入完成：新增 {created_count} 個，更新 {updated_count} 個',
-                'created_count': created_count,
-                'updated_count': updated_count
-            })
+            return redirect("system:user_list")
         except Exception as e:
             logger.error(f"用戶匯入失敗: {str(e)}")
             messages.error(request, f"用戶匯入失敗：{str(e)}")
-            # 測試：返回 JSON 錯誤而不是重定向
-            from django.http import JsonResponse
-            return JsonResponse({
-                'status': 'error',
-                'message': f'用戶匯入失敗：{str(e)}'
-            }, status=400)
+            return redirect("system:user_list")
         return redirect("system:user_list")
     return redirect("system:user_list")
 

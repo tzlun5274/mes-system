@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+{% block title %}未結案公司製令單{% endblock %}
+{% block content %}
+
+<!-- 麵包屑導航 -->
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'home' %}"><i class="fas fa-home"></i> 首頁</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'workorder:index' %}">工單管理功能入口</a></li>
+        <li class="breadcrumb-item active" aria-current="page">公司製令單</li>
+    </ol>
+</nav>
+
+<!-- 頁面說明 -->
+<div class="alert alert-info" role="alert">
+    <i class="fas fa-info-circle"></i>
+    <strong>說明：</strong>此頁面顯示 ERP 同步來的原始工單（來自各公司 MES 資料庫 prdMKOrdMain 表），
+    只顯示未結案的公司製令單（CompleteStatus=2 或空白，且 BillStatus 不是 1），方便現場追蹤與管理。
+</div>
+
+<!-- 統計卡片 -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ total_orders|default:0 }}</h4>
+                        <p class="card-text">總製令單</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clipboard-list fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ converted_orders|default:0 }}</h4>
+                        <p class="card-text">已轉工單</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-check-circle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ unconverted_orders|default:0 }}</h4>
+                        <p class="card-text">未轉工單</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if request.user.is_staff or request.user.is_superuser %}
+<div class="mb-3 p-3 bg-light border rounded">
+    <form method="post" action="" class="row g-2 align-items-center">
+        {% csrf_token %}
+        <div class="col-auto">
+            <label for="auto_convert_interval" class="col-form-label"><b>自動轉換工單間隔（分鐘）</b>：</label>
+        </div>
+        <div class="col-auto">
+            <input type="number" min="1" name="auto_convert_interval" id="auto_convert_interval" class="form-control" value="{{ auto_convert_interval|default:30 }}" required>
+        </div>
+        <div class="col-auto text-success">
+            <small>（目前設定：{{ auto_convert_interval|default:30 }} 分鐘）</small>
+        </div>
+        <div class="col-auto">
+            <label for="auto_sync_companyorder_interval" class="col-form-label"><b>自動同步製令間隔（分鐘）</b>：</label>
+        </div>
+        <div class="col-auto">
+            <input type="number" min="1" name="auto_sync_companyorder_interval" id="auto_sync_companyorder_interval" class="form-control" value="{{ auto_sync_companyorder_interval|default:30 }}" required>
+        </div>
+        <div class="col-auto text-success">
+            <small>（目前設定：{{ auto_sync_companyorder_interval|default:30 }} 分鐘）</small>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">儲存</button>
+        </div>
+    </form>
+    
+    <!-- 手動操作按鈕 -->
+    <div class="row mt-3 g-2 align-items-center">
+        <div class="col-auto">
+            <form method="post" action="{% url 'workorder:manual_sync_orders' %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-warning" onclick="return confirm('確定要手動同步各公司製令單嗎？')">
+                    <i class="fas fa-sync-alt"></i> 手動同步製令
+                </button>
+            </form>
+        </div>
+        <div class="col-auto">
+            <form method="post" action="{% url 'workorder:manual_convert_orders' %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success" onclick="return confirm('確定要手動轉換未轉換的製令單為 MES 工單嗎？')">
+                    <i class="fas fa-exchange-alt"></i> 手動轉換工單
+                </button>
+            </form>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'workorder:selective_revert_orders' %}" class="btn btn-primary">
+                <i class="fas fa-list-check"></i> 選擇性轉回製令
+            </a>
+        </div>
+        <div class="col-auto">
+            <small class="text-muted">
+                <i class="fas fa-info-circle"></i> 
+                手動同步：從各公司 ERP 資料庫同步最新製令單到 CompanyOrder 表<br>
+                手動轉換：將未轉換的製令單轉成 MES 系統的待生產工單，並自動建立工序明細<br>
+                選擇性轉回：可選擇單筆或多筆已轉換製令進行轉回
+            </small>
+        </div>
+    </div>
+</div>
+{% endif %}
+<div class="container mt-4">
+    <h2>公司製令單</h2>
+    <div class="row mb-3">
+        <div class="col-12">
+            <!-- 工單管理子選單（分頁按鈕） -->
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'workorder:workorder_dispatch:dispatch_list' %}">派工單</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="{% url 'workorder:company_orders' %}">公司製令</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'workorder:mes_orders' %}">MES工單作業</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <p class="text-muted">此頁顯示 ERP 同步來的原始工單（來自各公司 MES 資料庫 prdMKOrdMain 表），<strong>只顯示未結案的公司製令單（CompleteStatus=2，且 BillStatus 不是 1）</strong>，方便現場追蹤與管理。</p>
+    <form method="get" class="mb-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-auto">
+                <label for="search" class="col-form-label">搜尋：</label>
+            </div>
+            <div class="col-auto">
+                <input list="search_list" name="search" id="search" class="form-control" value="{{ request.GET.search|default:'' }}" onchange="this.form.submit()" placeholder="輸入公司、單號或產品編號...">
+                <datalist id="search_list">
+                    <option value="">全部公司</option>
+                    {% for company in companies %}
+                        <option value="{{ company.company_code }}">{{ company.company_name }}</option>
+                    {% endfor %}
+                    {% for workorder in workorders %}
+                        <option value="{{ workorder.company_code }}">公司代號</option>
+                        <option value="{{ workorder.mkordno }}">製令單號</option>
+                        <option value="{{ workorder.ProductID }}">產品編號</option>
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div class="col-auto">
+                <a href="{% url 'workorder:index' %}" class="btn btn-secondary">返回</a>
+            </div>
+        </div>
+    </form>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>公司代號</th>
+                <th>製令單號<br><span class="text-secondary">(MKOrdNO)</span></th>
+                <th>產品編號<br><span class="text-secondary">(ProductID)</span></th>
+                <th>生產數量<br><span class="text-secondary">(ProdtQty)</span></th>
+                <th>預定開工日<br><span class="text-secondary">(EstTakeMatDate)</span></th>
+                <th>預定出貨日<br><span class="text-secondary">(EstStockOutDate)</span><br>
+                    <a href="?search={{ request.GET.search|urlencode }}&sort=est_stock_out_date_asc" class="btn btn-sm btn-outline-secondary">▲</a>
+                    <a href="?search={{ request.GET.search|urlencode }}&sort=est_stock_out_date_desc" class="btn btn-sm btn-outline-secondary">▼</a>
+                </th>
+                <th>轉換狀態<br><span class="text-secondary">(MES 工單)</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for workorder in workorders %}
+            <tr>
+                <td>
+                    <span class="badge bg-info">{{ workorder.company_code }}</span>
+                </td>
+                <td>
+                    <strong>{{ workorder.mkordno }}</strong>
+                </td>
+                <td>{{ workorder.ProductID }}</td>
+                <td>{{ workorder.ProdtQty }}</td>
+                <td>{{ workorder.EstTakeMatDate }}</td>
+                <td>{{ workorder.EstStockOutDate }}</td>
+                <td>
+                    {% if workorder.is_converted %}
+                        <span class="badge bg-success">已轉換</span>
+                        <small class="text-muted d-block">已建立 MES 工單</small>
+                    {% else %}
+                        <span class="badge bg-warning">未轉換</span>
+                        <small class="text-muted d-block">尚未建立 MES 工單</small>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center">目前沒有未結案的公司製令單資料</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div class="alert alert-info mt-3">
+        <b>說明：</b>本頁資料來自各公司 MES 資料庫的 <code>prdMKOrdMain</code> 表，<strong>只顯示未結案的公司製令單（CompleteStatus=2，且 BillStatus 不是 1）</strong>，方便現場追蹤與管理。
+        <br><br>
+        <b>轉換狀態說明：</b>
+        <ul class="mb-0">
+            <li><span class="badge bg-success">已轉換</span>：此製令單已自動轉成 MES 系統的「待生產工單」，可在派工管理頁面看到</li>
+            <li><span class="badge bg-warning">未轉換</span>：此製令單尚未轉成 MES 工單，需要執行同步命令或手動轉換</li>
+        </ul>
+    </div>
+</div>
+{% endblock %} 

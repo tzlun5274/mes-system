@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
 設定工單管理定時任務
+注意：此檔案已被整合到 workorder/management/commands/sync_company_orders.py
+請使用：python manage.py sync_company_orders --setup-tasks
 """
 
 import os

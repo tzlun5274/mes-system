@@ -431,6 +431,7 @@ def dispatch_list(request):
 def manual_sync_orders(request):
     """
     手動同步各公司製令單到 CompanyOrder 表
+    直接執行同步邏輯，不透過命令列
     """
     if not (request.user.is_staff or request.user.is_superuser):
         workorder_logger.warning(
@@ -443,12 +444,23 @@ def manual_sync_orders(request):
         return redirect("workorder:company_orders")
 
     try:
-        # 執行同步命令
-        call_command("sync_pending_workorders")
-        workorder_logger.info(
-            f"管理員 {request.user} 手動同步公司製令單成功。IP: {request.META.get('REMOTE_ADDR')}"
-        )
-        messages.success(request, "手動同步製令單完成！")
+        # 直接執行同步邏輯
+        from workorder.services.sync_service import CompanyOrderSyncService
+        
+        sync_service = CompanyOrderSyncService()
+        result = sync_service.sync_all_companies()
+        
+        if result['success']:
+            workorder_logger.info(
+                f"管理員 {request.user} 手動同步公司製令單成功，共同步 {result['total_synced']} 筆記錄。IP: {request.META.get('REMOTE_ADDR')}"
+            )
+            messages.success(request, f"手動同步製令單完成！共同步 {result['total_synced']} 筆記錄")
+        else:
+            workorder_logger.error(
+                f"管理員 {request.user} 手動同步公司製令單失敗：{result.get('error', '未知錯誤')}。IP: {request.META.get('REMOTE_ADDR')}"
+            )
+            messages.error(request, f"同步失敗：{result.get('error', '未知錯誤')}")
+            
     except Exception as e:
         workorder_logger.error(
             f"管理員 {request.user} 手動同步公司製令單失敗：{e}。IP: {request.META.get('REMOTE_ADDR')}"
@@ -3694,9 +3706,7 @@ def smt_supplement_report_approve(request, report_id):
                 ProcessUpdateService.update_workorder_processes(report.workorder.id)
         except Exception as sync_error:
             # 同步失敗不影響核准流程，只記錄錯誤
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"同步SMT報工記錄到生產詳情失敗: {str(sync_error)}")
+            workorder_logger.error(f"同步SMT報工記錄到生產詳情失敗: {str(sync_error)}")
         
         messages.success(request, 'SMT報工記錄審核通過！')
     except SMTSupplementReport.DoesNotExist:
@@ -5208,9 +5218,7 @@ def active_workorders(request):
                 workorders_with_approved_reports.append(workorder)
     except Exception as e:
         # 如果派工單模組不存在或發生錯誤，記錄錯誤但不影響功能
-        import logging
-        logger = logging.getLogger('workorder')
-        logger.warning(f"獲取生產中派工單失敗: {str(e)}")
+        workorder_logger.warning(f"獲取生產中派工單失敗: {str(e)}")
     
     # 去重並排序
     workorders_with_approved_reports = list(set(workorders_with_approved_reports))

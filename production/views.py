@@ -850,8 +850,53 @@ def import_production_lines(request):
                                 error_count += 1
                                 continue
                         
-                        # 處理其他時間欄位（類似邏輯）
-                        # ... 簡化處理，避免過長
+                        # 處理午休開始時間
+                        if row_data['午休開始時間']:
+                            try:
+                                if isinstance(row_data['午休開始時間'], str):
+                                    lunch_start_time = datetime.strptime(row_data['午休開始時間'], '%H:%M').time()
+                                else:
+                                    lunch_start_time = row_data['午休開始時間'].time()
+                            except:
+                                errors.append(f"第{row_num}行：午休開始時間格式錯誤")
+                                error_count += 1
+                                continue
+                        
+                        # 處理午休結束時間
+                        if row_data['午休結束時間']:
+                            try:
+                                if isinstance(row_data['午休結束時間'], str):
+                                    lunch_end_time = datetime.strptime(row_data['午休結束時間'], '%H:%M').time()
+                                else:
+                                    lunch_end_time = row_data['午休結束時間'].time()
+                            except:
+                                errors.append(f"第{row_num}行：午休結束時間格式錯誤")
+                                error_count += 1
+                                continue
+                        
+                        # 處理加班開始時間
+                        if row_data['加班開始時間']:
+                            try:
+                                if isinstance(row_data['加班開始時間'], str):
+                                    overtime_start_time = datetime.strptime(row_data['加班開始時間'], '%H:%M').time()
+                                else:
+                                    overtime_start_time = row_data['加班開始時間'].time()
+                            except:
+                                errors.append(f"第{row_num}行：加班開始時間格式錯誤")
+                                error_count += 1
+                                continue
+                        
+                        # 處理加班結束時間
+                        if row_data['加班結束時間']:
+                            try:
+                                if isinstance(row_data['加班結束時間'], str):
+                                    overtime_end_time = datetime.strptime(row_data['加班結束時間'], '%H:%M').time()
+                                else:
+                                    overtime_end_time = row_data['加班結束時間'].time()
+                            except:
+                                errors.append(f"第{row_num}行：加班結束時間格式錯誤")
+                                error_count += 1
+                                continue
                         
                         # 處理工作日設定
                         work_days = '["1","2","3","4","5"]'

@@ -540,7 +540,7 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
         # 如果間隔設定有變更，重新設定定時任務
         if interval_changed:
             try:
-                call_command("setup_workorder_tasks")
+                call_command("sync_company_orders", "--setup-tasks")
                 workorder_logger.info(
                     f"管理員 {request.user} 重新設定定時任務成功。IP: {request.META.get('REMOTE_ADDR')}"
                 )

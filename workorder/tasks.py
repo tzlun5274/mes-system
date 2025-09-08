@@ -210,3 +210,180 @@ def auto_dispatch_workorders():
             'error': f'定時任務失敗：{str(e)}',
             'created_count': 0
         }
+
+
+@shared_task
+def auto_sync_company_orders():
+    """
+    定時任務：自動同步公司製令單
+    """
+    try:
+        from workorder.services.sync_service import CompanyOrderSyncService
+        
+        sync_service = CompanyOrderSyncService()
+        result = sync_service.sync_all_companies(auto_mode=True)
+        
+        if result['success']:
+            logger.info(f"定時任務：自動同步公司製令單完成，共同步 {result['total_synced']} 筆記錄")
+            return {
+                'success': True,
+                'message': f'定時任務：自動同步公司製令單完成，共同步 {result["total_synced"]} 筆記錄',
+                'total_synced': result['total_synced']
+            }
+        else:
+            logger.error(f"定時任務：自動同步公司製令單失敗：{result.get('error', '未知錯誤')}")
+            return {
+                'success': False,
+                'error': f'定時任務：自動同步公司製令單失敗：{result.get("error", "未知錯誤")}',
+                'total_synced': 0
+            }
+            
+    except Exception as e:
+        logger.error(f"定時任務：自動同步公司製令單執行失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'定時任務：自動同步公司製令單執行失敗: {str(e)}',
+            'total_synced': 0
+        }
+
+
+@shared_task
+def auto_convert_orders():
+    """
+    定時任務：自動轉換製令單為工單
+    """
+    try:
+        from workorder.company_order.models import CompanyOrder
+        from workorder.models import WorkOrder
+        from process.models import ProductProcessRoute, ProductProcessStandardCapacity, Operator, OperatorSkill, ProcessEquipment
+        from equip.models import Equipment
+        
+        # 取得未轉換的製令單
+        pending_orders = CompanyOrder.objects.filter(is_converted=False)
+        if not pending_orders.exists():
+            logger.info("定時任務：沒有需要轉換的製令單")
+            return {
+                'success': True,
+                'message': '沒有需要轉換的製令單',
+                'converted_count': 0
+            }
+        
+        converted_count = 0
+        processes_created = 0
+        auto_assigned = 0
+        
+        for company_order in pending_orders:
+            # 檢查工單是否已存在
+            existing_workorder = WorkOrder.objects.filter(
+                company_code=company_order.company_code,
+                order_number=company_order.mkordno
+            ).first()
+            
+            if existing_workorder:
+                # 如果工單已存在，跳過並標記為已轉換
+                company_order.is_converted = True
+                company_order.save()
+                continue
+            
+            # 建立工單
+            workorder = WorkOrder.objects.create(
+                order_number=company_order.mkordno,
+                product_code=company_order.product_id,
+                quantity=company_order.prodt_qty,
+                status="pending",
+                company_code=company_order.company_code,
+            )
+            converted_count += 1
+            
+            # 建立工序明細
+            try:
+                # 取得產品工藝路線
+                process_routes = ProductProcessRoute.objects.filter(
+                    product_code=company_order.product_id
+                ).order_by('sequence')
+                
+                if process_routes.exists():
+                    for route in process_routes:
+                        # 建立工序明細
+                        from workorder.models import WorkOrderProductionDetail
+                        WorkOrderProductionDetail.objects.create(
+                            workorder=workorder,
+                            process_code=route.process_code,
+                            process_name=route.process_name,
+                            sequence=route.sequence,
+                            planned_quantity=company_order.prodt_qty,
+                            status='pending'
+                        )
+                        processes_created += 1
+                        
+                        # 自動分配作業員和設備
+                        try:
+                            # 取得標準產能設定
+                            capacity_configs = ProductProcessStandardCapacity.objects.filter(
+                                product_code=company_order.product_id,
+                                process_code=route.process_code
+                            )
+                            
+                            for config in capacity_configs:
+                                # 分配作業員
+                                if config.operator_id:
+                                    operator = Operator.objects.filter(
+                                        operator_id=config.operator_id,
+                                        is_active=True
+                                    ).first()
+                                    if operator:
+                                        # 更新工序明細的作業員
+                                        detail = WorkOrderProductionDetail.objects.filter(
+                                            workorder=workorder,
+                                            process_code=route.process_code
+                                        ).first()
+                                        if detail:
+                                            detail.operator_id = operator.operator_id
+                                            detail.save()
+                                        auto_assigned += 1
+                                
+                                # 分配設備
+                                if config.equipment_id:
+                                    equipment = Equipment.objects.filter(
+                                        equipment_id=config.equipment_id,
+                                        status='active'
+                                    ).first()
+                                    if equipment:
+                                        # 更新工序明細的設備
+                                        detail = WorkOrderProductionDetail.objects.filter(
+                                            workorder=workorder,
+                                            process_code=route.process_code
+                                        ).first()
+                                        if detail:
+                                            detail.equipment_id = equipment.equipment_id
+                                            detail.save()
+                                        auto_assigned += 1
+                        except Exception as e:
+                            logger.warning(f"自動分配作業員和設備失敗：{str(e)}")
+                
+            except Exception as e:
+                logger.warning(f"建立工序明細失敗：{str(e)}")
+            
+            # 標記為已轉換
+            company_order.is_converted = True
+            company_order.save()
+        
+        logger.info(f"定時任務：自動轉換製令單完成，共轉換 {converted_count} 筆，建立 {processes_created} 個工序，自動分配 {auto_assigned} 次")
+        
+        return {
+            'success': True,
+            'message': f'定時任務：自動轉換製令單完成，共轉換 {converted_count} 筆，建立 {processes_created} 個工序，自動分配 {auto_assigned} 次',
+            'converted_count': converted_count,
+            'processes_created': processes_created,
+            'auto_assigned': auto_assigned
+        }
+        
+    except Exception as e:
+        logger.error(f"定時任務：自動轉換製令單執行失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'定時任務：自動轉換製令單執行失敗: {str(e)}',
+            'converted_count': 0,
+            'processes_created': 0,
+            'auto_assigned': 0
+        }

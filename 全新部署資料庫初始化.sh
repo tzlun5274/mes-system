@@ -48,39 +48,56 @@ else
     exit 1
 fi
 
-# 2. 清理所有遷移檔案（保留 __init__.py）
-echo -e "${YELLOW}📋 步驟 2: 清理遷移檔案...${NC}" | tee -a $LOG_FILE
-migration_dirs=(
-    "ai/migrations"
-    "company_order/migrations"
-    "equip/migrations"
-    "erp_integration/migrations"
-    "fill_work/migrations"
-    "kanban/migrations"
-    "material/migrations"
-    "onsite_reporting/migrations"
-    "process/migrations"
-    "production/migrations"
-    "quality/migrations"
-    "reporting/migrations"
-    "scheduling/migrations"
-    "system/migrations"
-    "workorder/migrations"
-    "workorder_dispatch/migrations"
-)
+# 2. 清除並重建資料庫
+echo -e "${YELLOW}📋 步驟 2: 清除並重建資料庫...${NC}" | tee -a $LOG_FILE
+echo -e "${YELLOW}⚠️  這將清除所有現有資料庫資料！${NC}" | tee -a $LOG_FILE
 
-for migration_dir in "${migration_dirs[@]}"; do
-    if [ -d "$migration_dir" ]; then
-        # 刪除所有 .py 檔案，除了 __init__.py
-        find "$migration_dir" -name "*.py" ! -name "__init__.py" -delete
-        echo "   清理: $migration_dir" | tee -a $LOG_FILE
-    fi
-done
+# 停止可能使用資料庫的服務
+echo "停止相關服務..." | tee -a $LOG_FILE
+systemctl stop celery-mes_config 2>/dev/null || true
+systemctl stop celerybeat-mes_config 2>/dev/null || true
+
+# 讀取資料庫配置
+DATABASE_NAME=$(grep "^DATABASE_NAME=" .env | cut -d'=' -f2 2>/dev/null || echo "mes_db")
+DATABASE_USER=$(grep "^DATABASE_USER=" .env | cut -d'=' -f2 2>/dev/null || echo "mes_user")
+DATABASE_PASSWORD=$(grep "^DATABASE_PASSWORD=" .env | cut -d'=' -f2 2>/dev/null || echo "mes_password")
+
+echo "資料庫配置:" | tee -a $LOG_FILE
+echo "  名稱: $DATABASE_NAME" | tee -a $LOG_FILE
+echo "  使用者: $DATABASE_USER" | tee -a $LOG_FILE
+
+# 清除資料庫
+echo "清除資料庫..." | tee -a $LOG_FILE
+sudo -u postgres dropdb $DATABASE_NAME 2>/dev/null || true
+sudo -u postgres dropuser $DATABASE_USER 2>/dev/null || true
+
+# 重新建立資料庫和用戶
+echo "重新建立資料庫和用戶..." | tee -a $LOG_FILE
+sudo -u postgres psql -c "CREATE USER $DATABASE_USER WITH PASSWORD '$DATABASE_PASSWORD';" 2>/dev/null || true
+sudo -u postgres psql -c "CREATE DATABASE $DATABASE_NAME OWNER $DATABASE_USER;" 2>/dev/null || true
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DATABASE_NAME TO $DATABASE_USER;" 2>/dev/null || true
+sudo -u postgres psql -c "ALTER USER $DATABASE_USER CREATEDB;" 2>/dev/null || true
+
+# 測試資料庫連線
+echo "測試資料庫連線..." | tee -a $LOG_FILE
+if sudo -u postgres psql -d $DATABASE_NAME -c "SELECT 1;" 2>&1 | grep -q "1 row"; then
+    echo -e "${GREEN}✅ 資料庫連線測試成功${NC}" | tee -a $LOG_FILE
+else
+    echo -e "${RED}❌ 資料庫連線測試失敗${NC}" | tee -a $LOG_FILE
+    exit 1
+fi
+
+# 3. 清理所有遷移檔案（保留 __init__.py）
+echo -e "${YELLOW}📋 步驟 3: 清理遷移檔案...${NC}" | tee -a $LOG_FILE
+echo "清除舊的遷移檔案..." | tee -a $LOG_FILE
+find . -path '*/migrations/*.py' -not -name '__init__.py' -delete 2>/dev/null || true
+find . -path '*/migrations/__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
 
 echo -e "${GREEN}✅ 遷移檔案已清理${NC}" | tee -a $LOG_FILE
 
-# 3. 生成初始遷移
-echo -e "${YELLOW}📋 步驟 3: 生成初始遷移...${NC}" | tee -a $LOG_FILE
+# 4. 生成初始遷移（按正確順序）
+echo -e "${YELLOW}📋 步驟 4: 生成初始遷移...${NC}" | tee -a $LOG_FILE
+echo "重新生成遷移檔案（按正確順序）..." | tee -a $LOG_FILE
 if python3 manage.py makemigrations 2>&1 | tee -a $LOG_FILE; then
     echo -e "${GREEN}✅ 初始遷移已生成${NC}" | tee -a $LOG_FILE
 else
@@ -88,8 +105,8 @@ else
     exit 1
 fi
 
-# 4. 執行遷移
-echo -e "${YELLOW}📋 步驟 4: 執行遷移...${NC}" | tee -a $LOG_FILE
+# 5. 執行遷移
+echo -e "${YELLOW}📋 步驟 5: 執行遷移...${NC}" | tee -a $LOG_FILE
 if python3 manage.py migrate 2>&1 | tee -a $LOG_FILE; then
     echo -e "${GREEN}✅ 遷移已執行${NC}" | tee -a $LOG_FILE
 else
@@ -97,28 +114,28 @@ else
     exit 1
 fi
 
-# 5. 創建超級用戶（根據 .env 設定）
-echo -e "${YELLOW}📋 步驟 5: 創建超級用戶...${NC}" | tee -a $LOG_FILE
+# 6. 創建超級用戶（根據 .env 設定）
+echo -e "${YELLOW}📋 步驟 6: 創建超級用戶...${NC}" | tee -a $LOG_FILE
 create_superuser_from_env
 
-# 6. 收集靜態檔案
-echo -e "${YELLOW}📋 步驟 6: 收集靜態檔案...${NC}" | tee -a $LOG_FILE
+# 7. 收集靜態檔案
+echo -e "${YELLOW}📋 步驟 7: 收集靜態檔案...${NC}" | tee -a $LOG_FILE
 if python3 manage.py collectstatic --noinput 2>&1 | tee -a $LOG_FILE; then
     echo -e "${GREEN}✅ 靜態檔案已收集${NC}" | tee -a $LOG_FILE
 else
     echo -e "${YELLOW}⚠️  收集靜態檔案時發生警告${NC}" | tee -a $LOG_FILE
 fi
 
-# 7. 系統檢查
-echo -e "${YELLOW}📋 步驟 7: 系統檢查...${NC}" | tee -a $LOG_FILE
+# 8. 系統檢查
+echo -e "${YELLOW}📋 步驟 8: 系統檢查...${NC}" | tee -a $LOG_FILE
 if python3 manage.py check 2>&1 | tee -a $LOG_FILE; then
     echo -e "${GREEN}✅ 系統檢查通過${NC}" | tee -a $LOG_FILE
 else
     echo -e "${YELLOW}⚠️  系統檢查發現警告${NC}" | tee -a $LOG_FILE
 fi
 
-# 8. 驗證關鍵資料表
-echo -e "${YELLOW}📋 步驟 8: 驗證關鍵資料表...${NC}" | tee -a $LOG_FILE
+# 9. 驗證關鍵資料表
+echo -e "${YELLOW}📋 步驟 9: 驗證關鍵資料表...${NC}" | tee -a $LOG_FILE
 python3 manage.py shell -c "
 from django.db import connection
 with connection.cursor() as cursor:

@@ -101,64 +101,26 @@ echo "未完成的遷移列表:" | tee -a $LOG_FILE
 python3 manage.py showmigrations | grep "\[ \]" | tee -a $LOG_FILE
 
 echo ""
-echo -e "${YELLOW}🔧 步驟 3: 執行基礎遷移${NC}"
+echo -e "${YELLOW}🔧 步驟 3: 清除並重建遷移檔案${NC}"
 
-# 先執行基礎遷移（Django 核心應用）
-echo "執行基礎遷移..." | tee -a $LOG_FILE
-run_command "python3 manage.py migrate sessions" "執行 sessions 遷移"
-run_command "python3 manage.py migrate auth" "執行 auth 遷移"
-run_command "python3 manage.py migrate contenttypes" "執行 contenttypes 遷移"
-run_command "python3 manage.py migrate admin" "執行 admin 遷移"
-run_command "python3 manage.py migrate django_celery_beat" "執行 django_celery_beat 遷移"
+# 清除所有遷移檔案，重新生成（確保依賴順序正確）
+echo "清除舊的遷移檔案..." | tee -a $LOG_FILE
+run_command "find . -path '*/migrations/*.py' -not -name '__init__.py' -delete" "清除舊的遷移檔案"
+run_command "find . -path '*/migrations/__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true" "清除遷移快取"
 
-echo ""
-echo -e "${YELLOW}🔧 步驟 4: 執行專案應用遷移${NC}"
-
-# 定義實際存在的應用程式（按依賴順序）
-APPLICATIONS=("system" "workorder" "erp_integration" "reporting")
-
-# 執行專案應用遷移
-echo "執行專案應用遷移..." | tee -a $LOG_FILE
-for app in "${APPLICATIONS[@]}"; do
-    echo "遷移應用: $app" | tee -a $LOG_FILE
-    if python3 manage.py migrate $app 2>&1 | tee -a $LOG_FILE; then
-        echo -e "${GREEN}✅ $app 遷移成功${NC}" | tee -a $LOG_FILE
-    else
-        echo -e "${YELLOW}⚠️  $app 遷移失敗，嘗試 --fake-initial${NC}" | tee -a $LOG_FILE
-        python3 manage.py migrate $app --fake-initial 2>&1 | tee -a $LOG_FILE
-    fi
-done
+# 重新生成遷移檔案（按正確順序）
+echo "重新生成遷移檔案..." | tee -a $LOG_FILE
+run_command "python3 manage.py makemigrations" "重新生成遷移檔案"
 
 echo ""
-echo -e "${YELLOW}🔧 步驟 5: 處理剩餘遷移${NC}"
+echo -e "${YELLOW}🔧 步驟 4: 執行資料庫遷移${NC}"
 
-# 檢查剩餘未完成的遷移
-REMAINING_UNMIGRATED=$(python3 manage.py showmigrations | grep "\[ \]" | wc -l)
-if [ "$REMAINING_UNMIGRATED" -gt 0 ]; then
-    echo "仍有 $REMAINING_UNMIGRATED 個遷移未完成，嘗試處理..." | tee -a $LOG_FILE
-    
-    # 嘗試執行所有遷移
-    run_command "python3 manage.py migrate" "執行所有剩餘遷移"
-    
-    # 如果還有未完成的，使用 --fake 處理
-    FINAL_UNMIGRATED=$(python3 manage.py showmigrations | grep "\[ \]" | wc -l)
-    if [ "$FINAL_UNMIGRATED" -gt 0 ]; then
-        echo "仍有 $FINAL_UNMIGRATED 個遷移未完成，使用 --fake 處理..." | tee -a $LOG_FILE
-        
-        # 獲取所有未完成的遷移
-        UNMIGRATED_LIST=$(python3 manage.py showmigrations | grep "\[ \]" | awk '{print $2}')
-        
-        for migration in $UNMIGRATED_LIST; do
-            app_name=$(echo $migration | cut -d'.' -f1)
-            migration_name=$(echo $migration | cut -d'.' -f2-)
-            echo "強制標記遷移為完成: $app_name.$migration_name" | tee -a $LOG_FILE
-            python3 manage.py migrate $app_name $migration_name --fake 2>&1 | tee -a $LOG_FILE
-        done
-    fi
-fi
+# 執行資料庫遷移
+echo "執行資料庫遷移..." | tee -a $LOG_FILE
+run_command "python3 manage.py migrate" "執行資料庫遷移"
 
 echo ""
-echo -e "${YELLOW}🔍 步驟 6: 驗證遷移結果${NC}"
+echo -e "${YELLOW}🔍 步驟 5: 驗證遷移結果${NC}"
 
 # 最終檢查遷移狀態
 echo "驗證遷移結果..." | tee -a $LOG_FILE
@@ -173,7 +135,7 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}🔍 步驟 7: 檢查關鍵表是否存在${NC}"
+echo -e "${YELLOW}🔍 步驟 6: 檢查關鍵表是否存在${NC}"
 
 # 檢查關鍵表是否存在
 echo "檢查關鍵資料表..." | tee -a $LOG_FILE
@@ -209,7 +171,7 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}🔍 步驟 8: 測試系統功能${NC}"
+echo -e "${YELLOW}🔍 步驟 7: 測試系統功能${NC}"
 
 # 測試 Django 檢查
 echo "執行 Django 系統檢查..." | tee -a $LOG_FILE

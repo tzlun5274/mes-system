@@ -954,15 +954,49 @@ else
     fi
 fi
 
-# 步驟 15: 執行資料庫遷移
+# 步驟 15: 清除並重建資料庫
 echo ""
-echo -e "${BLUE}🗃️ 步驟 15: 執行資料庫遷移${NC}"
+echo -e "${BLUE}🗃️ 步驟 15: 清除並重建資料庫${NC}"
 export DJANGO_SETTINGS_MODULE=mes_config.settings
+
+cd $PROJECT_DIR
+
+# 清除現有資料庫（全新部署）
+echo "清除現有資料庫..." | tee -a $LOG_FILE
+echo -e "${YELLOW}⚠️  這將清除所有現有資料庫資料！${NC}" | tee -a $LOG_FILE
+
+# 停止可能使用資料庫的服務
+echo "停止相關服務..." | tee -a $LOG_FILE
+systemctl stop celery-mes_config 2>/dev/null || true
+systemctl stop celerybeat-mes_config 2>/dev/null || true
+
+# 清除資料庫
+echo "清除資料庫..." | tee -a $LOG_FILE
+run_command "sudo -u postgres dropdb $DATABASE_NAME 2>/dev/null || true" "清除現有資料庫"
+run_command "sudo -u postgres dropuser $DATABASE_USER 2>/dev/null || true" "清除現有資料庫用戶"
+
+# 重新建立資料庫和用戶
+echo "重新建立資料庫和用戶..." | tee -a $LOG_FILE
+run_command "sudo -u postgres psql -c \"CREATE USER $DATABASE_USER WITH PASSWORD '$DATABASE_PASSWORD';\"" "重新建立資料庫用戶"
+run_command "sudo -u postgres psql -c \"CREATE DATABASE $DATABASE_NAME OWNER $DATABASE_USER;\"" "重新建立資料庫"
+run_command "sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE $DATABASE_NAME TO $DATABASE_USER;\"" "授予資料庫權限"
+run_command "sudo -u postgres psql -c \"ALTER USER $DATABASE_USER CREATEDB;\"" "授予建立資料庫權限"
+
+# 測試資料庫連線
+echo "測試資料庫連線..." | tee -a $LOG_FILE
+if sudo -u postgres psql -d $DATABASE_NAME -c "SELECT 1;" 2>&1 | grep -q "1 row"; then
+    echo -e "${GREEN}✅ 資料庫重建成功${NC}" | tee -a $LOG_FILE
+else
+    echo -e "${RED}❌ 資料庫重建失敗${NC}" | tee -a $LOG_FILE
+    exit 1
+fi
+
+# 步驟 16: 執行資料庫遷移
+echo ""
+echo -e "${BLUE}🗃️ 步驟 16: 執行資料庫遷移${NC}"
 
 # 初始化資料庫（全新生產環境專用）
 echo "初始化資料庫..." | tee -a $LOG_FILE
-
-cd $PROJECT_DIR
 
 # 全新生產主機的資料庫初始化策略
 echo "執行全新資料庫初始化..." | tee -a $LOG_FILE
@@ -1237,6 +1271,18 @@ if [ -d "$PROJECT_DIR" ] && [ -f "$PROJECT_DIR/manage.py" ]; then
     
     # 執行資料庫遷移
     echo "執行資料庫遷移..." | tee -a $LOG_FILE
+    
+    # 先清除所有遷移檔案，重新生成（確保依賴順序正確）
+    echo "清除舊的遷移檔案..." | tee -a $LOG_FILE
+    run_command "find . -path '*/migrations/*.py' -not -name '__init__.py' -delete" "清除舊的遷移檔案"
+    run_command "find . -path '*/migrations/__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true" "清除遷移快取"
+    
+    # 重新生成遷移檔案（按正確順序）
+    echo "重新生成遷移檔案..." | tee -a $LOG_FILE
+    run_command "python3 manage.py makemigrations" "重新生成遷移檔案"
+    
+    # 執行資料庫遷移
+    echo "執行資料庫遷移..." | tee -a $LOG_FILE
     run_command "python3 manage.py migrate" "執行資料庫遷移"
     
     # 收集靜態檔案
@@ -1275,9 +1321,9 @@ else
     echo "請先部署專案檔案再執行此步驟" | tee -a $LOG_FILE
 fi
 
-# 步驟 20: 啟動專案服務
+# 步驟 21: 啟動專案服務
 echo ""
-echo -e "${BLUE}🚀 步驟 20: 啟動專案服務${NC}"
+echo -e "${BLUE}🚀 步驟 21: 啟動專案服務${NC}"
 
 if [ -d "$PROJECT_DIR" ] && [ -f "$PROJECT_DIR/manage.py" ]; then
     # 啟動專案服務（跳過 Gunicorn，開發環境使用 Django 開發伺服器）
@@ -1302,9 +1348,9 @@ else
     echo -e "${YELLOW}⚠️  專案檔案不存在，跳過專案服務啟動${NC}" | tee -a $LOG_FILE
 fi
 
-# 步驟 21: 最終檢查
+# 步驟 22: 最終檢查
 echo ""
-echo -e "${BLUE}🔍 步驟 21: 最終檢查${NC}"
+echo -e "${BLUE}🔍 步驟 22: 最終檢查${NC}"
 
 # 檢查所有服務狀態
 echo "檢查所有服務狀態..." | tee -a $LOG_FILE

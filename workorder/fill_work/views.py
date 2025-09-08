@@ -1703,8 +1703,7 @@ def approve_fill_work(request, pk: int):
                 except Exception as status_error:
                     # 狀態更新錯誤不阻斷使用者操作
                     import logging
-                    logger = logging.getLogger(__name__)
-                    logger.error(f"工單狀態更新失敗: {str(status_error)}")
+                    logging.error(f"工單狀態更新失敗: {str(status_error)}")
                     
         except Exception:
             # 同步錯誤不阻斷使用者操作
@@ -3046,8 +3045,7 @@ def batch_approve_fill_work(request):
         except Exception as sync_error:
             # 同步失敗不影響核准流程，只記錄錯誤
             import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"批次同步填報記錄到生產詳情失敗: {str(sync_error)}")
+            logging.error(f"批次同步填報記錄到生產詳情失敗: {str(sync_error)}")
         
         # 批量更新工單狀態
         try:
@@ -3084,8 +3082,7 @@ def batch_approve_fill_work(request):
         except Exception as status_error:
             # 狀態更新錯誤不阻斷使用者操作
             import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"批量工單狀態更新失敗: {str(status_error)}")
+            logging.error(f"批量工單狀態更新失敗: {str(status_error)}")
         
     except Exception as e:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
