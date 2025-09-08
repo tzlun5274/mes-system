@@ -260,12 +260,13 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 DEFAULT_AUTO_FIELD = env("DEFAULT_AUTO_FIELD", default="django.db.models.BigAutoField")
 
 # Celery 配置：使用環境變數
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=f"redis://localhost:{env('REDIS_PORT', default='6379')}/0")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=f"redis://localhost:{env('REDIS_PORT', default='6379')}/0")
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=f"redis://:{env('REDIS_PASSWORD', default='')}@localhost:{env('REDIS_PORT', default='6379')}/0")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=f"redis://:{env('REDIS_PASSWORD', default='')}@localhost:{env('REDIS_PORT', default='6379')}/0")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = env("CELERY_TASK_SERIALIZER", default="json")
 CELERY_RESULT_SERIALIZER = env("CELERY_RESULT_SERIALIZER", default="json")
 CELERY_TIMEZONE = env("TIME_ZONE", default="Asia/Taipei")
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 # 認證和重定向設置
 LOGIN_URL = env("LOGIN_URL", default="/accounts/login/")

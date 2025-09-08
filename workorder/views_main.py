@@ -431,7 +431,6 @@ def dispatch_list(request):
 def manual_sync_orders(request):
     """
     手動同步各公司製令單到 CompanyOrder 表
-    直接執行同步邏輯，不透過命令列
     """
     if not (request.user.is_staff or request.user.is_superuser):
         workorder_logger.warning(
@@ -444,23 +443,12 @@ def manual_sync_orders(request):
         return redirect("workorder:company_orders")
 
     try:
-        # 直接執行同步邏輯
-        from workorder.services.sync_service import CompanyOrderSyncService
-        
-        sync_service = CompanyOrderSyncService()
-        result = sync_service.sync_all_companies()
-        
-        if result['success']:
-            workorder_logger.info(
-                f"管理員 {request.user} 手動同步公司製令單成功，共同步 {result['total_synced']} 筆記錄。IP: {request.META.get('REMOTE_ADDR')}"
-            )
-            messages.success(request, f"手動同步製令單完成！共同步 {result['total_synced']} 筆記錄")
-        else:
-            workorder_logger.error(
-                f"管理員 {request.user} 手動同步公司製令單失敗：{result.get('error', '未知錯誤')}。IP: {request.META.get('REMOTE_ADDR')}"
-            )
-            messages.error(request, f"同步失敗：{result.get('error', '未知錯誤')}")
-            
+        # 執行同步命令
+        call_command("sync_pending_workorders")
+        workorder_logger.info(
+            f"管理員 {request.user} 手動同步公司製令單成功。IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        messages.success(request, "手動同步製令單完成！")
     except Exception as e:
         workorder_logger.error(
             f"管理員 {request.user} 手動同步公司製令單失敗：{e}。IP: {request.META.get('REMOTE_ADDR')}"

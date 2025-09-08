@@ -24,12 +24,15 @@ check_processes() {
     
     # 檢查 Django 開發伺服器
     DJANGO_PROCESSES=$(ps aux | grep -E "(python.*manage.py runserver|gunicorn)" | grep -v grep)
-    if [ -n "$DJANGO_PROCESSES" ]; then
-        echo -e "${YELLOW}發現 Django 進程:${NC}"
-        echo "$DJANGO_PROCESSES"
+    CELERY_PROCESSES=$(ps aux | grep -E "(celery.*worker|celery.*beat)" | grep -v grep)
+    
+    if [ -n "$DJANGO_PROCESSES" ] || [ -n "$CELERY_PROCESSES" ]; then
+        echo -e "${YELLOW}發現相關進程:${NC}"
+        [ -n "$DJANGO_PROCESSES" ] && echo "Django 進程:" && echo "$DJANGO_PROCESSES"
+        [ -n "$CELERY_PROCESSES" ] && echo "Celery 進程:" && echo "$CELERY_PROCESSES"
         return 1
     else
-        echo -e "${GREEN}✓ 沒有發現 Django 進程${NC}"
+        echo -e "${GREEN}✓ 沒有發現相關進程${NC}"
         return 0
     fi
 }
@@ -37,16 +40,27 @@ check_processes() {
 # 函數：殺掉進程
 kill_processes() {
     echo -e "\n${YELLOW}🗡️  正在殺掉相關進程...${NC}"
-    # 只殺 runserver 0.0.0.0:8000 進程
-    echo "殺掉 Django runserver 0.0.0.0:8000 進程..."
-    pkill -f "manage.py runserver 0.0.0.0:8000" 2>/dev/null
+    
+    # 殺掉 Django 進程
+    echo "殺掉 Django 進程..."
+    pkill -f "manage.py runserver" 2>/dev/null
     pkill -f "gunicorn" 2>/dev/null
+    
+    # 殺掉 Celery 進程
+    echo "殺掉 Celery 進程..."
+    pkill -f "celery.*worker" 2>/dev/null
+    pkill -f "celery.*beat" 2>/dev/null
+    
     # 等待進程完全結束
     sleep 3
-    # 強制殺掉頑固進程（只針對 runserver 8000）
-    echo "強制殺掉頑固 runserver 0.0.0.0:8000 進程..."
-    pkill -9 -f "manage.py runserver 0.0.0.0:8000" 2>/dev/null
+    
+    # 強制殺掉頑固進程
+    echo "強制殺掉頑固進程..."
+    pkill -9 -f "manage.py runserver" 2>/dev/null
     pkill -9 -f "gunicorn" 2>/dev/null
+    pkill -9 -f "celery.*worker" 2>/dev/null
+    pkill -9 -f "celery.*beat" 2>/dev/null
+    
     # 再次等待
     sleep 2
     echo -e "${GREEN}✓ 進程清理完成${NC}"
@@ -57,19 +71,24 @@ confirm_cleanup() {
     echo -e "\n${BLUE}🧹 確認進程清理狀態...${NC}"
     
     # 檢查是否還有進程殘留
-    REMAINING_PROCESSES=$(ps aux | grep -E "(python.*manage.py runserver|gunicorn)" | grep -v grep)
+    REMAINING_DJANGO=$(ps aux | grep -E "(python.*manage.py runserver|gunicorn)" | grep -v grep)
+    REMAINING_CELERY=$(ps aux | grep -E "(celery.*worker|celery.*beat)" | grep -v grep)
     
-    if [ -n "$REMAINING_PROCESSES" ]; then
+    if [ -n "$REMAINING_DJANGO" ] || [ -n "$REMAINING_CELERY" ]; then
         echo -e "${RED}✗ 仍有進程殘留:${NC}"
-        echo "$REMAINING_PROCESSES"
+        [ -n "$REMAINING_DJANGO" ] && echo "Django 進程:" && echo "$REMAINING_DJANGO"
+        [ -n "$REMAINING_CELERY" ] && echo "Celery 進程:" && echo "$REMAINING_CELERY"
         echo -e "${YELLOW}嘗試最後一次強制清理...${NC}"
         pkill -9 -f "python.*manage.py runserver" 2>/dev/null
         pkill -9 -f "gunicorn" 2>/dev/null
+        pkill -9 -f "celery.*worker" 2>/dev/null
+        pkill -9 -f "celery.*beat" 2>/dev/null
         sleep 2
         
         # 最終檢查
-        FINAL_CHECK=$(ps aux | grep -E "(python.*manage.py runserver|gunicorn)" | grep -v grep)
-        if [ -n "$FINAL_CHECK" ]; then
+        FINAL_DJANGO=$(ps aux | grep -E "(python.*manage.py runserver|gunicorn)" | grep -v grep)
+        FINAL_CELERY=$(ps aux | grep -E "(celery.*worker|celery.*beat)" | grep -v grep)
+        if [ -n "$FINAL_DJANGO" ] || [ -n "$FINAL_CELERY" ]; then
             echo -e "${RED}✗ 無法完全清理進程，請手動檢查${NC}"
             return 1
         fi
@@ -289,6 +308,16 @@ start_services() {
         $PYTHON_CMD manage.py migrate 2>/dev/null
     fi
     
+    # 啟動 Celery Worker
+    echo "啟動 Celery Worker..."
+    nohup $PYTHON_CMD -m celery -A mes_config worker --loglevel=info > celery_worker.log 2>&1 &
+    sleep 3
+    
+    # 啟動 Celery Beat (定時任務排程器)
+    echo "啟動 Celery Beat (定時任務排程器)..."
+    nohup $PYTHON_CMD -m celery -A mes_config beat --loglevel=info > celery_beat.log 2>&1 &
+    sleep 3
+    
     # 啟動 Django 開發伺服器
     echo "啟動 Django 開發伺服器..."
     nohup $PYTHON_CMD manage.py runserver 0.0.0.0:8000 > nohup.out 2>&1 &
@@ -297,12 +326,30 @@ start_services() {
     echo "等待伺服器啟動..."
     sleep 5
     
-    # 檢查伺服器是否正常啟動
+    # 檢查所有服務是否正常啟動
+    echo "檢查服務狀態..."
+    
+    # 檢查 Celery Worker
+    if pgrep -f "celery.*worker" > /dev/null; then
+        echo -e "${GREEN}✓ Celery Worker 啟動成功${NC}"
+    else
+        echo -e "${RED}✗ Celery Worker 啟動失敗${NC}"
+    fi
+    
+    # 檢查 Celery Beat
+    if pgrep -f "celery.*beat" > /dev/null; then
+        echo -e "${GREEN}✓ Celery Beat 啟動成功${NC}"
+    else
+        echo -e "${RED}✗ Celery Beat 啟動失敗${NC}"
+    fi
+    
+    # 檢查 Django 伺服器
     if curl -s http://localhost:8000 > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ Django 伺服器啟動成功${NC}"
         echo -e "${GREEN}✓ MES 系統啟動成功！${NC}"
         return 0
     else
-        echo -e "${RED}✗ MES 系統啟動失敗${NC}"
+        echo -e "${RED}✗ Django 伺服器啟動失敗${NC}"
         echo "檢查錯誤日誌..."
         tail -10 nohup.out
         return 1
@@ -316,6 +363,9 @@ show_status() {
     # 顯示進程
     echo -e "\n${YELLOW}當前 Django 進程:${NC}"
     ps aux | grep -E "(python.*manage.py runserver|gunicorn)" | grep -v grep || echo "沒有發現 Django 進程"
+    
+    echo -e "\n${YELLOW}當前 Celery 進程:${NC}"
+    ps aux | grep -E "(celery.*worker|celery.*beat)" | grep -v grep || echo "沒有發現 Celery 進程"
     
     # 顯示端口
     echo -e "\n${YELLOW}端口占用情況:${NC}"

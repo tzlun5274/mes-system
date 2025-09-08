@@ -1,6 +1,6 @@
 """
-公司製令單管理子模組 - 管理介面
-負責公司製令單的 Django Admin 介面
+公司生產製造命令管理子模組 - 管理介面
+負責公司生產製造命令的 Django Admin 介面
 """
 
 from django.contrib import admin
@@ -10,7 +10,7 @@ from .models import CompanyOrder
 
 @admin.register(CompanyOrder)
 class CompanyOrderAdmin(admin.ModelAdmin):
-    """公司製令單管理介面"""
+    """公司生產製造命令管理介面"""
     
     list_display = [
         'company_code', 'mkordno', 'product_id', 'prodt_qty',

@@ -72,7 +72,7 @@
     <form method="post" action="" class="row g-2 align-items-center">
         {% csrf_token %}
         <div class="col-auto">
-            <label for="auto_convert_interval" class="col-form-label"><b>自動轉換工單間隔（分鐘）</b>：</label>
+            <label for="auto_convert_interval" class="col-form-label"><b>自動轉換MES工單間隔（分鐘）</b>：</label>
         </div>
         <div class="col-auto">
             <input type="number" min="1" name="auto_convert_interval" id="auto_convert_interval" class="form-control" value="{{ auto_convert_interval|default:30 }}" required>
@@ -108,7 +108,7 @@
             <form method="post" action="{% url 'workorder:manual_convert_orders' %}" style="display: inline;">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-success" onclick="return confirm('確定要手動轉換未轉換的製令單為 MES 工單嗎？')">
-                    <i class="fas fa-exchange-alt"></i> 手動轉換工單
+                    <i class="fas fa-exchange-alt"></i> 手動轉換MES工單
                 </button>
             </form>
         </div>

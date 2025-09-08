@@ -449,7 +449,7 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
         # 讀取系統設定
         from workorder.models import SystemConfig
         
-        # 自動轉換工單間隔設定（預設 30 分鐘）
+        # 自動轉換MES工單間隔設定（預設 30 分鐘）
         auto_convert_interval = 30
         try:
             config = SystemConfig.objects.get(key="auto_convert_interval")
@@ -516,7 +516,7 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
                 defaults={"value": new_convert_interval},
             )
             workorder_logger.info(
-                f"管理員 {request.user} 變更自動轉換工單間隔，原值：{old_value} 分鐘，新值：{new_convert_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
+                f"管理員 {request.user} 變更自動轉換MES工單間隔，原值：{old_value} 分鐘，新值：{new_convert_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
             )
             interval_changed = True
 
@@ -540,7 +540,7 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
         # 如果間隔設定有變更，重新設定定時任務
         if interval_changed:
             try:
-                call_command("sync_company_orders", "--setup-tasks")
+                call_command("setup_workorder_tasks")
                 workorder_logger.info(
                     f"管理員 {request.user} 重新設定定時任務成功。IP: {request.META.get('REMOTE_ADDR')}"
                 )
