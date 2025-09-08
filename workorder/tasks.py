@@ -237,48 +237,67 @@ def auto_convert_orders():
 
 
 @shared_task
+def auto_update_dispatch_statuses():
+    """
+    定時任務：自動更新派工單狀態
+    """
+    try:
+        from workorder.services.dispatch_status_service import DispatchStatusService
+        
+        logger.info("開始自動更新派工單狀態")
+        
+        # 使用派工狀態服務更新所有派工單狀態
+        result = DispatchStatusService.update_all_dispatch_statuses()
+        
+        if result['success']:
+            logger.info(f"定時任務完成：{result['message']}")
+            return {
+                'success': True,
+                'message': result['message'],
+                'updated_count': result.get('updated_count', 0)
+            }
+        else:
+            logger.error(f"定時任務失敗：{result['message']}")
+            return {
+                'success': False,
+                'error': result['message'],
+                'updated_count': 0
+            }
+            
+    except Exception as e:
+        logger.error(f"定時任務失敗：自動更新派工單狀態失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'定時任務失敗：{str(e)}',
+            'updated_count': 0
+        }
+
+
+@shared_task
 def auto_dispatch_workorders():
     """
     定時任務：自動批次派工
     """
     try:
-        with transaction.atomic():
-            # 取得所有未派工的工單
-            undispatched_orders = WorkOrder.objects.all()
-            
-            # 檢查每個工單是否已有對應的派工單
-            truly_undispatched = []
-            for wo in undispatched_orders:
-                dispatch_exists = WorkOrderDispatch.objects.filter(
-                    order_number=wo.order_number,
-                    product_code=wo.product_code
-                ).exists()
-                if not dispatch_exists:
-                    truly_undispatched.append(wo)
-            
-            created = 0
-            for wo in truly_undispatched:
-                # 建立派工單，直接設定為生產中狀態
-                dispatch = WorkOrderDispatch.objects.create(
-                    company_code=getattr(wo, "company_code", None),
-                    order_number=wo.order_number,
-                    product_code=wo.product_code,
-                    planned_quantity=wo.quantity,
-                    status="in_production",  # 直接設定為生產中
-                    dispatch_date=timezone.now().date(),  # 設定派工日期為今天
-                    created_by="system_auto_dispatch",
-                )
-                created += 1
-                
-                # 記錄操作日誌
-                logger.info(f"定時任務：自動批次派工 - 工單 {wo.order_number} 轉派為生產中狀態")
-            
-            logger.info(f"定時任務完成：自動批次派工完成，共建立 {created} 筆派工單")
-            
+        # 使用核心派工服務
+        from workorder.services.dispatch_service import WorkOrderDispatchService
+        result = WorkOrderDispatchService.auto_dispatch_all_workorders()
+        
+        if result['success']:
+            logger.info(f"定時任務完成：{result['message']}")
             return {
                 'success': True,
-                'message': f'定時任務完成：自動批次派工完成，共建立 {created} 筆派工單',
-                'created_count': created
+                'message': result['message'],
+                'created_count': result['created_count'],
+                'skipped_count': result['skipped_count']
+            }
+        else:
+            logger.error(f"定時任務失敗：{result['message']}")
+            return {
+                'success': False,
+                'error': result['message'],
+                'created_count': 0,
+                'skipped_count': 0
             }
             
     except Exception as e:
@@ -286,5 +305,6 @@ def auto_dispatch_workorders():
         return {
             'success': False,
             'error': f'定時任務失敗：{str(e)}',
-            'created_count': 0
+            'created_count': 0,
+            'skipped_count': 0
         }

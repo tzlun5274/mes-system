@@ -640,7 +640,7 @@ def manual_convert_orders(request):
                             # 記錄分配日誌
                             try:
                                 WorkOrderProcessLog.objects.create(
-                                    workorder_process=process,
+                                    workorder_process_id=process.id,
                                     action='auto_assignment',
                                     operator=assigned_operator.name if assigned_operator else None,
                                     equipment=assigned_equipment.name if assigned_equipment else None,
@@ -1014,7 +1014,7 @@ def create_workorder_processes(request, workorder_id):
                     # 記錄分配日誌
                     try:
                         WorkOrderProcessLog.objects.create(
-                            workorder_process=process,
+                            workorder_process_id=process.id,
                             action='auto_assignment',
                             operator=assigned_operator.name if assigned_operator else None,
                             equipment=assigned_equipment.name if assigned_equipment else None,
@@ -2628,7 +2628,7 @@ def update_process_capacity(request, process_id):
         try:
             from .models import WorkOrderProcessLog
             WorkOrderProcessLog.objects.create(
-                workorder_process=process,
+                workorder_process_id=process.id,
                 action='capacity_update',
                 description=f'更新產能設定：倍數={capacity_multiplier}x，目標產能={target_hourly_output}pcs/hr',
                 created_by=request.user.username if request.user.is_authenticated else 'system'
@@ -2778,7 +2778,7 @@ def update_process_status(request, process_id):
         try:
             from workorder.models import WorkOrderProcessLog
             WorkOrderProcessLog.objects.create(
-                workorder_process=process,
+                workorder_process_id=process.id,
                 action='manual_assignment',
                 operator=operator_name,
                 equipment=equipment_name,

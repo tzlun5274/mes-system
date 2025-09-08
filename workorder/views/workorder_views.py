@@ -683,43 +683,27 @@ def mes_orders_bulk_dispatch(request):
     if not order_numbers:
         return JsonResponse({"error": "沒有選取工單"}, status=400)
 
-    created = 0
-    skipped = 0
-    for no in order_numbers:
-        # 查詢所有匹配的工單
-        # 使用公司代號和工單號碼組合查詢，確保唯一性
-        work_orders = WorkOrder.objects.filter(order_number=no)
-        # 注意：這裡需要從請求中獲取公司代號，暫時保持原有邏輯
-        if not work_orders.exists():
-            skipped += 1
-            continue
-        
-        # 如果有多個工單，只處理第一個（保持原有行為）
-        wo = work_orders.first()
-        
-        # 若已有派工單，略過
-        if WorkOrderDispatch.objects.filter(order_number=no).exists():
-            skipped += 1
-            continue
-        
-        # 建立派工單，直接設定為生產中狀態
-        dispatch = WorkOrderDispatch.objects.create(
-            company_code=getattr(wo, "company_code", None),
-            order_number=wo.order_number,
-            product_code=wo.product_code,
-            planned_quantity=wo.quantity,
-            status="in_production",  # 直接設定為生產中
-            dispatch_date=timezone.now().date(),  # 設定派工日期為今天
-            created_by=str(request.user) if request.user.is_authenticated else "system",
-        )
-        created += 1
-        
-        # 記錄派工單建立日誌
+    # 使用核心派工服務
+    from workorder.services.dispatch_service import WorkOrderDispatchService
+    result = WorkOrderDispatchService.dispatch_multiple_workorders(order_numbers)
+    
+    if result['success']:
+        # 記錄批量派工日誌
         workorder_logger.info(
-            f"批量派工：工單 {wo.order_number} 轉派為生產中狀態。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
+            f"批量派工完成：成功 {result['created_count']} 筆，跳過 {result['skipped_count']} 筆。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
         )
-
-    return JsonResponse({"success": True, "created": created, "skipped": skipped})
+        
+        return JsonResponse({
+            "success": True,
+            "message": result['message'],
+            "created": result['created_count'],
+            "skipped": result['skipped_count']
+        })
+    else:
+        return JsonResponse({
+            "success": False,
+            "error": result['message']
+        }, status=400)
 
 @login_required
 @require_POST
@@ -731,33 +715,25 @@ def mes_order_dispatch(request):
     if not order_number:
         return JsonResponse({"error": "工單號碼不能為空"}, status=400)
     
-    # 使用 first() 避免 MultipleObjectsReturned 錯誤
-    # 注意：這裡需要從請求中獲取公司代號，暫時保持原有邏輯
-    wo = WorkOrder.objects.filter(order_number=order_number).first()
-    if not wo:
-        return JsonResponse({"error": "工單不存在"}, status=400)
+    # 使用核心派工服務
+    from workorder.services.dispatch_service import WorkOrderDispatchService
+    result = WorkOrderDispatchService.dispatch_single_workorder(order_number)
     
-    # 檢查是否已有派工單
-    if WorkOrderDispatch.objects.filter(order_number=order_number).exists():
-        return JsonResponse({"error": "此工單已有派工單"}, status=400)
-    
-    # 建立派工單，直接設定為生產中狀態
-    dispatch = WorkOrderDispatch.objects.create(
-        company_code=getattr(wo, "company_code", None),
-        order_number=wo.order_number,
-        product_code=wo.product_code,
-        planned_quantity=wo.quantity,
-        status="in_production",  # 直接設定為生產中
-        dispatch_date=timezone.now().date(),  # 設定派工日期為今天
-        created_by=str(request.user) if request.user.is_authenticated else "system",
-    )
-    
-    # 記錄派工單建立日誌
-    workorder_logger.info(
-        f"單筆派工：工單 {wo.order_number} 轉派為生產中狀態。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
-    )
-    
-    return JsonResponse({"success": True, "message": "派工單建立成功，已設定為生產中狀態"})
+    if result['success']:
+        # 記錄單筆派工日誌
+        workorder_logger.info(
+            f"單筆派工：工單 {order_number} 轉派為生產中狀態。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
+        )
+        
+        return JsonResponse({
+            "success": True, 
+            "message": result['message']
+        })
+    else:
+        return JsonResponse({
+            "success": False,
+            "error": result['message']
+        }, status=400)
 
 @login_required
 @require_POST
@@ -791,42 +767,25 @@ def mes_orders_auto_dispatch(request):
     自動批次派工：自動為所有未派工的工單建立派工單
     """
     try:
-        # 取得所有未派工的工單（修復多公司系統的派工邏輯）
-        undispatched_orders = WorkOrder.objects.all()
+        # 使用核心派工服務
+        from workorder.services.dispatch_service import WorkOrderDispatchService
+        result = WorkOrderDispatchService.auto_dispatch_all_workorders()
         
-        # 檢查每個工單是否已有對應的派工單（使用 order_number + product_code 組合）
-        truly_undispatched = []
-        for wo in undispatched_orders:
-            dispatch_exists = WorkOrderDispatch.objects.filter(
-                order_number=wo.order_number,
-                product_code=wo.product_code
-            ).exists()
-            if not dispatch_exists:
-                truly_undispatched.append(wo)
-        
-        created = 0
-        for wo in truly_undispatched:
-            # 建立派工單，直接設定為生產中狀態
-            dispatch = WorkOrderDispatch.objects.create(
-                company_code=getattr(wo, "company_code", None),
-                order_number=wo.order_number,
-                product_code=wo.product_code,
-                planned_quantity=wo.quantity,
-                status="in_production",  # 直接設定為生產中
-                dispatch_date=timezone.now().date(),  # 設定派工日期為今天
-                created_by=str(request.user) if request.user.is_authenticated else "system",
-            )
-            created += 1
-            
-            # 記錄派工單建立日誌
+        if result['success']:
+            # 記錄自動批次派工日誌
             workorder_logger.info(
-                f"自動批次派工：工單 {wo.order_number} 轉派為生產中狀態。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
+                f"自動批次派工完成：成功 {result['created_count']} 筆，跳過 {result['skipped_count']} 筆。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
             )
-        
-        return JsonResponse({
-            "success": True, 
-            "message": f"自動批次派工完成，共建立 {created} 筆派工單"
-        })
+            
+            return JsonResponse({
+                "success": True, 
+                "message": result['message']
+            })
+        else:
+            return JsonResponse({
+                "success": False,
+                "error": result['message']
+            }, status=500)
         
     except Exception as e:
         return JsonResponse({"error": f"自動批次派工失敗：{str(e)}"}, status=500)
@@ -929,7 +888,7 @@ def mes_orders_set_auto_dispatch_interval(request):
         periodic_task, created = PeriodicTask.objects.get_or_create(
             name="自動批次派工",
             defaults={
-                "task": "workorder.tasks.auto_batch_dispatch_orders",
+                "task": "workorder.tasks.auto_dispatch_workorders",
                 "interval": interval_schedule,
                 "enabled": True,
             },

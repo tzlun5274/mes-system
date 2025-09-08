@@ -224,15 +224,13 @@ class WorkOrderDispatchService:
             WorkOrderDispatch 物件
         """
         return WorkOrderDispatch.objects.create(
+            company_code=workorder.company_code,
             order_number=workorder.order_number,
             product_code=workorder.product_code,
-            product_name=workorder.product_name or '',
-            quantity=workorder.quantity,
-            company_code=workorder.company_code,
-            company_name=workorder.company_name or '',
+            planned_quantity=workorder.quantity,
             status='in_production',  # 直接設定為生產中狀態
-            created_at=timezone.now(),
-            updated_at=timezone.now()
+            dispatch_date=timezone.now().date(),  # 設定派工日期為今天
+            created_by='system_dispatch_service',
         )
     
     @classmethod

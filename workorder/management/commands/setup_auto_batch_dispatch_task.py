@@ -31,7 +31,7 @@ class Command(BaseCommand):
 
     def setup_auto_batch_dispatch_task(self):
         """設定自動批次派工任務"""
-        task_name = "workorder.tasks.auto_batch_dispatch_orders"
+        task_name = "workorder.tasks.auto_dispatch_workorders"
         display_name = "自動批次派工"
 
         # 從 SystemConfig 讀取自動批次派工間隔設定（預設 60 分鐘）
