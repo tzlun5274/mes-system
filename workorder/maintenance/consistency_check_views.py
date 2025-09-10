@@ -86,7 +86,7 @@ class ConsistencyCheckAjaxView(LoginRequiredMixin, View):
                 
                 return JsonResponse({
                     'success': True,
-                    'message': '問題修復成功'
+                    'message': '問題處理完成'
                 })
             
             elif action == 'batch_fix_issues':
@@ -121,7 +121,7 @@ class ConsistencyCheckAjaxView(LoginRequiredMixin, View):
                         errors.append(f'ID {result_id}: {str(e)}')
                 
                 if fixed_count > 0:
-                    message = f'批次修復完成，成功修復 {fixed_count} 筆問題'
+                    message = f'批次處理完成，成功處理 {fixed_count} 筆問題'
                     if errors:
                         message += f'，失敗 {len(errors)} 筆'
                     
@@ -240,7 +240,7 @@ class ConsistencyCheckFixView(LoginRequiredMixin, View):
             
             return JsonResponse({
                 'success': True,
-                'message': '問題修復成功'
+                'message': '問題處理完成'
             })
             
         except Exception as e:

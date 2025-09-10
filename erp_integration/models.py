@@ -60,7 +60,11 @@ class CompanyConfig(models.Model):
 
 
 class ERPIntegrationOperationLog(models.Model):
-    user = models.CharField(max_length=150, verbose_name="操作者")
+    user = models.CharField(
+        max_length=150, 
+        verbose_name="操作者",
+        help_text="操作者名稱（非外鍵關係，純文字欄位）"
+    )
     action = models.CharField(max_length=1000, verbose_name="操作描述")
     timestamp = models.DateTimeField(default=timezone.now, verbose_name="操作時間")
 

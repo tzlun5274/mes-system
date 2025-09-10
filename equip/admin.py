@@ -9,18 +9,18 @@ class EquipmentAdmin(admin.ModelAdmin):
     設備管理介面
     """
 
-    list_display = ["name", "model", "status", "production_line", "created_at"]
-    list_filter = ["status", "production_line", "created_at"]
+    list_display = ["name", "model", "status", "production_line_name", "created_at"]
+    list_filter = ["status", "production_line_name", "created_at"]
     search_fields = ["name", "model"]
     ordering = ["name"]
 
     fieldsets = (
         ("基本資訊", {"fields": ("name", "model")}),
-        ("狀態設定", {"fields": ("status", "production_line")}),
+        ("狀態設定", {"fields": ("status", "production_line_id", "production_line_name")}),
     )
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("production_line")
+        return super().get_queryset(request)
 
 
 @admin.register(EquipOperationLog)

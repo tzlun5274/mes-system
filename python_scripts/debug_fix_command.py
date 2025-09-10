@@ -68,7 +68,7 @@ def debug_fix_command(workorder_id):
                 workorder.updated_at = timezone.now()
                 workorder.save()
                 
-                print(f"修復成功: {old_status} → {workorder.status}")
+                print(f"處理完成: {old_status} → {workorder.status}")
                 
                 # 重新查詢確認
                 workorder.refresh_from_db()

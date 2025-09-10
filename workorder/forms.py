@@ -3,7 +3,7 @@ from django.db.models import Q
 from django.utils import timezone
 from .models import (
     WorkOrder,
-    CompanyOrder,
+    ManufacturingOrder,
     WorkOrderProcess,
     WorkOrderAssignment,
     WorkOrderProduction,

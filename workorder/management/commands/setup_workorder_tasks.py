@@ -19,7 +19,7 @@ class Command(BaseCommand):
         try:
             workorder_logger.info("=== 開始設定工單管理定時任務 ===")
 
-            # 設定自動同步生產製造命令任務
+            # 設定自動同步製造命令任務
             self.setup_auto_sync_task()
 
             # 設定自動轉換MES工單任務
@@ -33,9 +33,17 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"設定失敗：{str(e)}"))
 
     def setup_auto_sync_task(self):
-        """設定自動同步生產製造命令任務"""
-        task_name = "workorder.tasks.auto_sync_company_orders"
-        display_name = "自動同步公司生產製造命令"
+        """設定自動同步製造命令任務"""
+        task_name = "workorder.tasks.auto_sync_manufacturing_orders"
+        display_name = "自動同步公司製造命令"
+
+        # 先刪除舊任務
+        try:
+            old_task = PeriodicTask.objects.get(name=display_name)
+            old_task.delete()
+            workorder_logger.info(f"已刪除舊的定時任務：{display_name}")
+        except PeriodicTask.DoesNotExist:
+            workorder_logger.info(f"沒有找到舊的定時任務：{display_name}")
 
         # 從 SystemConfig 讀取自動同步間隔設定（預設 1 分鐘）
         auto_sync_interval = 1
@@ -50,7 +58,7 @@ class Command(BaseCommand):
                 key="auto_sync_companyorder_interval", value="1"
             )
 
-        # 建立或更新間隔排程
+        # 建立新的間隔排程
         interval, created = IntervalSchedule.objects.get_or_create(
             every=auto_sync_interval,
             period=IntervalSchedule.MINUTES,
@@ -61,28 +69,17 @@ class Command(BaseCommand):
                 f"建立新的間隔排程：每 {interval.every} {interval.period}"
             )
 
-        # 建立或更新定時任務
-        periodic_task, created = PeriodicTask.objects.get_or_create(
+        # 建立新的定時任務
+        periodic_task = PeriodicTask.objects.create(
             name=display_name,
-            defaults={
-                "task": task_name,
-                "interval": interval,
-                "enabled": True,
-            },
+            task=task_name,
+            interval=interval,
+            enabled=True,
         )
 
-        if not created:
-            # 更新現有任務
-            periodic_task.task = task_name
-            periodic_task.interval = interval
-            periodic_task.enabled = True
-            periodic_task.save()
-            workorder_logger.info(f"更新定時任務：{display_name}")
-        else:
-            workorder_logger.info(f"建立定時任務：{display_name}")
-
+        workorder_logger.info(f"建立新的定時任務：{display_name}")
         self.stdout.write(
-            f"✓ {display_name} 任務已設定（每 {auto_sync_interval} 分鐘執行）"
+            f"✓ {display_name} 任務已重新建立（每 {auto_sync_interval} 分鐘執行）"
         )
 
     def setup_auto_convert_task(self):
@@ -90,8 +87,8 @@ class Command(BaseCommand):
         task_name = "workorder.tasks.auto_convert_orders"
         display_name = "自動轉換MES工單"
 
-        # 從 SystemConfig 讀取自動轉換間隔設定（預設 3 分鐘）
-        auto_convert_interval = 3
+        # 從 SystemConfig 讀取自動轉換間隔設定（預設 1 分鐘）
+        auto_convert_interval = 1
         try:
             config = SystemConfig.objects.get(key="auto_convert_interval")
             auto_convert_interval = int(config.value)
@@ -99,10 +96,10 @@ class Command(BaseCommand):
                 f"讀取到自動轉換間隔設定：{auto_convert_interval} 分鐘"
             )
         except SystemConfig.DoesNotExist:
-            workorder_logger.warning("未找到自動轉換間隔設定，使用預設值 3 分鐘")
+            workorder_logger.warning("未找到自動轉換間隔設定，使用預設值 1 分鐘")
             # 只有在不存在時才建立預設設定
-            SystemConfig.objects.create(key="auto_convert_interval", value="3")
-            auto_convert_interval = 3
+            SystemConfig.objects.create(key="auto_convert_interval", value="1")
+            auto_convert_interval = 1
 
         # 建立或更新間隔排程
         interval, created = IntervalSchedule.objects.get_or_create(

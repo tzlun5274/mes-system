@@ -26,7 +26,7 @@
 - `WorkOrderCreateView` - 工單新增視圖
 - `WorkOrderUpdateView` - 工單編輯視圖
 - `WorkOrderDeleteView` - 工單刪除視圖
-- `CompanyOrderListView` - 公司製令單列表視圖
+- `ManufacturingOrderListView` - 公司製造命令列表視圖
 - `ReportIndexView` - 報工管理首頁視圖
 - `OperatorSupplementReportListView` - 作業員補登報工列表視圖
 - `SMTProductionReportListView` - SMT生產報工列表視圖
@@ -110,7 +110,7 @@ urlpatterns = [
 
 - `workorder/tests/test_views.py` - 視圖功能測試
 - 包含工單 CRUD 操作測試
-- 包含公司製令單功能測試
+- 包含公司製造命令功能測試
 - 包含報工管理功能測試
 - 包含權限控制測試
 
@@ -128,12 +128,12 @@ urlpatterns = [
 3. **瀏覽器快取**：更新靜態檔案後可能需要清除瀏覽器快取
 4. **測試執行**：建議在部署前執行完整的測試套件
 
-## 修復完成狀態
+## 處理完成狀態
 
-- ✅ 項目1：視圖設計違反規範 - 已完成修復
+- ✅ 項目1：視圖設計違反規範 - 已完成處理
 - ⏳ 項目2：缺少權限控制 - 待處理
-- ✅ 項目3：缺少靜態檔案目錄 - 已完成修復
+- ✅ 項目3：缺少靜態檔案目錄 - 已完成處理
 - ⏳ 項目4：缺少測試檔案 - 待處理
 - ⏳ 項目5：缺少文檔說明 - 待處理
 
-本次修復為工單模組建立了現代化的架構基礎，為後續的功能開發和維護提供了良好的基礎。 
+本次處理為工單模組建立了現代化的架構基礎，為後續的功能開發和維護提供了良好的基礎。 

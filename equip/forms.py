@@ -13,7 +13,7 @@ class EquipmentForm(forms.ModelForm):
 
     class Meta:
         model = Equipment
-        fields = ["name", "model", "status", "production_line"]
+        fields = ["name", "model", "status", "production_line_id", "production_line_name"]
         widgets = {
             "name": forms.TextInput(
                 attrs={
@@ -28,7 +28,18 @@ class EquipmentForm(forms.ModelForm):
                 }
             ),
             "status": forms.Select(attrs={"class": "form-control"}),
-            "production_line": forms.Select(attrs={"class": "form-control"}),
+            "production_line_id": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "例如：LINE-001",
+                }
+            ),
+            "production_line_name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "例如：SMT產線A",
+                }
+            ),
         }
 
     def clean_name(self):

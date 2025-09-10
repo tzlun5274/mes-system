@@ -9,8 +9,8 @@ from django.db.models import Sum
 # 導入派工單子模組的模型（使用字串引用避免循環依賴）
 # from .workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess
 
-# 導入公司製令單子模組的模型
-from .company_order.models import CompanyOrder
+# 導入公司製造命令子模組的模型
+from .manufacturing_order.models import ManufacturingOrder
 
 # 導入已完工工單子模組的模型
 # from .workorder_completed.models import CompletedWorkOrder, CompletedWorkOrderProcess  # 已移除
@@ -1321,15 +1321,14 @@ class WorkOrderOperationLog(models.Model):
     """
     
     timestamp = models.DateTimeField(default=timezone.now, verbose_name="時間戳")
-    user = models.CharField(max_length=150, verbose_name="用戶")
-    action = models.CharField(max_length=255, verbose_name="操作")
-    workorder_related = models.ForeignKey(
-        "WorkOrder",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        verbose_name="關聯工單",
+    user = models.CharField(
+        max_length=150, 
+        verbose_name="用戶",
+        help_text="用戶名稱（非外鍵關係，純文字欄位）"
     )
+    action = models.CharField(max_length=255, verbose_name="操作")
+    workorder_related_id = models.CharField(max_length=50, null=True, blank=True, verbose_name="關聯工單ID")
+    workorder_related_number = models.CharField(max_length=100, null=True, blank=True, verbose_name="關聯工單號碼")
     ip_address = models.GenericIPAddressField(
         null=True, blank=True, verbose_name="IP 地址"
     )

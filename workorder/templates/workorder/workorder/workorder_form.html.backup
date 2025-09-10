@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block title %}{{ edit_mode|default_if_none:False|yesno:'編輯工單,新增工單' }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ edit_mode|default_if_none:False|yesno:'編輯工單,新增工單' }}</h2>
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    <form method="post" class="card p-4 shadow-sm">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">送出</button>
+        <a href="{% url 'workorder:index' %}" class="btn btn-secondary ms-2">返回工單管理功能入口</a>
+    </form>
+</div>
+
+<script>
+// 當產品編號選擇改變時，自動帶出工單號與數量
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('工單表單 JavaScript 載入完成');
+    
+    const productSelect = document.getElementById('id_product_code');
+    const companyCodeInput = document.getElementById('id_company_code');
+    const orderNumberInput = document.getElementById('id_order_number');
+    const quantityInput = document.getElementById('id_quantity');
+    
+    console.log('DOM 元素檢查:', {
+        productSelect: productSelect,
+        companyCodeInput: companyCodeInput,
+        orderNumberInput: orderNumberInput,
+        quantityInput: quantityInput
+    });
+    
+    if (productSelect) {
+        console.log('產品編號下拉選單找到，設定事件監聽器');
+        productSelect.addEventListener('change', function() {
+            const productId = this.value;
+            const companyCode = companyCodeInput ? companyCodeInput.value : '';
+            
+            console.log('產品編號變更:', { productId, companyCode });
+            
+            if (productId) {
+                // 顯示載入中訊息
+                orderNumberInput.value = '載入中...';
+                quantityInput.value = '';
+                
+                const url = `{% url 'workorder:get_company_order_info' %}?product_id=${encodeURIComponent(productId)}&company_code=${encodeURIComponent(companyCode)}`;
+                console.log('發送 AJAX 請求到:', url);
+                
+                // 發送 AJAX 請求
+                fetch(url)
+                    .then(response => {
+                        console.log('AJAX 回應狀態:', response.status);
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('AJAX 回應資料:', data);
+                        if (data.status === 'success') {
+                            // 自動填入工單號與數量
+                            orderNumberInput.value = data.data.mkordno;
+                            quantityInput.value = data.data.prodt_qty;
+                            
+                            // 如果公司代號為空，自動填入
+                            if (!companyCode && companyCodeInput) {
+                                companyCodeInput.value = data.data.company_code;
+                            }
+                            
+                            console.log('自動填入完成:', {
+                                orderNumber: data.data.mkordno,
+                                quantity: data.data.prodt_qty,
+                                companyCode: data.data.company_code
+                            });
+                        } else {
+                            // 顯示錯誤訊息
+                            orderNumberInput.value = '';
+                            quantityInput.value = '';
+                            console.error('API 回傳錯誤:', data.message);
+                            alert('錯誤：' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('AJAX 請求失敗：', error);
+                        orderNumberInput.value = '';
+                        quantityInput.value = '';
+                        alert('網路錯誤，請重試');
+                    });
+            } else {
+                // 清空欄位
+                orderNumberInput.value = '';
+                quantityInput.value = '';
+                console.log('產品編號為空，清空相關欄位');
+            }
+        });
+    } else {
+        console.error('找不到產品編號下拉選單元素');
+    }
+    
+    // 當公司代號改變時，重新載入產品編號選項
+    if (companyCodeInput) {
+        companyCodeInput.addEventListener('change', function() {
+            const companyCode = this.value;
+            if (companyCode) {
+                // 重新載入產品編號選項
+                fetch(`{% url 'workorder:get_company_order_info' %}?company_code=${encodeURIComponent(companyCode)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // 這裡可以實作重新載入產品選項的邏輯
+                        // 目前先保持簡單，只清空產品選擇
+                        if (productSelect) {
+                            productSelect.value = '';
+                        }
+                        if (orderNumberInput) {
+                            orderNumberInput.value = '';
+                        }
+                        if (quantityInput) {
+                            quantityInput.value = '';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('重新載入產品選項失敗：', error);
+                    });
+            }
+        });
+    }
+});
+</script>
+{% endblock %} 

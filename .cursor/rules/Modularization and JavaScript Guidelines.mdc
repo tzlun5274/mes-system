@@ -1,0 +1,42 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+Modularization Principles
+Independent Development and Access Restrictions:
+
+Each functional module must be developed independently.
+
+Cross-accessing unauthorized logic from other modules is strictly forbidden.
+
+Inter-Module Communication:
+
+Modules may only communicate through explicitly defined APIs.
+
+Direct access to the internal implementation details of other modules is prohibited.
+
+Shared Logic:
+
+All shared logic must be extracted and centrally managed.
+
+Shared logic should be placed in a services.py file or built as an independent shared module.
+
+JavaScript Guidelines
+Native JS First:
+
+Only native JavaScript is permitted for development.
+
+The use of any external libraries, including but not limited to jQuery, is strictly prohibited.
+
+Modularization and Global Scope Isolation:
+
+All JavaScript code must be modularized.
+
+Polluting the global scope is strictly forbidden.
+
+File Location:
+
+Custom JavaScript files must be placed within the static/module_name/ directory.
+
+module_name should be replaced with the corresponding functional module name.

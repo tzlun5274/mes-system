@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 orderNumberInput.value = '載入中...';
                 quantityInput.value = '';
                 
-                const url = `{% url 'workorder:get_company_order_info' %}?product_id=${encodeURIComponent(productId)}&company_code=${encodeURIComponent(companyCode)}`;
+                const url = `{% url 'workorder:get_manufacturing_order_info' %}?product_id=${encodeURIComponent(productId)}&company_code=${encodeURIComponent(companyCode)}`;
                 console.log('發送 AJAX 請求到:', url);
                 
                 // 發送 AJAX 請求
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const companyCode = this.value;
             if (companyCode) {
                 // 重新載入產品編號選項
-                fetch(`{% url 'workorder:get_company_order_info' %}?company_code=${encodeURIComponent(companyCode)}`)
+                fetch(`{% url 'workorder:get_manufacturing_order_info' %}?company_code=${encodeURIComponent(companyCode)}`)
                     .then(response => response.json())
                     .then(data => {
                         // 這裡可以實作重新載入產品選項的邏輯

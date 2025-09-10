@@ -2,7 +2,7 @@
 # 此檔案定義產線管理模組的網頁路徑
 
 from django.urls import path
-from . import views
+from . import views, api
 
 app_name = "production"
 module_display_name = "產線管理"
@@ -41,4 +41,14 @@ urlpatterns = [
     path(
         "api/production-lines/", views.api_production_lines, name="api_production_lines"
     ),
+    
+    # production API 路由
+    path("api/production-line/", api.ProductionLineAPIView.as_view(), name="api_production_line_list"),
+    path("api/production-line/<int:line_id>/", api.ProductionLineAPIView.as_view(), name="api_production_line_detail"),
+    path("api/execution/", api.ProductionExecutionAPIView.as_view(), name="api_production_execution_list"),
+    path("api/execution/<int:execution_id>/", api.ProductionExecutionAPIView.as_view(), name="api_production_execution_detail"),
+    path("api/production-line-by-code/", api.get_production_line_by_code, name="api_production_line_by_code"),
+    path("api/active-production-lines/", api.get_active_production_lines, name="api_active_production_lines"),
+    path("api/executions-by-workorder/", api.get_production_executions_by_workorder, name="api_production_executions_by_workorder"),
+    path("api/monitor-data/", api.get_production_monitor_data, name="api_production_monitor_data"),
 ]

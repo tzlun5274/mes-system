@@ -38,9 +38,8 @@ class Unit(models.Model):
 
 
 class Event(models.Model):
-    unit = models.ForeignKey(
-        Unit, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("單位")
-    )
+    unit_id = models.CharField(max_length=50, null=True, blank=True, verbose_name=_("單位ID"))
+    unit_name = models.CharField(max_length=100, null=True, blank=True, verbose_name=_("單位名稱"))
     title = models.CharField(max_length=200, verbose_name=_("標題"))
     start = models.DateTimeField(verbose_name=_("開始時間"))
     end = models.DateTimeField(verbose_name=_("結束時間"))

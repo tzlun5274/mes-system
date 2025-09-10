@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, api
 
 app_name = "material"
 module_display_name = "物料管理"
@@ -76,4 +76,14 @@ urlpatterns = [
         views.api_requirement_estimation_summary,
         name="api_requirement_estimation_summary",
     ),
+    
+    # material API 路由
+    path("api/product/", api.ProductAPIView.as_view(), name="api_product_list"),
+    path("api/product/<int:product_id>/", api.ProductAPIView.as_view(), name="api_product_detail"),
+    path("api/material/", api.MaterialAPIView.as_view(), name="api_material_list"),
+    path("api/material/<int:material_id>/", api.MaterialAPIView.as_view(), name="api_material_detail"),
+    path("api/requirements/", api.get_material_requirements, name="api_material_requirements"),
+    path("api/inventory/", api.get_material_inventory, name="api_material_inventory"),
+    path("api/product-by-code/", api.get_product_by_code, name="api_product_by_code"),
+    path("api/material-by-code/", api.get_material_by_code, name="api_material_by_code"),
 ]

@@ -228,7 +228,7 @@ class OperatorBackfillForm(ModelForm):
     class Meta:
         model = FillWork
         fields = [
-            'product_id', 'workorder', 'company_name', 'operator', 'process', 'equipment',
+            'product_id', 'workorder', 'company_name', 'operator', 'process_id', 'process_name', 'equipment',
             'planned_quantity', 'work_quantity', 'defect_quantity', 'is_completed',
             'work_date', 'start_time', 'end_time', 'remarks', 'abnormal_notes'
         ]
@@ -238,7 +238,8 @@ class OperatorBackfillForm(ModelForm):
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'defect_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'is_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'process': forms.Select(attrs={'class': 'form-select'}),
+            'process_id': forms.Select(attrs={'class': 'form-select'}),
+            'process_name': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
             'start_time': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'HH:MM',
@@ -267,10 +268,10 @@ class OperatorBackfillForm(ModelForm):
             # 根據使用者權限過濾工序
             filtered_processes = get_user_filtered_processes(self.user, self.request)
             # 排除SMT相關工序
-            self.fields['process'].queryset = filtered_processes.exclude(name__icontains='SMT')
+            self.fields['process_id'].queryset = filtered_processes.exclude(name__icontains='SMT')
         else:
             # 沒有使用者資訊，預設排除SMT相關
-            self.fields['process'].queryset = ProcessName.objects.exclude(name__icontains='SMT')
+            self.fields['process_id'].queryset = ProcessName.objects.exclude(name__icontains='SMT')
         
         # 設定 planned_quantity 可留空
         self.fields['planned_quantity'].required = False
@@ -436,7 +437,7 @@ class OperatorRDBackfillForm(ModelForm):
     class Meta:
         model = FillWork
         fields = [
-            'product_id', 'workorder', 'company_name', 'operator', 'process', 'equipment',
+            'product_id', 'workorder', 'company_name', 'operator', 'process_id', 'process_name', 'equipment',
             'planned_quantity', 'work_quantity', 'defect_quantity', 'is_completed',
             'work_date', 'start_time', 'end_time', 'remarks', 'abnormal_notes'
         ]
@@ -451,7 +452,8 @@ class OperatorRDBackfillForm(ModelForm):
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'defect_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'is_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'process': forms.Select(attrs={'class': 'form-select'}),
+            'process_id': forms.Select(attrs={'class': 'form-select'}),
+            'process_name': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
             'start_time': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'HH:MM',
@@ -480,10 +482,10 @@ class OperatorRDBackfillForm(ModelForm):
             # 根據使用者權限過濾工序
             filtered_processes = get_user_filtered_processes(self.user, self.request)
             # 排除SMT相關工序
-            self.fields['process'].queryset = filtered_processes.exclude(name__icontains='SMT')
+            self.fields['process_id'].queryset = filtered_processes.exclude(name__icontains='SMT')
         else:
             # 沒有使用者資訊，預設排除SMT相關
-            self.fields['process'].queryset = ProcessName.objects.exclude(name__icontains='SMT')
+            self.fields['process_id'].queryset = ProcessName.objects.exclude(name__icontains='SMT')
         
         # 設定planned_quantity為非必填
         self.fields['planned_quantity'].required = False
@@ -641,7 +643,7 @@ class SMTBackfillForm(ModelForm):
     class Meta:
         model = FillWork
         fields = [
-            'product_id', 'workorder', 'company_name', 'operator', 'process', 'equipment',
+            'product_id', 'workorder', 'company_name', 'operator', 'process_id', 'process_name', 'equipment',
             'planned_quantity', 'work_quantity', 'defect_quantity', 'is_completed',
             'work_date', 'start_time', 'end_time', 'remarks', 'abnormal_notes'
         ]
@@ -652,7 +654,8 @@ class SMTBackfillForm(ModelForm):
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'defect_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'is_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'process': forms.Select(attrs={'class': 'form-select'}),
+            'process_id': forms.Select(attrs={'class': 'form-select'}),
+            'process_name': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
             'start_time': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'HH:MM',
@@ -681,10 +684,10 @@ class SMTBackfillForm(ModelForm):
             # 根據使用者權限過濾工序
             filtered_processes = get_user_filtered_processes(self.user, self.request)
             # 只顯示SMT相關工序
-            self.fields['process'].queryset = filtered_processes.filter(name__icontains='SMT')
+            self.fields['process_id'].queryset = filtered_processes.filter(name__icontains='SMT')
         else:
             # 沒有使用者資訊，預設只顯示SMT相關
-            self.fields['process'].queryset = ProcessName.objects.filter(name__icontains='SMT')
+            self.fields['process_id'].queryset = ProcessName.objects.filter(name__icontains='SMT')
         
         # planned_quantity 非必填
         self.fields['planned_quantity'].required = False
@@ -805,7 +808,7 @@ class SMTRDBackfillForm(ModelForm):
     class Meta:
         model = FillWork
         fields = [
-            'product_id', 'workorder', 'company_name', 'operator', 'process', 'equipment',
+            'product_id', 'workorder', 'company_name', 'operator', 'process_id', 'process_name', 'equipment',
             'planned_quantity', 'work_quantity', 'defect_quantity', 'is_completed',
             'work_date', 'start_time', 'end_time', 'remarks', 'abnormal_notes'
         ]
@@ -820,7 +823,8 @@ class SMTRDBackfillForm(ModelForm):
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'defect_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'is_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'process': forms.Select(attrs={'class': 'form-select'}),
+            'process_id': forms.Select(attrs={'class': 'form-select'}),
+            'process_name': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
             'start_time': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'HH:MM',
@@ -849,10 +853,10 @@ class SMTRDBackfillForm(ModelForm):
             # 根據使用者權限過濾工序
             filtered_processes = get_user_filtered_processes(self.user, self.request)
             # 只顯示SMT相關工序
-            self.fields['process'].queryset = filtered_processes.filter(name__icontains='SMT')
+            self.fields['process_id'].queryset = filtered_processes.filter(name__icontains='SMT')
         else:
             # 沒有使用者資訊，預設只顯示SMT相關
-            self.fields['process'].queryset = ProcessName.objects.filter(name__icontains='SMT')
+            self.fields['process_id'].queryset = ProcessName.objects.filter(name__icontains='SMT')
         
         # planned_quantity 非必填
         self.fields['planned_quantity'].required = False
@@ -974,14 +978,14 @@ class OperatorIndexView(LoginRequiredMixin, ListView):
     
     def get_queryset(self):
         return FillWork.objects.exclude(
-            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+            Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')
         ).order_by('-created_at')
     
     def get_context_data(self, **kwargs):
         """提供統計數據與最近記錄，供首頁儀表板顯示"""
         context = super().get_context_data(**kwargs)
         base_qs = FillWork.objects.exclude(
-            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+            Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')
         )
         context['operator_pending_count'] = base_qs.filter(approval_status='pending').count()
         context['operator_approved_count'] = base_qs.filter(approval_status='approved').count()
@@ -1188,7 +1192,7 @@ class SMTIndexView(LoginRequiredMixin, ListView):
     
     def get_queryset(self):
         return FillWork.objects.filter(
-            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+            Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')
         ).order_by('-created_at')
     
     def get_context_data(self, **kwargs):
@@ -1198,7 +1202,7 @@ class SMTIndexView(LoginRequiredMixin, ListView):
         """
         context = super().get_context_data(**kwargs)
         base_qs = FillWork.objects.filter(
-            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+            Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')
         )
         context['smt_pending_count'] = base_qs.filter(approval_status='pending').count()
         context['smt_approved_count'] = base_qs.filter(approval_status='approved').count()
@@ -1324,7 +1328,7 @@ class SMTRDBackfillCreateView(LoginRequiredMixin, CreateView):
                 messages.info(self.request, f'建立新RD樣品工單: {workorder.order_number}')
             
             # 檢查並建立派工單（比對公司代號+工單號碼+產品編號+工序）
-            process_name = form.cleaned_data.get('process').name if form.cleaned_data.get('process') else ''
+            process_name = form.cleaned_data.get('process_name') or ''
             existing_dispatch = WorkOrderDispatch.objects.filter(
                 company_code=company_code_value,
                 order_number='RD樣品',
@@ -1508,11 +1512,11 @@ class FillWorkListView(LoginRequiredMixin, ListView):
         fill_type = self.request.GET.get('type')
         if fill_type == 'operator':
             queryset = queryset.exclude(
-                Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+                Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')
             )
         elif fill_type == 'smt':
             queryset = queryset.filter(
-                Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+                Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')
             )
         
         # 根據狀態過濾
@@ -1534,9 +1538,9 @@ class FillWorkListView(LoginRequiredMixin, ListView):
         base_qs = FillWork.objects.all()
         fill_type = self.request.GET.get('type')
         if fill_type == 'operator':
-            base_qs = base_qs.exclude(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT'))
+            base_qs = base_qs.exclude(Q(operator__icontains='SMT') | Q(process_name__icontains='SMT'))
         elif fill_type == 'smt':
-            base_qs = base_qs.filter(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT'))
+            base_qs = base_qs.filter(Q(operator__icontains='SMT') | Q(process_name__icontains='SMT'))
         context['pending_count'] = base_qs.filter(approval_status='pending').count()
         context['approved_count'] = base_qs.filter(approval_status='approved').count()
         context['rejected_count'] = base_qs.filter(approval_status='rejected').count()
@@ -1652,7 +1656,7 @@ def approve_fill_work(request, pk: int):
                 # 判斷類型：SMT 或 作業員
                 is_smt = False
                 try:
-                    if (record.operator and 'SMT' in record.operator.upper()) or (record.process and 'SMT' in record.process.name.upper()):
+                    if (record.operator and 'SMT' in record.operator.upper()) or (record.process_name and 'SMT' in record.process_name.upper()):
                         is_smt = True
                 except Exception:
                     is_smt = False
@@ -1660,7 +1664,7 @@ def approve_fill_work(request, pk: int):
 
                 ProductionReportSyncService._create_or_update_production_detail(
                     workorder=workorder,
-                    process_name=(record.process.name if record.process else record.operation or ''),
+                    process_name=record.process_name or record.operation or '',
                     report_date=record.work_date,
                     report_time=timezone.now(),
                     work_quantity=record.work_quantity or 0,
@@ -2006,13 +2010,13 @@ def import_fill_work_records_smt(request):
 # 匯出（目前依照 type 參數）
 @login_required
 def export_fill_work_records_operator(request):
-    qs = FillWork.objects.exclude(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).order_by('-created_at')
+    qs = FillWork.objects.exclude(Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')).order_by('-created_at')
     return _export_fill_work_qs(qs, 'operator_fill_work_export.csv')
 
 
 @login_required
 def export_fill_work_records_smt(request):
-    qs = FillWork.objects.filter(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).order_by('-created_at')
+    qs = FillWork.objects.filter(Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')).order_by('-created_at')
     return _export_fill_work_qs(qs, 'smt_fill_work_export.csv')
 
 
@@ -2411,13 +2415,13 @@ def _check_duplicate_record(data: dict) -> bool:
 # 匯出：新增 XLSX
 @login_required
 def export_fill_work_records_operator_xlsx(request):
-    qs = FillWork.objects.exclude(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).order_by('-created_at')
+    qs = FillWork.objects.exclude(Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')).order_by('-created_at')
     return _export_fill_work_qs_xlsx(qs, 'operator_fill_work_export.xlsx')
 
 
 @login_required
 def export_fill_work_records_smt_xlsx(request):
-    qs = FillWork.objects.filter(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).order_by('-created_at')
+    qs = FillWork.objects.filter(Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')).order_by('-created_at')
     return _export_fill_work_qs_xlsx(qs, 'smt_fill_work_export.xlsx')
 
 
@@ -2484,13 +2488,13 @@ class SupervisorApprovalOperatorView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         return FillWork.objects.exclude(
-            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+            Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')
         ).order_by('-created_at')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         base_qs = FillWork.objects.exclude(
-            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+            Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')
         )
         context['pending_count'] = base_qs.filter(approval_status='pending').count()
         context['approved_count'] = base_qs.filter(approval_status='approved').count()
@@ -2511,13 +2515,13 @@ class SupervisorApprovalSMTView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         return FillWork.objects.filter(
-            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+            Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')
         ).order_by('-created_at')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         base_qs = FillWork.objects.filter(
-            Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')
+            Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')
         )
         context['pending_count'] = base_qs.filter(approval_status='pending').count()
         context['approved_count'] = base_qs.filter(approval_status='approved').count()
@@ -2607,7 +2611,7 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
         if product_id:
             qs = qs.filter(product_id__icontains=product_id)
         if operation:
-            qs = qs.filter(Q(operation__icontains=operation) | Q(process__name__icontains=operation))
+            qs = qs.filter(Q(operation__icontains=operation) | Q(process_name__icontains=operation))
         if start_date:
             try:
                 d1 = datetime.strptime(start_date, '%Y-%m-%d').date()
@@ -2647,7 +2651,7 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
         if product_id:
             base_qs = base_qs.filter(product_id__icontains=product_id)
         if operation:
-            base_qs = base_qs.filter(Q(operation__icontains=operation) | Q(process__name__icontains=operation))
+            base_qs = base_qs.filter(Q(operation__icontains=operation) | Q(process_name__icontains=operation))
         if start_date:
             try:
                 d1 = datetime.strptime(start_date, '%Y-%m-%d').date()
@@ -2663,8 +2667,8 @@ class SupervisorPendingListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
         
         # 計算過濾後的統計資料
         context['total_count'] = base_qs.count()
-        context['operator_count'] = base_qs.exclude(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).count()
-        context['smt_count'] = base_qs.filter(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT')).count()
+        context['operator_count'] = base_qs.exclude(Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')).count()
+        context['smt_count'] = base_qs.filter(Q(operator__icontains='SMT') | Q(process_name__icontains='SMT')).count()
         
         # 回填查詢值
         request_get = self.request.GET
@@ -2729,7 +2733,7 @@ class SupervisorReviewedListView(LoginRequiredMixin, UserPassesTestMixin, ListVi
         if product_id:
             qs = qs.filter(product_id__icontains=product_id)
         if operation:
-            qs = qs.filter(Q(operation__icontains=operation) | Q(process__name__icontains=operation))
+            qs = qs.filter(Q(operation__icontains=operation) | Q(process_name__icontains=operation))
         if approval_status:
             qs = qs.filter(approval_status=approval_status)
         if start_date:
@@ -2746,9 +2750,9 @@ class SupervisorReviewedListView(LoginRequiredMixin, UserPassesTestMixin, ListVi
                 pass
         if report_type:
             if report_type == 'smt':
-                qs = qs.filter(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT'))
+                qs = qs.filter(Q(operator__icontains='SMT') | Q(process_name__icontains='SMT'))
             elif report_type == 'operator':
-                qs = qs.exclude(Q(operator__icontains='SMT') | Q(process__name__icontains='SMT'))
+                qs = qs.exclude(Q(operator__icontains='SMT') | Q(process_name__icontains='SMT'))
         
         return qs.order_by('-work_date', '-start_time', '-created_at')
 

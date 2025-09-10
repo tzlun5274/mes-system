@@ -34,8 +34,8 @@
                         <div class="col-md-3">
                             <div class="card bg-light">
                                 <div class="card-body text-center">
-                                    <h3 class="text-info">{{ company_order_count }}</h3>
-                                    <p class="mb-0">筆公司製令單</p>
+                                    <h3 class="text-info">{{ manufacturing_order_count }}</h3>
+                                    <p class="mb-0">筆公司製造命令</p>
                                 </div>
                             </div>
                         </div>
@@ -70,7 +70,7 @@
                             </div>
                             <div class="col-md-6">
                                 <ul>
-                                    <li>所有公司製令單</li>
+                                    <li>所有公司製造命令</li>
                                     <li>所有派工記錄</li>
                                     <li>所有填報記錄</li>
                                     <li>所有相關統計資料</li>
@@ -152,7 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        if (!confirm('您確定要清除所有數據嗎？\n\n此操作將刪除：\n- {{ workorder_count }} 筆工單\n- {{ company_order_count }} 筆公司製令單\n- {{ dispatch_log_count }} 筆派工記錄\n\n此操作不可逆，請確認已備份重要資料！')) {
+        if (!confirm('您確定要清除所有數據嗎？\n\n此操作將刪除：\n- {{ workorder_count }} 筆工單\n- {{ manufacturing_order_count }} 筆公司製造命令\n- {{ dispatch_log_count }} 筆派工記錄\n\n此操作不可逆，請確認已備份重要資料！')) {
             e.preventDefault();
             return;
         }

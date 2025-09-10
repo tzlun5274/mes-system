@@ -30,7 +30,7 @@ import logging
 
 from ..models import WorkOrder, WorkOrderProductionDetail, CompletedWorkOrder
 # 移除 ProductionMonitoringData 引用，改用派工單監控資料
-from ..company_order.models import CompanyOrder
+from ..manufacturing_order.models import ManufacturingOrder
 from ..models import SystemConfig
 from ..forms import WorkOrderForm
 from erp_integration.models import CompanyConfig
@@ -376,22 +376,22 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         return super().delete(request, *args, **kwargs)
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
-class CompanyOrderListView(LoginRequiredMixin, ListView):
+class ManufacturingOrderListView(LoginRequiredMixin, ListView):
     """
-    公司製令單列表視圖
-    顯示從 ERP 同步的未結案公司製令單（CompleteStatus=2 或空白，且 BillStatus 不是 1），
+    公司製造命令列表視圖
+    顯示從 ERP 同步的未結案公司製造命令（CompleteStatus=2 或空白，且 BillStatus 不是 1），
     方便現場追蹤與管理，支援管理員設定功能
     """
 
-    model = CompanyOrder
-    template_name = "workorder/company_orders.html"
+    model = ManufacturingOrder
+    template_name = "workorder/manufacturing_orders.html"
     context_object_name = "workorders"
     paginate_by = 20
     ordering = ["sync_time"]
 
     def get_queryset(self):
         """取得查詢集，支援搜尋和排序功能"""
-        # 只顯示未結案的公司製令單
+        # 只顯示未結案的公司製造命令
         # CompleteStatus=2，且 BillStatus 不是 1（排除已結案的）
         queryset = (
             super()
@@ -435,7 +435,7 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
 
         # 取得所有公司代號供篩選使用
         context["company_codes"] = (
-            CompanyOrder.objects.values_list("company_code", flat=True)
+            ManufacturingOrder.objects.values_list("company_code", flat=True)
             .distinct()
             .order_by("company_code")
         )
@@ -449,8 +449,8 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
         # 讀取系統設定
         from workorder.models import SystemConfig
         
-        # 自動轉換MES工單間隔設定（預設 30 分鐘）
-        auto_convert_interval = 30
+        # 自動轉換MES工單間隔設定（預設 1 分鐘）
+        auto_convert_interval = 1
         try:
             config = SystemConfig.objects.get(key="auto_convert_interval")
             auto_convert_interval = int(config.value)
@@ -458,8 +458,8 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
             pass
         context["auto_convert_interval"] = auto_convert_interval
 
-        # 自動同步製令間隔（預設 30 分鐘）
-        auto_sync_companyorder_interval = 30
+        # 自動同步製造命令間隔（預設 1 分鐘）
+        auto_sync_companyorder_interval = 1
         try:
             config = SystemConfig.objects.get(key="auto_sync_companyorder_interval")
             auto_sync_companyorder_interval = int(config.value)
@@ -510,13 +510,20 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
             and new_convert_interval.isdigit()
             and int(new_convert_interval) > 0
         ):
-            old_value = request.POST.get("current_auto_convert_interval", "30")
+            old_value = request.POST.get("current_auto_convert_interval", "1")
             SystemConfig.objects.update_or_create(
                 key="auto_convert_interval",
                 defaults={"value": new_convert_interval},
             )
             workorder_logger.info(
                 f"管理員 {request.user} 變更自動轉換MES工單間隔，原值：{old_value} 分鐘，新值：{new_convert_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
+            )
+            # 記錄到操作日誌模型
+            from workorder.models import WorkOrderOperationLog
+            WorkOrderOperationLog.objects.create(
+                user=request.user.username,
+                action=f"變更自動轉換MES工單間隔，原值：{old_value} 分鐘，新值：{new_convert_interval} 分鐘",
+                ip_address=request.META.get('REMOTE_ADDR')
             )
             interval_changed = True
 
@@ -526,14 +533,21 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
             and int(new_sync_interval) > 0
         ):
             old_value = request.POST.get(
-                "current_auto_sync_companyorder_interval", "30"
+                "current_auto_sync_companyorder_interval", "1"
             )
             SystemConfig.objects.update_or_create(
                 key="auto_sync_companyorder_interval",
                 defaults={"value": new_sync_interval},
             )
             workorder_logger.info(
-                f"管理員 {request.user} 變更自動同步製令間隔，原值：{old_value} 分鐘，新值：{new_sync_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
+                f"管理員 {request.user} 變更自動同步製造命令間隔，原值：{old_value} 分鐘，新值：{new_sync_interval} 分鐘。IP: {request.META.get('REMOTE_ADDR')}"
+            )
+            # 記錄到操作日誌模型
+            from workorder.models import WorkOrderOperationLog
+            WorkOrderOperationLog.objects.create(
+                user=request.user.username,
+                action=f"變更自動同步製造命令間隔，原值：{old_value} 分鐘，新值：{new_sync_interval} 分鐘",
+                ip_address=request.META.get('REMOTE_ADDR')
             )
             interval_changed = True
 
@@ -554,15 +568,15 @@ class CompanyOrderListView(LoginRequiredMixin, ListView):
                 )
 
         workorder_logger.info(
-            f"使用者 {request.user} 檢視公司製令單列表。IP: {request.META.get('REMOTE_ADDR')}"
+            f"使用者 {request.user} 檢視公司製造命令列表。IP: {request.META.get('REMOTE_ADDR')}"
         )
 
         return self.get(request, *args, **kwargs)
 
 @require_GET
-def get_company_order_info(request):
+def get_manufacturing_order_info(request):
     """
-    取得公司製令單資訊的 API 端點
+    取得公司製造命令資訊的 API 端點
     用於 AJAX 請求
     """
     if not request.user.is_authenticated:
@@ -574,8 +588,8 @@ def get_company_order_info(request):
             return JsonResponse({"error": "缺少公司代號參數"}, status=400)
 
         # 取得該公司的製令單數量統計
-        total_orders = CompanyOrder.objects.filter(company_code=company_code).count()
-        converted_orders = CompanyOrder.objects.filter(
+        total_orders = ManufacturingOrder.objects.filter(company_code=company_code).count()
+        converted_orders = ManufacturingOrder.objects.filter(
             company_code=company_code, is_converted=True
         ).count()
         pending_orders = total_orders - converted_orders
@@ -683,27 +697,43 @@ def mes_orders_bulk_dispatch(request):
     if not order_numbers:
         return JsonResponse({"error": "沒有選取工單"}, status=400)
 
-    # 使用核心派工服務
-    from workorder.services.dispatch_service import WorkOrderDispatchService
-    result = WorkOrderDispatchService.dispatch_multiple_workorders(order_numbers)
-    
-    if result['success']:
-        # 記錄批量派工日誌
-        workorder_logger.info(
-            f"批量派工完成：成功 {result['created_count']} 筆，跳過 {result['skipped_count']} 筆。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
-        )
+    created = 0
+    skipped = 0
+    for no in order_numbers:
+        # 查詢所有匹配的工單
+        # 使用公司代號和工單號碼組合查詢，確保唯一性
+        work_orders = WorkOrder.objects.filter(order_number=no)
+        # 注意：這裡需要從請求中獲取公司代號，暫時保持原有邏輯
+        if not work_orders.exists():
+            skipped += 1
+            continue
         
-        return JsonResponse({
-            "success": True,
-            "message": result['message'],
-            "created": result['created_count'],
-            "skipped": result['skipped_count']
-        })
-    else:
-        return JsonResponse({
-            "success": False,
-            "error": result['message']
-        }, status=400)
+        # 如果有多個工單，只處理第一個（保持原有行為）
+        wo = work_orders.first()
+        
+        # 若已有派工單，略過
+        if WorkOrderDispatch.objects.filter(order_number=no).exists():
+            skipped += 1
+            continue
+        
+        # 建立派工單，直接設定為生產中狀態
+        dispatch = WorkOrderDispatch.objects.create(
+            company_code=getattr(wo, "company_code", None),
+            order_number=wo.order_number,
+            product_code=wo.product_code,
+            planned_quantity=wo.quantity,
+            status="in_production",  # 直接設定為生產中
+            dispatch_date=timezone.now().date(),  # 設定派工日期為今天
+            created_by=str(request.user) if request.user.is_authenticated else "system",
+        )
+        created += 1
+        
+        # 記錄派工單建立日誌
+        workorder_logger.info(
+            f"批量派工：工單 {wo.order_number} 轉派為生產中狀態。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
+        )
+
+    return JsonResponse({"success": True, "created": created, "skipped": skipped})
 
 @login_required
 @require_POST
@@ -715,25 +745,33 @@ def mes_order_dispatch(request):
     if not order_number:
         return JsonResponse({"error": "工單號碼不能為空"}, status=400)
     
-    # 使用核心派工服務
-    from workorder.services.dispatch_service import WorkOrderDispatchService
-    result = WorkOrderDispatchService.dispatch_single_workorder(order_number)
+    # 使用 first() 避免 MultipleObjectsReturned 錯誤
+    # 注意：這裡需要從請求中獲取公司代號，暫時保持原有邏輯
+    wo = WorkOrder.objects.filter(order_number=order_number).first()
+    if not wo:
+        return JsonResponse({"error": "工單不存在"}, status=400)
     
-    if result['success']:
-        # 記錄單筆派工日誌
-        workorder_logger.info(
-            f"單筆派工：工單 {order_number} 轉派為生產中狀態。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
-        )
-        
-        return JsonResponse({
-            "success": True, 
-            "message": result['message']
-        })
-    else:
-        return JsonResponse({
-            "success": False,
-            "error": result['message']
-        }, status=400)
+    # 檢查是否已有派工單
+    if WorkOrderDispatch.objects.filter(order_number=order_number).exists():
+        return JsonResponse({"error": "此工單已有派工單"}, status=400)
+    
+    # 建立派工單，直接設定為生產中狀態
+    dispatch = WorkOrderDispatch.objects.create(
+        company_code=getattr(wo, "company_code", None),
+        order_number=wo.order_number,
+        product_code=wo.product_code,
+        planned_quantity=wo.quantity,
+        status="in_production",  # 直接設定為生產中
+        dispatch_date=timezone.now().date(),  # 設定派工日期為今天
+        created_by=str(request.user) if request.user.is_authenticated else "system",
+    )
+    
+    # 記錄派工單建立日誌
+    workorder_logger.info(
+        f"單筆派工：工單 {wo.order_number} 轉派為生產中狀態。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
+    )
+    
+    return JsonResponse({"success": True, "message": "派工單建立成功，已設定為生產中狀態"})
 
 @login_required
 @require_POST
@@ -766,29 +804,21 @@ def mes_orders_auto_dispatch(request):
     """
     自動批次派工：自動為所有未派工的工單建立派工單
     """
-    try:
-        # 使用核心派工服務
-        from workorder.services.dispatch_service import WorkOrderDispatchService
-        result = WorkOrderDispatchService.auto_dispatch_all_workorders()
-        
-        if result['success']:
-            # 記錄自動批次派工日誌
-            workorder_logger.info(
-                f"自動批次派工完成：成功 {result['created_count']} 筆，跳過 {result['skipped_count']} 筆。操作者: {request.user}, IP: {request.META.get('REMOTE_ADDR')}"
-            )
-            
-            return JsonResponse({
-                "success": True, 
-                "message": result['message']
-            })
-        else:
-            return JsonResponse({
-                "success": False,
-                "error": result['message']
-            }, status=500)
-        
-    except Exception as e:
-        return JsonResponse({"error": f"自動批次派工失敗：{str(e)}"}, status=500)
+    from workorder.services.auto_dispatch_service import AutoDispatchService
+    
+    # 使用統一的服務執行批次派工
+    result = AutoDispatchService.execute_auto_dispatch(
+        created_by=str(request.user) if request.user.is_authenticated else "system",
+        user_ip=request.META.get('REMOTE_ADDR')
+    )
+    
+    if result['success']:
+        return JsonResponse({
+            "success": True, 
+            "message": result['message']
+        })
+    else:
+        return JsonResponse({"error": result['error']}, status=500)
 
 @login_required
 @require_POST
@@ -993,14 +1023,14 @@ class CreateMissingWorkOrdersView(LoginRequiredMixin, View):
                             if company_config:
                                 company_code = company_config.company_code
                             else:
-                                # 如果找不到公司配置，嘗試從公司製令單中查找
-                                company_order = CompanyOrder.objects.filter(
+                                # 如果找不到公司配置，嘗試從公司製造命令中查找
+                                manufacturing_order = ManufacturingOrder.objects.filter(
                                     mkordno=fill_work.workorder,
                                     product_id=fill_work.product_id
                                 ).first()
                                 
-                                if company_order:
-                                    company_code = company_order.company_code
+                                if manufacturing_order:
+                                    company_code = manufacturing_order.company_code
                         
                         except Exception as e:
                             workorder_logger.error(f"查找公司代號時發生錯誤: {e}")

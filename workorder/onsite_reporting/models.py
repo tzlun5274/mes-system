@@ -160,7 +160,8 @@ class OnsiteReport(models.Model):
             
             # 記錄歷史
             OnsiteReportHistory.objects.create(
-                onsite_report=self,
+                onsite_report_id=str(self.id),
+                onsite_report_name=f"{self.operator} - {self.workorder}",
                 change_type='complete',
                 old_status=self.status,
                 new_status='completed',
@@ -180,7 +181,8 @@ class OnsiteReport(models.Model):
             
             # 記錄歷史
             OnsiteReportHistory.objects.create(
-                onsite_report=self,
+                onsite_report_id=str(self.id),
+                onsite_report_name=f"{self.operator} - {self.workorder}",
                 change_type='pause',
                 old_status=self.status,
                 new_status='paused',
@@ -200,7 +202,8 @@ class OnsiteReport(models.Model):
             
             # 記錄歷史
             OnsiteReportHistory.objects.create(
-                onsite_report=self,
+                onsite_report_id=str(self.id),
+                onsite_report_name=f"{self.operator} - {self.workorder}",
                 change_type='resume',
                 old_status='paused',
                 new_status='resumed',
@@ -220,7 +223,8 @@ class OnsiteReport(models.Model):
             
             # 記錄歷史
             OnsiteReportHistory.objects.create(
-                onsite_report=self,
+                onsite_report_id=str(self.id),
+                onsite_report_name=f"{self.operator} - {self.workorder}",
                 change_type='stop',
                 old_status=self.status,
                 new_status='stopped',
@@ -371,7 +375,8 @@ class OnsiteReportHistory(models.Model):
     ]
     
     # 關聯欄位
-    onsite_report = models.ForeignKey(OnsiteReport, on_delete=models.CASCADE, verbose_name="現場報工記錄", help_text="現場報工記錄")
+    onsite_report_id = models.CharField(max_length=50, verbose_name="現場報工記錄ID", help_text="現場報工記錄ID")
+    onsite_report_name = models.CharField(max_length=200, verbose_name="現場報工記錄名稱", help_text="現場報工記錄名稱")
     
     # 變更資訊欄位
     change_type = models.CharField(max_length=20, choices=CHANGE_TYPE_CHOICES, verbose_name="變更類型", help_text="變更類型")
@@ -393,13 +398,13 @@ class OnsiteReportHistory(models.Model):
         db_table = 'workorder_onsite_report_history'
         ordering = ['-changed_at']
         indexes = [
-            models.Index(fields=['onsite_report']),
+            models.Index(fields=['onsite_report_id']),
             models.Index(fields=['change_type']),
             models.Index(fields=['changed_at']),
         ]
     
     def __str__(self):
-        return f"{self.onsite_report.operator} - {self.get_change_type_display()} - {self.changed_at}"
+        return f"{self.onsite_report_name} - {self.get_change_type_display()} - {self.changed_at}"
 
 
 class OnsiteReportConfig(models.Model):

@@ -159,152 +159,81 @@ def workorder_archive_task():
 
 
 @shared_task
-def auto_sync_company_orders():
-    """
-    定時任務：自動同步公司生產製造命令
-    """
-    try:
-        from django.core.management import call_command
-        from workorder.company_order.models import CompanyOrder
-        
-        # 記錄同步前的數量
-        before_count = CompanyOrder.objects.count()
-        logger.info(f"開始自動同步生產製造命令，同步前數量: {before_count}")
-        
-        # 執行同步命令
-        call_command("sync_pending_workorders")
-        
-        # 記錄同步後的數量
-        after_count = CompanyOrder.objects.count()
-        synced_count = after_count - before_count
-        
-        logger.info(f"自動同步生產製造命令完成，同步後數量: {after_count}，新增: {synced_count}")
-        
-        return {
-            'success': True,
-            'message': f'自動同步完成，新增 {synced_count} 筆生產製造命令',
-            'synced_count': synced_count,
-            'total_count': after_count
-        }
-        
-    except Exception as e:
-        logger.error(f"自動同步生產製造命令失敗: {str(e)}")
-        return {
-            'success': False,
-            'error': f'自動同步失敗: {str(e)}',
-            'synced_count': 0,
-            'total_count': 0
-        }
-
-
-@shared_task
-def auto_convert_orders():
-    """
-    定時任務：自動轉換生產製造命令為MES工單
-    """
-    try:
-        from workorder.company_order.services import CompanyOrderConvertService
-        
-        logger.info("開始自動轉換生產製造命令為MES工單")
-        
-        # 執行轉換
-        result = CompanyOrderConvertService.convert_to_workorder()
-        
-        if result.get('success', False):
-            converted_count = result.get('converted', 0)
-            logger.info(f"自動轉換完成，成功轉換 {converted_count} 筆生產製造命令")
-            return {
-                'success': True,
-                'message': f'自動轉換完成，成功轉換 {converted_count} 筆生產製造命令',
-                'converted_count': converted_count
-            }
-        else:
-            error_msg = result.get('error', '未知錯誤')
-            logger.error(f"自動轉換失敗: {error_msg}")
-            return {
-                'success': False,
-                'error': f'自動轉換失敗: {error_msg}',
-                'converted_count': 0
-            }
-            
-    except Exception as e:
-        logger.error(f"自動轉換生產製造命令失敗: {str(e)}")
-        return {
-            'success': False,
-            'error': f'自動轉換失敗: {str(e)}',
-            'converted_count': 0
-        }
-
-
-@shared_task
-def auto_update_dispatch_statuses():
-    """
-    定時任務：自動更新派工單狀態
-    """
-    try:
-        from workorder.services.dispatch_status_service import DispatchStatusService
-        
-        logger.info("開始自動更新派工單狀態")
-        
-        # 使用派工狀態服務更新所有派工單狀態
-        result = DispatchStatusService.update_all_dispatch_statuses()
-        
-        if result['success']:
-            logger.info(f"定時任務完成：{result['message']}")
-            return {
-                'success': True,
-                'message': result['message'],
-                'updated_count': result.get('updated_count', 0)
-            }
-        else:
-            logger.error(f"定時任務失敗：{result['message']}")
-            return {
-                'success': False,
-                'error': result['message'],
-                'updated_count': 0
-            }
-            
-    except Exception as e:
-        logger.error(f"定時任務失敗：自動更新派工單狀態失敗: {str(e)}")
-        return {
-            'success': False,
-            'error': f'定時任務失敗：{str(e)}',
-            'updated_count': 0
-        }
-
-
-@shared_task
 def auto_dispatch_workorders():
     """
     定時任務：自動批次派工
     """
+    from workorder.services.auto_dispatch_service import AutoDispatchService
+    
+    # 使用統一的服務執行批次派工
+    result = AutoDispatchService.execute_auto_dispatch(created_by="system")
+    
+    return result
+
+@shared_task
+def auto_sync_manufacturing_orders():
+    """
+    定時任務：自動同步各公司製造命令到 ManufacturingOrder 表
+    """
     try:
-        # 使用核心派工服務
-        from workorder.services.dispatch_service import WorkOrderDispatchService
-        result = WorkOrderDispatchService.auto_dispatch_all_workorders()
+        from django.core.management import call_command
         
-        if result['success']:
-            logger.info(f"定時任務完成：{result['message']}")
+        logger.info("開始執行自動同步製造命令任務")
+        
+        # 執行同步命令
+        call_command("sync_manufacturing_orders")
+        
+        logger.info("自動同步製造命令任務完成")
+        
+        return {
+            'success': True,
+            'message': '自動同步製造命令任務完成',
+            'timestamp': timezone.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"自動同步製造命令任務失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'自動同步製造命令任務失敗: {str(e)}',
+            'timestamp': timezone.now().isoformat()
+        }
+
+@shared_task
+def auto_convert_orders():
+    """
+    定時任務：自動轉換製造命令為 MES 工單
+    """
+    try:
+        from workorder.manufacturing_order.services import ManufacturingOrderConvertService
+        
+        logger.info("開始執行自動轉換MES工單任務")
+        
+        # 執行轉換服務
+        result = ManufacturingOrderConvertService.convert_to_workorder()
+        
+        if result.get('success', False):
+            logger.info(f"自動轉換MES工單任務完成：{result.get('message', '轉換完成')}")
             return {
                 'success': True,
-                'message': result['message'],
-                'created_count': result['created_count'],
-                'skipped_count': result['skipped_count']
+                'message': result.get('message', '自動轉換MES工單任務完成'),
+                'converted_count': result.get('converted_count', 0),
+                'timestamp': timezone.now().isoformat()
             }
         else:
-            logger.error(f"定時任務失敗：{result['message']}")
+            logger.error(f"自動轉換MES工單任務失敗：{result.get('message', '未知錯誤')}")
             return {
                 'success': False,
-                'error': result['message'],
-                'created_count': 0,
-                'skipped_count': 0
+                'error': result.get('message', '自動轉換MES工單任務失敗'),
+                'converted_count': 0,
+                'timestamp': timezone.now().isoformat()
             }
             
     except Exception as e:
-        logger.error(f"定時任務失敗：自動批次派工失敗: {str(e)}")
+        logger.error(f"自動轉換MES工單任務執行失敗: {str(e)}")
         return {
             'success': False,
-            'error': f'定時任務失敗：{str(e)}',
-            'created_count': 0,
-            'skipped_count': 0
+            'error': f'自動轉換MES工單任務執行失敗: {str(e)}',
+            'converted_count': 0,
+            'timestamp': timezone.now().isoformat()
         }

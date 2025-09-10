@@ -16,7 +16,7 @@ def create_missing_workorders_from_fillwork():
     from workorder.fill_work.models import FillWork
     from workorder.models import WorkOrder
     from erp_integration.models import CompanyConfig
-    from workorder.company_order.models import CompanyOrder
+    from workorder.manufacturing_order.models import ManufacturingOrder
     from django.db import transaction
     import logging
     
@@ -50,14 +50,14 @@ def create_missing_workorders_from_fillwork():
                     if company_config:
                         company_code = company_config.company_code
                     else:
-                        # 如果找不到公司配置，嘗試從公司製令單中查找
-                        company_order = CompanyOrder.objects.filter(
+                        # 如果找不到公司配置，嘗試從公司製造命令中查找
+                        manufacturing_order = ManufacturingOrder.objects.filter(
                             mkordno=fill_work.workorder,
                             product_id=fill_work.product_id
                         ).first()
                         
-                        if company_order:
-                            company_code = company_order.company_code
+                        if manufacturing_order:
+                            company_code = manufacturing_order.company_code
                 
                 except Exception as e:
                     logger.error(f"查找公司代號時發生錯誤: {e}")

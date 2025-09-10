@@ -1342,7 +1342,7 @@ def operator_report_export(request):
         if operator_name:
             query = query.filter(operator__name__icontains=operator_name)
         if process_name:
-            query = query.filter(process__name__icontains=process_name)
+            query = query.filter(process_name__icontains=process_name)
         if company_code:
             query = query.filter(workorder__company_code=company_code)
         

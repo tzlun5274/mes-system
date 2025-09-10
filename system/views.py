@@ -34,7 +34,7 @@ import os
 import subprocess
 from datetime import datetime, timedelta
 import smtplib
-from django_celery_beat.models import PeriodicTask, CrontabSchedule, IntervalSchedule
+from django_celery_beat.models import PeriodicTask, CrontabSchedule, IntervalSchedule  # 重新啟用
 from .tasks import auto_backup_database
 import csv
 import openpyxl
@@ -2380,7 +2380,7 @@ def manual_sync_reports(request):
 
 @login_required
 @user_passes_test(superuser_required, login_url="/accounts/login/")
-def order_sync_settings(request):
+def customer_order_sync_settings(request):
     """
     訂單同步設定頁面
     """
@@ -2412,7 +2412,7 @@ def order_sync_settings(request):
                 # 同步狀態只能由實際的同步任務執行來更新
                 
                 logger.info(f"訂單同步設定由 {request.user.username} 更新")
-                return redirect('system:order_sync_settings')
+                return redirect('system:customer_order_sync_settings')
         else:
             form = OrderSyncSettingsForm(instance=settings_obj)
         
@@ -2429,7 +2429,7 @@ def order_sync_settings(request):
             'task_status': task_status,
         }
         
-        return render(request, 'system/order_sync_settings.html', context)
+        return render(request, 'system/customer_order_sync_settings.html', context)
         
     except Exception as e:
         logger.error(f"訂單同步設定頁面載入失敗: {str(e)}")
@@ -2478,12 +2478,12 @@ def manual_order_sync(request):
             messages.success(request, f"同步任務已啟動，任務ID: {result.id}")
             logger.info(f"手動執行訂單同步任務，類型: {sync_type}，任務ID: {result.id}")
             
-        return redirect('system:order_sync_settings')
+        return redirect('system:customer_order_sync_settings')
         
     except Exception as e:
         logger.error(f"手動執行訂單同步失敗: {str(e)}")
         messages.error(request, f"執行失敗: {str(e)}")
-        return redirect('system:order_sync_settings')
+        return redirect('system:customer_order_sync_settings')
 
 
 def update_order_sync_tasks(settings_obj):
@@ -2760,8 +2760,12 @@ def workorder_settings(request):
     transfer_batch_size = get_config("transfer_batch_size", 50, int)
     transfer_retention_days = get_config("transfer_retention_days", 365, int)
     
-    # 自動完工定時任務
-    completion_tasks = ScheduledTask.objects.filter(task_type='completion_check').order_by('-created_at')
+    # 自動完工定時任務 - 使用 try-except 避免資料表不存在的錯誤
+    try:
+        completion_tasks = ScheduledTask.objects.filter(task_type='completion_check').order_by('-created_at')
+    except Exception as e:
+        # 如果資料表不存在，返回空查詢集
+        completion_tasks = ScheduledTask.objects.none()
     
     # 取得定時任務狀態
     try:
@@ -3735,7 +3739,7 @@ def user_work_permissions(request, user_id):
     
     # 取得或創建用戶工作權限
     work_permission, created = UserWorkPermission.objects.get_or_create(
-        user=user,
+        user=user.username,
         defaults={
             'can_operate_all_operators': True,
             'can_operate_all_processes': True,
@@ -3814,15 +3818,12 @@ def user_work_permissions_list(request):
     permission_filter = request.GET.get('permission', 'all')
     
     # 取得所有有工作權限設定的用戶
-    work_permissions = UserWorkPermission.objects.select_related('user').all()
+    work_permissions = UserWorkPermission.objects.all()
     
     # 搜尋功能
     if search_query:
         work_permissions = work_permissions.filter(
-            Q(user__username__icontains=search_query) |
-            Q(user__first_name__icontains=search_query) |
-            Q(user__last_name__icontains=search_query) |
-            Q(user__email__icontains=search_query)
+            Q(user__icontains=search_query)
         )
     
     # 權限篩選
@@ -3840,7 +3841,7 @@ def user_work_permissions_list(request):
         )
     
     # 排序
-    work_permissions = work_permissions.order_by('user__username')
+    work_permissions = work_permissions.order_by('user')
     
     # 分頁
     paginator = Paginator(work_permissions, 20)
@@ -3861,6 +3862,13 @@ def user_work_permissions_list(request):
         'onsite_reporting_users': work_permissions.filter(can_onsite_reporting=True).count(),
         'smt_reporting_users': work_permissions.filter(can_smt_reporting=True).count(),
     }
+    
+    # 為每個權限物件添加對應的 User 物件
+    for permission in page_obj:
+        try:
+            permission.user_obj = User.objects.get(username=permission.user)
+        except User.DoesNotExist:
+            permission.user_obj = None
     
     context = {
         'page_obj': page_obj,

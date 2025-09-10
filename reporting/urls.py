@@ -3,7 +3,7 @@
 """
 
 from django.urls import path
-from . import views
+from . import views, api
 
 app_name = 'reporting'
 
@@ -89,4 +89,9 @@ urlpatterns = [
     
     # CSV 國定假日匯入
     path('csv-holiday-import/', views.csv_holiday_import, name='csv_holiday_import'),
-] 
+    # reporting API 路由
+    path("api/workorder-report/", api.WorkOrderReportAPIView.as_view(), name="api_workorder_report_list"),
+    path("api/workorder-report/<int:report_id>/", api.WorkOrderReportAPIView.as_view(), name="api_workorder_report_detail"),
+    path("api/production-reports/", api.get_production_reports, name="api_production_reports"),
+    path("api/quality-reports/", api.get_quality_reports, name="api_quality_reports"),
+]

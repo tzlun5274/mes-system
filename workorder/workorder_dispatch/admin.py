@@ -43,17 +43,17 @@ class WorkOrderDispatchProcessAdmin(admin.ModelAdmin):
     派工單工序明細管理介面
     """
     list_display = [
-        'workorder_dispatch', 'process_name', 'step_order', 'planned_quantity',
+        'workorder_dispatch_id', 'process_name', 'step_order', 'planned_quantity',
         'assigned_operator', 'assigned_equipment', 'dispatch_status'
     ]
     list_filter = ['dispatch_status', 'created_at']
     search_fields = ['process_name', 'assigned_operator', 'assigned_equipment']
     readonly_fields = ['created_at', 'updated_at']
-    ordering = ['workorder_dispatch', 'step_order']
+    ordering = ['workorder_dispatch_id', 'step_order']
 
     fieldsets = (
         ('基本資訊', {
-            'fields': ('workorder_dispatch', 'process_name', 'step_order', 'planned_quantity')
+            'fields': ('workorder_dispatch_id', 'process_name', 'step_order', 'planned_quantity')
         }),
         ('派工分配', {
             'fields': ('assigned_operator', 'assigned_equipment', 'dispatch_status')

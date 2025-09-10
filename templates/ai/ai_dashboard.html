@@ -1,0 +1,89 @@
+{% extends "base_fastapi.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">{{ title }}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
+                                    <h5>預測分析</h5>
+                                    <p class="text-muted">AI 預測生產效率與品質趨勢</p>
+                                    <a href="/ai/prediction/" class="btn btn-primary">查看預測</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-warning">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                                    <h5>異常檢測</h5>
+                                    <p class="text-muted">AI 檢測設備與生產異常</p>
+                                    <a href="/ai/anomaly/" class="btn btn-warning">異常檢測</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-lightbulb fa-3x text-success mb-3"></i>
+                                    <h5>優化建議</h5>
+                                    <p class="text-muted">AI 提供生產優化建議</p>
+                                    <a href="/ai/optimization/" class="btn btn-success">查看建議</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>AI 模型狀態</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-4">
+                                            <h4 class="text-success">正常</h4>
+                                            <p class="text-muted">預測模型</p>
+                                        </div>
+                                        <div class="col-4">
+                                            <h4 class="text-success">正常</h4>
+                                            <p class="text-muted">異常檢測</p>
+                                        </div>
+                                        <div class="col-4">
+                                            <h4 class="text-success">正常</h4>
+                                            <p class="text-muted">優化模型</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>最近分析結果</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="text-center text-muted">
+                                        <i class="fas fa-brain fa-2x mb-2"></i>
+                                        <p>目前沒有分析結果</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

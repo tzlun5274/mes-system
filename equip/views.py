@@ -66,7 +66,7 @@ def index(request):
     EquipOperationLog.objects.create(
         user=request.user.username, action="查看設備管理首頁", timestamp=timezone.now()
     )
-    equipments = Equipment.objects.select_related("production_line").all()
+    equipments = Equipment.objects.all()
     return render(request, "equip/index.html", {"equipments": equipments})
 
 
@@ -274,7 +274,7 @@ def delete_equipment(request, equipment_id):
 @user_passes_test(equip_user_required, login_url="/accounts/login/")
 def get_equipments(request):
     """API：取得設備列表"""
-    equipments = Equipment.objects.select_related("production_line").all()
+    equipments = Equipment.objects.all()
     data = []
     for equipment in equipments:
         data.append(
@@ -283,11 +283,8 @@ def get_equipments(request):
                 "name": equipment.name,
                 "model": equipment.model,
                 "status": equipment.get_status_display(),
-                "production_line": (
-                    equipment.production_line.line_name
-                    if equipment.production_line
-                    else None
-                ),
+                "production_line_id": equipment.production_line_id,
+                "production_line_name": equipment.production_line_name,
             }
         )
     return JsonResponse({"equipments": data})

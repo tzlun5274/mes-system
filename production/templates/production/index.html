@@ -115,7 +115,7 @@
                                 <div>
                                     <strong>{{ line.line_name }}</strong>
                                     <br>
-                                    <small class="text-muted">{{ line.line_code }} - {{ line.line_type.type_name }}</small>
+                                    <small class="text-muted">{{ line.line_code }} - {{ line.line_type_name }}</small>
                                 </div>
                                 <a href="{% url 'production:line_detail' line.pk %}" class="btn btn-sm btn-outline-primary">
                                     查看

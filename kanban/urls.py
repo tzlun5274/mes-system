@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, api
 
 app_name = "kanban"
 module_display_name = "看板功能"
@@ -35,4 +35,9 @@ urlpatterns = [
         views.schedule_warning_board,
         name="schedule_warning_board",
     ),
+    
+    # kanban API 路由
+    path("api/board/", api.KanbanBoardAPIView.as_view(), name="api_kanban_board_list"),
+    path("api/board/<int:board_id>/", api.KanbanBoardAPIView.as_view(), name="api_kanban_board_detail"),
+    path("api/items/", api.get_kanban_items, name="api_kanban_items"),
 ]

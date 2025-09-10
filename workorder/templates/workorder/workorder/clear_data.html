@@ -78,20 +78,20 @@
                             </div>
                         </div>
                         
-                        <!-- 公司製令單清除選項 -->
+                        <!-- 公司製造命令清除選項 -->
                         <div class="card mb-3">
                             <div class="card-header bg-info text-white">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="clear_company_orders" name="clear_company_orders">
-                                    <label class="form-check-label" for="clear_company_orders">
-                                        <i class="fas fa-building"></i> 清除公司製令單
+                                    <input class="form-check-input" type="checkbox" id="clear_manufacturing_orders" name="clear_manufacturing_orders">
+                                    <label class="form-check-label" for="clear_manufacturing_orders">
+                                        <i class="fas fa-building"></i> 清除公司製造命令
                                     </label>
                                 </div>
                             </div>
                             <div class="card-body">
-                                <p class="mb-2">將清除所有公司製令單數據：</p>
+                                <p class="mb-2">將清除所有公司製造命令數據：</p>
                                 <ul class="mb-2">
-                                    <li>公司製令單：{{ company_orders_count }} 筆</li>
+                                    <li>公司製造命令：{{ manufacturing_orders_count }} 筆</li>
                                     <li>包含所有公司的製令單記錄</li>
                                     <li>包含已轉換和未轉換的製令單</li>
                                 </ul>
@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
         checkboxes.forEach(checkbox => {
             if (checkbox.id === 'clear_dispatch') selectedTypes.push('派工單');
             if (checkbox.id === 'clear_completed') selectedTypes.push('完工工單');
-            if (checkbox.id === 'clear_company_orders') selectedTypes.push('公司製令單');
+            if (checkbox.id === 'clear_manufacturing_orders') selectedTypes.push('公司製造命令');
         });
         
         const confirmMessage = `確定要清除以下數據嗎？\n\n${selectedTypes.join('\n')}\n\n此操作無法復原！`;

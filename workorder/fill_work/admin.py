@@ -24,7 +24,7 @@ class FillWorkAdmin(admin.ModelAdmin):
     
     list_filter = [
         'approval_status', 'work_date', 'created_at', 'company_name',
-        'process', 'is_completed'
+        'process_name', 'is_completed'
     ]
     
     search_fields = [
@@ -42,7 +42,7 @@ class FillWorkAdmin(admin.ModelAdmin):
             'fields': ('operator', 'company_name', 'workorder', 'product_id', 'planned_quantity')
         }),
         ('製程資訊', {
-            'fields': ('process', 'operation', 'equipment')
+            'fields': ('process_id', 'process_name', 'operation', 'equipment')
         }),
         ('時間資訊', {
             'fields': ('work_date', 'start_time', 'end_time')
@@ -78,7 +78,7 @@ class FillWorkAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         """自定義查詢集"""
-        return super().get_queryset(request).select_related('process')
+        return super().get_queryset(request)
     
     def approval_status_colored(self, obj):
         """核准狀態彩色顯示"""

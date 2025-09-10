@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, api
 
 app_name = "quality"
 module_display_name = "品質管理"
@@ -32,4 +32,9 @@ urlpatterns = [
     path(
         "api/aoi_test_reports/", views.get_aoi_test_reports, name="get_aoi_test_reports"
     ),
+    
+    # quality API 路由
+    path("api/inspection/", api.InspectionAPIView.as_view(), name="api_inspection_list"),
+    path("api/inspection/<int:inspection_id>/", api.InspectionAPIView.as_view(), name="api_inspection_detail"),
+    path("api/defects/", api.get_defects, name="api_defects"),
 ]

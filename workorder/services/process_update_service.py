@@ -71,7 +71,7 @@ class ProcessUpdateService:
             fill_work_reports = FillWork.objects.filter(
                 workorder=workorder.order_number,  # 工單號碼
                 product_id=workorder.product_code,  # 產品編號
-                process__name=process.process_name,  # 工序名稱
+                process_name=process.process_name,  # 工序名稱
                 approval_status='approved'
             )
             

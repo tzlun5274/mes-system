@@ -1,6 +1,5 @@
 from django.db import models
 from django.utils import timezone
-from process.models import Operator
 import logging
 
 
@@ -96,9 +95,11 @@ class Route(models.Model):
     name = models.CharField(
         max_length=200, verbose_name="路線名稱", null=True, blank=True
     )
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="產品")
+    product_id = models.CharField(max_length=50, verbose_name="產品ID")
+    product_name = models.CharField(max_length=200, verbose_name="產品名稱")
     step_order = models.IntegerField(verbose_name="步驟順序", null=True, blank=True)
-    process = models.ForeignKey(Process, on_delete=models.CASCADE, verbose_name="工序")
+    process_id = models.CharField(max_length=50, verbose_name="工序ID")
+    process_name = models.CharField(max_length=200, verbose_name="工序名稱")
     created_at = models.DateTimeField(
         auto_now_add=True, verbose_name="建立時間", null=True, blank=True
     )
@@ -106,11 +107,11 @@ class Route(models.Model):
     class Meta:
         verbose_name = "工藝路線"
         verbose_name_plural = "工藝路線管理"
-        ordering = ["product", "step_order"]
-        unique_together = ["product", "step_order"]
+        ordering = ["product_id", "step_order"]
+        unique_together = ["product_id", "step_order"]
 
     def __str__(self):
-        return f"{self.product.name} - {self.name}"
+        return f"{self.product_name} - {self.name}"
 
 
 class MaterialRequirement(models.Model):
@@ -118,10 +119,10 @@ class MaterialRequirement(models.Model):
     物料需求：記錄產品的材料需求（BOM 結構）
     """
 
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="產品")
-    material = models.ForeignKey(
-        Material, on_delete=models.CASCADE, verbose_name="材料"
-    )
+    product_id = models.CharField(max_length=50, verbose_name="產品ID")
+    product_name = models.CharField(max_length=200, verbose_name="產品名稱")
+    material_id = models.CharField(max_length=50, verbose_name="材料ID")
+    material_name = models.CharField(max_length=200, verbose_name="材料名稱")
     quantity_per_unit = models.DecimalField(
         max_digits=10, decimal_places=4, verbose_name="單位用量"
     )
@@ -130,11 +131,11 @@ class MaterialRequirement(models.Model):
     class Meta:
         verbose_name = "物料需求"
         verbose_name_plural = "物料需求管理"
-        unique_together = ["product", "material"]
-        ordering = ["product", "material"]
+        unique_together = ["product_id", "material_id"]
+        ordering = ["product_id", "material_id"]
 
     def __str__(self):
-        return f"{self.product.name} - {self.material.name}"
+        return f"{self.product_name} - {self.material_name}"
 
 
 class MaterialInventory(models.Model):
@@ -142,9 +143,8 @@ class MaterialInventory(models.Model):
     材料庫存：從 ERP 同步的即時庫存數量（唯讀）
     """
 
-    material = models.ForeignKey(
-        Material, on_delete=models.CASCADE, verbose_name="材料"
-    )
+    material_id = models.CharField(max_length=50, verbose_name="材料ID")
+    material_name = models.CharField(max_length=200, verbose_name="材料名稱")
     quantity = models.DecimalField(
         max_digits=10, decimal_places=2, default=0, verbose_name="庫存數量"
     )
@@ -165,10 +165,10 @@ class MaterialInventory(models.Model):
     class Meta:
         verbose_name = "材料庫存"
         verbose_name_plural = "材料庫存管理"
-        unique_together = ["material"]
+        unique_together = ["material_id"]
 
     def __str__(self):
-        return f"{self.material.name} - {self.quantity}"
+        return f"{self.material_name} - {self.quantity}"
 
 
 class MaterialShortageAlert(models.Model):
@@ -176,9 +176,8 @@ class MaterialShortageAlert(models.Model):
     缺料警告：當庫存不足以支援生產時發出警告
     """
 
-    material = models.ForeignKey(
-        Material, on_delete=models.CASCADE, verbose_name="材料"
-    )
+    material_id = models.CharField(max_length=50, verbose_name="材料ID")
+    material_name = models.CharField(max_length=200, verbose_name="材料名稱")
     work_order = models.CharField(
         max_length=50, verbose_name="影響工單", null=True, blank=True
     )
@@ -212,7 +211,7 @@ class MaterialShortageAlert(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.material.name} - 短缺 {self.shortage_quantity}"
+        return f"{self.material_name} - 短缺 {self.shortage_quantity}"
 
 
 class MaterialSupplyPlan(models.Model):
@@ -223,9 +222,8 @@ class MaterialSupplyPlan(models.Model):
     work_order = models.CharField(
         max_length=50, verbose_name="工單號", null=True, blank=True
     )
-    material = models.ForeignKey(
-        Material, on_delete=models.CASCADE, verbose_name="材料"
-    )
+    material_id = models.CharField(max_length=50, verbose_name="材料ID")
+    material_name = models.CharField(max_length=200, verbose_name="材料名稱")
     planned_quantity = models.DecimalField(
         max_digits=10, decimal_places=2, verbose_name="計劃用量"
     )
@@ -253,7 +251,7 @@ class MaterialSupplyPlan(models.Model):
         ordering = ["supply_time"]
 
     def __str__(self):
-        return f"{self.work_order} - {self.material.name} - {self.planned_quantity}"
+        return f"{self.work_order} - {self.material_name} - {self.planned_quantity}"
 
 
 class MaterialKanban(models.Model):
@@ -261,9 +259,8 @@ class MaterialKanban(models.Model):
     物料看板：用於 JIT 供料的看板管理
     """
 
-    material = models.ForeignKey(
-        Material, on_delete=models.CASCADE, verbose_name="材料"
-    )
+    material_id = models.CharField(max_length=50, verbose_name="材料ID")
+    material_name = models.CharField(max_length=200, verbose_name="材料名稱")
     kanban_type = models.CharField(
         max_length=20,
         choices=[
@@ -303,7 +300,7 @@ class MaterialKanban(models.Model):
         ordering = ["kanban_number"]
 
     def __str__(self):
-        return f"{self.kanban_number} - {self.material.name}"
+        return f"{self.kanban_number} - {self.material_name}"
 
 
 class MaterialInventoryManagement(models.Model):
@@ -311,9 +308,8 @@ class MaterialInventoryManagement(models.Model):
     庫存管理：管理材料的庫存進出、盤點、安全庫存等
     """
 
-    material = models.ForeignKey(
-        Material, on_delete=models.CASCADE, verbose_name="材料"
-    )
+    material_id = models.CharField(max_length=50, verbose_name="材料ID")
+    material_name = models.CharField(max_length=200, verbose_name="材料名稱")
     warehouse = models.CharField(
         max_length=100, verbose_name="倉庫位置", null=True, blank=True
     )
@@ -353,11 +349,11 @@ class MaterialInventoryManagement(models.Model):
     class Meta:
         verbose_name = "庫存管理"
         verbose_name_plural = "庫存管理"
-        unique_together = ["material", "warehouse"]
-        ordering = ["material__name"]
+        unique_together = ["material_id", "warehouse"]
+        ordering = ["material_name"]
 
     def __str__(self):
-        return f"{self.material.name} - {self.warehouse} - {self.current_stock}"
+        return f"{self.material_name} - {self.warehouse} - {self.current_stock}"
 
     def calculate_stock_status(self):
         """計算庫存狀態"""
@@ -376,9 +372,8 @@ class MaterialRequirementEstimation(models.Model):
     物料需求估算：根據生產計劃和歷史數據估算物料需求
     """
 
-    material = models.ForeignKey(
-        Material, on_delete=models.CASCADE, verbose_name="材料"
-    )
+    material_id = models.CharField(max_length=50, verbose_name="材料ID")
+    material_name = models.CharField(max_length=200, verbose_name="材料名稱")
     estimation_date = models.DateField(verbose_name="估算日期")
     period_start = models.DateField(verbose_name="期間開始")
     period_end = models.DateField(verbose_name="期間結束")
@@ -445,11 +440,11 @@ class MaterialRequirementEstimation(models.Model):
     class Meta:
         verbose_name = "物料需求估算"
         verbose_name_plural = "物料需求估算"
-        ordering = ["-estimation_date", "material__name"]
-        unique_together = ["material", "estimation_date", "period_start", "period_end"]
+        ordering = ["-estimation_date", "material_name"]
+        unique_together = ["material_id", "estimation_date", "period_start", "period_end"]
 
     def __str__(self):
-        return f"{self.material.name} - {self.period_start} 至 {self.period_end}"
+        return f"{self.material_name} - {self.period_start} 至 {self.period_end}"
 
     def calculate_forecast_accuracy(self):
         """計算預測準確率"""
@@ -468,9 +463,8 @@ class MaterialTransaction(models.Model):
     物料交易記錄：記錄所有庫存進出交易
     """
 
-    material = models.ForeignKey(
-        Material, on_delete=models.CASCADE, verbose_name="材料"
-    )
+    material_id = models.CharField(max_length=50, verbose_name="材料ID")
+    material_name = models.CharField(max_length=200, verbose_name="材料名稱")
     transaction_type = models.CharField(
         max_length=20,
         choices=[
@@ -532,7 +526,7 @@ class MaterialTransaction(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.material.name} - {self.transaction_type} - {self.quantity}"
+        return f"{self.material_name} - {self.transaction_type} - {self.quantity}"
 
     def save(self, *args, **kwargs):
         """自動計算總成本"""
@@ -547,7 +541,11 @@ class MaterialOperationLog(models.Model):
     物料管理操作日誌：記錄用戶在物料管理模組的所有操作（如查詢、匯入、匯出、異常等）
     """
 
-    user = models.CharField(max_length=50, verbose_name="操作用戶")
+    user = models.CharField(
+        max_length=50, 
+        verbose_name="操作用戶",
+        help_text="操作用戶名稱（非外鍵關係，純文字欄位）"
+    )
     action = models.CharField(max_length=200, verbose_name="操作內容")
     timestamp = models.DateTimeField(default=timezone.now, verbose_name="操作時間")
     notes = models.TextField(blank=True, null=True, verbose_name="備註")

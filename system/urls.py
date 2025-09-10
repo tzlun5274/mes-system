@@ -1,6 +1,6 @@
 from django.urls import path
 from django.shortcuts import redirect
-from . import views
+from . import views, api
 
 app_name = "system"
 module_display_name = "系統管理"
@@ -68,8 +68,8 @@ urlpatterns = [
     path("auto_approval_tasks/", views.auto_approval_tasks, name="auto_approval_tasks"),
     path("auto_approval_task/<int:task_id>/", views.auto_approval_task_detail, name="auto_approval_task_detail"),
     
-    # 訂單同步設定
-    path("order_sync_settings/", views.order_sync_settings, name="order_sync_settings"),
+    # 客戶訂單同步設定
+    path("customer_order_sync_settings/", views.customer_order_sync_settings, name="customer_order_sync_settings"),
     path("manual_order_sync/", views.manual_order_sync, name="manual_order_sync"),
     
     # 工單設定
@@ -94,4 +94,12 @@ urlpatterns = [
     
     # API 端點
     path("api/processes/", views.get_processes_api, name="get_processes_api"),
+    
+    # 系統管理 API 路由
+    path("api/scheduled-task/", api.ScheduledTaskAPIView.as_view(), name="api_scheduled_task_list"),
+    path("api/scheduled-task/<int:task_id>/", api.ScheduledTaskAPIView.as_view(), name="api_scheduled_task_detail"),
+    path("api/user-permissions/", api.get_user_permissions, name="api_user_permissions"),
+    path("api/auto-approval-tasks/", api.get_auto_approval_tasks, name="api_auto_approval_tasks"),
+    path("api/email-config/", api.get_email_config, name="api_email_config"),
+    path("api/operation-logs/", api.get_operation_logs, name="api_operation_logs"),
 ]

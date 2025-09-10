@@ -313,14 +313,15 @@ class WorkOrderRollbackService:
             for completed_process in completed_processes:
                 # 檢查是否已存在相同的工序明細
                 existing_process = WorkOrderDispatchProcess.objects.filter(
-                    workorder_dispatch=dispatch,
+                    workorder_dispatch_id=str(dispatch.id),
                     process_name=completed_process.process_name
                 ).first()
                 
                 if not existing_process:
                     # 建立新的工序明細
                     WorkOrderDispatchProcess.objects.create(
-                        workorder_dispatch=dispatch,
+                        workorder_dispatch_id=str(dispatch.id),
+                        workorder_dispatch_name=dispatch.order_number,
                         process_name=completed_process.process_name,
                         planned_quantity=completed_process.planned_quantity,
                         completed_quantity=completed_process.completed_quantity,

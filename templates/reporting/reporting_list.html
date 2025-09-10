@@ -1,0 +1,83 @@
+{% extends "base_fastapi.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">{{ title }}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
+                                    <h5>生產報表</h5>
+                                    <p class="text-muted">查看生產效率、產量統計等報表</p>
+                                    <a href="/reporting/production/" class="btn btn-primary">查看報表</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                                    <h5>品質報表</h5>
+                                    <p class="text-muted">查看品質檢驗、不良品統計等報表</p>
+                                    <a href="/reporting/quality/" class="btn btn-success">查看報表</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-info">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-tachometer-alt fa-3x text-info mb-3"></i>
+                                    <h5>效率報表</h5>
+                                    <p class="text-muted">查看設備效率、人員效率等報表</p>
+                                    <a href="/reporting/efficiency/" class="btn btn-info">查看報表</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-4">
+                            <div class="card border-warning">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-dollar-sign fa-3x text-warning mb-3"></i>
+                                    <h5>成本報表</h5>
+                                    <p class="text-muted">查看生產成本、物料成本等報表</p>
+                                    <a href="/reporting/cost/" class="btn btn-warning">查看報表</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-secondary">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-cogs fa-3x text-secondary mb-3"></i>
+                                    <h5>設備報表</h5>
+                                    <p class="text-muted">查看設備運行狀況、維護記錄等報表</p>
+                                    <a href="/reporting/equipment/" class="btn btn-secondary">查看報表</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-dark">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-boxes fa-3x text-dark mb-3"></i>
+                                    <h5>庫存報表</h5>
+                                    <p class="text-muted">查看庫存狀況、進出庫記錄等報表</p>
+                                    <a href="/reporting/inventory/" class="btn btn-dark">查看報表</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

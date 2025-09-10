@@ -93,9 +93,9 @@ def audit_multi_company_architecture():
         other_company_fillwork = FillWork.objects.exclude(company_name=company.company_name)
         
         # 檢查是否有相同工單號碼但不同公司的記錄
-        company_orders = set(company_fillwork.values_list('workorder', flat=True))
+        manufacturing_orders = set(company_fillwork.values_list('workorder', flat=True))
         other_orders = set(other_company_fillwork.values_list('workorder', flat=True))
-        common_orders = company_orders.intersection(other_orders)
+        common_orders = manufacturing_orders.intersection(other_orders)
         
         if common_orders:
             print(f"   ⚠ 公司 {company.company_name} 發現跨公司資料污染:")

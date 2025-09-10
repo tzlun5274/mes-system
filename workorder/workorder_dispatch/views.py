@@ -124,22 +124,22 @@ class DispatchListView(LoginRequiredMixin, ListView):
             
             # 然後處理 ERP 製令單資訊
             try:
-                from workorder.company_order.models import CompanyOrder
+                from workorder.manufacturing_order.models import ManufacturingOrder
                 # 使用公司代號和工單號碼來精確匹配
-                company_order = CompanyOrder.objects.filter(
+                manufacturing_order = ManufacturingOrder.objects.filter(
                     mkordno=dispatch.order_number,
                     company_code=dispatch.company_code
                 ).first()
                 
-                if company_order:
+                if manufacturing_order:
                     # 格式化日期：從 YYYYMMDD 轉換為 YYYY-MM-DD
                     def format_date(date_str):
                         if date_str and len(date_str) == 8:
                             return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
                         return date_str
                     
-                    dispatch.erp_start_date = format_date(company_order.est_take_mat_date)
-                    dispatch.erp_end_date = format_date(company_order.est_stock_out_date)
+                    dispatch.erp_start_date = format_date(manufacturing_order.est_take_mat_date)
+                    dispatch.erp_end_date = format_date(manufacturing_order.est_stock_out_date)
                 else:
                     dispatch.erp_start_date = None
                     dispatch.erp_end_date = None
@@ -176,7 +176,8 @@ class DispatchCreateView(LoginRequiredMixin, CreateView):
             
             # 記錄歷史
             DispatchHistory.objects.create(
-                workorder_dispatch=form.instance,
+                workorder_dispatch_id=str(form.instance.id),
+                workorder_dispatch_name=form.instance.order_number,
                 action='建立',
                 new_status='in_production',
                 operator=self.request.user.username,
@@ -216,7 +217,8 @@ class DispatchUpdateView(LoginRequiredMixin, UpdateView):
             # 記錄狀態變更歷史
             if old_status != new_status:
                 DispatchHistory.objects.create(
-                    workorder_dispatch=form.instance,
+                    workorder_dispatch_id=str(form.instance.id),
+                    workorder_dispatch_name=form.instance.order_number,
                     action='狀態變更',
                     old_status=old_status,
                     new_status=new_status,
@@ -296,22 +298,22 @@ class DispatchDetailView(LoginRequiredMixin, DetailView):
         
         # 取得 ERP 製令單資訊（預定開工日和預定出貨日）
         try:
-            from workorder.company_order.models import CompanyOrder
+            from workorder.manufacturing_order.models import ManufacturingOrder
             # 使用公司代號和工單號碼來精確匹配
-            company_order = CompanyOrder.objects.filter(
+            manufacturing_order = ManufacturingOrder.objects.filter(
                 mkordno=dispatch.order_number,
                 company_code=dispatch.company_code
             ).first()
             
-            if company_order:
+            if manufacturing_order:
                 # 格式化日期：從 YYYYMMDD 轉換為 YYYY-MM-DD
                 def format_date(date_str):
                     if date_str and len(date_str) == 8:
                         return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
                     return date_str
                 
-                context['erp_start_date'] = format_date(company_order.est_take_mat_date)
-                context['erp_end_date'] = format_date(company_order.est_stock_out_date)
+                context['erp_start_date'] = format_date(manufacturing_order.est_take_mat_date)
+                context['erp_end_date'] = format_date(manufacturing_order.est_stock_out_date)
             else:
                 context['erp_start_date'] = None
                 context['erp_end_date'] = None
@@ -324,10 +326,12 @@ class DispatchDetailView(LoginRequiredMixin, DetailView):
             context['erp_end_date'] = None
         
         # 取得工序明細
-        context['processes'] = dispatch.dispatch_processes.all()
+        from .models import WorkOrderDispatchProcess
+        context['processes'] = WorkOrderDispatchProcess.objects.filter(workorder_dispatch_id=str(dispatch.id))
         
         # 取得歷史記錄
-        context['history'] = dispatch.dispatch_history.all()[:10]
+        from .models import DispatchHistory
+        context['history'] = DispatchHistory.objects.filter(workorder_dispatch_id=str(dispatch.id))[:10]
         
         return context
 
@@ -348,7 +352,8 @@ class DispatchDeleteView(LoginRequiredMixin, DeleteView):
             
             # 記錄刪除歷史
             DispatchHistory.objects.create(
-                workorder_dispatch=dispatch,
+                workorder_dispatch_id=str(dispatch.id),
+                workorder_dispatch_name=dispatch.order_number,
                 action='刪除',
                 old_status=dispatch.status,
                 operator=request.user.username,
@@ -453,7 +458,8 @@ def bulk_dispatch_view(request):
                         
                         # 記錄歷史
                         DispatchHistory.objects.create(
-                            workorder_dispatch=dispatch,
+                            workorder_dispatch_id=str(dispatch.id),
+                            workorder_dispatch_name=dispatch.order_number,
                             action='批量建立',
                             new_status='in_production',
                             operator=request.user.username,
@@ -568,7 +574,8 @@ def update_dispatch_status(request, pk):
         
         # 記錄歷史
         DispatchHistory.objects.create(
-            workorder_dispatch=dispatch,
+            workorder_dispatch_id=str(dispatch.id),
+            workorder_dispatch_name=dispatch.order_number,
             action='狀態變更',
             old_status=old_status,
             new_status=new_status,

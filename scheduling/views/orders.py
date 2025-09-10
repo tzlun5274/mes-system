@@ -1,14 +1,14 @@
-# 這個檔案負責訂單管理頁面的後端邏輯
+# 這個檔案負責客戶訂單管理頁面的後端邏輯
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from ..order_management import order_query_manager, order_analytics
+from ..customer_order_management import order_query_manager, order_analytics
 from ..models import OrderMain
 
 
-def order_list(request):
+def customer_order_list(request):
     """
-    顯示訂單管理頁面，支援公司、客戶、訂單類型、交期查詢與Excel匯出，並可依預交貨日排序
+    顯示客戶訂單管理頁面，支援公司、客戶、訂單類型、交期查詢與Excel匯出，並可依預交貨日排序
     """
     # 取得查詢條件
     filters = {
@@ -70,7 +70,7 @@ def order_list(request):
     
     return render(
         request,
-        "scheduling/order_list.html",
+        "scheduling/customer_order_list.html",
         {
             "orders": orders_page,
             "stats": stats,
@@ -94,9 +94,9 @@ def order_list(request):
     )
 
 
-def order_detail(request, order_id):
+def customer_order_detail(request, order_id):
     """
-    顯示訂單詳情頁面
+    顯示客戶訂單詳情頁面
     """
     order = get_object_or_404(OrderMain, id=order_id)
     
@@ -129,12 +129,12 @@ def order_detail(request, order_id):
     except:
         pass
     
-    return render(request, 'scheduling/order_detail.html', context)
+    return render(request, 'scheduling/customer_order_detail.html', context)
 
 
 def order_detail_api(request, order_id):
     """
-    訂單詳情 API，用於 AJAX 請求
+    客戶訂單詳情 API，用於 AJAX 請求
     """
     try:
         order = get_object_or_404(OrderMain, id=order_id)

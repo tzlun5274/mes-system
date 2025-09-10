@@ -16,7 +16,7 @@ from django.utils import timezone  # 用於處理時間
 from django.db import transaction  # 用於資料庫事務管理
 from celery import shared_task  # 用於異步任務
 from .models import ERPConfig, CompanyConfig, ERPIntegrationOperationLog  # 導入模型
-from django_celery_beat.models import CrontabSchedule, PeriodicTask  # 導入定時任務模型
+from django_celery_beat.models import CrontabSchedule, PeriodicTask  # 重新啟用
 from django.http import JsonResponse
 
 # 設定ERP整合模組的日誌記錄器
@@ -289,7 +289,7 @@ def index(request):
     )
 
 
-from django_celery_beat.models import CrontabSchedule, PeriodicTask  # 導入定時任務模型
+from django_celery_beat.models import CrontabSchedule, PeriodicTask  # 重新啟用
 
 
 # 定義 ERP 連線設定視圖，用於配置 MSSQL 連線參數

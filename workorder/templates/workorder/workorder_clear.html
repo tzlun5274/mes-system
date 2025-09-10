@@ -59,8 +59,8 @@
                         </div>
                         <div class="col-md-1">
                             <div class="text-center">
-                                <div class="h4 text-success">{{ company_order_count }}</div>
-                                <div class="text-xs text-gray-600">公司製令單</div>
+                                <div class="h4 text-success">{{ manufacturing_order_count }}</div>
+                                <div class="text-xs text-gray-600">公司製造命令</div>
                             </div>
                         </div>
                         <div class="col-md-1">
@@ -192,7 +192,7 @@
                 <ul>
                     <li>{{ workorder_count }} 筆工單</li>
                     <li>{{ fillwork_count }} 筆填報紀錄</li>
-                    <li>{{ company_order_count }} 筆公司製令單</li>
+                    <li>{{ manufacturing_order_count }} 筆公司製造命令</li>
                     <li>{{ mkord_main_count }} 筆製令主檔</li>
                     <li>{{ mkord_mats_count }} 筆製令用料</li>
                     <li>{{ completed_workorder_count }} 筆已完工工單</li>
@@ -288,8 +288,8 @@ function showResult(data) {
             </div>
             <div class="col-md-1">
                 <div class="text-center">
-                    <div class="h5 text-success">${data.deleted_counts.company_order}</div>
-                    <div class="text-xs text-gray-600">公司製令單</div>
+                    <div class="h5 text-success">${data.deleted_counts.manufacturing_order}</div>
+                    <div class="text-xs text-gray-600">公司製造命令</div>
                 </div>
             </div>
             <div class="col-md-1">

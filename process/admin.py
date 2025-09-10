@@ -86,11 +86,12 @@ class ProductProcessStandardCapacityAdmin(admin.ModelAdmin):
 
 @admin.register(CapacityHistory)
 class CapacityHistoryAdmin(admin.ModelAdmin):
-    list_display = ("capacity", "change_type", "changed_by", "changed_at")
+    list_display = ("capacity_name", "capacity_id", "change_type", "changed_by", "changed_at")
     list_filter = ("change_type", "changed_at")
-    search_fields = ("capacity__product_code", "capacity__process_name", "changed_by")
+    search_fields = ("capacity_name", "capacity_id", "changed_by")
     readonly_fields = (
-        "capacity",
+        "capacity_id",
+        "capacity_name",
         "change_type",
         "old_values",
         "new_values",

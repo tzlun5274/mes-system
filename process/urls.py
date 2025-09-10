@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, api
 
 app_name = "process"
 module_display_name = "工序管理"
@@ -114,4 +114,14 @@ urlpatterns = [
         name="standard_capacity_import",
     ),
     path("capacity_calculator/", views.capacity_calculator, name="capacity_calculator"),
+    
+    # process API 路由
+    path("api/process-name/", api.ProcessNameAPIView.as_view(), name="api_process_name_list"),
+    path("api/process-name/<int:process_id>/", api.ProcessNameAPIView.as_view(), name="api_process_name_detail"),
+    path("api/operator-skills/", api.get_operator_skills, name="api_operator_skills"),
+    path("api/product-route/", api.get_product_process_route, name="api_product_process_route"),
+    path("api/operation-logs/", api.get_process_operation_logs, name="api_process_operation_logs"),
+    path("api/process-by-name/", api.get_process_by_name, name="api_process_by_name"),
+    path("api/active-processes/", api.get_active_processes, name="api_active_processes"),
+    path("api/skilled-operators/", api.get_skilled_operators, name="api_skilled_operators"),
 ]

@@ -18,7 +18,7 @@ from .models import (
 )
 
 # 導入子模組的模型
-from .company_order.models import CompanyOrder
+from .manufacturing_order.models import ManufacturingOrder
 from .models import SystemConfig
 # from .tasks import get_standard_processes
 from .forms import WorkOrderForm
@@ -145,9 +145,9 @@ def create(request):
 
 @require_GET
 @login_required
-def get_company_order_info(request):
+def get_manufacturing_order_info(request):
     """
-    AJAX 視圖：根據產品編號取得公司製令單資訊
+    AJAX 視圖：根據產品編號取得公司製造命令資訊
     回傳工單號與數量
     """
     product_id = request.GET.get("product_id")
@@ -157,21 +157,21 @@ def get_company_order_info(request):
         return JsonResponse({"status": "error", "message": "請提供產品編號"})
 
     try:
-        # 查詢公司製令單
-        query = CompanyOrder.objects.filter(product_id=product_id, is_converted=False)
+        # 查詢公司製造命令
+        query = ManufacturingOrder.objects.filter(product_id=product_id, is_converted=False)
         if company_code:
             query = query.filter(company_code=company_code)
 
-        company_order = query.first()
+        manufacturing_order = query.first()
 
-        if company_order:
+        if manufacturing_order:
             return JsonResponse(
                 {
                     "status": "success",
                     "data": {
-                        "mkordno": company_order.mkordno,
-                        "prodt_qty": company_order.prodt_qty,
-                        "company_code": company_order.company_code,
+                        "mkordno": manufacturing_order.mkordno,
+                        "prodt_qty": manufacturing_order.prodt_qty,
+                        "company_code": manufacturing_order.company_code,
                     },
                 }
             )
@@ -423,41 +423,41 @@ def dispatch_list(request):
         },
     )
 
-# 公司製令單列表（依公司分群）
-# 公司製令單管理功能已移至 CompanyOrderListView 類別視圖
+# 公司製造命令列表（依公司分群）
+# 公司製造命令管理功能已移至 ManufacturingOrderListView 類別視圖
 # 此函數已廢棄，保留註解以說明功能遷移
 
-# 手動同步製令單
+# 手動同步製造命令
 def manual_sync_orders(request):
     """
-    手動同步各公司製令單到 CompanyOrder 表
+    手動同步各公司製造命令到 ManufacturingOrder 表
     """
     if not (request.user.is_staff or request.user.is_superuser):
         workorder_logger.warning(
-            f"非管理員 {request.user} 嘗試手動同步製令單，已拒絕。IP: {request.META.get('REMOTE_ADDR')}"
+            f"非管理員 {request.user} 嘗試手動同步製造命令，已拒絕。IP: {request.META.get('REMOTE_ADDR')}"
         )
         messages.error(request, "只有管理員可以執行此操作")
-        return redirect("workorder:company_orders")
+        return redirect("workorder:manufacturing_orders")
 
     if request.method != "POST":
-        return redirect("workorder:company_orders")
+        return redirect("workorder:manufacturing_orders")
 
     try:
         # 執行同步命令
-        call_command("sync_pending_workorders")
+        call_command("sync_manufacturing_orders")
         workorder_logger.info(
-            f"管理員 {request.user} 手動同步公司製令單成功。IP: {request.META.get('REMOTE_ADDR')}"
+            f"管理員 {request.user} 手動同步公司製造命令成功。IP: {request.META.get('REMOTE_ADDR')}"
         )
-        messages.success(request, "手動同步製令單完成！")
+        messages.success(request, "手動同步製造命令完成！")
     except Exception as e:
         workorder_logger.error(
-            f"管理員 {request.user} 手動同步公司製令單失敗：{e}。IP: {request.META.get('REMOTE_ADDR')}"
+            f"管理員 {request.user} 手動同步公司製造命令失敗：{e}。IP: {request.META.get('REMOTE_ADDR')}"
         )
         messages.error(request, f"同步失敗：{e}")
 
-    return redirect("workorder:company_orders")
+    return redirect("workorder:manufacturing_orders")
 
-# 手動轉換工單
+# 手動轉換MES工單
 def manual_convert_orders(request):
     """
     手動轉換製令單為 MES 工單
@@ -477,43 +477,43 @@ def manual_convert_orders(request):
         if is_ajax:
             return JsonResponse({"status": "danger", "message": msg})
         messages.error(request, msg)
-        return redirect("workorder:company_orders")
+        return redirect("workorder:manufacturing_orders")
 
     try:
         # 取得未轉換的製令單
-        pending_orders = CompanyOrder.objects.filter(is_converted=False)
+        pending_orders = ManufacturingOrder.objects.filter(is_converted=False)
         if not pending_orders.exists():
             msg = "沒有需要轉換的製令單！"
             if is_ajax:
                 return JsonResponse({"status": "warning", "message": msg})
             messages.warning(request, msg)
-            return redirect("workorder:company_orders")
+            return redirect("workorder:manufacturing_orders")
 
         count_converted = 0
         count_processes_created = 0
         count_auto_assigned = 0
 
-        for company_order in pending_orders:
+        for manufacturing_order in pending_orders:
             # 檢查工單是否已存在（使用公司代號和製令單號的組合）
             existing_workorder = WorkOrder.objects.filter(
-                company_code=company_order.company_code,
-                order_number=company_order.mkordno
+                company_code=manufacturing_order.company_code,
+                order_number=manufacturing_order.mkordno
             ).first()
             
             if existing_workorder:
                 # 如果工單已存在，跳過並標記為已轉換
-                company_order.is_converted = True
-                company_order.save()
-                print(f"⚠️ 工單已存在，跳過轉換：{company_order.mkordno}")
+                manufacturing_order.is_converted = True
+                manufacturing_order.save()
+                print(f"⚠️ 工單已存在，跳過轉換：{manufacturing_order.mkordno}")
                 continue
             
             # 建立工單（使用製令單號作為工單號碼）
             workorder = WorkOrder.objects.create(
-                order_number=company_order.mkordno,  # 直接使用製令單號
-                product_code=company_order.product_id,  # 使用 product_id
-                quantity=company_order.prodt_qty,  # 使用 prodt_qty
+                order_number=manufacturing_order.mkordno,  # 直接使用製令單號
+                product_code=manufacturing_order.product_id,  # 使用 product_id
+                quantity=manufacturing_order.prodt_qty,  # 使用 prodt_qty
                 status="pending",
-                company_code=company_order.company_code,
+                company_code=manufacturing_order.company_code,
             )
             count_converted += 1
 
@@ -640,7 +640,7 @@ def manual_convert_orders(request):
                             # 記錄分配日誌
                             try:
                                 WorkOrderProcessLog.objects.create(
-                                    workorder_process_id=process.id,
+                                    workorder_process=process,
                                     action='auto_assignment',
                                     operator=assigned_operator.name if assigned_operator else None,
                                     equipment=assigned_equipment.name if assigned_equipment else None,
@@ -676,9 +676,9 @@ def manual_convert_orders(request):
                 # 如果建立工序明細失敗，記錄錯誤但不影響工單轉換
                 print(f"建立工序明細失敗 (工單: {workorder.order_number}): {e}")
 
-        # 更新 CompanyOrder 的轉換狀態
+        # 更新 ManufacturingOrder 的轉換狀態
         if count_converted > 0:
-            CompanyOrder.objects.filter(is_converted=False).update(is_converted=True)
+            ManufacturingOrder.objects.filter(is_converted=False).update(is_converted=True)
             
             # 更新成功訊息，包含自動分配資訊
             auto_assignment_msg = f"，並自動分配 {count_auto_assigned} 個工序的作業員和設備" if count_auto_assigned > 0 else ""
@@ -691,15 +691,15 @@ def manual_convert_orders(request):
             messages.info(request, "沒有需要轉換的製令單")
 
         workorder_logger.info(
-            f"管理員 {request.user} 手動轉換工單成功，轉換 {count_converted} 筆，建立工序 {count_processes_created} 筆，自動分配 {count_auto_assigned} 筆。IP: {request.META.get('REMOTE_ADDR')}"
+            f"管理員 {request.user} 手動轉換MES工單成功，轉換 {count_converted} 筆，建立工序 {count_processes_created} 筆，自動分配 {count_auto_assigned} 筆。IP: {request.META.get('REMOTE_ADDR')}"
         )
     except Exception as e:
         workorder_logger.error(
-            f"管理員 {request.user} 手動轉換工單失敗：{e}。IP: {request.META.get('REMOTE_ADDR')}"
+            f"管理員 {request.user} 手動轉換MES工單失敗：{e}。IP: {request.META.get('REMOTE_ADDR')}"
         )
         messages.error(request, f"轉換失敗：{e}")
 
-    return redirect("workorder:company_orders")
+    return redirect("workorder:manufacturing_orders")
 
 # 派工單工序明細管理
 def workorder_process_detail(request, workorder_id):
@@ -1014,7 +1014,7 @@ def create_workorder_processes(request, workorder_id):
                     # 記錄分配日誌
                     try:
                         WorkOrderProcessLog.objects.create(
-                            workorder_process_id=process.id,
+                            workorder_process=process,
                             action='auto_assignment',
                             operator=assigned_operator.name if assigned_operator else None,
                             equipment=assigned_equipment.name if assigned_equipment else None,
@@ -1100,7 +1100,7 @@ def get_processes_only(request):
 
 def clear_data(request):
     """
-    清除數據頁面：清除派工單、公司製令單等數據
+    清除數據頁面：清除派工單、公司製造命令等數據
     只有管理員可以執行此操作，需要確認頁面
     """
     if not (request.user.is_staff or request.user.is_superuser):
@@ -1111,17 +1111,17 @@ def clear_data(request):
         try:
             # 取得要清除的數據統計
             workorder_count = WorkOrder.objects.count()
-            company_order_count = CompanyOrder.objects.count()
+            manufacturing_order_count = ManufacturingOrder.objects.count()
             dispatch_log_count = DispatchLog.objects.count()
 
             # 清除所有數據
             WorkOrder.objects.all().delete()
-            CompanyOrder.objects.all().delete()
+            ManufacturingOrder.objects.all().delete()
             DispatchLog.objects.all().delete()
 
             messages.success(
                 request,
-                f"成功清除所有數據！共清除：工單 {workorder_count} 筆、公司製令單 {company_order_count} 筆、"
+                f"成功清除所有數據！共清除：工單 {workorder_count} 筆、公司製造命令 {manufacturing_order_count} 筆、"
                 f"派工記錄 {dispatch_log_count} 筆",
             )
             return redirect("workorder:index")
@@ -1132,14 +1132,14 @@ def clear_data(request):
 
     # GET 請求顯示確認頁面
     workorder_count = WorkOrder.objects.count()
-    company_order_count = CompanyOrder.objects.count()
+    manufacturing_order_count = ManufacturingOrder.objects.count()
     dispatch_log_count = DispatchLog.objects.count()
     
     context = {
         "workorder_count": workorder_count,
-        "company_order_count": company_order_count,
+        "manufacturing_order_count": manufacturing_order_count,
         "dispatch_log_count": dispatch_log_count,
-        "total_count": workorder_count + company_order_count + dispatch_log_count,
+        "total_count": workorder_count + manufacturing_order_count + dispatch_log_count,
     }
 
     return render(request, "workorder/clear_data_confirm.html", context)
@@ -1256,19 +1256,19 @@ def stop_production(request, pk):
 
 def selective_revert_orders(request):
     """
-    選擇性將已轉換的公司製令單退回（is_converted 設回 False）
+    選擇性將已轉換的公司製造命令退回（is_converted 設回 False）
     只有管理員可操作。
     """
     if not (request.user.is_staff or request.user.is_superuser):
         messages.error(request, "只有管理員可以執行此操作")
-        return redirect("workorder:company_orders")
+        return redirect("workorder:manufacturing_orders")
 
-    from .models import CompanyOrder
+    from .models import ManufacturingOrder
 
     if request.method == "POST":
         ids = request.POST.getlist("order_ids")
         if ids:
-            updated = CompanyOrder.objects.filter(id__in=ids, is_converted=True).update(
+            updated = ManufacturingOrder.objects.filter(id__in=ids, is_converted=True).update(
                 is_converted=False
             )
             workorder_logger.info(
@@ -1277,10 +1277,10 @@ def selective_revert_orders(request):
             messages.success(request, f"已成功退回 {updated} 筆製令單！")
         else:
             messages.warning(request, "請至少選擇一筆要退回的製令單！")
-        return redirect("workorder:company_orders")
+        return redirect("workorder:manufacturing_orders")
 
     # GET 顯示所有已轉換的製令單
-    orders = CompanyOrder.objects.filter(is_converted=True).order_by("-sync_time")
+    orders = ManufacturingOrder.objects.filter(is_converted=True).order_by("-sync_time")
     return render(request, "workorder/selective_revert_orders.html", {"orders": orders})
 
 def user_supplement_form(request, workorder_id):
@@ -2628,7 +2628,7 @@ def update_process_capacity(request, process_id):
         try:
             from .models import WorkOrderProcessLog
             WorkOrderProcessLog.objects.create(
-                workorder_process_id=process.id,
+                workorder_process=process,
                 action='capacity_update',
                 description=f'更新產能設定：倍數={capacity_multiplier}x，目標產能={target_hourly_output}pcs/hr',
                 created_by=request.user.username if request.user.is_authenticated else 'system'
@@ -2778,7 +2778,7 @@ def update_process_status(request, process_id):
         try:
             from workorder.models import WorkOrderProcessLog
             WorkOrderProcessLog.objects.create(
-                workorder_process_id=process.id,
+                workorder_process=process,
                 action='manual_assignment',
                 operator=operator_name,
                 equipment=equipment_name,
@@ -5168,7 +5168,18 @@ def active_workorders(request):
     # 先獲取已核准填報記錄的公司和工單號碼對應關係
     approved_fill_works = FillWork.objects.filter(
         approval_status='approved'
-    ).select_related('process')
+    ).values(
+        'id', 'operator', 'company_code', 'company_name', 'workorder', 
+        'product_id', 'planned_quantity', 'process_id', 'operation', 
+        'equipment', 'work_date', 'start_time', 'end_time', 'has_break',
+        'break_start_time', 'break_end_time', 'break_hours', 
+        'work_hours_calculated', 'overtime_hours_calculated', 
+        'work_quantity', 'defect_quantity', 'is_completed', 
+        'approval_status', 'approved_by', 'approved_at', 
+        'approval_remarks', 'rejection_reason', 'rejected_by', 
+        'rejected_at', 'remarks', 'abnormal_notes', 'created_by', 
+        'created_at', 'updated_at'
+    )
     
     # 建立公司代號到公司名稱的對應
     company_name_to_code = {config.company_name: config.company_code for config in CompanyConfig.objects.all()}
@@ -5275,7 +5286,7 @@ def active_workorders(request):
     # 1. 填報記錄的出貨包裝數量
     packaging_fillwork_reports = FillWork.objects.filter(
         approval_status='approved',
-        process__name__exact='出貨包裝'  # 修正：使用 exact 而不是 icontains
+        process_name__exact='出貨包裝'  # 修正：使用 process_name 欄位
     )
     fillwork_good_quantity = packaging_fillwork_reports.aggregate(
         total=Sum('work_quantity')

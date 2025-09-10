@@ -9,12 +9,8 @@ class ProcessEquipment(models.Model):
     工序設備對應表：記錄每個工序可用的設備。
     """
 
-    process_name = models.ForeignKey(
-        "ProcessName",
-        on_delete=models.CASCADE,
-        related_name="equipments",
-        verbose_name="工序名稱",
-    )
+    process_name_id = models.CharField(max_length=50, verbose_name="工序名稱ID")
+    process_name = models.CharField(max_length=100, verbose_name="工序名稱")
     equipment_id = models.IntegerField(verbose_name="設備 ID")
 
     class Meta:
@@ -24,7 +20,7 @@ class ProcessEquipment(models.Model):
         default_permissions = ()
 
     def __str__(self):
-        return f"{self.process_name.name} - 設備 ID: {self.equipment_id}"
+        return f"{self.process_name} - 設備 ID: {self.equipment_id}"
 
 
 # 更新 ProcessName 模型，移除舊字段
@@ -59,14 +55,8 @@ class Operator(models.Model):
     """
 
     name = models.CharField(max_length=100, unique=True, verbose_name="作業員名稱")
-    production_line = models.ForeignKey(
-        "production.ProductionLine",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        verbose_name="所屬產線",
-        help_text="此作業員所屬的生產線",
-    )
+    production_line_id = models.CharField(max_length=50, null=True, blank=True, verbose_name="所屬產線ID")
+    production_line_name = models.CharField(max_length=100, null=True, blank=True, verbose_name="所屬產線名稱")
     created_at = models.DateTimeField(
         "建立時間", auto_now_add=True, null=True, blank=True
     )
@@ -92,12 +82,10 @@ class OperatorSkill(models.Model):
     作業員技能表：記錄每位作業員擅長的工序與優先順序。
     """
 
-    operator = models.ForeignKey(
-        Operator, on_delete=models.CASCADE, related_name="skills", verbose_name="作業員"
-    )
-    process_name = models.ForeignKey(
-        ProcessName, on_delete=models.CASCADE, verbose_name="工序名稱"
-    )
+    operator_id = models.CharField(max_length=50, verbose_name="作業員ID")
+    operator_name = models.CharField(max_length=100, verbose_name="作業員名稱")
+    process_name_id = models.CharField(max_length=50, verbose_name="工序名稱ID")
+    process_name = models.CharField(max_length=100, verbose_name="工序名稱")
     priority = models.IntegerField(
         verbose_name="優先順序", validators=[MinValueValidator(1)]
     )
@@ -108,7 +96,7 @@ class OperatorSkill(models.Model):
         default_permissions = ()
 
     def __str__(self):
-        return f"{self.operator.name} - {self.process_name.name} (優先順序: {self.priority})"
+        return f"{self.operator_name} - {self.process_name} (優先順序: {self.priority})"
 
 
 class ProductProcessRoute(models.Model):
@@ -117,9 +105,8 @@ class ProductProcessRoute(models.Model):
     """
 
     product_id = models.CharField(max_length=100, verbose_name="產品編號")
-    process_name = models.ForeignKey(
-        "ProcessName", on_delete=models.CASCADE, verbose_name="工序名稱"
-    )
+    process_name_id = models.CharField(max_length=50, verbose_name="工序名稱ID")
+    process_name = models.CharField(max_length=100, null=True, blank=True, verbose_name="工序名稱")
     step_order = models.IntegerField(
         verbose_name="工序順序", validators=[MinValueValidator(1)]
     )
@@ -145,7 +132,7 @@ class ProductProcessRoute(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.product_id} - {self.process_name.name} (步驟 {self.step_order})"
+        return f"{self.product_id} - {self.process_name} (步驟 {self.step_order})"
 
 
 class ProcessOperationLog(models.Model):
@@ -153,7 +140,11 @@ class ProcessOperationLog(models.Model):
     工序操作日誌：記錄用戶操作歷史。
     """
 
-    user = models.CharField(max_length=100, verbose_name="用戶")
+    user = models.CharField(
+        max_length=100, 
+        verbose_name="用戶",
+        help_text="用戶名稱（非外鍵關係，純文字欄位）"
+    )
     action = models.TextField(verbose_name="操作")
     timestamp = models.DateTimeField(default=timezone.now, verbose_name="時間戳")
 
@@ -375,9 +366,8 @@ class CapacityHistory(models.Model):
     產能歷史記錄表：追蹤產能標準的變更歷史。
     """
 
-    capacity = models.ForeignKey(
-        ProductProcessStandardCapacity, on_delete=models.CASCADE, related_name="history"
-    )
+    capacity_id = models.CharField(max_length=50, verbose_name="產能ID")
+    capacity_name = models.CharField(max_length=100, null=True, blank=True, verbose_name="產能名稱")
     change_type = models.CharField(
         "變更類型",
         max_length=20,

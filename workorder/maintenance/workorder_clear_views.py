@@ -9,7 +9,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.db import transaction
 from workorder.models import WorkOrder
-from workorder.company_order.models import CompanyOrder
+from workorder.manufacturing_order.models import ManufacturingOrder
 from workorder.models import SystemConfig
 from workorder.fill_work.models import FillWork
 from workorder.workorder_dispatch.models import WorkOrderDispatch, WorkOrderDispatchProcess
@@ -38,7 +38,7 @@ class WorkOrderClearView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
         context.update({
             'workorder_count': WorkOrder.objects.count(),
             'fillwork_count': FillWork.objects.count(),
-            'company_order_count': CompanyOrder.objects.count(),
+            'manufacturing_order_count': ManufacturingOrder.objects.count(),
 
             'completed_workorder_count': CompletedWorkOrder.objects.count(),
             'completed_process_count': CompletedWorkOrderProcess.objects.count(),
@@ -48,7 +48,7 @@ class WorkOrderClearView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
             'total_count': (
                 WorkOrder.objects.count() + 
                 FillWork.objects.count() + 
-                CompanyOrder.objects.count() +
+                ManufacturingOrder.objects.count() +
                 CompletedWorkOrder.objects.count() +
                 CompletedWorkOrderProcess.objects.count() +
                 CompletedProductionReport.objects.count() +
@@ -107,7 +107,7 @@ class WorkOrderClearAjaxView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
             with transaction.atomic():
                 # 統計刪除數量
                 fillwork_count = FillWork.objects.count()
-                company_order_count = CompanyOrder.objects.count()
+                manufacturing_order_count = ManufacturingOrder.objects.count()
                 workorder_count = WorkOrder.objects.count()
                 
                 # 新增：統計已完工工單相關資料
@@ -147,14 +147,14 @@ class WorkOrderClearAjaxView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
                 WorkOrder.objects.all().delete()
                 
                 # 5. 刪除ERP相關資料
-                CompanyOrder.objects.all().delete()
+                ManufacturingOrder.objects.all().delete()
             
             return {
                 'success': True,
                 'message': '所有工單資料已成功清除',
                 'deleted_counts': {
                     'fillwork': fillwork_count,
-                    'company_order': company_order_count,
+                    'manufacturing_order': manufacturing_order_count,
                     'workorder': workorder_count,
                     'completed_workorder': completed_workorder_count,
                     'completed_process': completed_process_count,
@@ -164,7 +164,7 @@ class WorkOrderClearAjaxView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
                     'workorder_process': workorder_process_count,
                     'workorder_process_log': workorder_process_log_count,
                     'workorder_process_capacity': workorder_process_capacity_count,
-                    'total': fillwork_count + company_order_count + workorder_count + completed_workorder_count + completed_process_count + completed_report_count + dispatch_count + dispatch_process_count + workorder_process_count + workorder_process_log_count + workorder_process_capacity_count
+                    'total': fillwork_count + manufacturing_order_count + workorder_count + completed_workorder_count + completed_process_count + completed_report_count + dispatch_count + dispatch_process_count + workorder_process_count + workorder_process_log_count + workorder_process_capacity_count
                 },
                 'backup_path': backup_path,
                 'clear_time': timezone.now().isoformat()
@@ -195,10 +195,10 @@ class WorkOrderClearAjaxView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
             with open(f'{backup_dir}/fillworks.json', 'w', encoding='utf-8') as f:
                 serializers.serialize('json', fillworks, stream=f)
             
-            # 備份公司製令單
-            company_orders = CompanyOrder.objects.all()
-            with open(f'{backup_dir}/company_orders.json', 'w', encoding='utf-8') as f:
-                serializers.serialize('json', company_orders, stream=f)
+            # 備份公司製造命令
+            manufacturing_orders = ManufacturingOrder.objects.all()
+            with open(f'{backup_dir}/manufacturing_orders.json', 'w', encoding='utf-8') as f:
+                serializers.serialize('json', manufacturing_orders, stream=f)
             
 
             

@@ -43,14 +43,15 @@ def superuser_required(user):
 @user_passes_test(process_user_required, login_url="/accounts/login/")
 def process_names(request):
     log_user_operation(request.user.username, "process", "查看工序工藝名稱設定")
-    process_names = ProcessName.objects.all().prefetch_related("equipments")
+    process_names = ProcessName.objects.all()
     equipments = get_equipment_options(request)
     equip_id_to_name = {
         str(e["id"]): e["name"] for e in equipments if "id" in e and "name" in e
     }
     enhanced_process_names = []
     for process in process_names:
-        equip_ids = [str(e.equipment_id) for e in process.equipments.all()]
+        # 通過 ProcessEquipment 模型獲取設備ID
+        equip_ids = [str(pe.equipment_id) for pe in ProcessEquipment.objects.filter(process_name_id=process.name)]
         equip_names = [
             equip_id_to_name.get(eid, f"未知設備({eid})") for eid in equip_ids
         ]
@@ -122,7 +123,7 @@ def edit_process_name(request, name_id):
     equipments = get_equipment_options(request)
     # 預處理設備 ID 列表
     normal_equip_ids = list(
-        process_name.equipments.values_list("equipment_id", flat=True)
+        ProcessEquipment.objects.filter(process_name_id=process_name.name).values_list("equipment_id", flat=True)
     )
     if request.method == "POST":
         new_name = request.POST.get("name")
@@ -144,7 +145,7 @@ def edit_process_name(request, name_id):
         process_name.name = new_name
         process_name.description = description
         process_name.save()
-        process_name.equipments.all().delete()
+        ProcessEquipment.objects.filter(process_name_id=process_name.name).delete()
         equip_ids = request.POST.getlist("usable_equipment_ids[]")
         for equip_id in equip_ids:
             if equip_id.strip().isdigit():
@@ -196,10 +197,11 @@ def export_process_names(request):
     headers = ["工序名稱", "描述", "能使用的設備"]
     for col_num, header in enumerate(headers, 1):
         worksheet[f"{get_column_letter(col_num)}1"] = header
-    process_names = ProcessName.objects.all().prefetch_related("equipments")
+    process_names = ProcessName.objects.all()
     row_num = 2
     for process in process_names:
-        equip_ids = [str(e.equipment_id) for e in process.equipments.all()]
+        # 通過 ProcessEquipment 模型獲取設備ID
+        equip_ids = [str(pe.equipment_id) for pe in ProcessEquipment.objects.filter(process_name_id=process.name)]
         equip_names = [
             equip_id_to_name.get(eid, f"未知設備({eid})") for eid in equip_ids
         ]
@@ -244,7 +246,7 @@ def import_process_names(request):
                     process_name, created = ProcessName.objects.get_or_create(name=name)
                     process_name.description = description
                     process_name.save()
-                    process_name.equipments.all().delete()
+                    ProcessEquipment.objects.filter(process_name_id=process_name.name).delete()
                     for equip_name in equip_names:
                         equip_id = equip_name_to_id.get(equip_name.strip())
                         if equip_id and equip_id.isdigit():

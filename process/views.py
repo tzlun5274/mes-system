@@ -82,7 +82,7 @@ def api_process_names(request):
     processes = []
     for process in ProcessName.objects.all():
         # 獲取設備 ID
-        equipment_ids = list(process.equipments.values_list("equipment_id", flat=True))
+        equipment_ids = list(ProcessEquipment.objects.filter(process_name_id=process.name).values_list("equipment_id", flat=True))
 
         processes.append(
             {
@@ -359,7 +359,8 @@ def standard_capacity_create(request):
             )
             # 記錄歷史
             CapacityHistory.objects.create(
-                capacity=obj,
+                capacity_id=str(obj.id),
+                capacity_name=f"{obj.product_code} - {obj.process_name}",
                 change_type="created",
                 changed_by=request.user.username,
                 change_reason="新增標準產能設定",
@@ -418,7 +419,8 @@ def standard_capacity_update(request, pk):
                 "optimal_batch_size": obj.optimal_batch_size,
             }
             CapacityHistory.objects.create(
-                capacity=obj,
+                capacity_id=str(obj.id),
+                capacity_name=f"{obj.product_code} - {obj.process_name}",
                 change_type="updated",
                 old_values=old_values,
                 new_values=new_values,
@@ -466,7 +468,8 @@ def standard_capacity_delete(request, pk):
             obj = ProductProcessStandardCapacity.objects.get(pk=pk)
             # 記錄歷史
             CapacityHistory.objects.create(
-                capacity=obj,
+                capacity_id=str(obj.id),
+                capacity_name=f"{obj.product_code} - {obj.process_name}",
                 change_type="deactivated",
                 changed_by=request.user.username,
                 change_reason="刪除標準產能設定",
@@ -519,7 +522,8 @@ def standard_capacity_delete_all(request):
             # 記錄歷史（批次記錄）
             for obj in capacities:
                 CapacityHistory.objects.create(
-                    capacity=obj,
+                    capacity_id=str(obj.id),
+                    capacity_name=f"{obj.product_code} - {obj.process_name}",
                     change_type="deactivated",
                     changed_by=request.user.username,
                     change_reason="批次刪除標準產能設定",

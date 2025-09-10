@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.utils.translation import gettext_lazy as gettext_lazy
 from django.contrib import messages
-from ..order_management import order_schedule_manager
+from ..customer_order_management import order_schedule_manager
 import logging
 
 logger = logging.getLogger("scheduling.views")
@@ -44,7 +44,7 @@ def update_order_schedule(request):
         )
 
         if result["status"] == "success":
-            messages.success(request, gettext_lazy("訂單更新排程設定成功！"))
+            messages.success(request, gettext_lazy("客戶訂單更新排程設定成功！"))
             return JsonResponse(result)
         else:
             messages.error(request, gettext_lazy("更新訂單排程失敗，請聯繫管理員"))

@@ -1,0 +1,114 @@
+# 現場報工功能移除報告
+
+## 📋 移除原因
+根據用戶要求，現場報工功能與填報管理功能重複，且沒有入口卡片，因此決定移除現場報工功能以保持系統簡潔。
+
+## 🗑️ 已移除的檔案和功能
+
+### 1. 模型檔案
+- **移除模型**：`OnSiteReport`、`SMTOnSiteReport`
+- **位置**：`workorder/models.py`
+- **影響**：現場報工記錄不再儲存
+
+### 2. 視圖檔案
+- **移除檔案**：`workorder/views/onsite_reporting_views.py`
+- **移除視圖**：
+  - `onsite_reporting_home` - 現場報工首頁
+  - `operator_onsite_reporting` - 作業員現場報工
+  - `smt_onsite_reporting` - SMT現場報工
+  - `onsite_reporting_list` - 現場報工記錄列表
+  - `onsite_reporting_detail` - 現場報工記錄詳情
+  - `update_onsite_report_status` - 更新現場報工狀態
+  - `onsite_reporting_statistics` - 現場報工統計
+
+### 3. 表單檔案
+- **移除表單**：
+  - `OnSiteReportForm` - 作業員現場報工表單
+  - `SMTOnSiteReportForm` - SMT現場報工表單
+  - `OperatorOnSiteReportForm` - 作業員現場報工表單（重複）
+- **位置**：`workorder/forms.py`
+
+### 4. URL路由
+- **移除路由**：
+  - `onsite-reporting/` - 現場報工首頁
+  - `onsite-reporting/operator/` - 作業員現場報工
+  - `onsite-reporting/smt/` - SMT現場報工
+  - `onsite-reporting/list/` - 現場報工記錄列表
+  - `onsite-reporting/detail/<int:report_id>/<str:report_type>/` - 現場報工記錄詳情
+  - `onsite-reporting/update-status/<int:report_id>/<str:report_type>/` - 更新現場報工狀態
+  - `onsite-reporting/statistics/` - 現場報工統計
+- **位置**：`workorder/urls.py`
+
+### 5. 模板檔案
+- **移除目錄**：`workorder/templates/workorder/onsite_reporting/`
+- **移除檔案**：
+  - `home.html` - 現場報工首頁模板
+  - `operator_onsite_reporting.html` - 作業員現場報工模板
+  - `smt_onsite_reporting.html` - SMT現場報工模板
+  - `onsite_reporting_list.html` - 現場報工記錄列表模板
+  - `onsite_reporting_detail.html` - 現場報工記錄詳情模板
+  - `onsite_reporting_statistics.html` - 現場報工統計模板
+
+### 6. 工單管理首頁
+- **移除卡片**：現場報工管理卡片
+- **位置**：`workorder/templates/workorder/workorder/workorder_list.html`
+
+### 7. 資料庫遷移
+- **移除遷移檔案**：`0011_onsitereport_smtonsitereport.py`
+- **新增遷移檔案**：`0013_remove_onsite_reporting_models.py`
+- **資料表移除**：
+  - `workorder_onsite_report` - 現場報工記錄表
+  - `workorder_smt_onsite_report` - SMT現場報工記錄表
+
+## ✅ 保留的功能
+
+### 填報管理功能
+- **位置**：`workorder/fill_work/`
+- **功能**：補登填報記錄、核准流程、RD樣品自動建立
+- **入口**：工單管理首頁的「填報作業管理」卡片
+
+### 其他工單管理功能
+- 派工單管理
+- 公司製令單
+- MES工單管理
+- 生產執行監控
+- 已完工工單
+- 相符性檢查
+- 清除所有工單
+- 創建缺失工單
+- Excel匯入工單
+
+## 🔧 技術細節
+
+### 遷移處理
+1. 修正了遷移檔案的依賴關係
+2. 建立了新的遷移檔案來移除資料表
+3. 成功執行了資料庫遷移
+
+### 程式碼清理
+1. 移除了所有現場報工相關的導入語句
+2. 清理了重複的表單定義
+3. 確保了系統檢查通過
+
+### 測試結果
+- ✅ Django系統檢查通過
+- ✅ 工單管理首頁正常載入
+- ✅ 無錯誤或警告訊息
+
+## 📊 影響評估
+
+### 正面影響
+1. **系統簡化**：移除了重複功能，減少維護成本
+2. **用戶體驗**：避免功能混淆，介面更清晰
+3. **程式碼品質**：減少了重複程式碼
+
+### 無影響
+1. **填報管理**：功能完全保留，不受影響
+2. **RD樣品自動建立**：功能完全保留，不受影響
+3. **其他工單功能**：所有功能正常運作
+
+## 🎯 結論
+
+現場報工功能已成功移除，系統現在更加簡潔和專注。填報管理功能完全保留，可以滿足所有報工需求。RD樣品工單自動建立功能也完全保留，確保了核心業務流程的完整性。
+
+系統現在只保留必要的功能，避免了功能重複，提高了維護效率和用戶體驗。 

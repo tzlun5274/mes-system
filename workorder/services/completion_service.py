@@ -209,7 +209,7 @@ class FillWorkCompletionService:
             # 基本查詢條件（不限制產品編號，只找最後一筆出貨包裝報工）
             fillwork_reports = FillWork.objects.filter(
                 workorder=workorder.order_number,
-                process__name__exact=cls.PACKAGING_PROCESS_NAME,
+                process_name__exact=cls.PACKAGING_PROCESS_NAME,
                 approval_status='approved'
             )
             
@@ -271,7 +271,7 @@ class FillWorkCompletionService:
             fillwork_reports = FillWork.objects.filter(
                 workorder=workorder.order_number,
                 product_id=workorder.product_code,
-                process__name__exact=cls.PACKAGING_PROCESS_NAME,
+                process_name__exact=cls.PACKAGING_PROCESS_NAME,
                 approval_status='approved'
             )
             
@@ -863,7 +863,7 @@ class FillWorkCompletionService:
             fillwork_reports = FillWork.objects.filter(
                 workorder=workorder.order_number,
                 product_id=workorder.product_code,
-                process__name__exact="出貨包裝",  # 修正：使用 exact 而不是 icontains
+                process_name__exact="出貨包裝",  # 修正：使用 exact 而不是 icontains
                 approval_status='approved'
             )
             

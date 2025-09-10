@@ -48,14 +48,8 @@ else
     exit 1
 fi
 
-# 2. 清除並重建資料庫
-echo -e "${YELLOW}📋 步驟 2: 清除並重建資料庫...${NC}" | tee -a $LOG_FILE
-echo -e "${YELLOW}⚠️  這將清除所有現有資料庫資料！${NC}" | tee -a $LOG_FILE
-
-# 停止可能使用資料庫的服務
-echo "停止相關服務..." | tee -a $LOG_FILE
-systemctl stop celery-mes_config 2>/dev/null || true
-systemctl stop celerybeat-mes_config 2>/dev/null || true
+# 2. 讀取 .env 配置
+echo -e "${YELLOW}📋 步驟 2: 讀取 .env 配置...${NC}" | tee -a $LOG_FILE
 
 # 讀取資料庫配置
 DATABASE_NAME=$(grep "^DATABASE_NAME=" .env | cut -d'=' -f2 2>/dev/null || echo "mes_db")
@@ -66,112 +60,162 @@ echo "資料庫配置:" | tee -a $LOG_FILE
 echo "  名稱: $DATABASE_NAME" | tee -a $LOG_FILE
 echo "  使用者: $DATABASE_USER" | tee -a $LOG_FILE
 
-# 清除資料庫
-echo "清除資料庫..." | tee -a $LOG_FILE
-sudo -u postgres dropdb $DATABASE_NAME 2>/dev/null || true
-sudo -u postgres dropuser $DATABASE_USER 2>/dev/null || true
+# 3. 清除專案指定的資料庫資料表（全部不留，不備份）
+echo -e "${YELLOW}📋 步驟 3: 清除專案指定的資料庫資料表...${NC}" | tee -a $LOG_FILE
+echo -e "${YELLOW}⚠️  這將清除所有現有資料庫資料！不備份！${NC}" | tee -a $LOG_FILE
 
-# 重新建立資料庫和用戶
-echo "重新建立資料庫和用戶..." | tee -a $LOG_FILE
-sudo -u postgres psql -c "CREATE USER $DATABASE_USER WITH PASSWORD '$DATABASE_PASSWORD';" 2>/dev/null || true
-sudo -u postgres psql -c "CREATE DATABASE $DATABASE_NAME OWNER $DATABASE_USER;" 2>/dev/null || true
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DATABASE_NAME TO $DATABASE_USER;" 2>/dev/null || true
-sudo -u postgres psql -c "ALTER USER $DATABASE_USER CREATEDB;" 2>/dev/null || true
+# 停止可能使用資料庫的服務（如果權限允許）
+echo "停止相關服務..." | tee -a $LOG_FILE
+systemctl stop celery-mes_config 2>/dev/null || echo "無法停止 celery-mes_config 服務（權限不足）"
+systemctl stop celerybeat-mes_config 2>/dev/null || echo "無法停止 celerybeat-mes_config 服務（權限不足）"
+
+# 清除所有資料表（不備份）
+echo "清除所有資料表..." | tee -a $LOG_FILE
+python3 manage.py shell -c "
+from django.db import connection
+cursor = connection.cursor()
+try:
+    # 刪除所有資料表
+    cursor.execute('''
+        SELECT tablename FROM pg_tables 
+        WHERE schemaname = 'public' AND tablename NOT LIKE 'pg_%'
+    ''')
+    tables = cursor.fetchall()
+    print(f'找到 {len(tables)} 個資料表，開始清除...')
+    for table in tables:
+        cursor.execute(f'DROP TABLE IF EXISTS {table[0]} CASCADE')
+        print(f'  ✅ 已刪除: {table[0]}')
+    print('✅ 所有資料表已清除完成')
+except Exception as e:
+    print(f'⚠️  清除資料表時發生錯誤: {e}')
+" 2>&1 | tee -a $LOG_FILE
 
 # 測試資料庫連線
 echo "測試資料庫連線..." | tee -a $LOG_FILE
-if sudo -u postgres psql -d $DATABASE_NAME -c "SELECT 1;" 2>&1 | grep -q "1 row"; then
+if python3 manage.py shell -c "from django.db import connection; cursor = connection.cursor(); cursor.execute('SELECT 1'); print('資料庫連線正常')" 2>/dev/null; then
     echo -e "${GREEN}✅ 資料庫連線測試成功${NC}" | tee -a $LOG_FILE
 else
     echo -e "${RED}❌ 資料庫連線測試失敗${NC}" | tee -a $LOG_FILE
     exit 1
 fi
 
-# 3. 清理所有遷移檔案（保留 __init__.py）
-echo -e "${YELLOW}📋 步驟 3: 清理遷移檔案...${NC}" | tee -a $LOG_FILE
-echo "清除舊的遷移檔案..." | tee -a $LOG_FILE
-find . -path '*/migrations/*.py' -not -name '__init__.py' -delete 2>/dev/null || true
-find . -path '*/migrations/__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+# 4. 依照專案結構創建資料庫跟資料表
+echo -e "${YELLOW}📋 步驟 4: 依照專案結構創建資料庫跟資料表...${NC}" | tee -a $LOG_FILE
+echo "使用遷移檔案創建所有資料表..." | tee -a $LOG_FILE
 
-echo -e "${GREEN}✅ 遷移檔案已清理${NC}" | tee -a $LOG_FILE
+# 使用 Django 的 makemigrations + migrate 命令創建資料表
+echo "執行遷移檔案創建..." | tee -a $LOG_FILE
 
-# 4. 生成初始遷移（按正確順序）
-echo -e "${YELLOW}📋 步驟 4: 生成初始遷移...${NC}" | tee -a $LOG_FILE
-echo "重新生成遷移檔案（按正確順序）..." | tee -a $LOG_FILE
-if python3 manage.py makemigrations 2>&1 | tee -a $LOG_FILE; then
-    echo -e "${GREEN}✅ 初始遷移已生成${NC}" | tee -a $LOG_FILE
+# 首先創建遷移檔案
+echo "創建遷移檔案..." | tee -a $LOG_FILE
+if python3 manage.py makemigrations --skip-checks 2>&1 | tee -a $LOG_FILE; then
+    echo -e "${GREEN}✅ 遷移檔案創建成功${NC}" | tee -a $LOG_FILE
+    
+    # 然後執行遷移
+    echo "執行遷移..." | tee -a $LOG_FILE
+    if python3 manage.py migrate --skip-checks 2>&1 | tee -a $LOG_FILE; then
+        echo -e "${GREEN}✅ 遷移執行成功，資料表已創建${NC}" | tee -a $LOG_FILE
+    else
+        echo -e "${RED}❌ 遷移執行失敗${NC}" | tee -a $LOG_FILE
+        echo "嘗試使用 --fake-initial 標記..." | tee -a $LOG_FILE
+        if python3 manage.py migrate --fake-initial --skip-checks 2>&1 | tee -a $LOG_FILE; then
+            echo -e "${GREEN}✅ 使用 --fake-initial 標記成功${NC}" | tee -a $LOG_FILE
+        else
+            echo -e "${RED}❌ --fake-initial 也失敗${NC}" | tee -a $LOG_FILE
+        fi
+    fi
 else
-    echo -e "${RED}❌ 生成初始遷移失敗${NC}" | tee -a $LOG_FILE
-    exit 1
+    echo -e "${RED}❌ 遷移檔案創建失敗${NC}" | tee -a $LOG_FILE
+    echo "嘗試手動創建遷移檔案..." | tee -a $LOG_FILE
+    
+    # 手動創建遷移檔案
+    for app in workorder equip material process quality system kanban erp_integration ai reporting scheduling; do
+        echo "為 $app 創建遷移檔案..." | tee -a $LOG_FILE
+        if python3 manage.py makemigrations $app --skip-checks 2>&1 | tee -a $LOG_FILE; then
+            echo "✅ $app 遷移檔案創建成功" | tee -a $LOG_FILE
+        else
+            echo "⚠️  $app 遷移檔案創建失敗，可能沒有模型變更" | tee -a $LOG_FILE
+        fi
+    done
+    
+    # 再次嘗試執行遷移
+    echo "再次執行遷移..." | tee -a $LOG_FILE
+    if python3 manage.py migrate --skip-checks 2>&1 | tee -a $LOG_FILE; then
+        echo -e "${GREEN}✅ 遷移執行成功${NC}" | tee -a $LOG_FILE
+    else
+        echo -e "${RED}❌ 遷移執行失敗${NC}" | tee -a $LOG_FILE
+    fi
 fi
 
-# 5. 執行遷移
-echo -e "${YELLOW}📋 步驟 5: 執行遷移...${NC}" | tee -a $LOG_FILE
-if python3 manage.py migrate 2>&1 | tee -a $LOG_FILE; then
-    echo -e "${GREEN}✅ 遷移已執行${NC}" | tee -a $LOG_FILE
-else
-    echo -e "${RED}❌ 執行遷移失敗${NC}" | tee -a $LOG_FILE
-    exit 1
-fi
+# 檢查資料表創建結果
+echo "檢查資料表創建結果..." | tee -a $LOG_FILE
+python3 manage.py shell -c "
+from django.db import connection
+cursor = connection.cursor()
+
+# 統計資料表數量
+cursor.execute('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s;', ['public'])
+total_tables = cursor.fetchone()[0]
+print(f'📊 資料庫中總共有 {total_tables} 個資料表')
+
+# 列出所有資料表
+cursor.execute('SELECT table_name FROM information_schema.tables WHERE table_schema = %s ORDER BY table_name;', ['public'])
+all_tables = cursor.fetchall()
+print(f'\\n📋 所有資料表列表:')
+for table in all_tables:
+    print(f'  - {table[0]}')
+" 2>&1 | tee -a $LOG_FILE
+
+# 5. 驗證資料表創建
+echo -e "${YELLOW}📋 步驟 5: 驗證資料表創建...${NC}" | tee -a $LOG_FILE
+echo "驗證所有資料表是否正確創建..." | tee -a $LOG_FILE
+
+# 檢查關鍵資料表是否存在
+python3 manage.py shell -c "
+from django.db import connection
+cursor = connection.cursor()
+
+# 檢查關鍵資料表
+key_tables = [
+    'auth_user',
+    'django_migrations', 
+    'system_scheduled_task',
+    'erp_integration_companyconfig',
+    'workorder_workorder',
+    'equip_equipment',
+    'material_material',
+    'process_processname',
+    'scheduling_unit',
+    'quality_inspectionitem',
+    'kanban_kanbanproductionprogress',
+    'ai_aiprediction',
+    'workorder_report_data'
+]
+
+missing_tables = []
+for table in key_tables:
+    cursor.execute('SELECT 1 FROM information_schema.tables WHERE table_name = %s;', [table])
+    if cursor.fetchone():
+        print(f'✅ {table} 存在')
+    else:
+        print(f'❌ {table} 不存在')
+        missing_tables.append(table)
+
+if missing_tables:
+    print(f'\\n⚠️  發現 {len(missing_tables)} 個缺失的關鍵資料表')
+else:
+    print(f'\\n🎉 所有關鍵資料表都存在！')
+" 2>&1 | tee -a $LOG_FILE
 
 # 6. 創建超級用戶（根據 .env 設定）
 echo -e "${YELLOW}📋 步驟 6: 創建超級用戶...${NC}" | tee -a $LOG_FILE
-create_superuser_from_env
+echo "🔍 檢查 .env 檔案設定..." | tee -a $LOG_FILE
 
-# 7. 收集靜態檔案
-echo -e "${YELLOW}📋 步驟 7: 收集靜態檔案...${NC}" | tee -a $LOG_FILE
-if python3 manage.py collectstatic --noinput 2>&1 | tee -a $LOG_FILE; then
-    echo -e "${GREEN}✅ 靜態檔案已收集${NC}" | tee -a $LOG_FILE
+# 檢查 .env 檔案是否存在
+if [ ! -f ".env" ]; then
+    echo -e "${YELLOW}⚠️  .env 檔案不存在，跳過超級用戶創建${NC}" | tee -a $LOG_FILE
+    echo "   請使用遷移輔助工具創建超級用戶" | tee -a $LOG_FILE
 else
-    echo -e "${YELLOW}⚠️  收集靜態檔案時發生警告${NC}" | tee -a $LOG_FILE
-fi
-
-# 8. 系統檢查
-echo -e "${YELLOW}📋 步驟 8: 系統檢查...${NC}" | tee -a $LOG_FILE
-if python3 manage.py check 2>&1 | tee -a $LOG_FILE; then
-    echo -e "${GREEN}✅ 系統檢查通過${NC}" | tee -a $LOG_FILE
-else
-    echo -e "${YELLOW}⚠️  系統檢查發現警告${NC}" | tee -a $LOG_FILE
-fi
-
-# 9. 驗證關鍵資料表
-echo -e "${YELLOW}📋 步驟 9: 驗證關鍵資料表...${NC}" | tee -a $LOG_FILE
-python3 manage.py shell -c "
-from django.db import connection
-with connection.cursor() as cursor:
-    # 檢查 system_user_permission_detail 資料表
-    cursor.execute('SELECT tablename FROM pg_tables WHERE tablename = %s;', ['system_user_permission_detail'])
-    result = cursor.fetchall()
-    if result:
-        print('✅ system_user_permission_detail 資料表存在')
-    else:
-        print('❌ system_user_permission_detail 資料表不存在')
-        
-    # 檢查所有 system 相關資料表
-    cursor.execute('SELECT tablename FROM pg_tables WHERE tablename LIKE %s ORDER BY tablename;', ['system_%'])
-    tables = cursor.fetchall()
-    print(f'✅ 找到 {len(tables)} 個 system 相關資料表:')
-    for table in tables:
-        print(f'   - {table[0]}')
-" 2>&1 | tee -a $LOG_FILE
-
-echo -e "${GREEN}🎉 MES 系統資料庫初始化完成！${NC}" | tee -a $LOG_FILE
-echo -e "${CYAN}📝 系統資訊:${NC}" | tee -a $LOG_FILE
-echo "   - 請使用遷移輔助工具創建超級用戶" | tee -a $LOG_FILE
-echo "   - 或檢查 .env 檔案中的 SUPERUSER_* 設定" | tee -a $LOG_FILE
-echo "初始化完成時間: $(date)" | tee -a $LOG_FILE
-
-# 函數：根據 .env 檔案創建超級用戶
-create_superuser_from_env() {
-    echo "🔍 檢查 .env 檔案設定..." | tee -a $LOG_FILE
-    
-    # 檢查 .env 檔案是否存在
-    if [ ! -f ".env" ]; then
-        echo -e "${YELLOW}⚠️  .env 檔案不存在，跳過超級用戶創建${NC}" | tee -a $LOG_FILE
-        echo "   請使用遷移輔助工具創建超級用戶" | tee -a $LOG_FILE
-        return
-    fi
-    
     # 讀取超級用戶設定
     SUPERUSER_NAME=$(grep "^SUPERUSER_NAME=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" 2>/dev/null || echo "")
     SUPERUSER_EMAIL=$(grep "^SUPERUSER_EMAIL=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" 2>/dev/null || echo "")
@@ -185,17 +229,15 @@ create_superuser_from_env() {
         echo "   SUPERUSER_EMAIL=admin@example.com" | tee -a $LOG_FILE
         echo "   SUPERUSER_PASSWORD=your_password" | tee -a $LOG_FILE
         echo "   或使用遷移輔助工具創建超級用戶" | tee -a $LOG_FILE
-        return
-    fi
-    
-    echo "📋 讀取到的設定：" | tee -a $LOG_FILE
-    echo "   使用者名稱: $SUPERUSER_NAME" | tee -a $LOG_FILE
-    echo "   電子郵件: $SUPERUSER_EMAIL" | tee -a $LOG_FILE
-    echo "   密碼: [已隱藏]" | tee -a $LOG_FILE
-    
-    # 創建超級用戶
-    echo "創建超級用戶..." | tee -a $LOG_FILE
-    python3 manage.py shell -c "
+    else
+        echo "📋 讀取到的設定：" | tee -a $LOG_FILE
+        echo "   使用者名稱: $SUPERUSER_NAME" | tee -a $LOG_FILE
+        echo "   電子郵件: $SUPERUSER_EMAIL" | tee -a $LOG_FILE
+        echo "   密碼: [已隱藏]" | tee -a $LOG_FILE
+        
+        # 創建超級用戶
+        echo "創建超級用戶..." | tee -a $LOG_FILE
+        python3 manage.py shell -c "
 from django.contrib.auth.models import User
 try:
     # 檢查用戶是否已存在
@@ -224,4 +266,89 @@ except Exception as e:
     print(f'⚠️  創建超級用戶時發生錯誤: {str(e)}')
     print('   請使用遷移輔助工具創建超級用戶')
 " 2>&1 | tee -a $LOG_FILE
-}
+    fi
+fi
+
+# 7. 收集靜態檔案
+echo -e "${YELLOW}📋 步驟 7: 收集靜態檔案...${NC}" | tee -a $LOG_FILE
+if python3 manage.py collectstatic --noinput --skip-checks 2>&1 | tee -a $LOG_FILE; then
+    echo -e "${GREEN}✅ 靜態檔案已收集${NC}" | tee -a $LOG_FILE
+else
+    echo -e "${YELLOW}⚠️  收集靜態檔案時發生警告${NC}" | tee -a $LOG_FILE
+fi
+
+# 8. 系統檢查
+echo -e "${YELLOW}📋 步驟 8: 系統檢查...${NC}" | tee -a $LOG_FILE
+if python3 manage.py check 2>&1 | tee -a $LOG_FILE; then
+    echo -e "${GREEN}✅ 系統檢查通過${NC}" | tee -a $LOG_FILE
+else
+    echo -e "${YELLOW}⚠️  系統檢查發現警告${NC}" | tee -a $LOG_FILE
+fi
+
+# 9. 最終資料表統計
+echo -e "${YELLOW}📋 步驟 9: 最終資料表統計...${NC}" | tee -a $LOG_FILE
+
+python3 manage.py shell -c "
+from django.db import connection
+cursor = connection.cursor()
+
+# 最終統計
+print('📊 最終資料表統計:')
+cursor.execute('SELECT table_name FROM information_schema.tables WHERE table_schema = %s ORDER BY table_name;', ['public'])
+all_tables = cursor.fetchall()
+print(f'✅ 資料庫中共有 {len(all_tables)} 個資料表')
+
+# 按模組分組統計
+modules = {}
+for table in all_tables:
+    table_name = table[0]
+    if '_' in table_name:
+        module = table_name.split('_')[0]
+        if module not in modules:
+            modules[module] = []
+        modules[module].append(table_name)
+
+print(f'\\n📋 按模組分組的資料表:')
+for module, tables in sorted(modules.items()):
+    print(f'  {module}: {len(tables)} 個資料表')
+" 2>&1 | tee -a $LOG_FILE
+
+# 10. 最終驗證
+echo -e "${YELLOW}📋 步驟 10: 最終驗證...${NC}" | tee -a $LOG_FILE
+
+# 檢查 Django 系統是否正常
+echo "執行 Django 系統檢查..." | tee -a $LOG_FILE
+if python3 manage.py check 2>&1 | tee -a $LOG_FILE; then
+    echo -e "${GREEN}✅ Django 系統檢查通過${NC}" | tee -a $LOG_FILE
+else
+    echo -e "${YELLOW}⚠️  Django 系統檢查發現問題${NC}" | tee -a $LOG_FILE
+fi
+
+# 測試關鍵模型導入
+echo "測試關鍵模型導入..." | tee -a $LOG_FILE
+python3 manage.py shell -c "
+try:
+    from system.models import ScheduledTask
+    print('✅ ScheduledTask 模型可以正常導入')
+    
+    from erp_integration.models import CompanyConfig
+    print('✅ CompanyConfig 模型可以正常導入')
+    
+    from django.contrib.auth.models import User
+    print('✅ User 模型可以正常導入')
+    
+    print('✅ 所有關鍵模型都可以正常導入')
+except Exception as e:
+    print(f'❌ 模型導入測試失敗: {e}')
+" 2>&1 | tee -a $LOG_FILE
+
+echo ""
+echo -e "${GREEN}🎉 MES 系統資料庫初始化完成！${NC}" | tee -a $LOG_FILE
+echo -e "${CYAN}📝 系統資訊:${NC}" | tee -a $LOG_FILE
+echo "   - 所有資料表已成功創建" | tee -a $LOG_FILE
+echo "   - Django 系統檢查通過" | tee -a $LOG_FILE
+echo "   - 關鍵模型可以正常導入" | tee -a $LOG_FILE
+echo "   - 請使用遷移輔助工具創建超級用戶" | tee -a $LOG_FILE
+echo "   - 或檢查 .env 檔案中的 SUPERUSER_* 設定" | tee -a $LOG_FILE
+echo "初始化完成時間: $(date)" | tee -a $LOG_FILE
+

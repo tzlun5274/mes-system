@@ -445,7 +445,7 @@ class ReportSyncSettings(models.Model):
 
 
 
-# 完工判斷設定已整合到 workorder.company_order.models.SystemConfig
+# 完工判斷設定已整合到 workorder.manufacturing_order.models.SystemConfig
 # 使用現有的 SystemConfig 模型來管理完工判斷相關設定
 
 
@@ -461,7 +461,13 @@ class CleanupLog(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, verbose_name="執行狀態")
     execution_time = models.DateTimeField(auto_now_add=True, verbose_name="執行時間")
     details = models.TextField(blank=True, null=True, verbose_name="執行詳情")
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="執行使用者")
+    user = models.CharField(
+        max_length=150, 
+        null=True, 
+        blank=True, 
+        verbose_name="執行使用者",
+        help_text="執行使用者名稱（非外鍵關係，純文字欄位）"
+    )
     
     class Meta:
         verbose_name = "清理操作日誌"
@@ -569,22 +575,20 @@ class AutoApprovalTask(models.Model):
         verbose_name="更新時間"
     )
     
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
+    created_by = models.CharField(
+        max_length=150,
         null=True,
         blank=True,
         verbose_name="建立者",
-        related_name='created_auto_approval_tasks'
+        help_text="建立者名稱（非外鍵關係，純文字欄位）"
     )
     
-    updated_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
+    updated_by = models.CharField(
+        max_length=150,
         null=True,
         blank=True,
         verbose_name="更新者",
-        related_name='updated_auto_approval_tasks'
+        help_text="更新者名稱（非外鍵關係，純文字欄位）"
     )
 
     class Meta:
@@ -659,7 +663,7 @@ class AutoApprovalTask(models.Model):
 
 class OrderSyncSettings(models.Model):
     """
-    訂單同步設定：管理訂單資料的自動同步配置
+    客戶訂單同步設定：管理客戶訂單資料的自動同步配置
     """
     
     # 同步設定
@@ -686,12 +690,12 @@ class OrderSyncSettings(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
     
     class Meta:
-        verbose_name = "訂單同步設定"
-        verbose_name_plural = "訂單同步設定"
+        verbose_name = "客戶訂單同步設定"
+        verbose_name_plural = "客戶訂單同步設定"
         db_table = 'system_order_sync_settings'
     
     def __str__(self):
-        return f"訂單同步設定 (ID: {self.id})"
+        return f"客戶訂單同步設定 (ID: {self.id})"
     
     def get_sync_status_display(self):
         """取得同步狀態顯示文字"""
@@ -765,7 +769,11 @@ class OrderSyncLog(models.Model):
 
 class UserPermissionDetail(models.Model):
     """使用者權限細分設定"""
-    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="使用者")
+    user = models.CharField(
+        max_length=150,
+        verbose_name="使用者",
+        help_text="使用者名稱（非外鍵關係，純文字欄位）"
+    )
     
     # 作業員權限細分
     can_operate_all_operators = models.BooleanField(default=True, verbose_name="可操作全部作業員")
@@ -909,7 +917,13 @@ class UserPermissionDetail(models.Model):
 
 class UserWorkPermission(models.Model):
     """用戶工作權限細分表 - 控制報工時的操作範圍"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="用戶")
+    user = models.CharField(
+        max_length=100, 
+        unique=True, 
+        verbose_name="用戶",
+        help_text="用戶名稱（非外鍵關係，純文字欄位）",
+        default="system"
+    )
     
     # 作業員權限控制
     can_operate_all_operators = models.BooleanField(default=True, verbose_name="可操作所有作業員")
@@ -964,7 +978,7 @@ class UserWorkPermission(models.Model):
         db_table = 'system_user_work_permission'
 
     def __str__(self):
-        return f"{self.user.username} 的工作權限"
+        return f"{self.user} 的工作權限"
 
     def get_allowed_operators_display(self):
         """獲取允許的作業員顯示名稱"""

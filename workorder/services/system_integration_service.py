@@ -322,7 +322,7 @@ class SystemIntegrationService:
             return {
                 'success': True,
                 'results': results,
-                'summary': '綜合修復完成'
+                'summary': '綜合處理完成'
             }
             
         except Exception as e:

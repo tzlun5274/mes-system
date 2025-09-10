@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, api
 
 app_name = "ai"
 module_display_name = "AI 功能"
@@ -38,4 +38,10 @@ urlpatterns = [
     path("api/predictions/", views.get_predictions, name="get_predictions"),
     path("api/optimizations/", views.get_optimizations, name="get_optimizations"),
     path("api/anomalies/", views.get_anomalies, name="get_anomalies"),
+    
+    # ai API 路由
+    path("api/prediction/", api.PredictionAPIView.as_view(), name="api_prediction_list"),
+    path("api/prediction/<int:prediction_id>/", api.PredictionAPIView.as_view(), name="api_prediction_detail"),
+    path("api/anomalies/", api.get_anomalies, name="api_anomalies"),
+    path("api/optimizations/", api.get_optimizations, name="api_optimizations"),
 ]

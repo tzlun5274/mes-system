@@ -16,18 +16,18 @@ def sync_orders_task():
     定時任務：同步訂單資料從 ERP 到 MES
     """
     try:
-        from .order_management import OrderManager
+        from .customer_order_management import OrderManager
         
-        logger.info("開始執行訂單同步定時任務")
+        logger.info("開始執行客戶訂單同步定時任務")
         
-        # 創建訂單管理器
+        # 創建客戶訂單管理器
         order_manager = OrderManager()
         
         # 執行同步
         result = order_manager.sync_orders_from_erp()
         
         if result.get('status') == 'success':
-            logger.info(f"訂單同步成功：{result.get('message')}")
+            logger.info(f"客戶訂單同步成功：{result.get('message')}")
             
             # 更新同步狀態
             try:
@@ -61,7 +61,7 @@ def sync_orders_task():
                 'executed_at': timezone.now().isoformat()
             }
         else:
-            logger.error(f"訂單同步失敗：{result.get('message')}")
+            logger.error(f"客戶訂單同步失敗：{result.get('message')}")
             
             # 更新同步狀態
             try:
@@ -96,7 +96,7 @@ def sync_orders_task():
             }
             
     except Exception as e:
-        logger.error(f"訂單同步定時任務執行失敗: {str(e)}", exc_info=True)
+        logger.error(f"客戶訂單同步定時任務執行失敗: {str(e)}", exc_info=True)
         
         # 更新同步狀態為失敗
         try:
@@ -125,7 +125,7 @@ def sync_orders_task():
         
         return {
             'success': False,
-            'error': f'訂單同步定時任務執行失敗: {str(e)}',
+            'error': f'客戶訂單同步定時任務執行失敗: {str(e)}',
             'total_orders': 0,
             'executed_at': timezone.now().isoformat()
         }

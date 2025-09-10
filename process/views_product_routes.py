@@ -189,7 +189,7 @@ def view_product_route(request, product_id):
             equip_id_to_name.get(eid, f"未知設備({eid})") for eid in equipment_ids
         ]
         logger.debug(
-            f"檢視產品工藝路線: product_id={product_id}, step_order={route.step_order}, process_name={route.process_name.name}, equipment_ids={equipment_ids}, equipment_names={equipment_names}"
+            f"檢視產品工藝路線: product_id={product_id}, step_order={route.step_order}, process_name={route.process_name}, equipment_ids={equipment_ids}, equipment_names={equipment_names}"
         )
         enhanced_routes.append(
             {
@@ -379,7 +379,8 @@ def add_product_route(request):
                     )
                     ProductProcessRoute.objects.create(
                         product_id=product_id,
-                        process_name=process_name,
+                        process_name=process_name.name,
+                        process_name_id=str(process_name.id),
                         step_order=int(step_order),
                         usable_equipment_ids=cleaned_equipment_ids,
                         dependent_semi_product=dependent_semi_product or None,
@@ -449,7 +450,7 @@ def edit_product_route(request, product_id):
             else []
         )
         logger.debug(
-            f"編輯頁面加載: product_id={product_id}, step_order={route.step_order}, process_name={route.process_name.name}, equipment_ids={equipment_ids}"
+            f"編輯頁面加載: product_id={product_id}, step_order={route.step_order}, process_name={route.process_name}, equipment_ids={equipment_ids}"
         )
         enhanced_routes.append(
             {
@@ -651,7 +652,8 @@ def edit_product_route(request, product_id):
                                     logger.debug(f"刪除舊記錄: route_id={route.id}")
                                     route.delete()
                                     # 更新重複記錄
-                                    existing_duplicate.process_name = process_name
+                                    existing_duplicate.process_name = process_name.name
+                                    existing_duplicate.process_name_id = str(process_name.id)
                                     existing_duplicate.usable_equipment_ids = cleaned_equipment_ids
                                     existing_duplicate.dependent_semi_product = dependent_semi_product or None
                                     existing_duplicate.save()
@@ -659,7 +661,8 @@ def edit_product_route(request, product_id):
                                 else:
                                     # 更新現有工序
                                     route.product_id = product_id_new
-                                    route.process_name = process_name
+                                    route.process_name = process_name.name
+                                    route.process_name_id = str(process_name.id)
                                     route.step_order = step_order
                                     route.usable_equipment_ids = cleaned_equipment_ids
                                     route.dependent_semi_product = (
@@ -671,7 +674,8 @@ def edit_product_route(request, product_id):
                                     )
                             else:
                                 # 只更新其他欄位，不改變產品編號和步驟順序
-                                route.process_name = process_name
+                                route.process_name = process_name.name
+                                route.process_name_id = str(process_name.id)
                                 route.usable_equipment_ids = cleaned_equipment_ids
                                 route.dependent_semi_product = (
                                     dependent_semi_product or None
@@ -689,7 +693,8 @@ def edit_product_route(request, product_id):
                             
                             if existing_route:
                                 # 如果已存在，則更新現有記錄
-                                existing_route.process_name = process_name
+                                existing_route.process_name = process_name.name
+                                existing_route.process_name_id = str(process_name.id)
                                 existing_route.usable_equipment_ids = cleaned_equipment_ids
                                 existing_route.dependent_semi_product = dependent_semi_product or None
                                 existing_route.save()
@@ -698,7 +703,8 @@ def edit_product_route(request, product_id):
                                 # 如果不存在，則創建新記錄
                                 ProductProcessRoute.objects.create(
                                     product_id=product_id_new,
-                                    process_name=process_name,
+                                    process_name=process_name.name,
+                                    process_name_id=str(process_name.id),
                                     step_order=step_order,
                                     usable_equipment_ids=cleaned_equipment_ids,
                                     dependent_semi_product=dependent_semi_product or None,
@@ -713,7 +719,8 @@ def edit_product_route(request, product_id):
                         
                         if existing_route:
                             # 如果已存在，則更新現有記錄
-                            existing_route.process_name = process_name
+                            existing_route.process_name = process_name.name
+                            existing_route.process_name_id = str(process_name.id)
                             existing_route.usable_equipment_ids = cleaned_equipment_ids
                             existing_route.dependent_semi_product = dependent_semi_product or None
                             existing_route.save()
@@ -722,7 +729,8 @@ def edit_product_route(request, product_id):
                             # 如果不存在，則創建新記錄
                             ProductProcessRoute.objects.create(
                                 product_id=product_id_new,
-                                process_name=process_name,
+                                process_name=process_name.name,
+                                process_name_id=str(process_name.id),
                                 step_order=step_order,
                                 usable_equipment_ids=cleaned_equipment_ids,
                                 dependent_semi_product=dependent_semi_product or None,
@@ -821,7 +829,7 @@ def export_product_routes(request):
                 equip_names.append(f"未知設備({eid})")
         worksheet[f"A{row_num}"] = route.product_id
         worksheet[f"B{row_num}"] = route.step_order
-        worksheet[f"C{row_num}"] = route.process_name.name
+        worksheet[f"C{row_num}"] = route.process_name
         worksheet[f"D{row_num}"] = ", ".join(equip_names) if equip_names else ""
         worksheet[f"E{row_num}"] = route.dependent_semi_product or ""
         row_num += 1
@@ -944,9 +952,9 @@ def import_product_routes(request):
                         try:
                             ProductProcessRoute.objects.create(
                                 product_id=product_id,
-                                process_name=process,
+                                process_name=process.name,
+                                process_name_id=str(process.id),
                                 step_order=step_order,
-                                capacity_per_hour=0,  # 已移除產能，預設為 0
                                 usable_equipment_ids=(
                                     ",".join(equipment_ids) if equipment_ids else ""
                                 ),
@@ -1151,7 +1159,8 @@ def import_product_routes(request):
                     ).delete()
                     ProductProcessRoute.objects.create(
                         product_id=product_id,
-                        process_name=process,
+                        process_name=process.name,
+                        process_name_id=str(process.id),
                         step_order=step_order,
                         usable_equipment_ids=(
                             ",".join(equipment_ids) if equipment_ids else ""
@@ -1219,7 +1228,7 @@ def api_calculate_capacity(request):
         capacity_data = (
             ProductProcessStandardCapacity.objects.filter(
                 product_code=product_id,
-                process_name=route.process_name.name,
+                process_name=route.process_name,
                 is_active=True,
             )
             .order_by("-version")
@@ -1246,7 +1255,7 @@ def api_calculate_capacity(request):
         result.append(
             {
                 "step_order": step_order,
-                "process_name": route.process_name.name,
+                "process_name": route.process_name,
                 "parallel": parallel,
                 "capacity_per_hour": capacity_per_hour,
                 "hours": round(hours, 2),

@@ -1,0 +1,52 @@
+{% extends "base_fastapi.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">{{ title }}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white mb-3">
+                                <div class="card-body text-center">
+                                    <h5>生產看板</h5>
+                                    <a href="/kanban/production/" class="btn btn-light btn-sm">進入看板</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white mb-3">
+                                <div class="card-body text-center">
+                                    <h5>設備看板</h5>
+                                    <a href="/kanban/equipment/" class="btn btn-light btn-sm">進入看板</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white mb-3">
+                                <div class="card-body text-center">
+                                    <h5>品質看板</h5>
+                                    <a href="/kanban/quality/" class="btn btn-light btn-sm">進入看板</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white mb-3">
+                                <div class="card-body text-center">
+                                    <h5>物料看板</h5>
+                                    <a href="/kanban/material/" class="btn btn-light btn-sm">進入看板</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

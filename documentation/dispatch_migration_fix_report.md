@@ -94,4 +94,4 @@ django.db.migrations.exceptions.NodeNotFoundError: Migration dispatch.0007_updat
 
 ## 結論
 
-通過系統性的分析和修復，成功解決了 dispatch 模組的遷移依賴問題。系統現在可以正常啟動和運行，所有必要的資料表都已正確創建。這次修復為未來的遷移管理提供了寶貴的經驗和教訓。 
+通過系統性的分析和處理，成功解決了 dispatch 模組的遷移依賴問題。系統現在可以正常啟動和運行，所有必要的資料表都已正確創建。這次處理為未來的遷移管理提供了寶貴的經驗和教訓。 

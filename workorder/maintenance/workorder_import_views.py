@@ -18,7 +18,7 @@ import re
 
 from ..models import WorkOrder
 from erp_integration.models import CompanyConfig
-from ..company_order.models import CompanyOrder
+from ..manufacturing_order.models import ManufacturingOrder
 from ..models import SystemConfig
 
 logger = logging.getLogger(__name__)
@@ -190,15 +190,15 @@ def process_workorder_import(df, user):
                         elif order_number == 'RD樣品':
                             company_code = '10'  # RD樣品通常屬於耀儀科技
                     
-                    # 方法4: 從公司製令單查找
+                    # 方法4: 從公司製造命令查找
                     if not company_code:
-                        company_order = CompanyOrder.objects.filter(
+                        manufacturing_order = ManufacturingOrder.objects.filter(
                             mkordno=order_number,
                             product_id=product_code
                         ).first()
                         
-                        if company_order:
-                            company_code = company_order.company_code
+                        if manufacturing_order:
+                            company_code = manufacturing_order.company_code
                     
                     # 如果還是找不到公司代號，使用預設值
                     if not company_code:

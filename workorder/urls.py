@@ -1,22 +1,23 @@
 from django.urls import path, include
 from django.views.generic import RedirectView
-from . import views_main as workorder_views
-from . import views_import as import_views
+from . import views, api as workorder_views
+from . import views, views_import as import_views
+from . import views_main
 from .supervisor import views as supervisor_views
 from .views.workorder_views import (
     WorkOrderListView, WorkOrderDetailView, WorkOrderCreateView, 
-    WorkOrderUpdateView, WorkOrderDeleteView, CompanyOrderListView,
-    get_company_order_info, MesOrderListView, mes_orders_bulk_dispatch,
+    WorkOrderUpdateView, WorkOrderDeleteView, ManufacturingOrderListView,
+    get_manufacturing_order_info, MesOrderListView, mes_orders_bulk_dispatch,
     mes_order_dispatch, mes_order_delete, mes_orders_auto_dispatch,
     mes_orders_set_auto_dispatch_interval, CreateMissingWorkOrdersView
 )
 
 
 # 維護功能已移至 maintenance 模組
-# from .views.workorder_clear_views import (
+# from .views_main.workorder_clear_views import (
 #     WorkOrderClearView, WorkOrderClearAjaxView
 # )
-# from .views.workorder_import_views import (
+# from .views_main.workorder_import_views import (
 #     workorder_import_page, workorder_import_file, download_workorder_template
 # )
 
@@ -31,14 +32,14 @@ from .views.rollback_views import (
 from .views import api_views
 # 自動分配功能已移除
 # 完工自動化管理功能已簡化，移除複雜的視圖
-# from .views.completion_automation_views import (
+# from .views_main.completion_automation_views import (
 #     CompletionAutomationManagementView,
 #     AutoManagementConfigListView, AutoManagementConfigCreateView,
 #     AutoManagementConfigUpdateView, AutoManagementConfigDeleteView,
 #     execute_auto_function, toggle_auto_function
 # )
 # 相符性檢查功能已移至 maintenance 模組
-# from .views.consistency_check_views import (
+# from .views_main.consistency_check_views import (
 #     ConsistencyCheckHomeView, ConsistencyCheckAjaxView, ConsistencyCheckDetailView,
 #     ConsistencyCheckExportView, ConsistencyCheckFixView
 # )
@@ -54,19 +55,19 @@ urlpatterns = [
     path("edit/<int:pk>/", WorkOrderUpdateView.as_view(), name="edit"),
     path("delete/<int:pk>/", WorkOrderDeleteView.as_view(), name="delete"),
     path("detail/<int:pk>/", WorkOrderDetailView.as_view(), name="production_workorder_detail"),
-    path("force-complete/<int:pk>/", workorder_views.force_complete_workorder, name="force_complete_workorder"),
-    path("auto-complete/<int:pk>/", workorder_views.auto_complete_workorder, name="auto_complete_workorder"),
+    path("force-complete/<int:pk>/", views_main.force_complete_workorder, name="force_complete_workorder"),
+    path("auto-complete/<int:pk>/", views_main.auto_complete_workorder, name="auto_complete_workorder"),
     path("list/", WorkOrderListView.as_view(), name="list"),
-    path("active/", workorder_views.active_workorders, name="active_workorders"),
-    path("completion-check/", workorder_views.check_workorder_completion, name="completion_check"),
-    path("process/<int:workorder_id>/", workorder_views.workorder_process_detail, name="workorder_process_detail"),
-    path("delete-in-progress/", workorder_views.delete_in_progress_workorders, name="delete_in_progress_workorders"),
-    path("start-production/<int:pk>/", workorder_views.start_production, name="start_production"),
-    path("stop-production/<int:pk>/", workorder_views.stop_production, name="stop_production"),
-    path("manual-sync-orders/", workorder_views.manual_sync_orders, name="manual_sync_orders"),
-    path("manual-convert-orders/", workorder_views.manual_convert_orders, name="manual_convert_orders"),
-    path("selective-revert-orders/", workorder_views.selective_revert_orders, name="selective_revert_orders"),
-    path("delete-pending-workorders/", workorder_views.delete_pending_workorders, name="delete_pending_workorders"),
+    path("active/", views_main.active_workorders, name="active_workorders"),
+    path("completion-check/", views_main.check_workorder_completion, name="completion_check"),
+    path("process/<int:workorder_id>/", views_main.workorder_process_detail, name="workorder_process_detail"),
+    path("delete-in-progress/", views_main.delete_in_progress_workorders, name="delete_in_progress_workorders"),
+    path("start-production/<int:pk>/", views_main.start_production, name="start_production"),
+    path("stop-production/<int:pk>/", views_main.stop_production, name="stop_production"),
+    path("manual-sync-orders/", views_main.manual_sync_orders, name="manual_sync_orders"),
+    path("manual-convert-orders/", views_main.manual_convert_orders, name="manual_convert_orders"),
+    path("selective-revert-orders/", views_main.selective_revert_orders, name="selective_revert_orders"),
+    path("delete-pending-workorders/", views_main.delete_pending_workorders, name="delete_pending_workorders"),
 
 
     
@@ -113,33 +114,33 @@ urlpatterns = [
     path('rollback/batch/', batch_rollback_completed_workorders, name='batch_rollback'),
     path('rollback/<int:pk>/check/', check_rollback_status, name='rollback_status_check'),
     
-    # 公司製令單管理 - 使用類別視圖
-    path("company/", CompanyOrderListView.as_view(), name="company_orders"),
+    # 公司製造命令管理 - 使用類別視圖
+    path("manufacturing_orders/", ManufacturingOrderListView.as_view(), name="manufacturing_orders"),
     
     # 統一API路由 - 整合填報和現場報工的API
-    path("static/api/workorder-list/", workorder_views.get_workorder_list_unified, name="workorder_list"),
-    path("static/api/workorder-by-product/", workorder_views.get_workorder_by_product_unified, name="workorder_by_product"),
-    path("static/api/workorder-detail/", workorder_views.get_workorder_detail_unified, name="workorder_detail"),
-    path("static/api/workorder-data/", workorder_views.get_workorder_data_unified, name="workorder_data"),
-    path("static/api/workorder-info/", workorder_views.get_workorder_info_unified, name="workorder_info"),
-    path("static/api/product-list/", workorder_views.get_product_list_unified, name="product_list"),
-    path("static/api/products-by-company/", workorder_views.get_products_by_company_unified, name="products_by_company"),
-    path("static/api/company-list/", workorder_views.get_company_list_unified, name="company_list"),
-    path("static/api/operator-list/", workorder_views.get_operator_list_unified, name="operator_list"),
-    path("static/api/process-list/", workorder_views.get_process_list_unified, name="process_list"),
-    path("static/api/equipment-list/", workorder_views.get_equipment_list_unified, name="equipment_list"),
+    path("static/api/workorder-list/", views_main.get_workorder_list_unified, name="workorder_list"),
+    path("static/api/workorder-by-product/", views_main.get_workorder_by_product_unified, name="workorder_by_product"),
+    path("static/api/workorder-detail/", views_main.get_workorder_detail_unified, name="workorder_detail"),
+    path("static/api/workorder-data/", views_main.get_workorder_data_unified, name="workorder_data"),
+    path("static/api/workorder-info/", views_main.get_workorder_info_unified, name="workorder_info"),
+    path("static/api/product-list/", views_main.get_product_list_unified, name="product_list"),
+    path("static/api/products-by-company/", views_main.get_products_by_company_unified, name="products_by_company"),
+    path("static/api/company-list/", views_main.get_company_list_unified, name="company_list"),
+    path("static/api/operator-list/", views_main.get_operator_list_unified, name="operator_list"),
+    path("static/api/process-list/", views_main.get_process_list_unified, name="process_list"),
+    path("static/api/equipment-list/", views_main.get_equipment_list_unified, name="equipment_list"),
     
     # 原有API路由（保留作為備用）
-    path("static/api/company_order_info/", get_company_order_info, name="get_company_order_info"),
-    path("static/api/get_workorders_by_product/", workorder_views.get_workorders_by_product, name="get_workorders_by_product"),
-    path("static/api/get_product_by_workorder/", workorder_views.get_product_by_workorder, name="get_product_by_workorder"),
-    path("static/api/create_workorder_processes/<int:workorder_id>/", workorder_views.create_workorder_processes, name="create_workorder_processes"),
-    path("quick-create-processes/<int:workorder_id>/", workorder_views.quick_create_processes_from_route, name="quick_create_processes_from_route"),
-    path("static/api/get_operators_and_equipments/", workorder_views.get_operators_and_equipments, name="get_operators_and_equipments"),
-    path("static/api/get_operators_only/", workorder_views.get_operators_only, name="get_operators_only"),
-    path("static/api/get_equipments_only/", workorder_views.get_equipments_only, name="get_equipments_only"),
-    path("static/api/add_process/<int:workorder_id>/", workorder_views.add_process, name="add_process"),
-    path("static/api/move_process/", workorder_views.move_process, name="move_process"),
+    path("static/api/manufacturing_order_info/", get_manufacturing_order_info, name="get_manufacturing_order_info"),
+    path("static/api/get_workorders_by_product/", views_main.get_workorders_by_product, name="get_workorders_by_product"),
+    path("static/api/get_product_by_workorder/", views_main.get_product_by_workorder, name="get_product_by_workorder"),
+    path("static/api/create_workorder_processes/<int:workorder_id>/", views_main.create_workorder_processes, name="create_workorder_processes"),
+    path("quick-create-processes/<int:workorder_id>/", views_main.quick_create_processes_from_route, name="quick_create_processes_from_route"),
+    path("static/api/get_operators_and_equipments/", views_main.get_operators_and_equipments, name="get_operators_and_equipments"),
+    path("static/api/get_operators_only/", views_main.get_operators_only, name="get_operators_only"),
+    path("static/api/get_equipments_only/", views_main.get_equipments_only, name="get_equipments_only"),
+    path("static/api/add_process/<int:workorder_id>/", views_main.add_process, name="add_process"),
+    path("static/api/move_process/", views_main.move_process, name="move_process"),
     
     # 工序 API 路由
     path("static/api/process/<int:process_id>/", api_views.get_process_detail, name="get_process_detail"),
@@ -190,8 +191,15 @@ urlpatterns = [
     path("mes-orders/dispatch/", mes_order_dispatch, name="mes_order_dispatch"),
     path("mes-orders/delete/", mes_order_delete, name="mes_order_delete"),
     path("mes-orders/auto-dispatch/", mes_orders_auto_dispatch, name="mes_orders_auto_dispatch"),
-    path("mes-orders/convert-to-production/", workorder_views.mes_orders_convert_to_production, name="mes_orders_convert_to_production"),
+    path("mes-orders/convert-to-production/", views_main.mes_orders_convert_to_production, name="mes_orders_convert_to_production"),
     path("mes-orders/set-auto-dispatch-interval/", mes_orders_set_auto_dispatch_interval, name="mes_orders_set_auto_dispatch_interval"),
 
 
+    
+    # workorder API 路由
+    path("api/workorder/", workorder_views.WorkOrderAPIView.as_view(), name="api_workorder_list"),
+    path("api/workorder/<int:workorder_id>/", workorder_views.WorkOrderAPIView.as_view(), name="api_workorder_detail"),
+    path("api/workorder-by-number/", workorder_views.get_workorder_by_number, name="api_workorder_by_number"),
+    path("api/processes/", workorder_views.get_workorder_processes, name="api_workorder_processes"),
+    path("api/workorders-by-status/", workorder_views.get_workorders_by_status, name="api_workorders_by_status"),
 ]

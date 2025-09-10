@@ -101,7 +101,7 @@ def onsite_report_post_save(sender, instance, created, **kwargs):
                     # 填報記錄數量
                     fill_work_quantity = FillWork.objects.filter(
                         workorder=instance.workorder,
-                        process__name=instance.process,
+                        process_name=instance.process,
                         approval_status='approved'
                     ).aggregate(
                         total=Sum('work_quantity')

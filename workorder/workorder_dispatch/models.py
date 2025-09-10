@@ -210,7 +210,7 @@ class WorkOrderDispatch(models.Model):
         self.total_quantity = self.total_good_quantity + self.total_defect_quantity
         
         # 出貨包裝專項統計（填報記錄）
-        packaging_reports = approved_reports.filter(process__name='出貨包裝')
+        packaging_reports = approved_reports.filter(process_name='出貨包裝')
         packaging_good_quantity = packaging_reports.aggregate(
             total=Sum('work_quantity')
         )['total'] or 0
@@ -437,12 +437,8 @@ class WorkOrderDispatchProcess(models.Model):
     """
     派工單工序明細：記錄每個派工單的工序分配
     """
-    workorder_dispatch = models.ForeignKey(
-        WorkOrderDispatch,
-        on_delete=models.CASCADE,
-        verbose_name="派工單",
-        related_name="dispatch_processes"
-    )
+    workorder_dispatch_id = models.CharField(max_length=50, verbose_name="派工單ID")
+    workorder_dispatch_name = models.CharField(max_length=200, verbose_name="派工單名稱")
     process_name = models.CharField(max_length=100, verbose_name="工序名稱")
     step_order = models.IntegerField(verbose_name="工序順序")
     planned_quantity = models.IntegerField(verbose_name="計劃數量")
@@ -470,23 +466,19 @@ class WorkOrderDispatchProcess(models.Model):
         verbose_name = "派工單工序"
         verbose_name_plural = "派工單工序明細"
         db_table = "workorder_dispatch_process"
-        unique_together = (("workorder_dispatch", "step_order"),)
-        ordering = ["workorder_dispatch", "step_order"]
+        unique_together = (("workorder_dispatch_id", "step_order"),)
+        ordering = ["workorder_dispatch_id", "step_order"]
 
     def __str__(self):
-        return f"{self.workorder_dispatch.order_number} - {self.process_name}"
+        return f"{self.workorder_dispatch_name} - {self.process_name}"
 
 
 class DispatchHistory(models.Model):
     """
     派工歷史記錄：記錄每次派工操作的歷史
     """
-    workorder_dispatch = models.ForeignKey(
-        WorkOrderDispatch,
-        on_delete=models.CASCADE,
-        verbose_name="派工單",
-        related_name="dispatch_history"
-    )
+    workorder_dispatch_id = models.CharField(max_length=50, verbose_name="派工單ID")
+    workorder_dispatch_name = models.CharField(max_length=200, verbose_name="派工單名稱")
     action = models.CharField(max_length=50, verbose_name="操作類型")
     old_status = models.CharField(max_length=20, verbose_name="原狀態", null=True, blank=True)
     new_status = models.CharField(max_length=20, verbose_name="新狀態", null=True, blank=True)
@@ -501,4 +493,4 @@ class DispatchHistory(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.workorder_dispatch.order_number} - {self.action} - {self.created_at}" 
+        return f"{self.workorder_dispatch_name} - {self.action} - {self.created_at}" 

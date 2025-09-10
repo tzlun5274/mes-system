@@ -168,7 +168,7 @@ class OnsiteReportHistoryAdmin(admin.ModelAdmin):
     ]
     
     readonly_fields = [
-        'onsite_report', 'changed_at'
+        'onsite_report_id', 'changed_at'
     ]
     
     def onsite_report_link(self, obj):

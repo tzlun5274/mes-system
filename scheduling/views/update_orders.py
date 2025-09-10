@@ -1,7 +1,7 @@
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.utils.translation import gettext as _
-from ..order_management import order_manager
+from ..customer_order_management import order_manager
 import logging
 
 logger = logging.getLogger("scheduling.views")
@@ -18,7 +18,7 @@ def update_orders(request):
         return HttpResponseBadRequest("無效的請求方法")
 
     try:
-        # 使用訂單管理器執行同步
+        # 使用客戶訂單管理器執行同步
         result = order_manager.sync_orders_from_erp(
             user=request.user, ip_address=request.META.get("REMOTE_ADDR")
         )
@@ -29,7 +29,7 @@ def update_orders(request):
             return JsonResponse(result, status=400)
 
     except Exception as e:
-        logger.error(f"手動觸發訂單更新失敗: {str(e)}", exc_info=True)
+        logger.error(f"手動觸發客戶訂單更新失敗: {str(e)}", exc_info=True)
         return JsonResponse(
             {"status": "error", "message": f"更新失敗: {str(e)}"}, status=500
         )

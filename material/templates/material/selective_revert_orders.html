@@ -45,7 +45,7 @@
                                 </button>
                             </div>
                             <div class="col-auto">
-                                <a href="{% url 'material:company_orders' %}" class="btn btn-secondary">
+                                <a href="{% url 'material:manufacturing_orders' %}" class="btn btn-secondary">
                                     <i class="fas fa-times me-1"></i>取消
                                 </a>
                             </div>
@@ -59,7 +59,7 @@
                                             <input type="checkbox" id="selectAllCheckbox" onchange="toggleAll(this)">
                                         </th>
                                         <th>公司代號</th>
-                                        <th>製令單號</th>
+                                        <th>製造訂單號</th>
                                         <th>產品編號</th>
                                         <th>生產數量</th>
                                         <th>預定開工日</th>
@@ -102,7 +102,7 @@
                         <p class="mb-0">所有製令都是未轉換狀態，無需進行轉回操作。</p>
                     </div>
                     <div class="text-center">
-                        <a href="{% url 'material:company_orders' %}" class="btn btn-primary">
+                        <a href="{% url 'material:manufacturing_orders' %}" class="btn btn-primary">
                             <i class="fas fa-arrow-left me-1"></i>返回
                         </a>
                     </div>

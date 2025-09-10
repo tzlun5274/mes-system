@@ -1,5 +1,5 @@
 """
-訂單管理 API 視圖
+客戶訂單管理 API 視圖
 提供訂單相關的 RESTful API 介面
 """
 
@@ -12,21 +12,21 @@ from django.views import View
 import json
 import logging
 
-from ..order_management import (
+from ..customer_order_management import (
     order_manager,
     order_query_manager,
     order_schedule_manager,
     order_analytics,
 )
 
-logger = logging.getLogger("scheduling.order_api")
+logger = logging.getLogger("scheduling.customer_order_api")
 
 
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_orders_api(request):
     """
-    取得訂單列表 API
+    取得客戶訂單列表 API
     GET /api/orders/
     """
     try:
@@ -82,9 +82,9 @@ def get_orders_api(request):
         )
 
     except Exception as e:
-        logger.error(f"取得訂單列表失敗: {str(e)}", exc_info=True)
+        logger.error(f"取得客戶訂單列表失敗: {str(e)}", exc_info=True)
         return JsonResponse(
-            {"status": "error", "message": f"取得訂單列表失敗: {str(e)}"}, status=500
+            {"status": "error", "message": f"取得客戶訂單列表失敗: {str(e)}"}, status=500
         )
 
 
@@ -263,7 +263,7 @@ def export_orders_api(request):
 class OrderAPIView(View):
     """
     訂單 API 視圖類別
-    提供統一的訂單管理 API 介面
+    提供統一的客戶訂單管理 API 介面
     """
 
     def get(self, request, action=None):

@@ -55,10 +55,10 @@ class RouteAdmin(admin.ModelAdmin):
     工藝路線管理：管理產品生產工藝路線
     """
 
-    list_display = ["name", "product", "step_order", "process", "created_at"]
-    list_filter = ["product", "process", "created_at"]
-    search_fields = ["name", "product__name", "process__name"]
-    ordering = ["product", "step_order"]
+    list_display = ["name", "product_name", "product_id", "step_order", "process_name", "created_at"]
+    list_filter = ["created_at"]
+    search_fields = ["name", "product_name", "product_id", "process_name", "process_id"]
+    ordering = ["product_id", "step_order"]
 
 
 @admin.register(MaterialRequirement)
@@ -67,10 +67,10 @@ class MaterialRequirementAdmin(admin.ModelAdmin):
     物料需求管理：管理產品材料需求（BOM）
     """
 
-    list_display = ["product", "material", "quantity_per_unit", "created_at"]
-    list_filter = ["product", "material", "created_at"]
-    search_fields = ["product__name", "material__name"]
-    ordering = ["product", "material"]
+    list_display = ["product_name", "product_id", "material_name", "material_id", "quantity_per_unit", "created_at"]
+    list_filter = ["created_at"]
+    search_fields = ["product_name", "product_id", "material_name", "material_id"]
+    ordering = ["product_id", "material_id"]
 
 
 @admin.register(MaterialShortageAlert)
@@ -80,7 +80,7 @@ class MaterialShortageAlertAdmin(admin.ModelAdmin):
     """
 
     list_display = [
-        "material",
+        "material_name",
         "work_order",
         "required_quantity",
         "available_quantity",
@@ -103,7 +103,7 @@ class MaterialSupplyPlanAdmin(admin.ModelAdmin):
 
     list_display = [
         "work_order",
-        "material",
+        "material_name",
         "planned_quantity",
         "supply_time",
         "supply_location",
@@ -124,7 +124,8 @@ class MaterialKanbanAdmin(admin.ModelAdmin):
 
     list_display = [
         "kanban_number",
-        "material",
+        "material_name",
+        "material_id",
         "kanban_type",
         "quantity_per_kanban",
         "current_quantity",
@@ -133,7 +134,7 @@ class MaterialKanbanAdmin(admin.ModelAdmin):
         "last_updated",
     ]
     list_filter = ["kanban_type", "status", "last_updated"]
-    search_fields = ["kanban_number", "material__name", "location"]
+    search_fields = ["kanban_number", "material_name", "material_id", "location"]
     ordering = ["kanban_number"]
     readonly_fields = ["last_updated"]
 
@@ -145,19 +146,19 @@ class MaterialInventoryManagementAdmin(admin.ModelAdmin):
     """
 
     list_display = [
-        "material",
+        "material_name",
+        "material_id",
         "warehouse",
         "current_stock",
         "safety_stock",
-        "stock_status",
         "last_updated",
     ]
-    list_filter = ["stock_status", "warehouse", "material__category"]
-    search_fields = ["material__name", "material__code", "warehouse"]
+    list_filter = ["warehouse"]
+    search_fields = ["material_name", "material_id", "warehouse"]
     readonly_fields = ["last_updated"]
 
     fieldsets = (
-        ("基本資訊", {"fields": ("material", "warehouse")}),
+        ("基本資訊", {"fields": ("material_id", "material_name", "warehouse")}),
         (
             "庫存設定",
             {
@@ -175,7 +176,7 @@ class MaterialInventoryManagementAdmin(admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("material")
+        return super().get_queryset(request).select_related("material_name")
 
 
 @admin.register(MaterialRequirementEstimation)
@@ -185,7 +186,7 @@ class MaterialRequirementEstimationAdmin(admin.ModelAdmin):
     """
 
     list_display = [
-        "material",
+        "material_name",
         "estimation_date",
         "period_start",
         "period_end",
@@ -200,7 +201,7 @@ class MaterialRequirementEstimationAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             "基本資訊",
-            {"fields": ("material", "estimation_date", "period_start", "period_end")},
+            {"fields": ("material_name", "estimation_date", "period_start", "period_end")},
         ),
         (
             "需求估算",
@@ -216,7 +217,7 @@ class MaterialRequirementEstimationAdmin(admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("material")
+        return super().get_queryset(request).select_related("material_name")
 
 
 @admin.register(MaterialTransaction)
@@ -226,7 +227,7 @@ class MaterialTransactionAdmin(admin.ModelAdmin):
     """
 
     list_display = [
-        "material",
+        "material_name",
         "transaction_type",
         "quantity",
         "unit_cost",
@@ -243,7 +244,7 @@ class MaterialTransactionAdmin(admin.ModelAdmin):
             "交易資訊",
             {
                 "fields": (
-                    "material",
+                    "material_name",
                     "transaction_type",
                     "quantity",
                     "unit_cost",
@@ -258,4 +259,4 @@ class MaterialTransactionAdmin(admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("material")
+        return super().get_queryset(request).select_related("material_name")

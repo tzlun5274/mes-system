@@ -1,0 +1,46 @@
+{% extends "base_fastapi.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">{{ title }}</h3>
+                    <div>
+                        <a href="/production/create/" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> 新增生產線
+                        </a>
+                        <a href="/production/monitoring/" class="btn btn-info">
+                            <i class="fas fa-desktop"></i> 生產監控
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>生產線編號</th>
+                                    <th>生產線名稱</th>
+                                    <th>產品名稱</th>
+                                    <th>當前狀態</th>
+                                    <th>產量</th>
+                                    <th>效率</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted">目前沒有生產線資料</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

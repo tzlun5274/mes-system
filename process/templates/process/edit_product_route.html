@@ -41,7 +41,7 @@
                                     <select class="form-control process-name" id="process_name_{{ forloop.counter0 }}" name="process_name[]" required>
                                         <option value="">選擇工序</option>
                                         {% for process in process_names %}
-                                            <option value="{{ process.id }}" {% if process.id == route.process_name.id %}selected{% endif %}>{{ process.name }}</option>
+                                            <option value="{{ process.id }}" {% if process.name == route.process_name %}selected{% endif %}>{{ process.name }}</option>
                                         {% endfor %}
                                     </select>
                                 </div>

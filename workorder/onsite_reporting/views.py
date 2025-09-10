@@ -443,7 +443,8 @@ class OnsiteReportDetailView(LoginRequiredMixin, DetailView):
                     change_type = 'update'
                 
                 OnsiteReportHistory.objects.create(
-                    onsite_report=self.object,
+                    onsite_report_id=str(self.object.id),
+                    onsite_report_name=f"{self.object.operator} - {self.object.workorder}",
                     change_type=change_type,
                     old_status=old_status,
                     new_status=new_status,
@@ -469,7 +470,7 @@ class OnsiteReportDetailView(LoginRequiredMixin, DetailView):
         # 取得歷史記錄
         try:
             context['history'] = OnsiteReportHistory.objects.filter(
-                onsite_report=self.object
+                onsite_report_id=str(self.object.id)
             ).order_by('-changed_at')
         except:
             context['history'] = []
@@ -830,7 +831,8 @@ def quick_status_change(request, pk):
                     # 記錄歷史
                     try:
                         OnsiteReportHistory.objects.create(
-                            onsite_report=onsite_report,
+                            onsite_report_id=str(onsite_report.id),
+                            onsite_report_name=f"{onsite_report.operator} - {onsite_report.workorder}",
                             change_type='quick_pause',
                             old_status=old_status,
                             new_status='paused',
@@ -863,7 +865,8 @@ def quick_status_change(request, pk):
                     # 記錄歷史
                     try:
                         OnsiteReportHistory.objects.create(
-                            onsite_report=onsite_report,
+                            onsite_report_id=str(onsite_report.id),
+                            onsite_report_name=f"{onsite_report.operator} - {onsite_report.workorder}",
                             change_type='quick_resume',
                             old_status=old_status,
                             new_status='resumed',
@@ -913,7 +916,8 @@ def quick_status_change(request, pk):
                     # 記錄歷史
                     try:
                         OnsiteReportHistory.objects.create(
-                            onsite_report=onsite_report,
+                            onsite_report_id=str(onsite_report.id),
+                            onsite_report_name=f"{onsite_report.operator} - {onsite_report.workorder}",
                             change_type='quick_complete',
                             old_status=old_status,
                             new_status='completed',
@@ -949,7 +953,8 @@ def quick_status_change(request, pk):
                     # 記錄歷史
                     try:
                         OnsiteReportHistory.objects.create(
-                            onsite_report=onsite_report,
+                            onsite_report_id=str(onsite_report.id),
+                            onsite_report_name=f"{onsite_report.operator} - {onsite_report.workorder}",
                             change_type='quick_stop',
                             old_status=old_status,
                             new_status='stopped',

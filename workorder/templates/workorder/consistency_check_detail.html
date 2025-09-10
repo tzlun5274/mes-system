@@ -285,7 +285,7 @@
                             </h4>
                             <p class="text-muted">
                                 {% if is_fixed %}
-                                    所有問題都已經修復完成！
+                                    所有問題都已經處理完成！
                                 {% else %}
                                     太好了！沒有發現相符性問題。
                                 {% endif %}
@@ -552,7 +552,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 // 顯示成功訊息
-                alert('修復成功！');
+                alert('處理完成！');
                 // 重新載入頁面
                 location.reload();
             } else {
@@ -704,7 +704,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert(`批次修復成功！共修復 ${data.fixed_count} 筆問題。`);
+                alert(`批次處理完成！共處理 ${data.fixed_count} 筆問題。`);
                 location.reload();
             } else {
                 alert('批次修復失敗：' + data.message);

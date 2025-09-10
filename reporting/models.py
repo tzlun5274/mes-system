@@ -285,7 +285,8 @@ class ReportExecutionLog(models.Model):
         ('running', '執行中'),
     ]
     
-    report_schedule = models.ForeignKey(ReportSchedule, on_delete=models.CASCADE, verbose_name="報表排程")
+    report_schedule_id = models.CharField(max_length=50, verbose_name="報表排程ID")
+    report_schedule_name = models.CharField(max_length=200, verbose_name="報表排程名稱")
     execution_time = models.DateTimeField(auto_now_add=True, verbose_name="執行時間")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, verbose_name="執行狀態")
     message = models.TextField(blank=True, verbose_name="執行訊息")
@@ -298,7 +299,7 @@ class ReportExecutionLog(models.Model):
         ordering = ['-execution_time']
     
     def __str__(self):
-        return f"{self.report_schedule.name} - {self.execution_time.strftime('%Y-%m-%d %H:%M')}" 
+        return f"{self.report_schedule_name} - {self.execution_time.strftime('%Y-%m-%d %H:%M')}" 
 
 
 class OperatorProcessCapacityScore(models.Model):

@@ -40,12 +40,12 @@ class ProductionLineAdmin(admin.ModelAdmin):
     list_display = [
         "line_code",
         "line_name",
-        "line_type",
+        "line_type_name",
         "work_time_display",
         "work_days_display",
         "is_active",
     ]
-    list_filter = ["line_type", "is_active", "created_at"]
+    list_filter = ["line_type_name", "is_active", "created_at"]
     search_fields = ["line_code", "line_name"]
     ordering = ["line_code"]
 
@@ -107,7 +107,8 @@ class ProductionLineScheduleAdmin(admin.ModelAdmin):
     """
 
     list_display = [
-        "production_line",
+        "production_line_name",
+        "production_line_id",
         "schedule_date",
         "work_time_display",
         "is_holiday",
@@ -115,20 +116,19 @@ class ProductionLineScheduleAdmin(admin.ModelAdmin):
         "created_at",
     ]
     list_filter = [
-        "production_line__line_type",
         "is_holiday",
         "schedule_date",
         "created_at",
     ]
     search_fields = [
-        "production_line__line_code",
-        "production_line__line_name",
+        "production_line_id",
+        "production_line_name",
         "created_by",
     ]
-    ordering = ["-schedule_date", "production_line"]
+    ordering = ["-schedule_date", "production_line_name"]
 
     fieldsets = (
-        ("基本資訊", {"fields": ("production_line", "schedule_date")}),
+        ("基本資訊", {"fields": ("production_line_id", "production_line_name", "schedule_date")}),
         (
             "工作時間設定",
             {

@@ -89,7 +89,8 @@ class ProductionLineForm(forms.ModelForm):
         fields = [
             "line_code",
             "line_name",
-            "line_type",
+            "line_type_id",
+            "line_type_name",
             "description",
             "work_start_time",
             "work_end_time",
@@ -109,7 +110,8 @@ class ProductionLineForm(forms.ModelForm):
                     "placeholder": "例如：SMT產線1、組裝產線1",
                 }
             ),
-            "line_type": forms.Select(attrs={"class": "form-select"}),
+            "line_type_id": forms.TextInput(attrs={"class": "form-control"}),
+            "line_type_name": forms.TextInput(attrs={"class": "form-control"}),
             "description": forms.Textarea(
                 attrs={
                     "class": "form-control",
@@ -277,7 +279,8 @@ class ProductionLineScheduleForm(forms.ModelForm):
     class Meta:
         model = ProductionLineSchedule
         fields = [
-            "production_line",
+            "production_line_id",
+            "production_line_name",
             "schedule_date",
             "work_start_time",
             "work_end_time",
@@ -289,7 +292,7 @@ class ProductionLineScheduleForm(forms.ModelForm):
             "holiday_reason",
         ]
         widgets = {
-            "production_line": forms.Select(attrs={"class": "form-select"}),
+            "production_line_id": forms.Select(attrs={"class": "form-select"}),
             "schedule_date": forms.DateInput(
                 attrs={"class": "form-control", "type": "date"}
             ),
@@ -315,6 +318,127 @@ class ProductionLineScheduleForm(forms.ModelForm):
             "holiday_reason": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "請說明假日原因"}
             ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # 設定產線選擇的選項
+        from .models import ProductionLine
+        production_lines = ProductionLine.objects.filter(is_active=True)
+        choices = [(str(line.id), f"{line.line_name} ({line.line_code})") for line in production_lines]
+        self.fields["production_line_id"].choices = [("", "請選擇產線")] + choices
+        
+        # 如果有實例，設定工作日的初始值
+        if self.instance and self.instance.pk:
+            try:
+                work_days_list = json.loads(self.instance.work_days)
+                self.fields["work_days"].initial = work_days_list
+            except:
+                self.fields["work_days"].initial = ["1", "2", "3", "4", "5"]
+        else:
+            # 預設選擇週一到週五
+            self.fields["work_days"].initial = ["1", "2", "3", "4", "5"]
+
+    def clean(self):
+        """整體驗證"""
+        cleaned_data = super().clean()
+        
+        # 根據選擇的產線ID設定產線名稱
+        production_line_id = cleaned_data.get("production_line_id")
+        if production_line_id:
+            try:
+                from .models import ProductionLine
+                production_line = ProductionLine.objects.get(id=production_line_id)
+                cleaned_data["production_line_name"] = production_line.line_name
+            except ProductionLine.DoesNotExist:
+                raise ValidationError("選擇的產線不存在")
+        
+        return cleaned_data
+
+class ProductionLineForm(forms.ModelForm):
+    """
+    產線管理表單
+    """
+
+    # 工作日選擇欄位
+    work_days_choices = [
+        ("1", "週一"),
+        ("2", "週二"),
+        ("3", "週三"),
+        ("4", "週四"),
+        ("5", "週五"),
+        ("6", "週六"),
+        ("7", "週日"),
+    ]
+
+    work_days = forms.MultipleChoiceField(
+        choices=work_days_choices,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+        label="工作日設定",
+        help_text="選擇此產線的工作日",
+    )
+
+    # 午休時間設定選項
+    has_lunch_break = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="設定午休時間",
+        help_text="勾選此選項以設定午休時間，不勾選則表示沒有午休時間",
+    )
+
+    class Meta:
+        model = ProductionLine
+        fields = [
+            "line_code",
+            "line_name",
+            "line_type_id",
+            "line_type_name",
+            "description",
+            "work_start_time",
+            "work_end_time",
+            "lunch_start_time",
+            "lunch_end_time",
+            "overtime_start_time",
+            "overtime_end_time",
+            "work_days",
+            "is_active",
+        ]
+        widgets = {
+            "line_code": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "例如：LINE001"}
+            ),
+            "line_name": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "例如：第一產線"}
+            ),
+            "line_type_id": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "例如：SMT"}
+            ),
+            "line_type_name": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "例如：SMT產線"}
+            ),
+            "description": forms.Textarea(
+                attrs={"class": "form-control", "rows": 3, "placeholder": "產線描述"}
+            ),
+            "work_start_time": forms.TimeInput(
+                attrs={"class": "form-control", "type": "time"}
+            ),
+            "work_end_time": forms.TimeInput(
+                attrs={"class": "form-control", "type": "time"}
+            ),
+            "lunch_start_time": forms.TimeInput(
+                attrs={"class": "form-control", "type": "time"}
+            ),
+            "lunch_end_time": forms.TimeInput(
+                attrs={"class": "form-control", "type": "time"}
+            ),
+            "overtime_start_time": forms.TimeInput(
+                attrs={"class": "form-control", "type": "time"}
+            ),
+            "overtime_end_time": forms.TimeInput(
+                attrs={"class": "form-control", "type": "time"}
+            ),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
     def __init__(self, *args, **kwargs):

@@ -1,0 +1,85 @@
+{% extends "base_fastapi.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">{{ title }}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-sync fa-3x text-primary mb-3"></i>
+                                    <h5>同步狀態</h5>
+                                    <p class="text-muted">查看 ERP 資料同步狀態</p>
+                                    <a href="/erp/sync-status/" class="btn btn-primary">查看狀態</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-list fa-3x text-success mb-3"></i>
+                                    <h5>同步日誌</h5>
+                                    <p class="text-muted">查看 ERP 同步操作日誌</p>
+                                    <a href="/erp/sync-log/" class="btn btn-success">查看日誌</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-info">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-map fa-3x text-info mb-3"></i>
+                                    <h5>資料對應</h5>
+                                    <p class="text-muted">管理 ERP 與 MES 資料對應</p>
+                                    <a href="/erp/data-mapping/" class="btn btn-info">資料對應</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>同步統計</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-6">
+                                            <h3 class="text-primary">0</h3>
+                                            <p class="text-muted">今日同步次數</p>
+                                        </div>
+                                        <div class="col-6">
+                                            <h3 class="text-success">0</h3>
+                                            <p class="text-muted">成功同步次數</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>最近同步記錄</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="text-center text-muted">
+                                        <i class="fas fa-history fa-2x mb-2"></i>
+                                        <p>目前沒有同步記錄</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

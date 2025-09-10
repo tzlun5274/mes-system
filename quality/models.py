@@ -18,9 +18,8 @@ class InspectionItem(models.Model):
 
 
 class InspectionRecord(models.Model):
-    inspection_item = models.ForeignKey(
-        InspectionItem, on_delete=models.CASCADE, verbose_name="檢驗項目"
-    )
+    inspection_item_id = models.CharField(max_length=50, verbose_name="檢驗項目ID")
+    inspection_item_name = models.CharField(max_length=100, verbose_name="檢驗項目名稱")
     product_name = models.CharField(max_length=100, verbose_name="產品名稱")
     inspection_date = models.DateField(verbose_name="檢驗日期")
     result = models.CharField(
@@ -92,7 +91,11 @@ class AOITestReport(models.Model):
 
 
 class QualityOperationLog(models.Model):
-    user = models.CharField(max_length=100, verbose_name="用戶")
+    user = models.CharField(
+        max_length=100, 
+        verbose_name="用戶",
+        help_text="用戶名稱（非外鍵關係，純文字欄位）"
+    )
     action = models.TextField(verbose_name="操作")
     timestamp = models.DateTimeField(default=timezone.now, verbose_name="時間戳")
 

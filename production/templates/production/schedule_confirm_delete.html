@@ -20,7 +20,7 @@
             您即將刪除以下排程記錄：
           </p>
           <div class="alert alert-warning">
-            <strong>產線：</strong>{{ schedule.production_line.line_name }}<br>
+            <strong>產線：</strong>{{ schedule.production_line_name }}<br>
             <strong>排程日期：</strong>{{ schedule.schedule_date|date:"Y-m-d" }}<br>
             <strong>工作時間：</strong>{{ schedule.work_start_time|time:"H:i" }} - {{ schedule.work_end_time|time:"H:i" }}<br>
             <strong>假日狀態：</strong>

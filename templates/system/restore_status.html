@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-hant">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - MES 系統</title>
+    <link rel="stylesheet" href="{% static 'bootstrap/bootstrap.min.css' %}">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background: #f5f5f5; 
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .status-container {
+            max-width: 600px;
+            width: 100%;
+            padding: 20px;
+        }
+        .status-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .status-header {
+            background: #007bff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .status-body {
+            padding: 30px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #007bff;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="status-container">
+        <div class="status-card">
+            <div class="status-header">
+                <h2><i class="fas fa-database"></i> 資料庫還原狀態</h2>
+            </div>
+            <div class="status-body text-center">
+                <div class="spinner"></div>
+                <h4>正在執行資料庫還原...</h4>
+                <p class="text-muted">
+                    請稍候，系統正在處理您的資料庫還原請求。
+                </p>
+                
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                
+                <div class="mt-3">
+                    <small class="text-muted">
+                        任務 ID: {{ task_id }}<br>
+                        狀態: <span id="taskStatus">{{ status }}</span>
+                    </small>
+                </div>
+                
+                <div class="mt-4">
+                    <button class="btn btn-secondary" onclick="location.reload()">
+                        <i class="fas fa-redo"></i> 重新整理
+                    </button>
+                    <a href="{% url 'system:restore_database' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回還原頁面
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="{% static 'bootstrap/bootstrap.bundle.min.js' %}"></script>
+    <script>
+        // 自動檢查任務狀態
+        let checkCount = 0;
+        const maxChecks = 60; // 最多檢查 60 次（5 分鐘）
+        
+        function checkTaskStatus() {
+            checkCount++;
+            
+            // 模擬進度條
+            const progressFill = document.getElementById('progressFill');
+            const progress = Math.min((checkCount / maxChecks) * 100, 95);
+            progressFill.style.width = progress + '%';
+            
+            // 每 5 秒檢查一次任務狀態
+            setTimeout(() => {
+                if (checkCount < maxChecks) {
+                    location.reload();
+                } else {
+                    // 超時處理
+                    document.querySelector('.spinner').style.display = 'none';
+                    document.querySelector('h4').textContent = '任務執行時間過長';
+                    document.querySelector('p').textContent = '資料庫還原任務執行時間超過預期，請檢查系統日誌或聯繫管理員。';
+                    progressFill.style.width = '100%';
+                    progressFill.style.backgroundColor = '#dc3545';
+                }
+            }, 5000);
+        }
+        
+        // 頁面載入後開始檢查
+        document.addEventListener('DOMContentLoaded', checkTaskStatus);
+    </script>
+</body>
+</html> 

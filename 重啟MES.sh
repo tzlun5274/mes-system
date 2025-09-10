@@ -308,14 +308,14 @@ start_services() {
         $PYTHON_CMD manage.py migrate 2>/dev/null
     fi
     
-    # 啟動 Celery Worker
-    echo "啟動 Celery Worker..."
-    nohup $PYTHON_CMD -m celery -A mes_config worker --loglevel=info > celery_worker.log 2>&1 &
+    # 重啟 Celery Worker 服務
+    echo "重啟 Celery Worker 服務..."
+    sudo systemctl restart celery-mes_config
     sleep 3
     
-    # 啟動 Celery Beat (定時任務排程器)
-    echo "啟動 Celery Beat (定時任務排程器)..."
-    nohup $PYTHON_CMD -m celery -A mes_config beat --loglevel=info > celery_beat.log 2>&1 &
+    # 重啟 Celery Beat 服務 (定時任務排程器)
+    echo "重啟 Celery Beat 服務 (定時任務排程器)..."
+    sudo systemctl restart celerybeat-mes_config
     sleep 3
     
     # 啟動 Django 開發伺服器
@@ -329,18 +329,20 @@ start_services() {
     # 檢查所有服務是否正常啟動
     echo "檢查服務狀態..."
     
-    # 檢查 Celery Worker
-    if pgrep -f "celery.*worker" > /dev/null; then
-        echo -e "${GREEN}✓ Celery Worker 啟動成功${NC}"
+    # 檢查 Celery Worker 服務狀態
+    if systemctl is-active --quiet celery-mes_config; then
+        echo -e "${GREEN}✓ Celery Worker 服務運行正常${NC}"
     else
-        echo -e "${RED}✗ Celery Worker 啟動失敗${NC}"
+        echo -e "${RED}✗ Celery Worker 服務啟動失敗${NC}"
+        systemctl status celery-mes_config --no-pager
     fi
     
-    # 檢查 Celery Beat
-    if pgrep -f "celery.*beat" > /dev/null; then
-        echo -e "${GREEN}✓ Celery Beat 啟動成功${NC}"
+    # 檢查 Celery Beat 服務狀態
+    if systemctl is-active --quiet celerybeat-mes_config; then
+        echo -e "${GREEN}✓ Celery Beat 服務運行正常${NC}"
     else
-        echo -e "${RED}✗ Celery Beat 啟動失敗${NC}"
+        echo -e "${RED}✗ Celery Beat 服務啟動失敗${NC}"
+        systemctl status celerybeat-mes_config --no-pager
     fi
     
     # 檢查 Django 伺服器

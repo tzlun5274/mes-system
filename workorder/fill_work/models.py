@@ -33,7 +33,8 @@ class FillWork(models.Model):
     planned_quantity = models.IntegerField(default=0, verbose_name="工單預設生產數量", help_text="工單預設生產數量")
     
     # 製程相關欄位
-    process = models.ForeignKey('process.ProcessName', on_delete=models.CASCADE, verbose_name="工序", help_text="工序")
+    process_id = models.CharField(max_length=50, verbose_name="工序ID", help_text="工序ID")
+    process_name = models.CharField(max_length=100, verbose_name="工序名稱", help_text="工序名稱")
     operation = models.CharField(max_length=100, blank=True, verbose_name="工序名稱", help_text="工序名稱")
     equipment = models.CharField(max_length=100, blank=True, default='', verbose_name="使用的設備", help_text="使用的設備")
     

@@ -1,11 +1,11 @@
 from django.urls import path
-from . import views
+from . import views, api
 from .views.schedule_hybrid import (
     schedule_hybrid,
     hybrid_scheduling_preview,
     schedule_warning_board,
 )
-from .views.orders import order_list, order_detail, order_detail_api
+from .views.orders import customer_order_list, customer_order_detail, order_detail_api
 from .views.order_api import OrderAPIView
 from .views.unified_scheduling import (
     unified_scheduling_view,
@@ -89,8 +89,8 @@ urlpatterns = [
         views.calculate_task_duration,
         name="api_calculate_task_duration",
     ),
-    path("order_list/", order_list, name="order_list"),
-    path("order_detail/<int:order_id>/", order_detail, name="order_detail"),
+    path("customer_order_list/", customer_order_list, name="customer_order_list"),
+    path("customer_order_detail/<int:order_id>/", customer_order_detail, name="customer_order_detail"),
     path("api/order_detail/<int:order_id>/", order_detail_api, name="order_detail_api"),
     # 訂單 API 路由
     path("api/orders/", OrderAPIView.as_view(), name="api_orders"),
@@ -114,4 +114,10 @@ urlpatterns = [
         get_scheduling_parameters,
         name="get_scheduling_parameters",
     ),
+    
+    # scheduling API 路由
+    path("api/event/", api.EventAPIView.as_view(), name="api_event_list"),
+    path("api/event/<int:event_id>/", api.EventAPIView.as_view(), name="api_event_detail"),
+    path("api/units/", api.get_units, name="api_units"),
+    path("api/warnings/", api.get_schedule_warnings, name="api_schedule_warnings"),
 ]

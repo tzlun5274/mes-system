@@ -24,14 +24,20 @@ class Equipment(models.Model):
         max_length=20, choices=STATUS_CHOICES, default="idle", verbose_name="設備狀態"
     )
 
-    # 所屬產線
-    production_line = models.ForeignKey(
-        "production.ProductionLine",
-        on_delete=models.SET_NULL,
+    # 所屬產線（使用字串欄位，避免外鍵耦合）
+    production_line_id = models.CharField(
+        max_length=100, 
+        blank=True, 
         null=True,
-        blank=True,
-        verbose_name="所屬產線",
-        help_text="此設備所屬的生產線",
+        verbose_name="產線ID", 
+        help_text="此設備所屬的生產線ID"
+    )
+    production_line_name = models.CharField(
+        max_length=200, 
+        blank=True, 
+        null=True,
+        verbose_name="產線名稱", 
+        help_text="此設備所屬的生產線名稱"
     )
 
     # 時間戳記
@@ -51,7 +57,7 @@ class Equipment(models.Model):
 
     def __str__(self):
         line_name = (
-            f" - {self.production_line.line_name}" if self.production_line else ""
+            f" - {self.production_line_name}" if self.production_line_name else ""
         )
         return f"{self.name} ({self.get_status_display()}{line_name})"
 
@@ -62,7 +68,11 @@ class EquipOperationLog(models.Model):
     """
 
     timestamp = models.DateTimeField(default=timezone.now, verbose_name="時間")
-    user = models.CharField(max_length=150, verbose_name="用戶")
+    user = models.CharField(
+        max_length=150, 
+        verbose_name="用戶",
+        help_text="用戶名稱（非外鍵關係，純文字欄位）"
+    )
     action = models.CharField(max_length=255, verbose_name="操作")
 
     class Meta:

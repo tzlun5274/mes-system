@@ -95,7 +95,7 @@
             <tbody>
               {% for schedule in page_obj %}
               <tr>
-                <td>{{ schedule.production_line.line_name }}</td>
+                <td>{{ schedule.production_line_name }}</td>
                 <td>{{ schedule.schedule_date|date:"Y-m-d" }}</td>
                 <td>{{ schedule.work_start_time|time:"H:i" }} - {{ schedule.work_end_time|time:"H:i" }}</td>
                 <td>

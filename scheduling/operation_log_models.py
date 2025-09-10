@@ -8,15 +8,14 @@ class SchedulingOperationLog(models.Model):
     """
 
     timestamp = models.DateTimeField(default=timezone.now, verbose_name="時間戳")
-    user = models.CharField(max_length=150, verbose_name="用戶")
-    action = models.CharField(max_length=255, verbose_name="操作")
-    event_related = models.ForeignKey(
-        "Event",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        verbose_name="關聯事件",
+    user = models.CharField(
+        max_length=150, 
+        verbose_name="用戶",
+        help_text="用戶名稱（非外鍵關係，純文字欄位）"
     )
+    action = models.CharField(max_length=255, verbose_name="操作")
+    event_related_id = models.CharField(max_length=50, null=True, blank=True, verbose_name="關聯事件ID")
+    event_related_title = models.CharField(max_length=200, null=True, blank=True, verbose_name="關聯事件標題")
     ip_address = models.GenericIPAddressField(
         null=True, blank=True, verbose_name="IP 地址"
     )

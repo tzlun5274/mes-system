@@ -3,7 +3,7 @@ from django.db.models import Q
 from django.utils import timezone
 from .models import (
     WorkOrder,
-    CompanyOrder,
+    ManufacturingOrder,
     WorkOrderProcess,
     WorkOrderAssignment,
     WorkOrderProduction,
@@ -366,20 +366,20 @@ class WorkOrderForm(forms.ModelForm):
         self.fields["product_code"].choices = self.get_product_choices()
 
     def get_product_choices(self):
-        """取得產品編號選項，從公司製令單中取得"""
+        """取得產品編號選項，從公司製造命令中取得"""
         choices = [("", "請選擇產品編號")]
         try:
-            # 取得所有公司製令單的產品編號（包括已轉換和未轉換的）
-            from .models import CompanyOrder
+            # 取得所有公司製造命令的產品編號（包括已轉換和未轉換的）
+            from .models import ManufacturingOrder
 
-            company_orders = (
-                CompanyOrder.objects.all()
+            manufacturing_orders = (
+                ManufacturingOrder.objects.all()
                 .values_list("product_id", "product_id")
                 .distinct()
                 .order_by("product_id")
             )
 
-            for product_id, _ in company_orders:
+            for product_id, _ in manufacturing_orders:
                 choices.append((product_id, product_id))
         except Exception as e:
             # 如果發生錯誤，至少提供空選項

@@ -98,7 +98,11 @@ class KanbanDeliverySchedule(models.Model):
 
 
 class KanbanOperationLog(models.Model):
-    user = models.CharField(max_length=100, verbose_name="用戶")
+    user = models.CharField(
+        max_length=100, 
+        verbose_name="用戶",
+        help_text="用戶名稱（非外鍵關係，純文字欄位）"
+    )
     action = models.TextField(verbose_name="操作")
     timestamp = models.DateTimeField(default=timezone.now, verbose_name="時間戳")
 
@@ -109,3 +113,86 @@ class KanbanOperationLog(models.Model):
 
     def __str__(self):
         return f"{self.timestamp} - {self.user} - {self.action}"
+
+
+class KanbanBoard(models.Model):
+    """
+    看板管理模型
+    管理不同的看板
+    """
+    
+    name = models.CharField(max_length=100, verbose_name="看板名稱")
+    description = models.TextField(blank=True, null=True, verbose_name="看板描述")
+    board_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('production', '生產看板'),
+            ('equipment', '設備看板'),
+            ('quality', '品質看板'),
+            ('material', '物料看板'),
+        ],
+        default='production',
+        verbose_name="看板類型"
+    )
+    
+    is_active = models.BooleanField(default=True, verbose_name="啟用狀態")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    
+    class Meta:
+        verbose_name = "看板"
+        verbose_name_plural = "看板管理"
+        ordering = ["-created_at"]
+    
+    def __str__(self):
+        return self.name
+
+
+class KanbanItem(models.Model):
+    """
+    看板項目模型
+    管理看板中的具體項目
+    """
+    
+    board_id = models.CharField(max_length=50, verbose_name="看板ID")
+    board_name = models.CharField(max_length=100, verbose_name="看板名稱")
+    title = models.CharField(max_length=200, verbose_name="項目標題")
+    description = models.TextField(blank=True, null=True, verbose_name="項目描述")
+    
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('todo', '待處理'),
+            ('in_progress', '進行中'),
+            ('completed', '已完成'),
+            ('cancelled', '已取消'),
+        ],
+        default='todo',
+        verbose_name="狀態"
+    )
+    
+    priority = models.CharField(
+        max_length=10,
+        choices=[
+            ('low', '低'),
+            ('medium', '中'),
+            ('high', '高'),
+            ('urgent', '緊急'),
+        ],
+        default='medium',
+        verbose_name="優先級"
+    )
+    
+    assigned_to = models.CharField(max_length=100, blank=True, null=True, verbose_name="負責人")
+    due_date = models.DateTimeField(blank=True, null=True, verbose_name="截止日期")
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
+    
+    class Meta:
+        verbose_name = "看板項目"
+        verbose_name_plural = "看板項目管理"
+        ordering = ["-created_at"]
+    
+    def __str__(self):
+        return f"{self.title} - {self.get_status_display()}"

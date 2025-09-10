@@ -184,7 +184,7 @@ su - mes
   - workorder_dispatch: 7個 → 1個
   - fill_work: 8個 → 1個
   - onsite_reporting: 10個 → 1個
-  - company_order: 5個 → 1個
+  - manufacturing_order: 5個 → 1個
 
 #### 1.2 創建部署包
 ```bash
@@ -301,7 +301,7 @@ sudo systemctl start gunicorn-mes_config
    - 包含 10 個原始遷移檔案的內容
    - 涵蓋現場報工的所有功能
 
-7. **company_order**: `0001_squashed_0005_delete_companyordersystemconfig.py`
+7. **manufacturing_order**: `0001_squashed_0005_delete_companyordersystemconfig.py`
    - 包含 5 個原始遷移檔案的內容
    - 涵蓋公司訂單的所有功能
 

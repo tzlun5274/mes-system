@@ -1,9 +1,9 @@
 """
-管理命令：手動執行訂單同步
+管理命令：手動執行客戶訂單同步
 """
 
 from django.core.management.base import BaseCommand
-from scheduling.order_management import OrderManager
+from scheduling.customer_order_management import OrderManager
 
 
 class Command(BaseCommand):
@@ -22,7 +22,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        self.stdout.write('開始執行訂單同步...')
+        self.stdout.write('開始執行客戶訂單同步...')
         
         force = options['force']
         dry_run = options['dry_run']
@@ -31,7 +31,7 @@ class Command(BaseCommand):
             self.stdout.write('🔍 試運行模式：只檢查資料，不實際同步')
         
         try:
-            # 創建訂單管理器
+            # 創建客戶訂單管理器
             order_manager = OrderManager()
             
             if dry_run:
@@ -44,11 +44,11 @@ class Command(BaseCommand):
                 if result.get('status') == 'success':
                     self.stdout.write(
                         self.style.SUCCESS(
-                            f'✅ 訂單同步成功！共同步 {result.get("total_orders", 0)} 筆訂單'
+                            f'✅ 客戶訂單同步成功！共同步 {result.get("total_orders", 0)} 筆訂單'
                         )
                     )
                 else:
-                    error_msg = f'❌ 訂單同步失敗：{result.get("message", "未知錯誤")}'
+                    error_msg = f'❌ 客戶訂單同步失敗：{result.get("message", "未知錯誤")}'
                     if force:
                         self.stdout.write(self.style.WARNING(error_msg))
                         self.stdout.write('⚠️ 由於使用 --force 參數，繼續執行...')
@@ -57,7 +57,7 @@ class Command(BaseCommand):
                         return
                         
         except Exception as e:
-            error_msg = f'❌ 訂單同步執行失敗：{str(e)}'
+            error_msg = f'❌ 客戶訂單同步執行失敗：{str(e)}'
             if force:
                 self.stdout.write(self.style.WARNING(error_msg))
                 self.stdout.write('⚠️ 由於使用 --force 參數，繼續執行...')

@@ -18,51 +18,43 @@ SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-fallback-key-for-
 DEBUG = env.bool('DEBUG', default=True)
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost', '0.0.0.0', '*'])
 
+# 跳過遷移檢查
+MIGRATION_MODULES = {}
+
 # API 基礎 URL
 SITE_URL = f"http://{env('HOST_IP', default='localhost')}:{env('DJANGO_PORT', default='8000')}"
 
 # 已安裝的應用
-# 注意：應用程式順序很重要，被依賴的應用程式必須在前面
 INSTALLED_APPS = [
-    # Django 核心應用
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.contrib.humanize",
-    
-    # 第三方應用
     "corsheaders",  # 添加 django-cors-headers
-    "django_celery_beat",  # 添加 Celery Beat 支援
-    
-    # 基礎模組（無依賴）
+    "equip",
+    "material",
+    "process",
+    "scheduling.apps.SchedulingConfig",
+    "quality",
     "system",
-    "erp_integration.apps.ErpIntegrationConfig",
-    
-    # 核心業務模組（按依賴順序排列）
-    "process",  # 製程管理 - 被其他模組依賴
-    "equip",    # 設備管理
-    "material", # 物料管理
-    "quality",  # 品質管理
-    
-    # 工單相關模組（依賴 process）
     "workorder",
-    "workorder.company_order.apps.CompanyOrderConfig",
+    "workorder.manufacturing_order.apps.ManufacturingOrderConfig",
     "workorder.workorder_dispatch.apps.WorkOrderDispatchConfig",
+    "workorder.fill_work.apps.FillWorkConfig",
     "workorder.onsite_reporting.apps.OnsiteReportingConfig",
     "workorder.workorder_completed.apps.WorkOrderCompletedConfig",
-    "workorder.fill_work.apps.FillWorkConfig",  # 依賴 process.ProcessName
-    
-    # 生產和排程模組
-    "production",
-    "scheduling.apps.SchedulingConfig",
-    
-    # 其他功能模組
+            # 移除 production_monitoring，改用派工單監控資料
+
     "kanban.apps.KanbanConfig",
+    "erp_integration.apps.ErpIntegrationConfig",
     "ai.apps.AiConfig",
+    "production",
     "reporting",
+    # "work_reporting_management",  # 已移除新的報工管理系統
+    "django.contrib.humanize",
+    "django_celery_beat",  # 重新啟用 Celery Beat 支援
 ]
 
 # 中間件設置
@@ -199,6 +191,7 @@ DATABASES = {
         "OPTIONS": {
             "options": "-c search_path=public"
         },
+        "MIGRATE": False,  # 跳過遷移檢查
     }
 }
 
@@ -260,13 +253,15 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 DEFAULT_AUTO_FIELD = env("DEFAULT_AUTO_FIELD", default="django.db.models.BigAutoField")
 
 # Celery 配置：使用環境變數
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=f"redis://:{env('REDIS_PASSWORD', default='')}@localhost:{env('REDIS_PORT', default='6379')}/0")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=f"redis://:{env('REDIS_PASSWORD', default='')}@localhost:{env('REDIS_PORT', default='6379')}/0")
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=f"redis://localhost:{env('REDIS_PORT', default='6379')}/0")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=f"redis://localhost:{env('REDIS_PORT', default='6379')}/0")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = env("CELERY_TASK_SERIALIZER", default="json")
 CELERY_RESULT_SERIALIZER = env("CELERY_RESULT_SERIALIZER", default="json")
 CELERY_TIMEZONE = env("TIME_ZONE", default="Asia/Taipei")
-CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+# Celery Beat 配置
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # 認證和重定向設置
 LOGIN_URL = env("LOGIN_URL", default="/accounts/login/")

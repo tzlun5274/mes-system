@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load i18n %}
+{% load process_tags %}
 
 {% block title %}
 作業員與技能管理 - MES 系統
@@ -85,28 +86,30 @@
                                         </div>
                                     </td>
                                     <td>
-                                        {% if operator.production_line %}
+                                        {% if operator.production_line_name %}
                                             <span class="badge bg-info">
                                                 <i class="bi bi-building me-1"></i>
-                                                {{ operator.production_line.line_name }}
+                                                {{ operator.production_line_name }}
                                             </span>
                                         {% else %}
                                             <span class="text-muted fst-italic">未設定</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if operator.skills.all %}
-                                            <div class="d-flex flex-wrap gap-1">
-                                                {% for skill in operator.skills.all %}
-                                                    <span class="badge bg-success" title="優先順序: {{ skill.priority }}">
-                                                        {{ skill.process_name.name }}
-                                                        <small class="ms-1">({{ skill.priority }})</small>
-                                                    </span>
-                                                {% endfor %}
-                                            </div>
-                                        {% else %}
-                                            <span class="text-muted fst-italic">無技能</span>
-                                        {% endif %}
+                                        {% with skills=operator|get_operator_skills %}
+                                            {% if skills %}
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    {% for skill in skills %}
+                                                        <span class="badge bg-success" title="優先順序: {{ skill.priority }}">
+                                                            {{ skill.process_name }}
+                                                            <small class="ms-1">({{ skill.priority }})</small>
+                                                        </span>
+                                                    {% endfor %}
+                                                </div>
+                                            {% else %}
+                                                <span class="text-muted fst-italic">無技能</span>
+                                            {% endif %}
+                                        {% endwith %}
                                     </td>
                                     <td>
                                         <small class="text-muted">

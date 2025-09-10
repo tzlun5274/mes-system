@@ -34,7 +34,11 @@ def quality_user_required(user):
 def index(request):
     log_user_operation(request.user.username, "quality", "訪問品質管理模組首頁")
     inspection_items = InspectionItem.objects.all()[:5]
-    inspection_records = InspectionRecord.objects.all()[:5]
+    # 使用 values() 方法明確選擇存在的欄位，避免存取不存在的 inspection_item_name 欄位
+    inspection_records = InspectionRecord.objects.values(
+        'id', 'inspection_item_id', 'product_name', 'inspection_date', 
+        'result', 'remarks', 'created_at', 'updated_at'
+    )[:5]
     defective_products = DefectiveProduct.objects.all()[:5]
     final_inspections = FinalInspectionReport.objects.all()[:5]
     aoi_test_reports = AOITestReport.objects.all()[:5]
@@ -149,7 +153,7 @@ def get_inspection_records(request):
     inspection_records_data = [
         {
             "id": record.id,
-            "inspection_item": record.inspection_item.name,
+            "inspection_item": record.inspection_item_id,
             "product_name": record.product_name,
             "inspection_date": record.inspection_date.isoformat(),
             "result": record.result,

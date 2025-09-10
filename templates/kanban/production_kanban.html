@@ -1,0 +1,75 @@
+{% extends "base_fastapi.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">{{ title }}</h3>
+                    <a href="/kanban/" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回看板首頁
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white text-center">
+                                    <h5 class="mb-0">待生產</h5>
+                                </div>
+                                <div class="card-body" style="min-height: 400px;">
+                                    <div class="text-center text-muted">
+                                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                                        <p>目前沒有待生產工單</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-white text-center">
+                                    <h5 class="mb-0">生產中</h5>
+                                </div>
+                                <div class="card-body" style="min-height: 400px;">
+                                    <div class="text-center text-muted">
+                                        <i class="fas fa-cogs fa-3x mb-3"></i>
+                                        <p>目前沒有生產中工單</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white text-center">
+                                    <h5 class="mb-0">待檢驗</h5>
+                                </div>
+                                <div class="card-body" style="min-height: 400px;">
+                                    <div class="text-center text-muted">
+                                        <i class="fas fa-search fa-3x mb-3"></i>
+                                        <p>目前沒有待檢驗工單</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white text-center">
+                                    <h5 class="mb-0">已完成</h5>
+                                </div>
+                                <div class="card-body" style="min-height: 400px;">
+                                    <div class="text-center text-muted">
+                                        <i class="fas fa-check-circle fa-3x mb-3"></i>
+                                        <p>目前沒有已完成工單</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
