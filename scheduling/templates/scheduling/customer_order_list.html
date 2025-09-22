@@ -58,6 +58,73 @@
     <h2>客戶訂單管理</h2>
     <p class="text-muted">本頁顯示所有公司國內/國外訂單（同步自ERP），可依公司、客戶、訂單類型、交期查詢，並可匯出Excel。</p>
     
+    <!-- 同步條件說明區塊 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-info-circle text-info"></i> 同步條件說明
+                <button class="btn btn-sm btn-outline-secondary float-end" type="button" data-bs-toggle="collapse" data-bs-target="#syncConditions" aria-expanded="true" aria-controls="syncConditions" id="syncToggleBtn">
+                    <i class="fas fa-chevron-up"></i> 展開/收合
+                </button>
+            </h5>
+        </div>
+        <div class="collapse show" id="syncConditions">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary">
+                            <i class="fas fa-home"></i> 國內訂單同步條件
+                        </h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success"></i> 訂單號碼格式：<code>113-*</code></li>
+                            <li><i class="fas fa-check text-success"></i> 訂單日期：<code>2020年1月1日</code> 以後</li>
+                            <li><i class="fas fa-check text-success"></i> 訂單狀態：<code>未結案</code> (BillStatus = 0 或 NULL)</li>
+                            <li><i class="fas fa-check text-success"></i> 未交數量：<code>> 0</code></li>
+                            <li><i class="fas fa-check text-success"></i> 產品編號：<code>PFP-*</code> 開頭</li>
+                        </ul>
+                        <p class="text-muted small">
+                            <strong>資料來源：</strong> ordBillMain (主表) + ordBillSub (明細表) + comCustomer (客戶表)
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-primary">
+                            <i class="fas fa-globe"></i> 國外訂單同步條件
+                        </h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success"></i> 訂單號碼格式：<code>542-*</code></li>
+                            <li><i class="fas fa-check text-success"></i> 訂單日期：<code>2020年1月1日</code> 以後</li>
+                            <li><i class="fas fa-check text-success"></i> 訂單狀態：<code>未結案</code> (BillStatus = 0 或 NULL)</li>
+                            <li><i class="fas fa-check text-success"></i> 未交數量：<code>> 0</code></li>
+                            <li><i class="fas fa-check text-success"></i> 產品編號：<code>PFP-*</code> 開頭</li>
+                        </ul>
+                        <p class="text-muted small">
+                            <strong>資料來源：</strong> TraBillMain (主表) + TraBillSub (明細表) + comCustomer (客戶表)
+                        </p>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <h6 class="text-warning">
+                            <i class="fas fa-exclamation-triangle"></i> 重要說明
+                        </h6>
+                        <div class="alert alert-warning">
+                            <ul class="mb-0">
+                                <li><strong>同步頻率：</strong> 每30分鐘自動同步一次，也可手動執行同步</li>
+                                <li><strong>資料更新：</strong> 每次同步會清空現有資料，重新從ERP提取</li>
+                                <li><strong>公司範圍：</strong> 僅同步已設定在ERP整合模組中的公司資料</li>
+                                <li><strong>資料庫連線：</strong> 使用各公司專屬的MES資料庫進行查詢</li>
+                                <li><strong>狀態判斷：</strong> 逾期訂單（交期 < 今天）、緊急訂單（交期 ≤ 7天內）</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- 統計資訊區塊 -->
     {% if order_summary %}
     <div class="row mb-4">
@@ -305,5 +372,23 @@ function changePerPage(perPage) {
     urlParams.set('page', '1'); // 重置到第一頁
     window.location.href = window.location.pathname + '?' + urlParams.toString();
 }
+
+// 處理同步條件說明區塊的展開/收合按鈕圖示
+document.addEventListener('DOMContentLoaded', function() {
+    const syncToggleBtn = document.getElementById('syncToggleBtn');
+    const syncConditions = document.getElementById('syncConditions');
+    
+    if (syncToggleBtn && syncConditions) {
+        syncConditions.addEventListener('show.bs.collapse', function() {
+            syncToggleBtn.querySelector('i').className = 'fas fa-chevron-up';
+            syncToggleBtn.setAttribute('aria-expanded', 'true');
+        });
+        
+        syncConditions.addEventListener('hide.bs.collapse', function() {
+            syncToggleBtn.querySelector('i').className = 'fas fa-chevron-down';
+            syncToggleBtn.setAttribute('aria-expanded', 'false');
+        });
+    }
+});
 </script>
 {% endblock %}

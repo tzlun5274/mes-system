@@ -21,10 +21,6 @@
     padding: 0.25rem 0.5rem;
 }
 
-.fix-button {
-    min-width: 100px;
-}
-
 .exclude-notice {
     background-color: #fff3cd;
     border: 1px solid #ffeaa7;
@@ -102,24 +98,18 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-3">
-                            <strong>檢查類型：</strong><br>
-                            <span class="badge bg-primary">{{ check_type_display }}</span>
+                            <span class="badge bg-primary status-badge">檢查類型：{{ check_type_display }}</span>
                         </div>
                         <div class="col-md-3">
-                            <strong>顯示狀態：</strong><br>
-                            <span class="badge {% if is_fixed %}bg-success{% else %}bg-warning{% endif %}">
-                                {% if is_fixed %}已修復{% else %}未修復{% endif %}
-                            </span>
+                            <span class="badge bg-warning status-badge">顯示狀態：{% if is_fixed %}已修復{% else %}未修復{% endif %}</span>
                         </div>
                         <div class="col-md-3">
-                            <strong>問題數量：</strong><br>
-                            <span class="badge bg-info">{{ total_count }} 筆</span>
+                            <span class="badge bg-info status-badge">問題數量：{{ total_count }}筆</span>
                         </div>
                         <div class="col-md-3">
-                            <strong>操作：</strong><br>
                             <a href="?type={{ check_type }}&fixed={% if is_fixed %}false{% else %}true{% endif %}" 
-                               class="btn btn-sm btn-outline-primary">
-                                切換到{% if is_fixed %}未修復{% else %}已修復{% endif %}
+                               class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-exchange-alt"></i> 切換到{% if is_fixed %}未修復{% else %}已修復{% endif %}
                             </a>
                         </div>
                     </div>
@@ -128,169 +118,129 @@
         </div>
     </div>
 
-    <!-- 匯出和批次操作功能 -->
+    <!-- 匯出和批次操作 -->
     <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="export-buttons">
-                    <a href="{% url 'workorder:maintenance:consistency_check_export' %}?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=csv" 
-                       class="btn btn-success">
-                        <i class="fas fa-download"></i> 匯出 CSV
-                    </a>
-                    <a href="{% url 'workorder:maintenance:consistency_check_export' %}?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=excel" 
-                       class="btn btn-success">
-                        <i class="fas fa-file-excel"></i> 匯出 Excel
-                    </a>
-                </div>
-                {% if not is_fixed %}
-                <div class="batch-actions">
-                    <button id="selectAllBtn" class="btn btn-outline-primary me-2">
-                        <i class="fas fa-check-square"></i> 全選
-                    </button>
-                    <button id="batchFixBtn" class="btn btn-warning" disabled>
-                        <i class="fas fa-wrench"></i> 批次修復 (<span id="selectedCount">0</span>)
-                    </button>
-                </div>
-                {% endif %}
+        <div class="col-md-6">
+            <div class="export-buttons">
+                <a href="?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=csv" 
+                   class="btn btn-success">
+                    <i class="fas fa-download"></i> 匯出 CSV
+                </a>
+                <a href="?type={{ check_type }}&fixed={{ is_fixed|yesno:'true,false' }}&format=excel" 
+                   class="btn btn-success">
+                    <i class="fas fa-file-excel"></i> 匯出 Excel
+                </a>
             </div>
         </div>
+        {% if not is_fixed %}
+        <div class="col-md-6 text-end">
+            <div class="batch-actions">
+                <button id="selectAllBtn" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-check-square"></i> 全選
+                </button>
+                <button id="batchFixBtn" class="btn btn-warning" disabled>
+                    <i class="fas fa-wrench"></i> 批次修復 (<span id="selectedCount">0</span>)
+                </button>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- 檢查結果列表 -->
     <div class="row">
         <div class="col-12">
             <div class="card detail-card">
-                <div class="card-header bg-secondary text-white">
-                    <h4 class="mb-0">
+                <div class="card-header">
+                    <h5 class="mb-0">
                         <i class="fas fa-list"></i>
                         檢查結果列表
-                    </h4>
+                    </h5>
                 </div>
                 <div class="card-body">
                     {% if results %}
-                        <div class="table-responsive">
-                            <table class="table table-striped table-hover">
-                                <thead>
-                                    <tr>
-                                        {% if not is_fixed %}
-                                        <th class="text-center" style="width: 50px;">
-                                            <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
-                                        </th>
-                                        {% endif %}
-                                        {% if check_type == 'missing_dispatch' %}
-                                            <th colspan="3" class="text-center bg-warning text-dark">填報資料（無對應工單）</th>
-                                        {% else %}
-                                            <th colspan="3" class="text-center bg-primary text-white">來源（工單資料）</th>
-                                            <th colspan="3" class="text-center bg-warning text-dark">填報資料</th>
-                                        {% endif %}
-                                        {% if is_fixed %}
-                                            <th>修復時間</th>
-                                            <th>修復人員</th>
-                                            <th>修復方式</th>
-                                        {% else %}
-                                            <th>操作</th>
-                                        {% endif %}
-                                    </tr>
-                                    <tr>
-                                        {% if not is_fixed %}
-                                        <th class="text-center">選擇</th>
-                                        {% endif %}
-                                        {% if check_type == 'missing_dispatch' %}
-                                            <th class="text-dark fw-bold">公司名稱</th>
-                                            <th class="text-dark fw-bold">工單號碼</th>
-                                            <th class="text-dark fw-bold">產品編號</th>
-                                        {% else %}
-                                            <th class="text-dark fw-bold">公司名稱</th>
-                                            <th class="text-dark fw-bold">工單號碼</th>
-                                            <th class="text-dark fw-bold">產品編號</th>
-                                            <th class="text-dark fw-bold">公司名稱</th>
-                                            <th class="text-dark fw-bold">工單號碼</th>
-                                            <th class="text-dark fw-bold">產品編號</th>
-                                        {% endif %}
-                                        {% if is_fixed %}
-                                            <th class="text-dark fw-bold">修復時間</th>
-                                            <th class="text-dark fw-bold">修復人員</th>
-                                            <th class="text-dark fw-bold">修復方式</th>
-                                        {% else %}
-                                            <th class="text-dark fw-bold">操作</th>
-                                        {% endif %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for result in results %}
-                                    <tr data-result-id="{{ result.id }}">
-                                        {% if not is_fixed %}
-                                        <td class="text-center">
-                                            <input type="checkbox" class="form-check-input result-checkbox" 
-                                                   value="{{ result.id }}" data-result-id="{{ result.id }}">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    {% if not is_fixed %}
+                                    <th class="text-center">
+                                        <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
+                                    </th>
+                                    {% endif %}
+                                    {% if check_type == 'missing_dispatch' %}
+                                        <th class="text-dark fw-bold">公司名稱</th>
+                                        <th class="text-dark fw-bold">工單號碼</th>
+                                        <th class="text-dark fw-bold">產品編號</th>
+                                    {% else %}
+                                        <th class="text-dark fw-bold">公司名稱</th>
+                                        <th class="text-dark fw-bold">工單號碼</th>
+                                        <th class="text-dark fw-bold">產品編號</th>
+                                        <th class="text-dark fw-bold">公司名稱</th>
+                                        <th class="text-dark fw-bold">工單號碼</th>
+                                        <th class="text-dark fw-bold">產品編號</th>
+                                    {% endif %}
+                                    {% if is_fixed %}
+                                        <th class="text-dark fw-bold">修復時間</th>
+                                        <th class="text-dark fw-bold">修復人員</th>
+                                        <th class="text-dark fw-bold">修復方式</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for result in results %}
+                                <tr data-result-id="{{ result.id }}">
+                                    {% if not is_fixed %}
+                                    <td class="text-center">
+                                        <input type="checkbox" class="form-check-input result-checkbox" 
+                                               value="{{ result.id }}" data-result-id="{{ result.id }}">
+                                    </td>
+                                    {% endif %}
+                                    {% if check_type == 'missing_dispatch' %}
+                                        <td class="wrong-company-name">{{ result.wrong_company_name|default:result.company_name|default:"-" }}</td>
+                                        <td class="wrong-workorder">{{ result.wrong_workorder|default:result.workorder|default:"-" }}</td>
+                                        <td class="wrong-product-code">{{ result.wrong_product_code|default:result.product_code|default:"-" }}</td>
+                                    {% else %}
+                                        <td class="company-name">{{ result.company_name|default:"-" }}</td>
+                                        <td class="workorder">{{ result.workorder|default:"-" }}</td>
+                                        <td class="product-code">{{ result.product_code|default:"-" }}</td>
+                                        <td class="wrong-company-name">
+                                            {% if check_type == 'wrong_company' %}
+                                                <span class="text-danger">{{ result.wrong_company_name|default:"-" }}</span>
+                                            {% else %}
+                                                {{ result.company_name|default:"-" }}
+                                            {% endif %}
                                         </td>
-                                        {% endif %}
-                                        {% if check_type == 'missing_dispatch' %}
-                                            <td class="wrong-company-name">{{ result.wrong_company_name|default:result.company_name|default:"-" }}</td>
-                                            <td class="wrong-workorder">{{ result.wrong_workorder|default:result.workorder|default:"-" }}</td>
-                                            <td class="wrong-product-code">{{ result.wrong_product_code|default:result.product_code|default:"-" }}</td>
-                                        {% else %}
-                                            <td class="company-name">{{ result.company_name|default:"-" }}</td>
-                                            <td class="workorder">{{ result.workorder|default:"-" }}</td>
-                                            <td class="product-code">{{ result.product_code|default:"-" }}</td>
-                                            <td class="wrong-company-name">
-                                                {% if check_type == 'wrong_company' %}
-                                                    <span class="text-danger">{{ result.wrong_company_name|default:"-" }}</span>
-                                                {% else %}
-                                                    {{ result.company_name|default:"-" }}
-                                                {% endif %}
-                                            </td>
-                                            <td class="wrong-workorder">
-                                                {% if check_type == 'wrong_workorder' %}
-                                                    <span class="text-danger">{{ result.wrong_workorder|default:"-" }}</span>
-                                                {% else %}
-                                                    {{ result.workorder|default:"-" }}
-                                                {% endif %}
-                                            </td>
-                                            <td class="wrong-product-code">
-                                                {% if check_type == 'wrong_product_code' %}
-                                                    <span class="text-danger">{{ result.wrong_product_code|default:"-" }}</span>
-                                                {% else %}
-                                                    {{ result.product_code|default:"-" }}
-                                                {% endif %}
-                                            </td>
-                                        {% endif %}
-                                        {% if is_fixed %}
-                                            <td>{{ result.fixed_at|date:"Y-m-d H:i"|default:"-" }}</td>
-                                            <td>{{ result.fixed_by|default:"-" }}</td>
-                                            <td>{{ result.fix_method|default:"-" }}</td>
-                                        {% else %}
-                                            <td>
-                                                <button class="btn btn-sm btn-warning fix-button" 
-                                                        data-result-id="{{ result.id }}"
-                                                        data-check-type="{{ check_type }}">
-                                                    <i class="fas fa-wrench"></i> 修復
-                                                </button>
-                                            </td>
-                                        {% endif %}
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                                        <td class="wrong-workorder">
+                                            {% if check_type == 'wrong_workorder' %}
+                                                <span class="text-danger">{{ result.wrong_workorder|default:"-" }}</span>
+                                            {% else %}
+                                                {{ result.workorder|default:"-" }}
+                                            {% endif %}
+                                        </td>
+                                        <td class="wrong-product-code">
+                                            {% if check_type == 'wrong_product_code' %}
+                                                <span class="text-danger">{{ result.wrong_product_code|default:"-" }}</span>
+                                            {% else %}
+                                                {{ result.product_code|default:"-" }}
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                    {% if is_fixed %}
+                                        <td>{{ result.fixed_at|date:"Y-m-d H:i"|default:"-" }}</td>
+                                        <td>{{ result.fixed_by|default:"-" }}</td>
+                                        <td>{{ result.fix_method|default:"-" }}</td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                     {% else %}
-                        <div class="text-center py-4">
-                            <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
-                            <h4 class="mt-3 text-muted">
-                                {% if is_fixed %}
-                                    沒有已修復的問題
-                                {% else %}
-                                    沒有未修復的問題
-                                {% endif %}
-                            </h4>
-                            <p class="text-muted">
-                                {% if is_fixed %}
-                                    所有問題都已經處理完成！
-                                {% else %}
-                                    太好了！沒有發現相符性問題。
-                                {% endif %}
-                            </p>
-                        </div>
+                    <div class="text-center py-4">
+                        <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+                        <h5 class="text-muted">沒有找到相關問題</h5>
+                        <p class="text-muted">所有資料都符合檢查條件</p>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -298,61 +248,9 @@
     </div>
 </div>
 
-<!-- 單筆修復確認對話框 -->
-<div class="modal fade" id="fixModal" tabindex="-1" aria-labelledby="fixModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="fixModalLabel">修復相符性問題</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p id="fixModalMessage">確定要修復這個問題嗎？</p>
-                <p class="text-muted" id="fixModalDescription"><small>修復說明</small></p>
-                
-                <!-- 顯示原始錯誤資料 -->
-                <div class="alert alert-info mb-3">
-                    <h6><i class="fas fa-info-circle"></i> 原始錯誤資料：</h6>
-                    <div id="originalErrorData">
-                        <small class="text-muted">載入中...</small>
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="fixMethod" class="form-label">修復方式：</label>
-                    <select class="form-select" id="fixMethod">
-                        <option value="update_fill_work">修改填報紀錄</option>
-                        <option value="delete_fill_work">刪除填報紀錄</option>
-                    </select>
-                </div>
-                
-                <!-- 修改選項（當選擇 update_fill_work 時顯示） -->
-                <div id="singleUpdateOptions" style="display: none;">
-                    <div class="mb-3">
-                        <label for="singleNewCompanyName" class="form-label">公司名稱：</label>
-                        <input type="text" class="form-control" id="singleNewCompanyName" placeholder="輸入新的公司名稱">
-                    </div>
-                    <div class="mb-3">
-                        <label for="singleNewWorkorder" class="form-label">工單號碼：</label>
-                        <input type="text" class="form-control" id="singleNewWorkorder" placeholder="輸入新的工單號碼">
-                    </div>
-                    <div class="mb-3">
-                        <label for="singleNewProductId" class="form-label">產品編號：</label>
-                        <input type="text" class="form-control" id="singleNewProductId" placeholder="輸入新的產品編號">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-warning" id="confirmFix">確認修復</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- 批次修復確認對話框 -->
 <div class="modal fade" id="batchFixModal" tabindex="-1" aria-labelledby="batchFixModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="batchFixModalLabel">批次修復相符性問題</h5>
@@ -360,33 +258,31 @@
             </div>
             <div class="modal-body">
                 <p>確定要批次修復選中的 <span id="batchFixCount">0</span> 筆問題嗎？</p>
+                
                 <div class="mb-3">
-                    <label for="batchFixMethod" class="form-label">修復方式：</label>
+                    <label for="batchFixMethod" class="form-label">修復方式</label>
                     <select class="form-select" id="batchFixMethod">
                         <option value="update_fill_work">修改填報紀錄</option>
                         <option value="delete_fill_work">刪除填報紀錄</option>
                     </select>
                 </div>
                 
-                <!-- 修改選項（當選擇 update_fill_work 時顯示） -->
-                <div id="updateOptions">
-                    <div class="mb-3">
-                        <label for="newCompanyName" class="form-label">公司名稱：</label>
-                        <input type="text" class="form-control" id="newCompanyName" placeholder="輸入新的公司名稱">
+                <div id="updateOptions" style="display: block;">
+                    <h6>修改資料：</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="newCompanyName" class="form-label">公司名稱：</label>
+                            <input type="text" class="form-control" id="newCompanyName">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="newWorkorder" class="form-label">工單號碼：</label>
+                            <input type="text" class="form-control" id="newWorkorder">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="newProductId" class="form-label">產品編號：</label>
+                            <input type="text" class="form-control" id="newProductId">
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="newWorkorder" class="form-label">工單號碼：</label>
-                        <input type="text" class="form-control" id="newWorkorder" placeholder="輸入新的工單號碼">
-                    </div>
-                    <div class="mb-3">
-                        <label for="newProductId" class="form-label">產品編號：</label>
-                        <input type="text" class="form-control" id="newProductId" placeholder="輸入新的產品編號">
-                    </div>
-                </div>
-                
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <strong>注意：</strong>此操作將修改或刪除填報紀錄，操作後無法復原。
                 </div>
             </div>
             <div class="modal-footer">
@@ -401,173 +297,6 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 單筆修復功能
-    const fixButtons = document.querySelectorAll('.fix-button');
-    const fixModal = new bootstrap.Modal(document.getElementById('fixModal'));
-    let currentResultId = null;
-    let currentCheckType = null;
-
-    fixButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            currentResultId = this.dataset.resultId;
-            currentCheckType = this.dataset.checkType;
-            
-            // 根據檢查類型設定對話框內容
-            updateFixModalContent(currentCheckType);
-            
-            // 載入原始錯誤資料
-            loadOriginalErrorData(currentResultId);
-            
-            // 重置修改選項的顯示狀態（預設顯示修改選項）
-            const singleUpdateOptions = document.getElementById('singleUpdateOptions');
-            singleUpdateOptions.style.display = 'block';
-            
-            fixModal.show();
-        });
-    });
-
-    // 載入原始錯誤資料
-    function loadOriginalErrorData(resultId) {
-        // 從頁面中查找對應的結果資料
-        const resultRow = document.querySelector(`tr[data-result-id="${resultId}"]`);
-        if (!resultRow) {
-            document.getElementById('originalErrorData').innerHTML = '<small class="text-danger">無法載入原始資料</small>';
-            return;
-        }
-        
-        // 提取原始錯誤資料
-        const companyName = resultRow.querySelector('.company-name')?.textContent?.trim() || '';
-        const workorder = resultRow.querySelector('.workorder')?.textContent?.trim() || '';
-        const productCode = resultRow.querySelector('.product-code')?.textContent?.trim() || '';
-        const wrongCompanyName = resultRow.querySelector('.wrong-company-name')?.textContent?.trim() || '';
-        const wrongWorkorder = resultRow.querySelector('.wrong-workorder')?.textContent?.trim() || '';
-        const wrongProductCode = resultRow.querySelector('.wrong-product-code')?.textContent?.trim() || '';
-        
-        // 顯示原始錯誤資料
-        let errorDataHtml = '<div class="row">';
-        errorDataHtml += '<div class="col-md-6">';
-        errorDataHtml += '<strong>填報紀錄：</strong><br>';
-        errorDataHtml += `<small>公司名稱: ${wrongCompanyName || companyName}<br>`;
-        errorDataHtml += `工單號碼: ${wrongWorkorder || workorder}<br>`;
-        errorDataHtml += `產品編號: ${wrongProductCode || productCode}</small>`;
-        errorDataHtml += '</div>';
-        
-        // 如果是填報異常，沒有正確資料
-        if (currentCheckType === 'missing_dispatch') {
-            errorDataHtml += '<div class="col-md-6">';
-            errorDataHtml += '<strong>問題說明：</strong><br>';
-            errorDataHtml += '<small class="text-danger">此填報紀錄沒有對應的工單資料</small>';
-            errorDataHtml += '</div>';
-        } else {
-            errorDataHtml += '<div class="col-md-6">';
-            errorDataHtml += '<strong>正確資料：</strong><br>';
-            errorDataHtml += `<small>公司名稱: ${companyName}<br>`;
-            errorDataHtml += `工單號碼: ${workorder}<br>`;
-            errorDataHtml += `產品編號: ${productCode}</small>`;
-            errorDataHtml += '</div>';
-        }
-        errorDataHtml += '</div>';
-        
-        document.getElementById('originalErrorData').innerHTML = errorDataHtml;
-        
-        // 預填修復欄位（使用錯誤的資料作為預設值）
-        document.getElementById('singleNewCompanyName').value = wrongCompanyName || companyName;
-        document.getElementById('singleNewWorkorder').value = wrongWorkorder || workorder;
-        document.getElementById('singleNewProductId').value = wrongProductCode || productCode;
-    }
-
-    // 更新修復對話框內容
-    function updateFixModalContent(checkType) {
-        const messageEl = document.getElementById('fixModalMessage');
-        const descriptionEl = document.getElementById('fixModalDescription');
-        
-        if (checkType === 'missing_dispatch') {
-            messageEl.textContent = '確定要修復這個填報異常嗎？';
-            descriptionEl.innerHTML = '<small>可以刪除填報紀錄或修改公司名稱、工單號碼、產品編號</small>';
-        } else if (checkType === 'wrong_product_code') {
-            messageEl.textContent = '確定要修復這個產品編號錯誤嗎？';
-            descriptionEl.innerHTML = '<small>將把填報紀錄的產品編號更新為工單的正確產品編號</small>';
-        } else if (checkType === 'wrong_company') {
-            messageEl.textContent = '確定要修復這個公司名稱錯誤嗎？';
-            descriptionEl.innerHTML = '<small>將把填報紀錄的公司名稱更新為工單的正確公司名稱</small>';
-        } else if (checkType === 'wrong_workorder') {
-            messageEl.textContent = '確定要修復這個工單號碼錯誤嗎？';
-            descriptionEl.innerHTML = '<small>將把填報紀錄的工單號碼更新為正確的工單號碼</small>';
-        } else {
-            messageEl.textContent = '確定要修復這個問題嗎？';
-            descriptionEl.innerHTML = '<small>修復說明</small>';
-        }
-    }
-
-    // 單筆修復方式變更事件
-    document.getElementById('fixMethod').addEventListener('change', function() {
-        console.log('修復方式變更為：', this.value);
-        const singleUpdateOptions = document.getElementById('singleUpdateOptions');
-        if (this.value === 'update_fill_work') {
-            singleUpdateOptions.style.display = 'block';
-            console.log('顯示修改選項');
-        } else {
-            singleUpdateOptions.style.display = 'none';
-            console.log('隱藏修改選項');
-        }
-    });
-
-    // 確認單筆修復
-    document.getElementById('confirmFix').addEventListener('click', function() {
-        const fixMethod = document.getElementById('fixMethod').value;
-        
-        // 收集修改資料
-        let fixData = {};
-        if (fixMethod === 'update_fill_work') {
-            const newCompanyName = document.getElementById('singleNewCompanyName').value.trim();
-            const newWorkorder = document.getElementById('singleNewWorkorder').value.trim();
-            const newProductId = document.getElementById('singleNewProductId').value.trim();
-            
-            if (newCompanyName) fixData.company_name = newCompanyName;
-            if (newWorkorder) fixData.workorder = newWorkorder;
-            if (newProductId) fixData.product_id = newProductId;
-        }
-        
-        // 發送修復請求
-        const params = new URLSearchParams({
-            'action': 'fix_issue',
-            'result_id': currentResultId,
-            'fix_method': fixMethod
-        });
-        
-        // 如果有修改資料，加入請求中
-        if (Object.keys(fixData).length > 0) {
-            params.append('fix_data', JSON.stringify(fixData));
-        }
-        
-        fetch('{% url "workorder:maintenance:consistency_check_ajax" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: params
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // 顯示成功訊息
-                alert('處理完成！');
-                // 重新載入頁面
-                location.reload();
-            } else {
-                alert('修復失敗：' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('修復失敗，請稍後再試');
-        })
-        .finally(() => {
-            fixModal.hide();
-        });
-    });
-
     // 批次修復功能
     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
     const resultCheckboxes = document.querySelectorAll('.result-checkbox');
@@ -663,6 +392,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const fixMethod = document.getElementById('batchFixMethod').value;
         const selectedIds = getSelectedResultIds();
         
+        console.log('批次修復開始:', {
+            fixMethod: fixMethod,
+            selectedIds: selectedIds,
+            selectedCount: selectedIds.length
+        });
+        
+        // 檢查是否有選中的項目
+        if (selectedIds.length === 0) {
+            alert('請先選擇要修復的問題！');
+            return;
+        }
+        
         // 收集修改資料
         let fixData = {};
         if (fixMethod === 'update_fill_work') {
@@ -674,6 +415,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (newWorkorder) fixData.workorder = newWorkorder;
             if (newProductId) fixData.product_id = newProductId;
         }
+        
+        console.log('修復資料:', fixData);
         
         // 顯示載入狀態
         const button = this;
@@ -693,6 +436,8 @@ document.addEventListener('DOMContentLoaded', function() {
             params.append('fix_data', JSON.stringify(fixData));
         }
         
+        console.log('發送請求參數:', params.toString());
+        
         fetch('{% url "workorder:maintenance:consistency_check_ajax" %}', {
             method: 'POST',
             headers: {
@@ -701,8 +446,12 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: params
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('回應狀態:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('回應資料:', data);
             if (data.success) {
                 alert(`批次處理完成！共處理 ${data.fixed_count} 筆問題。`);
                 location.reload();
@@ -711,8 +460,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('批次修復失敗，請稍後再試');
+            console.error('批次修復錯誤:', error);
+            alert('批次修復失敗，請稍後再試。錯誤詳情請查看瀏覽器控制台。');
         })
         .finally(() => {
             button.innerHTML = originalText;
@@ -767,4 +516,4 @@ document.addEventListener('DOMContentLoaded', function() {
     updateSelectAllState();
 });
 </script>
-{% endblock %} 
+{% endblock %}

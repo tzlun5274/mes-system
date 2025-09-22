@@ -2851,3 +2851,19 @@ def get_operation_logs(request):
         for log in logs
     ]
     return JsonResponse({"operation_logs": logs_data})
+
+
+# API 測試頁面視圖
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def api_test(request):
+    """
+    ERP 整合 API 測試頁面
+    提供一個簡單的介面來測試所有 ERP 整合相關的 API
+    """
+    ERPIntegrationOperationLog.objects.create(
+        user=request.user.username,
+        action="訪問 API 測試頁面",
+        timestamp=timezone.now(),
+    )
+    return render(request, "erp_integration/api_test.html")

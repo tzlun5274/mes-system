@@ -210,7 +210,7 @@ class WorkOrderDispatch(models.Model):
         self.total_quantity = self.total_good_quantity + self.total_defect_quantity
         
         # 出貨包裝專項統計（填報記錄）
-        packaging_reports = approved_reports.filter(process_name='出貨包裝')
+        packaging_reports = approved_reports.filter(operation='出貨包裝')
         packaging_good_quantity = packaging_reports.aggregate(
             total=Sum('work_quantity')
         )['total'] or 0

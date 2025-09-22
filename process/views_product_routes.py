@@ -159,6 +159,8 @@ def view_product_route(request, product_id):
     log_user_operation(
         request.user.username, "process", f"檢視產品工藝路線: {product_id}"
     )
+    
+    # 使用 API 方式取得資料，避免直接查詢外鍵
     routes = ProductProcessRoute.objects.filter(product_id=product_id).order_by(
         "step_order"
     )
@@ -166,35 +168,50 @@ def view_product_route(request, product_id):
         messages.error(request, f"產品編號 {product_id} 不存在！")
         return redirect("process:product_routes")
 
-    equipments = get_equipment_options(request)
-    equip_id_to_name = {
-        str(equip["id"]): equip["name"]
-        for equip in equipments
-        if isinstance(equip, dict) and "id" in equip and "name" in equip
+    # 取得工序名稱和設備資訊的映射
+    process_names = {
+        str(p.id): p.name 
+        for p in ProcessName.objects.all()
     }
-    logger.debug(f"設備 ID 到名稱映射: {equip_id_to_name}")
+    
+    equipments = {
+        str(e.id): e.name 
+        for e in Equipment.objects.all()
+    }
 
     enhanced_routes = []
     for route in routes:
-        equipment_ids = (
-            [
+        # 處理設備ID列表
+        equipment_ids = []
+        equipment_names = []
+        if route.usable_equipment_ids:
+            equipment_ids = [
                 eid.strip()
                 for eid in route.usable_equipment_ids.split(",")
                 if eid.strip() and eid.strip().isdigit()
             ]
-            if route.usable_equipment_ids
-            else []
+            equipment_names = [
+                equipments.get(eid, f"未知設備({eid})") for eid in equipment_ids
+            ]
+        
+        # 取得工序名稱顯示
+        process_name_display = process_names.get(
+            route.process_name_id, 
+            route.process_name or "未知工序"
         )
-        equipment_names = [
-            equip_id_to_name.get(eid, f"未知設備({eid})") for eid in equipment_ids
-        ]
+        
         logger.debug(
-            f"檢視產品工藝路線: product_id={product_id}, step_order={route.step_order}, process_name={route.process_name}, equipment_ids={equipment_ids}, equipment_names={equipment_names}"
+            f"檢視產品工藝路線: product_id={product_id}, step_order={route.step_order}, "
+            f"process_name_id={route.process_name_id}, process_name={route.process_name}, "
+            f"process_name_display={process_name_display}, equipment_ids={equipment_ids}, "
+            f"equipment_names={equipment_names}"
         )
+        
         enhanced_routes.append(
             {
                 "id": route.id,
                 "process_name": route.process_name,
+                "process_name_display": process_name_display,
                 "step_order": route.step_order,
                 "usable_equipment_names": equipment_names,
                 "dependent_semi_product": route.dependent_semi_product or "",
@@ -796,12 +813,21 @@ def export_product_routes(request):
     匯出產品工藝路線（Excel），欄位順序：產品編號、工序順序、工序名稱、指定可用設備、依賴半成品
     """
     log_user_operation(request.user.username, "process", "匯出產品工藝路線數據")
+    
+    # 使用 API 化方式取得資料，避免直接查詢外鍵
     equipments = get_equipment_options(request)
     equip_id_to_name = {
         str(equip["id"]): equip["name"]
         for equip in equipments
         if isinstance(equip, dict) and "id" in equip and "name" in equip
     }
+    
+    # 取得工序名稱映射
+    process_names = {
+        str(p.id): p.name 
+        for p in ProcessName.objects.all()
+    }
+    
     workbook = openpyxl.Workbook()
     worksheet = workbook.active
     worksheet.title = "Product Process Routes"
@@ -809,14 +835,16 @@ def export_product_routes(request):
     headers = ["產品編號", "工序順序", "工序名稱", "指定可用設備", "依賴半成品"]
     for col_num, header in enumerate(headers, 1):
         worksheet[f"{get_column_letter(col_num)}1"] = header
+    
     routes = ProductProcessRoute.objects.all().order_by("product_id", "step_order")
     row_num = 2
     for route in routes:
+        # 處理設備ID列表
         equip_ids = (
             [
                 eid.strip()
                 for eid in route.usable_equipment_ids.split(",")
-                if eid.strip()
+                if eid.strip() and eid.strip().isdigit()
             ]
             if route.usable_equipment_ids
             else []
@@ -827,12 +855,20 @@ def export_product_routes(request):
                 equip_names.append(equip_id_to_name[eid])
             else:
                 equip_names.append(f"未知設備({eid})")
+        
+        # 取得正確的工序名稱顯示
+        process_name_display = process_names.get(
+            route.process_name_id, 
+            route.process_name or "未知工序"
+        )
+        
         worksheet[f"A{row_num}"] = route.product_id
         worksheet[f"B{row_num}"] = route.step_order
-        worksheet[f"C{row_num}"] = route.process_name
+        worksheet[f"C{row_num}"] = process_name_display
         worksheet[f"D{row_num}"] = ", ".join(equip_names) if equip_names else ""
         worksheet[f"E{row_num}"] = route.dependent_semi_product or ""
         row_num += 1
+    
     buffer = BytesIO()
     workbook.save(buffer)
     buffer.seek(0)

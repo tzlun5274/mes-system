@@ -552,7 +552,7 @@ function loadUserPermissions() {
     document.getElementById('form_user_id').value = userId;
     
     // 載入使用者權限設定
-    fetch(`/system/permission/advanced/load_user_permissions/${userId}/`, {
+    fetch(`/system/api/user-permissions/${userId}/`, {
         method: 'GET',
         headers: {
             'X-Requested-With': 'XMLHttpRequest',

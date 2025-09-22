@@ -1,4 +1,3 @@
-print("schedule_manual.py 被載入")
 # scheduling/views/schedule_manual.py
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import render

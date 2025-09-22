@@ -25,9 +25,10 @@ logger = logging.getLogger(__name__)
 
 def import_user_required(user):
     """
-    檢查用戶是否為超級用戶或具有匯入權限
+    檢查用戶是否為超級用戶
+    系統維護功能只有超級用戶可以訪問
     """
-    return user.is_superuser or user.groups.filter(name="報表使用者").exists()
+    return user.is_superuser
 
 @login_required
 @user_passes_test(import_user_required, login_url='/login/')

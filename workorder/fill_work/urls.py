@@ -35,6 +35,8 @@ urlpatterns = [
 
     # 填報記錄詳情
     path("<int:pk>/detail/", views.FillWorkDetailView.as_view(), name="fill_work_detail"),
+    path("<int:pk>/edit/", views.FillWorkEditView.as_view(), name="fill_work_edit"),
+    path("<int:pk>/update/", views.update_fill_work_field, name="update_fill_work_field"),
     path("<int:pk>/delete/", views.FillWorkDeleteView.as_view(), name="fill_work_delete"),
 
     # 功能設定

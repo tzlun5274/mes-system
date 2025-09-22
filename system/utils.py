@@ -510,6 +510,8 @@ def filter_work_records_by_user_permission(user, queryset, record_type='all'):
         return queryset.none()
     elif record_type == 'onsite_reporting' and not work_permission.can_onsite_reporting:
         return queryset.none()
+    elif record_type == 'operator_reporting' and not work_permission.can_operator_reporting:
+        return queryset.none()
     elif record_type == 'smt_reporting' and not work_permission.can_smt_reporting:
         return queryset.none()
     elif record_type == 'all':
@@ -517,6 +519,7 @@ def filter_work_records_by_user_permission(user, queryset, record_type='all'):
         if not any([
             work_permission.can_fill_work,
             work_permission.can_onsite_reporting,
+            work_permission.can_operator_reporting,
             work_permission.can_smt_reporting
         ]):
             return queryset.none()

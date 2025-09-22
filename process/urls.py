@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views, api
+from .api_data_service import DataServiceAPI, get_process_name_by_id, get_equipment_by_ids
 
 app_name = "process"
 module_display_name = "工序管理"
@@ -124,4 +125,9 @@ urlpatterns = [
     path("api/process-by-name/", api.get_process_by_name, name="api_process_by_name"),
     path("api/active-processes/", api.get_active_processes, name="api_active_processes"),
     path("api/skilled-operators/", api.get_skilled_operators, name="api_skilled_operators"),
+    
+    # 統一資料服務 API
+    path("api/data-service/", DataServiceAPI.as_view(), name="api_data_service"),
+    path("api/process-name/<int:process_name_id>/", get_process_name_by_id, name="api_process_name_by_id"),
+    path("api/equipments/", get_equipment_by_ids, name="api_equipments_by_ids"),
 ]

@@ -3,6 +3,14 @@
 
 {% block content %}
 <div class="container-fluid mt-4">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/home/">首頁</a></li>
+            <li class="breadcrumb-item active" aria-current="page">系統管理</li>
+        </ol>
+    </nav>
+
     <div class="row">
         <div class="col-12">
             <div class="card">
@@ -17,7 +25,7 @@
                                     <i class="fas fa-users fa-3x text-primary mb-3"></i>
                                     <h5>使用者管理</h5>
                                     <p class="text-muted">管理系統使用者帳號與權限</p>
-                                    <a href="/system/users/" class="btn btn-primary">管理使用者</a>
+                                    <a href="/system/user/list/" class="btn btn-primary">管理使用者</a>
                                 </div>
                             </div>
                         </div>
@@ -27,7 +35,7 @@
                                     <i class="fas fa-user-tag fa-3x text-success mb-3"></i>
                                     <h5>角色管理</h5>
                                     <p class="text-muted">管理使用者角色與權限設定</p>
-                                    <a href="/system/roles/" class="btn btn-success">管理角色</a>
+                                    <a href="/system/permission/list/" class="btn btn-success">管理角色</a>
                                 </div>
                             </div>
                         </div>
@@ -37,7 +45,7 @@
                                     <i class="fas fa-building fa-3x text-info mb-3"></i>
                                     <h5>公司管理</h5>
                                     <p class="text-muted">管理公司基本資料與設定</p>
-                                    <a href="/system/companies/" class="btn btn-info">管理公司</a>
+                                    <a href="/erp_integration/company_config/" class="btn btn-info">管理公司</a>
                                 </div>
                             </div>
                         </div>
@@ -50,7 +58,7 @@
                                     <i class="fas fa-cog fa-3x text-warning mb-3"></i>
                                     <h5>系統設定</h5>
                                     <p class="text-muted">系統參數與基本設定</p>
-                                    <a href="/system/settings/" class="btn btn-warning">系統設定</a>
+                                    <a href="/system/email_config/" class="btn btn-warning">系統設定</a>
                                 </div>
                             </div>
                         </div>
@@ -70,7 +78,7 @@
                                     <i class="fas fa-file-alt fa-3x text-dark mb-3"></i>
                                     <h5>系統日誌</h5>
                                     <p class="text-muted">查看系統操作日誌與錯誤記錄</p>
-                                    <a href="/system/logs/" class="btn btn-dark">查看日誌</a>
+                                    <a href="/system/environment/" class="btn btn-dark">查看日誌</a>
                                 </div>
                             </div>
                         </div>

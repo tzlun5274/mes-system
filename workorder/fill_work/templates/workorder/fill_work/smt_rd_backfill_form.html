@@ -47,22 +47,22 @@
                             
                             <!-- 產品編號 -->
                             <div class="col-md-4 mb-3">
-                                <label for="product_id" class="form-label">產品編號 <span class="text-danger">*</span></label>
+                                <label for="product_id" class="form-label">產品編號</label>
                                 <input type="text" class="form-control" id="product_id" name="product_id" value="PFP-CCT" placeholder="請輸入產品編號">
                                 <div class="form-text">RD樣品固定產品編號</div>
                             </div>
 
                             <!-- 工單號碼 -->
                             <div class="col-md-4 mb-3">
-                                <label for="workorder" class="form-label">工單號碼 <span class="text-danger">*</span></label>
+                                <label for="workorder" class="form-label">工單號碼</label>
                                 <input type="text" class="form-control" id="workorder" name="workorder" value="RD樣品" readonly>
                                 <div class="form-text">RD樣品固定工單號碼</div>
                             </div>
 
                             <!-- 公司名稱 -->
                             <div class="col-md-4 mb-3">
-                                <label for="company_name" class="form-label">公司名稱 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="company_name" name="company_name" required>
+                                <label for="company_name" class="form-label">公司名稱</label>
+                                <select class="form-select" id="company_name" name="company_name">
                                     <option value="">請選擇公司名稱</option>
                                     {% for value, label in form.fields.company_name.choices %}
                                         {% if value %}
@@ -74,22 +74,24 @@
 
                             <!-- 作業員 -->
                             <div class="col-md-4 mb-3">
-                                <label for="operator" class="form-label">作業員 <span class="text-danger">*</span></label>
+                                <label for="operator" class="form-label">作業員</label>
                                 <input type="text" class="form-control" id="operator" name="operator" value="" readonly>
                                 <div class="form-text">選擇設備後會自動填入設備名稱</div>
                             </div>
 
                             <!-- 工序 -->
                             <div class="col-md-4 mb-3">
-                                <label for="process_id" class="form-label">工序 <span class="text-danger">*</span></label>
+                                <label for="process_id" class="form-label">工序</label>
                                 {{ form.process_id }}
+                                <!-- 隱藏的 process_name 欄位，由 JavaScript 自動填入 -->
+                                <input type="hidden" id="id_process_name" name="process_name" value="">
                                 <div class="form-text">請選擇此次填報的工序</div>
                             </div>
 
                             <!-- 使用的設備 -->
                             <div class="col-md-4 mb-3">
-                                <label for="equipment" class="form-label">使用的設備 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="equipment" name="equipment" required>
+                                <label for="equipment" class="form-label">使用的設備</label>
+                                <select class="form-select" id="equipment" name="equipment">
                                     <option value="">請選擇使用的設備</option>
                                     {% for value, label in form.fields.equipment.choices %}
                                         {% if value %}
@@ -306,57 +308,33 @@ function updateTimeFields() {
     }
 }
 
-// 表單驗證（頂部顯示詳細錯誤）
+// 表單驗證（移除驗證邏輯）
 function validateForm() {
-    // 依實際元素 id 對應選擇器（Django 自動產生 id_*）
-    const selectors = {
-        company_name: 'company_name',
-        process: 'id_process',
-        equipment: 'equipment',
-        work_quantity: 'id_work_quantity'
-    };
-    const labelMap = {
-        company_name: '公司名稱',
-        process: '工序',
-        equipment: '使用的設備',
-        work_quantity: '工作數量'
-    };
-    const missing = [];
-    Object.keys(selectors).forEach(key => {
-        const element = document.getElementById(selectors[key]);
-        const v = element ? (element.value || '').toString().trim() : '';
-        if (!v) missing.push(labelMap[key] || key);
-    });
-    const startTimeElement = document.getElementById('start_time');
-    const endTimeElement = document.getElementById('end_time');
-    const startTime = startTimeElement ? startTimeElement.value : '';
-    const endTime = endTimeElement ? endTimeElement.value : '';
-    let timeError = '';
-    if (!startTime || !endTime) {
-        timeError = '請選擇完整的開始時間與結束時間';
-    } else {
-        const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
-        const endMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
-        if (endMinutes <= startMinutes) timeError = '結束時間必須晚於開始時間';
-    }
-    if (missing.length || timeError) {
-        const parts = [];
-        if (missing.length) parts.push('請填寫必填欄位：' + missing.join('、'));
-        if (timeError) parts.push(timeError);
-        const clientErrorElement = document.getElementById('clientError');
-        if (clientErrorElement) {
-            clientErrorElement.classList.remove('d-none');
-            clientErrorElement.textContent = parts.join('；');
-        }
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return false;
-    }
-    const clientErrorElement = document.getElementById('clientError');
-    if (clientErrorElement) {
-        clientErrorElement.classList.add('d-none');
-        clientErrorElement.textContent = '';
-    }
+    // 移除所有驗證邏輯，直接返回true
+    console.log('SMT RD樣品表單驗證已移除，直接通過');
     return true;
 }
+
+// 工序選擇事件：自動填入 process_name
+document.addEventListener('DOMContentLoaded', function() {
+    const processSelect = document.getElementById('id_process_id');
+    const processNameInput = document.getElementById('id_process_name');
+    if (processSelect && processNameInput) {
+        console.log('綁定工序選擇事件');
+        processSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const processName = selectedOption.text;
+            console.log('工序選擇變更為:', processName);
+            processNameInput.value = processName;
+        });
+        
+        // 初始化時也要填入 process_name
+        if (processSelect.value) {
+            const selectedOption = processSelect.options[processSelect.selectedIndex];
+            const processName = selectedOption.text;
+            processNameInput.value = processName;
+        }
+    }
+});
 </script>
 {% endblock %}

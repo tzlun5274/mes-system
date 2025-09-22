@@ -49,22 +49,22 @@
                             
                             <!-- 產品編號 (可編輯) -->
                             <div class="col-md-4 mb-3">
-                                <label for="product_id" class="form-label">產品編號 <span class="text-danger">*</span></label>
+                                <label for="product_id" class="form-label">產品編號</label>
                                 <input type="text" class="form-control" id="product_id" name="product_id" value="PFP-CCT" placeholder="請輸入產品編號" title="請輸入RD樣品的產品編號">
                                 <div class="form-text">請輸入RD樣品的產品編號（預設為PFP-CCT）</div>
                             </div>
 
                             <!-- 工單號碼 (固定值) -->
                             <div class="col-md-4 mb-3">
-                                <label for="workorder" class="form-label">工單號碼 <span class="text-danger">*</span></label>
+                                <label for="workorder" class="form-label">工單號碼</label>
                                 <input type="text" class="form-control" id="workorder" name="workorder" value="RD樣品" readonly>
                                 <div class="form-text">RD樣品固定工單號碼</div>
                             </div>
 
                             <!-- 公司名稱 -->
                             <div class="col-md-4 mb-3">
-                                <label for="company_name" class="form-label">公司名稱 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="company_name" name="company_name" required>
+                                <label for="company_name" class="form-label">公司名稱</label>
+                                <select class="form-select" id="company_name" name="company_name">
                                     <option value="">請選擇公司名稱</option>
                                     {% for value, label in form.fields.company_name.choices %}
                                         {% if value %}
@@ -77,8 +77,8 @@
 
                             <!-- 作業員 -->
                             <div class="col-md-4 mb-3">
-                                <label for="operator" class="form-label">作業員 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="operator" name="operator" required>
+                                <label for="operator" class="form-label">作業員</label>
+                                <select class="form-select" id="operator" name="operator">
                                     <option value="">請選擇作業員</option>
                                     {% for value, label in form.fields.operator.choices %}
                                         {% if value %}
@@ -91,9 +91,11 @@
 
                             <!-- 工序 -->
                             <div class="col-md-4 mb-3">
-                                <label for="process_id" class="form-label">工序 <span class="text-danger">*</span></label>
+                                <label for="id_process_id" class="form-label">工序</label>
                                 {{ form.process_id }}
-                                <div class="form-text">請選擇此次RD樣品作業的工序</div>
+                                <!-- 隱藏的 process_name 欄位，由 JavaScript 自動填入 -->
+                                <input type="hidden" id="id_process_name" name="process_name" value="">
+                                <div class="form-text">請選擇此次RD樣品作業的工序（可選）</div>
                             </div>
 
                             <!-- 使用的設備 -->
@@ -293,15 +295,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // 先更新隱藏欄位
             updateTimeFields();
             
-            // 驗證表單
-            if (!validateForm()) {
-                console.log('表單驗證失敗');
-                e.preventDefault();
-                return false;
-            }
-            
-            console.log('表單驗證通過');
-            // 驗證通過，顯示載入指示器
+            // 移除表單驗證，直接提交
+            console.log('表單驗證已移除，直接提交');
+            // 顯示載入指示器
             showLoading();
             
             // 允許表單提交
@@ -319,6 +315,26 @@ document.addEventListener('DOMContentLoaded', function() {
             {% endif %}
         {% endfor %}
     {% endif %}
+    
+    // 工序選擇事件：自動填入 process_name
+    const processSelect = document.getElementById('id_process_id');
+    const processNameInput = document.getElementById('id_process_name');
+    if (processSelect && processNameInput) {
+        console.log('綁定工序選擇事件');
+        processSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const processName = selectedOption.text;
+            console.log('工序選擇變更為:', processName);
+            processNameInput.value = processName;
+        });
+        
+        // 初始化時也要填入 process_name
+        if (processSelect.value) {
+            const selectedOption = processSelect.options[processSelect.selectedIndex];
+            const processName = selectedOption.text;
+            processNameInput.value = processName;
+        }
+    }
 });
 
 // 更新隱藏的時間欄位
@@ -355,72 +371,10 @@ function hideLoading() {
     document.getElementById('loadingIndicator').style.display = 'none';
 }
 
-// 表單驗證
+// 表單驗證（移除驗證邏輯）
 function validateForm() {
-    let errorMessages = [];
-    
-    // 檢查必填欄位
-    const requiredFields = [
-        { id: 'company_name', name: '公司名稱' },
-        { id: 'operator', name: '作業員' },
-        { id: 'id_process', name: '工序' },
-        { id: 'id_work_quantity', name: '工作數量' }
-    ];
-    
-    for (let field of requiredFields) {
-        const element = document.getElementById(field.id);
-        const value = element ? element.value : '';
-        if (!value || value === '') {
-            errorMessages.push(`• ${field.name} 為必填欄位`);
-        }
-    }
-    
-    // 驗證時間
-    const startHour = document.getElementById('start_hour').value;
-    const startMinute = document.getElementById('start_minute').value;
-    const endHour = document.getElementById('end_hour').value;
-    const endMinute = document.getElementById('end_minute').value;
-    
-    if (!startHour || !startMinute) {
-        errorMessages.push('• 開始時間 為必填欄位');
-    }
-    
-    if (!endHour || !endMinute) {
-        errorMessages.push('• 結束時間 為必填欄位');
-    }
-    
-    // 驗證時間邏輯
-    if (startHour && startMinute && endHour && endMinute) {
-        const startMinutes = parseInt(startHour) * 60 + parseInt(startMinute);
-        const endMinutes = parseInt(endHour) * 60 + parseInt(endMinute);
-        
-        if (endMinutes <= startMinutes) {
-            errorMessages.push('• 結束時間 必須晚於開始時間');
-        }
-    }
-    
-    // 驗證工作數量
-    const workQuantityElement = document.getElementById('id_work_quantity');
-    const workQuantity = workQuantityElement ? parseInt(workQuantityElement.value) : 0;
-    if (isNaN(workQuantity) || workQuantity < 0) {
-        errorMessages.push('• 工作數量 不能為負數');
-    }
-    
-    // 驗證不良品數量
-    const defectQuantityElement = document.getElementById('id_defect_quantity');
-    const defectQuantity = defectQuantityElement ? parseInt(defectQuantityElement.value) || 0 : 0;
-    if (defectQuantity < 0) {
-        errorMessages.push('• 不良品數量 不能為負數');
-    }
-    
-    // 如果有錯誤，顯示詳細錯誤訊息
-    if (errorMessages.length > 0) {
-        const errorTitle = '請修正以下錯誤：';
-        const errorContent = errorMessages.join('\n');
-        alert(`${errorTitle}\n\n${errorContent}`);
-        return false;
-    }
-    
+    // 移除所有驗證邏輯，直接返回true
+    console.log('表單驗證已移除，直接通過');
     return true;
 }
 </script>

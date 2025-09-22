@@ -15,7 +15,7 @@
             <p><strong>設備名稱：</strong> {{ equipment.name }}</p>
             <p><strong>型號：</strong> {{ equipment.model }}</p>
             <p><strong>狀態：</strong> {{ equipment.get_status_display }}</p>
-            <p><strong>所屬產線：</strong> {% if equipment.production_line %}{{ equipment.production_line.line_name }} ({{ equipment.production_line.line_code }}){% else %}未指定{% endif %}</p>
+            <p><strong>所屬產線：</strong> {% if equipment.production_line_name %}{{ equipment.production_line_name }}{% else %}未指定{% endif %}</p>
             <p><strong>創建時間：</strong> {{ equipment.created_at|date:"Y-m-d H:i:s" }}</p>
             <p><strong>更新時間：</strong> {{ equipment.updated_at|date:"Y-m-d H:i:s" }}</p>
         </div>

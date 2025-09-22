@@ -74,7 +74,7 @@
                                 </tr>
                                 <tr>
                                     <td><strong>工序：</strong></td>
-                                    <td>{{ object.process.name|default:object.operation|default:"未指定" }}</td>
+                                    <td>{{ object.process_name|default:object.operation|default:"未指定" }}</td>
                                 </tr>
                                 <tr>
                                     <td><strong>工作數量：</strong></td>
@@ -82,7 +82,7 @@
                                 </tr>
                                 <tr>
                                     <td><strong>工作時數：</strong></td>
-                                    <td>{{ object.work_hours }}</td>
+                                    <td>{{ object.work_hours_calculated }}</td>
                                 </tr>
                                 <tr>
                                     <td><strong>核准狀態：</strong></td>

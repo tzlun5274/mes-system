@@ -39,7 +39,7 @@
                         {% for route in routes %}
                             <tr>
                                 <td>{{ route.step_order }}</td>
-                                <td>{{ route.process_name.name }}</td>
+                                <td>{{ route.process_name_display|default:'-' }}</td>
                                 <td>
                                     {% if route.usable_equipment_names %}
                                         {{ route.usable_equipment_names|join:', ' }}
@@ -58,4 +58,17 @@
         </div>
     </div>
 </div>
+
+<!-- 引入產品工藝路線 API 服務 -->
+<script src="{% static 'process/js/product_route_api.js' %}"></script>
+
+<script>
+// 頁面載入完成後的初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('產品工藝路線頁面已載入');
+    
+    // 可以在這裡添加動態載入資料的邏輯
+    // 例如：如果需要即時更新資料
+});
+</script>
 {% endblock %}

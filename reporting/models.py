@@ -5,6 +5,7 @@
 
 from django.db import models
 from django.utils import timezone
+from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 
 
@@ -98,7 +99,7 @@ class WorkOrderReportData(models.Model):
             defaults={
                 'operator_name': fill_work.operator,
                 'product_code': fill_work.product_id,
-                'process_name': fill_work.operation or (fill_work.process.name if fill_work.process else ''),
+                'process_name': fill_work.operation or fill_work.process_name or '',
                 'start_time': fill_work.start_time,
                 'end_time': fill_work.end_time,
                 'work_hours': work_hours,
@@ -120,7 +121,7 @@ class WorkOrderReportData(models.Model):
             # 更新現有記錄
             report_data.operator_name = fill_work.operator
             report_data.product_code = fill_work.product_id
-            report_data.process_name = fill_work.operation or (fill_work.process.name if fill_work.process else '')
+            report_data.process_name = fill_work.operation or fill_work.process_name or ''
             report_data.start_time = fill_work.start_time
             report_data.end_time = fill_work.end_time
             report_data.work_hours = work_hours
@@ -218,7 +219,7 @@ class ReportSchedule(models.Model):
     """報表排程設定"""
     
     REPORT_TYPES = [
-        ('data_sync', '資料同步'),
+        ('data_sync', '填報與現場記錄資料同步'),
         ('previous_workday', '前一個工作日報表'),
         ('current_week', '本週報表'),
         ('previous_week', '上週報表'),
@@ -257,6 +258,32 @@ class ReportSchedule(models.Model):
         verbose_name="檔案格式"
     )
     
+    # 資料同步時間設定
+    sync_execution_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('interval', '間隔執行'),
+            ('fixed_time', '固定時間'),
+        ],
+        default='interval',
+        verbose_name="執行方式",
+        help_text="資料同步的執行方式"
+    )
+    
+    sync_interval_minutes = models.IntegerField(
+        default=60,
+        verbose_name="同步間隔（分鐘）",
+        help_text="每多少分鐘執行一次資料同步",
+        validators=[MinValueValidator(1), MaxValueValidator(1440)]
+    )
+    
+    sync_fixed_time = models.TimeField(
+        null=True,
+        blank=True,
+        verbose_name="固定同步時間",
+        help_text="每天固定時間執行資料同步"
+    )
+    
     # 狀態
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', verbose_name="狀態")
     
@@ -290,7 +317,7 @@ class ReportExecutionLog(models.Model):
     execution_time = models.DateTimeField(auto_now_add=True, verbose_name="執行時間")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, verbose_name="執行狀態")
     message = models.TextField(blank=True, verbose_name="執行訊息")
-    file_path = models.CharField(max_length=500, blank=True, verbose_name="檔案路徑")
+    file_path = models.CharField(max_length=500, blank=True, null=True, verbose_name="檔案路徑")
     
     class Meta:
         verbose_name = "報表執行日誌"

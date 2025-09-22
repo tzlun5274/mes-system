@@ -58,6 +58,19 @@ class Command(BaseCommand):
                 key="auto_sync_companyorder_interval", value="1"
             )
 
+        # 從 SystemConfig 讀取自動同步啟用狀態（預設啟用）
+        auto_sync_enabled = True
+        try:
+            config = SystemConfig.objects.get(key="auto_sync_companyorder_enabled")
+            auto_sync_enabled = config.value.lower() == 'true'
+            workorder_logger.info(f"讀取到自動同步啟用狀態：{auto_sync_enabled}")
+        except SystemConfig.DoesNotExist:
+            workorder_logger.warning("未找到自動同步啟用狀態設定，使用預設值 True")
+            # 自動建立預設設定
+            SystemConfig.objects.create(
+                key="auto_sync_companyorder_enabled", value="True"
+            )
+
         # 建立新的間隔排程
         interval, created = IntervalSchedule.objects.get_or_create(
             every=auto_sync_interval,
@@ -74,7 +87,7 @@ class Command(BaseCommand):
             name=display_name,
             task=task_name,
             interval=interval,
-            enabled=True,
+            enabled=auto_sync_enabled,
         )
 
         workorder_logger.info(f"建立新的定時任務：{display_name}")
@@ -101,6 +114,19 @@ class Command(BaseCommand):
             SystemConfig.objects.create(key="auto_convert_interval", value="1")
             auto_convert_interval = 1
 
+        # 從 SystemConfig 讀取自動轉換啟用狀態（預設啟用）
+        auto_convert_enabled = True
+        try:
+            config = SystemConfig.objects.get(key="auto_convert_enabled")
+            auto_convert_enabled = config.value.lower() == 'true'
+            workorder_logger.info(f"讀取到自動轉換啟用狀態：{auto_convert_enabled}")
+        except SystemConfig.DoesNotExist:
+            workorder_logger.warning("未找到自動轉換啟用狀態設定，使用預設值 True")
+            # 自動建立預設設定
+            SystemConfig.objects.create(
+                key="auto_convert_enabled", value="True"
+            )
+
         # 建立或更新間隔排程
         interval, created = IntervalSchedule.objects.get_or_create(
             every=auto_convert_interval,
@@ -118,7 +144,7 @@ class Command(BaseCommand):
             defaults={
                 "task": task_name,
                 "interval": interval,
-                "enabled": True,
+                "enabled": auto_convert_enabled,
             },
         )
 
@@ -126,11 +152,11 @@ class Command(BaseCommand):
             # 更新現有任務
             periodic_task.task = task_name
             periodic_task.interval = interval
-            periodic_task.enabled = True
+            periodic_task.enabled = auto_convert_enabled
             periodic_task.save()
-            workorder_logger.info(f"更新定時任務：{display_name}")
+            workorder_logger.info(f"更新定時任務：{display_name}，啟用狀態：{auto_convert_enabled}")
         else:
-            workorder_logger.info(f"建立定時任務：{display_name}")
+            workorder_logger.info(f"建立定時任務：{display_name}，啟用狀態：{auto_convert_enabled}")
 
         self.stdout.write(
             f"✓ {display_name} 任務已設定（每 {auto_convert_interval} 分鐘執行）"

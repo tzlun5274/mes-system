@@ -136,7 +136,8 @@
         </div>
     </div>
 
-    <!-- 系統維護功能 -->
+    <!-- 系統維護功能 - 只有超級用戶可以看到 -->
+    {% if user.is_superuser %}
     <div class="row mt-4">
         <div class="col-12">
             <h3 class="mb-3">
@@ -203,7 +204,8 @@
                 </div>
             </div>
         </div>
-
+    </div>
+    {% endif %}
 
 
 

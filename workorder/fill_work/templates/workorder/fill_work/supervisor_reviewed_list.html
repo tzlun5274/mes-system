@@ -242,7 +242,7 @@
 										<span class="badge bg-danger">已駁回</span>
 									{% endif %}
 								</td>
-								<td>{% if 'SMT' in r.operator|upper or 'SMT' in r.process.name|upper %}SMT{% else %}作業員{% endif %}</td>
+								<td>{% if 'SMT' in r.operator|upper or 'SMT' in r.process_name|upper %}SMT{% else %}作業員{% endif %}</td>
 								<td>{{ r.operator|default:r.equipment }}</td>
 								<td>{{ r.workorder }}</td>
 								<td>{{ r.product_id }}</td>

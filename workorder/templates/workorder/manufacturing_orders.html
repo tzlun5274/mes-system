@@ -69,28 +69,61 @@
 
 {% if request.user.is_staff or request.user.is_superuser %}
 <div class="mb-3 p-3 bg-light border rounded">
-    <form method="post" action="" class="row g-2 align-items-center">
+    <form method="post" action="" class="row g-3 align-items-center">
         {% csrf_token %}
-        <div class="col-auto">
-            <label for="auto_convert_interval" class="col-form-label"><b>自動轉換MES工單間隔（分鐘）</b>：</label>
+        
+        <!-- 自動轉換MES工單設定 -->
+        <div class="col-12">
+            <div class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="auto_convert_enabled" id="auto_convert_enabled" 
+                               {% if auto_convert_enabled %}checked{% endif %}>
+                        <label class="form-check-label" for="auto_convert_enabled">
+                            <b>啟用自動轉換MES工單</b>
+                        </label>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <label for="auto_convert_interval" class="col-form-label">間隔（分鐘）：</label>
+                </div>
+                <div class="col-auto">
+                    <input type="number" min="1" name="auto_convert_interval" id="auto_convert_interval" 
+                           class="form-control" value="{{ auto_convert_interval|default:1 }}" required>
+                </div>
+                <div class="col-auto text-success">
+                    <small>（目前設定：{{ auto_convert_interval|default:1 }} 分鐘）</small>
+                </div>
+            </div>
         </div>
-        <div class="col-auto">
-            <input type="number" min="1" name="auto_convert_interval" id="auto_convert_interval" class="form-control" value="{{ auto_convert_interval|default:1 }}" required>
+        
+        <!-- 自動同步製造命令設定 -->
+        <div class="col-12">
+            <div class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="auto_sync_companyorder_enabled" id="auto_sync_companyorder_enabled" 
+                               {% if auto_sync_companyorder_enabled %}checked{% endif %}>
+                        <label class="form-check-label" for="auto_sync_companyorder_enabled">
+                            <b>啟用自動同步製造命令</b>
+                        </label>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <label for="auto_sync_companyorder_interval" class="col-form-label">間隔（分鐘）：</label>
+                </div>
+                <div class="col-auto">
+                    <input type="number" min="1" name="auto_sync_companyorder_interval" id="auto_sync_companyorder_interval" 
+                           class="form-control" value="{{ auto_sync_companyorder_interval|default:1 }}" required>
+                </div>
+                <div class="col-auto text-success">
+                    <small>（目前設定：{{ auto_sync_companyorder_interval|default:1 }} 分鐘）</small>
+                </div>
+            </div>
         </div>
-        <div class="col-auto text-success">
-            <small>（目前設定：{{ auto_convert_interval|default:1 }} 分鐘）</small>
-        </div>
-        <div class="col-auto">
-            <label for="auto_sync_companyorder_interval" class="col-form-label"><b>自動同步製造命令間隔（分鐘）</b>：</label>
-        </div>
-        <div class="col-auto">
-            <input type="number" min="1" name="auto_sync_companyorder_interval" id="auto_sync_companyorder_interval" class="form-control" value="{{ auto_sync_companyorder_interval|default:1 }}" required>
-        </div>
-        <div class="col-auto text-success">
-            <small>（目前設定：{{ auto_sync_companyorder_interval|default:1 }} 分鐘）</small>
-        </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-primary">儲存</button>
+        
+        <div class="col-12">
+            <button type="submit" class="btn btn-primary">儲存設定</button>
         </div>
     </form>
     

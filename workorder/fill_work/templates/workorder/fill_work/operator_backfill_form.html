@@ -97,6 +97,8 @@
                             <div class="col-md-4 mb-3">
                                 <label for="process_id" class="form-label">工序 <span class="text-danger">*</span></label>
                                 {{ form.process_id }}
+                                <!-- 隱藏的 process_name 欄位，由 JavaScript 自動填入 -->
+                                <input type="hidden" id="id_process_name" name="process_name" value="">
                                 <div class="form-text">請選擇此次填報的工序</div>
                             </div>
 
@@ -332,6 +334,26 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('作業員模板：設備選擇變更為:', equipmentName);
             // 已移除自動填入作業員功能，作業員由使用者手動選擇
         });
+    }
+    
+    // 工序選擇事件：自動填入 process_name
+    const processSelect = document.getElementById('id_process_id');
+    const processNameInput = document.getElementById('id_process_name');
+    if (processSelect && processNameInput) {
+        console.log('綁定工序選擇事件');
+        processSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const processName = selectedOption.text;
+            console.log('工序選擇變更為:', processName);
+            processNameInput.value = processName;
+        });
+        
+        // 初始化時也要填入 process_name
+        if (processSelect.value) {
+            const selectedOption = processSelect.options[processSelect.selectedIndex];
+            const processName = selectedOption.text;
+            processNameInput.value = processName;
+        }
     }
     
 

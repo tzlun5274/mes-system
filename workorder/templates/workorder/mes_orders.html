@@ -86,13 +86,13 @@
       <a href="{% url 'workorder:create' %}" class="btn btn-primary me-2">
         <i class="fas fa-plus"></i> 新增工單
       </a>
-      <button id="btn-auto-dispatch" class="btn btn-info me-2">
-        <i class="fas fa-magic"></i> 自動批次派工
+      <button id="btn-dispatch-all" class="btn btn-info me-2">
+        <i class="fas fa-magic"></i> 全部派工
       </button>
       <button id="btn-convert-to-production" class="btn btn-warning me-2">
         <i class="fas fa-play-circle"></i> 全部工單轉生產中
       </button>
-      <button id="btn-bulk-dispatch" class="btn btn-success me-2" disabled>
+      <button id="btn-dispatch-batch" class="btn btn-success me-2" disabled>
         <i class="fas fa-tasks"></i> 批量派工
       </button>
       <button id="btn-settings" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#settingsModal">
@@ -119,22 +119,26 @@
       <tbody>
         {% for o in orders %}
         <tr>
-          <td><input type="checkbox" class="row-chk" value="{{ o.order_number }}" {% if o.order_number in dispatched_map %}disabled{% endif %} /></td>
+          <td><input type="checkbox" class="row-chk" value="{{ o.id }}" data-order-number="{{ o.order_number }}" {% if o.order_number|add:","|add:o.product_code in dispatched_map %}disabled{% endif %} /></td>
           <td>{{ o.company_name|default:o.company_code|default:'-' }}</td>
           <td>{{ o.order_number }}</td>
           <td>{{ o.product_code }}</td>
           <td>{{ o.quantity }}</td>
           <td>{{ o.created_at|date:'Y-m-d H:i' }}</td>
           <td>
-            {% if o.order_number in dispatched_map %}
+            {% if o.order_number|add:","|add:o.product_code in dispatched_map %}
               <span class="badge bg-success">已派工</span>
             {% else %}
               <span class="badge bg-warning text-dark">未派工</span>
             {% endif %}
           </td>
           <td>
-            {% if o.order_number not in dispatched_map %}
-              <button class="btn btn-sm btn-primary dispatch-btn" data-order="{{ o.order_number }}" title="派工">
+            {% if o.order_number|add:","|add:o.product_code not in dispatched_map %}
+              <button class="btn btn-sm btn-primary dispatch-btn" 
+                      data-order="{{ o.order_number }}" 
+                      data-workorder-id="{{ o.id }}" 
+                      title="派工"
+                      onclick="dispatchSingleWorkorder({{ o.id }}, '{{ o.order_number }}')">
                 <i class="fas fa-tasks"></i>
               </button>
             {% endif %}
@@ -163,11 +167,23 @@
       <div class="modal-body">
         <form id="auto-dispatch-settings-form">
           <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="auto-dispatch-enabled" 
+                     name="enabled" {% if auto_dispatch_enabled %}checked{% endif %}>
+              <label class="form-check-label" for="auto-dispatch-enabled">
+                <strong>啟用自動批次派工</strong>
+              </label>
+            </div>
+            <div class="form-text">開啟後，系統會根據設定的間隔時間自動為未派工的工單建立派工單</div>
+          </div>
+          
+          <div class="mb-3">
             <label for="auto-dispatch-interval" class="form-label">自動批次派工間隔（分鐘）</label>
             <input type="number" class="form-control" id="auto-dispatch-interval" 
                    name="interval" min="1" max="1440" value="{{ auto_dispatch_interval|default:60 }}" required>
             <div class="form-text">設定範圍：1-1440分鐘（1分鐘到24小時）</div>
           </div>
+          
           <div class="alert alert-info">
             <i class="fas fa-info-circle"></i>
             <strong>說明：</strong>系統會根據設定的間隔時間，自動為所有未派工的工單建立派工單。
@@ -185,12 +201,12 @@
 <script>
   const chkAll = document.getElementById('chk-all');
   const rowChks = () => Array.from(document.querySelectorAll('.row-chk'));
-  const btnBulkDispatch = document.getElementById('btn-bulk-dispatch');
-  const btnAutoDispatch = document.getElementById('btn-auto-dispatch');
+  const btnDispatchBatch = document.getElementById('btn-dispatch-batch');
+  const btnDispatchAll = document.getElementById('btn-dispatch-all');
 
   // 批量派工功能
   function refreshBtn() {
-    btnBulkDispatch.disabled = rowChks().filter(chk => chk.checked && !chk.disabled).length === 0;
+    btnDispatchBatch.disabled = rowChks().filter(chk => chk.checked && !chk.disabled).length === 0;
   }
   
   chkAll && (chkAll.onchange = () => {
@@ -200,18 +216,18 @@
   
   rowChks().forEach(chk => chk.onchange = refreshBtn);
 
-  btnBulkDispatch && (btnBulkDispatch.onclick = async () => {
+  btnDispatchBatch && (btnDispatchBatch.onclick = async () => {
     const selected = rowChks().filter(chk => chk.checked && !chk.disabled).map(chk => chk.value);
     if (selected.length === 0) return;
     
     if (!confirm(`確定要為選取的 ${selected.length} 筆工單建立派工單嗎？`)) return;
     
-    btnBulkDispatch.disabled = true;
+    btnDispatchBatch.disabled = true;
     try {
-      const resp = await fetch('{% url "workorder:mes_orders_bulk_dispatch" %}', {
+      const resp = await fetch('{% url "workorder:unified_dispatch" %}', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-        body: JSON.stringify({ order_numbers: selected })
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: `dispatch_mode=batch&workorder_ids=${selected.join(',')}`
       });
       const data = await resp.json();
       if (data.success) {
@@ -223,31 +239,32 @@
     } catch (e) {
       alert('批量派工失敗');
     } finally {
-      btnBulkDispatch.disabled = false;
+      btnDispatchBatch.disabled = false;
     }
   });
 
-  // 自動批次派工功能
-  btnAutoDispatch && (btnAutoDispatch.onclick = async () => {
+  // 全部派工功能
+  btnDispatchAll && (btnDispatchAll.onclick = async () => {
     if (!confirm('確定要為所有未派工的工單自動建立派工單嗎？')) return;
     
-    btnAutoDispatch.disabled = true;
+    btnDispatchAll.disabled = true;
     try {
-      const resp = await fetch('{% url "workorder:mes_orders_auto_dispatch" %}', {
+      const resp = await fetch('{% url "workorder:unified_dispatch" %}', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: 'dispatch_mode=all'
       });
       const data = await resp.json();
       if (data.success) {
         alert(data.message);
         window.location.reload();
       } else {
-        alert(data.error || '自動批次派工失敗');
+        alert(data.error || '全部派工失敗');
       }
     } catch (e) {
-      alert('自動批次派工失敗');
+      alert('全部派工失敗');
     } finally {
-      btnAutoDispatch.disabled = false;
+      btnDispatchAll.disabled = false;
     }
   });
 
@@ -280,32 +297,33 @@
   });
 
   // 單筆派工功能
-  document.querySelectorAll('.dispatch-btn').forEach(btn => {
-    btn.onclick = async () => {
-      const orderNumber = btn.dataset.order;
-      if (!confirm(`確定要為工單 ${orderNumber} 建立派工單嗎？`)) return;
-      
-      btn.disabled = true;
-      try {
-        const resp = await fetch('{% url "workorder:mes_order_dispatch" %}', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
-          body: `order_number=${orderNumber}`
-        });
-        const data = await resp.json();
-        if (data.success) {
-          alert(data.message);
-          window.location.reload();
-        } else {
-          alert(data.error || '派工失敗');
-        }
-      } catch (e) {
-        alert('派工失敗');
-      } finally {
-        btn.disabled = false;
+  function dispatchSingleWorkorder(workorderId, orderNumber) {
+    if (!confirm(`確定要為工單 ${orderNumber} 建立派工單嗎？`)) return;
+    
+    const btn = event.target.closest('.dispatch-btn');
+    btn.disabled = true;
+    
+    fetch('{% url "workorder:unified_dispatch" %}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+      body: `dispatch_mode=single&workorder_id=${workorderId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert(data.message);
+        window.location.reload();
+      } else {
+        alert(data.error || '派工失敗');
       }
-    };
-  });
+    })
+    .catch(e => {
+      alert('派工失敗');
+    })
+    .finally(() => {
+      btn.disabled = false;
+    });
+  }
 
   // 刪除工單功能
   document.querySelectorAll('.delete-btn').forEach(btn => {
@@ -338,6 +356,8 @@
   // 設定功能
   document.getElementById('btn-save-settings').onclick = async () => {
     const interval = document.getElementById('auto-dispatch-interval').value;
+    const enabled = document.getElementById('auto-dispatch-enabled').checked;
+    
     if (!interval || interval < 1 || interval > 1440) {
       alert('請輸入有效的間隔時間（1-1440分鐘）');
       return;
@@ -351,7 +371,7 @@
       const resp = await fetch('{% url "workorder:mes_orders_set_auto_dispatch_interval" %}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
-        body: `interval=${interval}`
+        body: `interval=${interval}&enabled=${enabled}`
       });
       const data = await resp.json();
       if (data.success) {

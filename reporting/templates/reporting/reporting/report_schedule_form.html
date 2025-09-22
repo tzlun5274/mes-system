@@ -79,13 +79,24 @@
                         </div>
 
                         <div class="row mb-3">
-                            <div class="col-md-6">
+                            <div class="col-md-6" id="company_field">
                                 <label for="company" class="form-label">
                                     <i class="fas fa-building text-primary"></i> 公司代號 <span class="text-danger">*</span>
                                 </label>
-                                <input type="text" class="form-control" id="company" name="company" 
-                                       value="{{ schedule.company|default:'' }}" required
-                                       placeholder="請輸入公司代號">
+                                <select class="form-select" id="company" name="company" required>
+                                    <option value="">請選擇公司</option>
+                                    <option value="ALL" 
+                                            {% if schedule.company == 'ALL' %}selected{% endif %}>
+                                        ALL - 所有公司
+                                    </option>
+                                    {% for company in companies %}
+                                        <option value="{{ company.company_code }}" 
+                                                {% if schedule.company == company.company_code %}selected{% endif %}>
+                                            {{ company.company_code }} - {{ company.company_name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">選擇要生成報表的公司，選擇「ALL」將包含所有公司</div>
                             </div>
                             <div class="col-md-6">
                                 <label for="status" class="form-label">
@@ -116,6 +127,54 @@
                                     {% endfor %}
                                 </select>
                                 <div class="form-text">選擇報表發送的檔案格式</div>
+                            </div>
+                        </div>
+
+                        <!-- 填報與現場記錄資料同步時間設定 -->
+                        <div class="row mb-3" id="sync_time_settings_row">
+                            <div class="col-md-12">
+                                <div class="card">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0"><i class="fas fa-clock text-white"></i> 填報與現場記錄資料同步時間設定</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label for="sync_execution_type" class="form-label">
+                                                    <i class="fas fa-cog text-primary"></i> 執行方式
+                                                </label>
+                                                <select class="form-select" id="sync_execution_type" name="sync_execution_type">
+                                                    <option value="interval" {% if schedule.sync_execution_type == 'interval' or not schedule %}selected{% endif %}>間隔執行</option>
+                                                    <option value="fixed_time" {% if schedule.sync_execution_type == 'fixed_time' %}selected{% endif %}>固定時間</option>
+                                                </select>
+                                                <div class="form-text">選擇填報與現場記錄資料同步的執行方式</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row mt-3" id="interval_settings">
+                                            <div class="col-md-6">
+                                                <label for="sync_interval_minutes" class="form-label">
+                                                    <i class="fas fa-stopwatch text-primary"></i> 同步間隔（分鐘）
+                                                </label>
+                                                <input type="number" class="form-control" id="sync_interval_minutes" name="sync_interval_minutes" 
+                                                       value="{% if schedule.sync_interval_minutes %}{{ schedule.sync_interval_minutes }}{% else %}60{% endif %}"
+                                                       min="1" max="1440" required>
+                                                <div class="form-text">每多少分鐘執行一次填報與現場記錄資料同步（1-1440分鐘）</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row mt-3" id="fixed_time_settings" style="display: none;">
+                                            <div class="col-md-6">
+                                                <label for="sync_fixed_time" class="form-label">
+                                                    <i class="fas fa-clock text-primary"></i> 固定同步時間
+                                                </label>
+                                                <input type="time" class="form-control" id="sync_fixed_time" name="sync_fixed_time" 
+                                                       value="{% if schedule.sync_fixed_time %}{{ schedule.sync_fixed_time|time:'H:i' }}{% endif %}">
+                                                <div class="form-text">每天固定時間執行填報與現場記錄資料同步</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -200,7 +259,7 @@
                 <div class="card-body">
                     <h6><i class="fas fa-lightbulb text-warning"></i> 報表類型說明</h6>
                     <div class="mb-3">
-                        <h6 class="text-primary">📊 資料同步</h6>
+                        <h6 class="text-primary">📊 填報與現場記錄資料同步</h6>
                         <p class="small mb-2">每小時自動同步工單和填報資料，無需設定執行時間</p>
                     </div>
                     
@@ -295,18 +354,33 @@ document.addEventListener('DOMContentLoaded', function() {
         const scheduleDayHelp = document.getElementById('schedule_day_help');
         const executionTimeInfo = document.getElementById('execution_time_info');
         
+        // 先重置所有必填驗證
+        scheduleTimeInput.setAttribute('required', 'required');
+        document.getElementById('company').setAttribute('required', 'required');
+        
         // 隱藏或顯示相關欄位
         if (reportType === 'data_sync') {
-            // 資料同步不需要設定執行時間和檔案格式
+            // 填報與現場記錄資料同步需要顯示時間設定選項，但不需要檔案格式和公司代號
             scheduleTimeInput.parentElement.style.display = 'none';
             scheduleDayInput.parentElement.style.display = 'none';
             document.getElementById('file_format_row').style.display = 'none';
-            executionTimeInfo.innerHTML = '<p class="small text-success"><strong>📊 資料同步：</strong>每小時自動執行，無需設定執行時間</p>';
+            document.getElementById('company_field').style.display = 'none';
+            document.getElementById('sync_time_settings_row').style.display = 'block';
+            
+            // 移除必填驗證
+            scheduleTimeInput.removeAttribute('required');
+            document.getElementById('company').removeAttribute('required');
+            
+            executionTimeInfo.innerHTML = '<p class="small text-success"><strong>📊 填報與現場記錄資料同步：</strong>可設定間隔執行或固定時間執行，無需設定執行時間和公司代號</p>';
         } else if (reportType === 'previous_workday') {
             // 前一個工作日報表只需要執行時間
             scheduleTimeInput.parentElement.style.display = 'block';
             scheduleDayInput.parentElement.style.display = 'none';
             document.getElementById('file_format_row').style.display = 'block';
+            document.getElementById('sync_time_settings_row').style.display = 'none';
+            document.getElementById('company_field').style.display = 'block';
+            
+            
             scheduleTimeInput.placeholder = '建議設定為 10:00';
             executionTimeInfo.innerHTML = '<p class="small text-info"><strong>📅 前一個工作日報表：</strong>每天早上10點後自動執行，考慮假期和補班日</p>';
         } else if (reportType.includes('week')) {
@@ -314,6 +388,8 @@ document.addEventListener('DOMContentLoaded', function() {
             scheduleTimeInput.parentElement.style.display = 'block';
             scheduleDayInput.parentElement.style.display = 'block';
             document.getElementById('file_format_row').style.display = 'block';
+            document.getElementById('sync_time_settings_row').style.display = 'none';
+            document.getElementById('company_field').style.display = 'block';
             scheduleTimeInput.placeholder = '建議設定為 09:00';
             scheduleDayInput.min = '1';
             scheduleDayInput.max = '7';
@@ -325,6 +401,8 @@ document.addEventListener('DOMContentLoaded', function() {
             scheduleTimeInput.parentElement.style.display = 'block';
             scheduleDayInput.parentElement.style.display = 'block';
             document.getElementById('file_format_row').style.display = 'block';
+            document.getElementById('sync_time_settings_row').style.display = 'none';
+            document.getElementById('company_field').style.display = 'block';
             scheduleTimeInput.placeholder = '建議設定為 09:00';
             scheduleDayInput.min = '1';
             scheduleDayInput.max = '31';
@@ -336,6 +414,8 @@ document.addEventListener('DOMContentLoaded', function() {
             scheduleTimeInput.parentElement.style.display = 'block';
             scheduleDayInput.parentElement.style.display = 'block';
             document.getElementById('file_format_row').style.display = 'block';
+            document.getElementById('sync_time_settings_row').style.display = 'none';
+            document.getElementById('company_field').style.display = 'block';
             scheduleTimeInput.placeholder = '建議設定為 09:00';
             scheduleDayInput.min = '1';
             scheduleDayInput.max = '31';
@@ -347,6 +427,8 @@ document.addEventListener('DOMContentLoaded', function() {
             scheduleTimeInput.parentElement.style.display = 'block';
             scheduleDayInput.parentElement.style.display = 'block';
             document.getElementById('file_format_row').style.display = 'block';
+            document.getElementById('sync_time_settings_row').style.display = 'none';
+            document.getElementById('company_field').style.display = 'block';
             scheduleTimeInput.placeholder = '建議設定為 09:00';
             scheduleDayInput.min = '1';
             scheduleDayInput.max = '31';
@@ -358,6 +440,8 @@ document.addEventListener('DOMContentLoaded', function() {
             scheduleTimeInput.parentElement.style.display = 'block';
             scheduleDayInput.parentElement.style.display = 'none';
             document.getElementById('file_format_row').style.display = 'block';
+            document.getElementById('sync_time_settings_row').style.display = 'none';
+            document.getElementById('company_field').style.display = 'block';
             scheduleTimeInput.placeholder = '建議設定為 09:00';
             executionTimeInfo.innerHTML = '<p class="small text-muted">請選擇報表類型以查看詳細說明</p>';
         }
@@ -366,42 +450,78 @@ document.addEventListener('DOMContentLoaded', function() {
     // 監聽報表類型變更
     reportTypeSelect.addEventListener('change', updateScheduleDayHelp);
     
+    // 監聽填報與現場記錄資料同步執行方式變化
+    const syncExecutionTypeSelect = document.getElementById('sync_execution_type');
+    if (syncExecutionTypeSelect) {
+        syncExecutionTypeSelect.addEventListener('change', function() {
+            const intervalSettings = document.getElementById('interval_settings');
+            const fixedTimeSettings = document.getElementById('fixed_time_settings');
+            const intervalMinutesInput = document.getElementById('sync_interval_minutes');
+            const fixedTimeInput = document.getElementById('sync_fixed_time');
+            
+            if (this.value === 'interval') {
+                intervalSettings.style.display = 'block';
+                fixedTimeSettings.style.display = 'none';
+                intervalMinutesInput.setAttribute('required', 'required');
+                fixedTimeInput.removeAttribute('required');
+            } else if (this.value === 'fixed_time') {
+                intervalSettings.style.display = 'none';
+                fixedTimeSettings.style.display = 'block';
+                intervalMinutesInput.removeAttribute('required');
+                fixedTimeInput.setAttribute('required', 'required');
+            }
+        });
+        
+        // 初始化執行方式設定
+        syncExecutionTypeSelect.dispatchEvent(new Event('change'));
+    }
+    
     // 初始化說明
     updateScheduleDayHelp();
     
     // 表單驗證
     const form = document.getElementById('scheduleForm');
     form.addEventListener('submit', function(e) {
+        console.log('表單提交開始驗證...');
+        
         const name = document.getElementById('name').value.trim();
         const reportType = document.getElementById('report_type').value;
         const company = document.getElementById('company').value.trim();
         const scheduleTime = document.getElementById('schedule_time').value;
         
+        console.log('表單資料:', { name, reportType, company, scheduleTime });
+        
         if (!name) {
             e.preventDefault();
             alert('請輸入排程名稱');
+            console.log('驗證失敗: 缺少排程名稱');
             return false;
         }
         
         if (!reportType) {
             e.preventDefault();
             alert('請選擇報表類型');
+            console.log('驗證失敗: 缺少報表類型');
             return false;
         }
         
-        if (!company) {
+        // 只有非填報與現場記錄資料同步類型才需要驗證公司代號
+        if (reportType !== 'data_sync' && !company) {
             e.preventDefault();
-            alert('請輸入公司代號');
+            alert('請選擇公司代號');
+            console.log('驗證失敗: 缺少公司代號');
             return false;
         }
         
-        if (!scheduleTime) {
+        // 只有非填報與現場記錄資料同步類型才需要驗證執行時間
+        if (reportType !== 'data_sync' && !scheduleTime) {
             e.preventDefault();
             alert('請設定執行時間');
+            console.log('驗證失敗: 缺少執行時間');
             return false;
         }
         
-        // 驗證收件人信箱格式
+        // 驗證收件人信箱格式（如果填寫了的話）
         const emailRecipients = document.getElementById('email_recipients').value.trim();
         if (emailRecipients) {
             const emails = emailRecipients.split(',').map(email => email.trim());
@@ -411,10 +531,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (email && !emailRegex.test(email)) {
                     e.preventDefault();
                     alert(`信箱格式錯誤: ${email}`);
+                    console.log('驗證失敗: 信箱格式錯誤');
                     return false;
                 }
             }
         }
+        
+        console.log('✅ 表單驗證通過，準備提交');
+        // 注意：收件人信箱不是必填欄位，可以不填寫
     });
 });
 </script>

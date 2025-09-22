@@ -18,7 +18,8 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.conf import settings
 from django.views.generic import TemplateView, ListView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import (
     WorkOrderReportData, ReportSchedule, ReportExecutionLog,
@@ -28,7 +29,17 @@ from .forms import (
     GenerateScoringReportForm, 
     SupervisorScoreForm, OperatorScoreFilterForm
 )
-from .services import WorkHourReportService, ReportGeneratorService, ReportSchedulerService, CompletedWorkOrderReportService, ScoringService, OperatorCapacityService, WorkOrderAnalysisService
+from .scheduler import ReportScheduler
+from .report_generator import ReportGenerator
+from .report_schedule_sync_service import ReportScheduleSyncService
+from django.utils import timezone
+from datetime import timedelta
+
+# 動態導入其他模組的模型
+try:
+    from workorder.fill_work.models import FillWork
+except ImportError:
+    FillWork = None
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +212,7 @@ def get_daily_work_report_data(start_date, end_date):
     fill_work_reports = FillWork.objects.filter(
         work_date__range=[start_date, end_date],
         approval_status='approved'
-    ).select_related('process')
+    )
     
     for report in fill_work_reports:
         data.append({
@@ -211,7 +222,7 @@ def get_daily_work_report_data(start_date, end_date):
             'product_id': report.product_id,
             'start_time': report.start_time,
             'end_time': report.end_time,
-            'process': report.process.name if report.process else '',
+            'process': report.operation or report.process_name or '',
             'work_quantity': report.work_quantity,
             'defect_quantity': report.defect_quantity,
         })
@@ -610,7 +621,7 @@ def get_abnormal_report_data(start_date, end_date):
             'operator': report.operator,
             'work_date': report.work_date.strftime('%Y-%m-%d'),
             'workorder': report.workorder,
-            'process': report.process.name if report.process else '',
+            'process': report.operation or report.process_name or '',
             'abnormal_notes': report.abnormal_notes,
             'good_quantity': report.work_quantity,
             'defect_quantity': report.defect_quantity,
@@ -1540,9 +1551,21 @@ def report_schedule_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # 檢查每個排程的同步狀態
+    from django_celery_beat.models import PeriodicTask
+    schedule_sync_status = {}
+    for schedule in schedules:
+        task = PeriodicTask.objects.filter(name=f'report_schedule_{schedule.id}').first()
+        schedule_sync_status[schedule.id] = {
+            'synced': task is not None,
+            'enabled': task.enabled if task else False,
+            'last_run': task.last_run_at if task else None,
+        }
+    
     context = {
         'page_obj': page_obj,
         'schedules': page_obj,
+        'schedule_sync_status': schedule_sync_status,
     }
     return render(request, 'reporting/reporting/report_schedule_list.html', context)
 
@@ -1557,30 +1580,57 @@ def report_schedule_form(request, schedule_id=None):
     
     if request.method == 'POST':
         try:
+            # 處理公司代號：資料同步類型自動設為 ALL
+            report_type = request.POST.get('report_type')
+            company = request.POST.get('company')
+            if report_type == 'data_sync':
+                company = 'ALL'  # 填報與現場記錄資料同步不分公司，自動設為 ALL
+            
+            # 處理執行時間：填報與現場記錄資料同步類型可以為空
+            schedule_time = request.POST.get('schedule_time')
+            if report_type == 'data_sync' and not schedule_time:
+                schedule_time = '09:00:00'  # 填報與現場記錄資料同步預設時間
+            
             if schedule:
                 # 更新現有排程
                 schedule.name = request.POST.get('name')
-                schedule.report_type = request.POST.get('report_type')
-                schedule.company = request.POST.get('company')
-                schedule.schedule_time = request.POST.get('schedule_time')
+                schedule.report_type = report_type
+                schedule.company = company
+                schedule.schedule_time = schedule_time
                 schedule.schedule_day = request.POST.get('schedule_day') or None
                 schedule.file_format = request.POST.get('file_format', 'html')
+                schedule.sync_execution_type = request.POST.get('sync_execution_type', 'interval')
+                schedule.sync_interval_minutes = request.POST.get('sync_interval_minutes', 60)
+                schedule.sync_fixed_time = request.POST.get('sync_fixed_time') or None
                 schedule.status = request.POST.get('status')
                 schedule.email_recipients = request.POST.get('email_recipients', '')
                 schedule.save()
+                
+                # 同步到 Celery Beat
+                from .report_schedule_sync_service import ReportScheduleSyncService
+                sync_result = ReportScheduleSyncService.sync_report_schedules_to_celery()
+                
                 messages.success(request, '報表排程更新成功')
             else:
                 # 建立新排程
                 schedule = ReportSchedule.objects.create(
                     name=request.POST.get('name'),
-                    report_type=request.POST.get('report_type'),
-                    company=request.POST.get('company'),
-                    schedule_time=request.POST.get('schedule_time'),
+                    report_type=report_type,
+                    company=company,
+                    schedule_time=schedule_time,
                     schedule_day=request.POST.get('schedule_day') or None,
                     file_format=request.POST.get('file_format', 'html'),
+                    sync_execution_type=request.POST.get('sync_execution_type', 'interval'),
+                    sync_interval_minutes=request.POST.get('sync_interval_minutes', 60),
+                    sync_fixed_time=request.POST.get('sync_fixed_time') or None,
                     status=request.POST.get('status'),
                     email_recipients=request.POST.get('email_recipients', ''),
                 )
+                
+                # 同步到 Celery Beat
+                from .report_schedule_sync_service import ReportScheduleSyncService
+                sync_result = ReportScheduleSyncService.sync_report_schedules_to_celery()
+                
                 messages.success(request, '報表排程建立成功')
             
             return redirect('reporting:report_schedule_list')
@@ -1588,11 +1638,19 @@ def report_schedule_form(request, schedule_id=None):
         except Exception as e:
             messages.error(request, f'儲存報表排程失敗: {str(e)}')
     
+    # 獲取公司選項
+    try:
+        from erp_integration.models import CompanyConfig
+        companies = CompanyConfig.objects.all().order_by('company_code')
+    except Exception:
+        companies = []
+    
     context = {
         'schedule': schedule,
         'report_types': ReportSchedule.REPORT_TYPES,
         'file_formats': ReportSchedule.FILE_FORMATS,
         'status_choices': ReportSchedule.STATUS_CHOICES,
+        'companies': companies,
     }
     return render(request, 'reporting/reporting/report_schedule_form.html', context)
 
@@ -1614,20 +1672,131 @@ def report_execution_log(request):
     return render(request, 'reporting/reporting/report_execution_log.html', context)
 
 
+@require_http_methods(["GET"])
+@csrf_exempt
+def api_report_execution_logs(request):
+    """API: 獲取報表執行日誌"""
+    try:
+        schedule_id = request.GET.get('schedule_id')
+        
+        if schedule_id:
+            # 查詢特定排程的執行記錄
+            logs = ReportExecutionLog.objects.filter(
+                report_schedule_id=schedule_id
+            ).order_by('-execution_time')
+        else:
+            # 查詢所有執行記錄
+            logs = ReportExecutionLog.objects.all().order_by('-execution_time')
+        
+        # 轉換為 JSON 格式
+        logs_data = []
+        for log in logs:
+            logs_data.append({
+                'id': log.id,
+                'report_schedule_id': log.report_schedule_id,
+                'report_schedule_name': log.report_schedule_name,
+                'execution_time': log.execution_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'status': log.status,
+                'message': log.message,
+                'file_path': log.file_path,
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'data': logs_data,
+            'count': len(logs_data)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def view_report_file(request, file_path):
+    """檢視報表檔案"""
+    import os
+    from django.http import HttpResponse, Http404
+    from django.conf import settings
+    
+    try:
+        # 解碼檔案路徑
+        import urllib.parse
+        decoded_file_path = urllib.parse.unquote(file_path)
+        
+        # 檢查檔案是否存在
+        if not os.path.exists(decoded_file_path):
+            raise Http404("報表檔案不存在")
+        
+        # 檢查檔案是否在允許的目錄內（安全檢查）
+        media_root = settings.MEDIA_ROOT
+        if not decoded_file_path.startswith(media_root):
+            raise Http404("無權限存取此檔案")
+        
+        # 根據檔案類型決定回應方式
+        file_extension = os.path.splitext(decoded_file_path)[1].lower()
+        
+        if file_extension == '.html':
+            # HTML 檔案直接顯示
+            with open(decoded_file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            return HttpResponse(content, content_type='text/html; charset=utf-8')
+        
+        elif file_extension in ['.xlsx', '.xls']:
+            # Excel 檔案下載
+            with open(decoded_file_path, 'rb') as f:
+                response = HttpResponse(f.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                filename = os.path.basename(decoded_file_path)
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response
+        
+        elif file_extension == '.csv':
+            # CSV 檔案下載
+            with open(decoded_file_path, 'rb') as f:
+                response = HttpResponse(f.read(), content_type='text/csv; charset=utf-8')
+                filename = os.path.basename(decoded_file_path)
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response
+        
+        else:
+            # 其他檔案類型下載
+            with open(decoded_file_path, 'rb') as f:
+                response = HttpResponse(f.read(), content_type='application/octet-stream')
+                filename = os.path.basename(decoded_file_path)
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response
+                
+    except Exception as e:
+        raise Http404(f"無法檢視報表檔案: {str(e)}")
+
+
 @login_required
 def execute_report_schedule(request, schedule_id):
     """手動執行報表排程"""
     try:
         schedule = get_object_or_404(ReportSchedule, id=schedule_id)
-        scheduler = ReportSchedulerService()
+        scheduler = ReportScheduler()
         
-        # 手動執行排程
-        scheduler._execute_schedule(schedule)
+        # 手動執行排程（跳過時間檢查）
+        result = scheduler.execute_single_schedule(schedule)
         
-        messages.success(request, f'報表排程 {schedule.name} 執行成功')
+        if result.get('success'):
+            # 統一調度器已經處理了郵件發送，這裡只需要顯示結果
+            if schedule.email_recipients:
+                messages.success(request, f'報表排程 {schedule.name} 執行成功，郵件已發送')
+            else:
+                messages.success(request, f'報表排程 {schedule.name} 執行成功')
+        else:
+            messages.error(request, f'執行報表排程失敗: {result.get("message", "未知錯誤")}')
         
     except Exception as e:
-        messages.error(request, f'執行報表排程失敗: {str(e)}')
+        import traceback
+        error_msg = f'執行報表排程失敗: {str(e)}'
+        print(f"錯誤詳情: {error_msg}")
+        print(f"錯誤追蹤: {traceback.format_exc()}")
+        messages.error(request, error_msg)
     
     return redirect('reporting:report_schedule_list')
 
@@ -1639,12 +1808,17 @@ def delete_report_schedule(request, schedule_id):
         schedule = get_object_or_404(ReportSchedule, id=schedule_id)
         schedule_name = schedule.name
         
-        # 檢查是否有相關的執行記錄
-        execution_count = ReportExecutionLog.objects.filter(report_schedule=schedule).count()
+        # 查詢相關的執行記錄
+        execution_count = ReportExecutionLog.objects.filter(report_schedule_id=schedule.id).count()
         
         if request.method == 'POST':
             # 確認刪除
             schedule.delete()
+            
+            # 同步到 Celery Beat
+            from .report_schedule_sync_service import ReportScheduleSyncService
+            sync_result = ReportScheduleSyncService.sync_report_schedules_to_celery()
+            
             messages.success(request, f'報表排程「{schedule_name}」已成功刪除')
             return redirect('reporting:report_schedule_list')
         else:
@@ -1657,43 +1831,82 @@ def delete_report_schedule(request, schedule_id):
             
     except Exception as e:
         messages.error(request, f'刪除報表排程失敗: {str(e)}')
+        return redirect('reporting:report_schedule_list')
+
+
+@login_required
+@require_POST
+def sync_report_schedules(request):
+    """同步報表排程到 Celery Beat"""
+    try:
+        from .report_schedule_sync_service import ReportScheduleSyncService
+        
+        # 執行同步
+        result = ReportScheduleSyncService.sync_report_schedules_to_celery()
+        
+        if result['success']:
+            messages.success(request, f"✅ {result['message']}")
+        else:
+            messages.error(request, f"❌ 同步失敗: {result.get('error', '未知錯誤')}")
+            
+    except Exception as e:
+        messages.error(request, f"❌ 同步時發生錯誤: {str(e)}")
+    
     return redirect('reporting:report_schedule_list')
+
+
 
 
 @login_required
 def sync_report_data(request):
     """同步報表資料"""
     try:
-        from workorder.fill_work.models import FillWork
-        from workorder.onsite_reporting.models import OnsiteReport
+        from .data_sync import DataSyncService
         
-        # 同步填報資料
-        fill_works = FillWork.objects.filter(approval_status='approved')
-        fill_works_synced = 0
-        for fill_work in fill_works:
-            try:
-                WorkOrderReportData.create_from_fill_work(fill_work)
-                fill_works_synced += 1
-            except Exception as e:
-                logger.error(f"同步填報資料失敗: {fill_work.id} - {str(e)}")
+        # 使用統一的資料同步核心函數
+        # 手動同步：同步所有資料，不強制同步（會跳過已存在的記錄）
+        result = DataSyncService.sync_fill_work_and_onsite_data(force_sync=False)
         
-        # 同步現場報工資料
-        onsite_reports = OnsiteReport.objects.filter(status='completed')
-        onsite_synced = 0
-        for onsite_report in onsite_reports:
-            try:
-                WorkOrderReportData.create_from_onsite_report(onsite_report)
-                onsite_synced += 1
-            except Exception as e:
-                logger.error(f"同步現場報工資料失敗: {onsite_report.id} - {str(e)}")
-        
-        total_synced = fill_works_synced + onsite_synced
-        messages.success(request, f'報表資料同步完成，填報資料 {fill_works_synced} 筆，現場報工 {onsite_synced} 筆，總計 {total_synced} 筆記錄')
+        if result['success']:
+            # 檢查是否為 AJAX 請求
+            if request.headers.get('Content-Type') == 'application/json' or request.headers.get('Accept') == 'application/json':
+                return JsonResponse({
+                    'success': True,
+                    'message': result['message'],
+                    'fill_works_synced': result['fill_works_synced'],
+                    'onsite_synced': result['onsite_synced'],
+                    'total_synced': result['total_synced'],
+                    'fill_works_skipped': result.get('fill_works_skipped', 0),
+                    'onsite_skipped': result.get('onsite_skipped', 0),
+                    'total_skipped': result.get('total_skipped', 0)
+                })
+            else:
+                messages.success(request, result['message'])
+                return redirect('reporting:work_hour_report_index')
+        else:
+            # 檢查是否為 AJAX 請求
+            if request.headers.get('Content-Type') == 'application/json' or request.headers.get('Accept') == 'application/json':
+                return JsonResponse({
+                    'success': False,
+                    'error': result['error']
+                })
+            else:
+                messages.error(request, result['error'])
+                return redirect('reporting:work_hour_report_index')
         
     except Exception as e:
-        messages.error(request, f'同步報表資料失敗: {str(e)}')
-    
-    return redirect('reporting:work_hour_report_index') 
+        error_message = f'同步報表資料失敗: {str(e)}'
+        logger.error(error_message)
+        
+        # 檢查是否為 AJAX 請求
+        if request.headers.get('Content-Type') == 'application/json' or request.headers.get('Accept') == 'application/json':
+            return JsonResponse({
+                'success': False,
+                'error': error_message
+            }, status=500)
+        else:
+            messages.error(request, error_message)
+            return redirect('reporting:work_hour_report_index') 
 
 @login_required
 def chart_data(request):
@@ -2091,7 +2304,7 @@ def scoring_dashboard(request):
 @login_required
 def score_period_management(request):
     """評分週期管理"""
-    from .services import ScorePeriodService
+    from .score_period_service import ScorePeriodService
     
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -2134,7 +2347,7 @@ def score_period_management(request):
 @login_required
 def score_period_detail(request, period_type):
     """評分週期詳情"""
-    from .services import ScorePeriodService
+    from .score_period_service import ScorePeriodService
     
     company_code = request.GET.get('company_code', '')
     if not company_code:
@@ -2269,7 +2482,7 @@ def detailed_stats(request):
 @login_required
 def test_workday_calendar(request):
     """測試工作日曆服務"""
-    from .services import WorkdayCalendarService
+    from .workday_calendar import WorkdayCalendarService
     from datetime import date, timedelta
     
     calendar_service = WorkdayCalendarService()
@@ -2323,7 +2536,8 @@ def test_workday_calendar(request):
 @login_required
 def holiday_setup_management(request):
     """假期設定管理"""
-    from .services import HolidayAutoSetupService, WorkdayCalendarService
+    from .holiday_auto_setup_service import HolidayAutoSetupService
+    from .workday_calendar import WorkdayCalendarService
     from datetime import date, timedelta
     
     setup_service = HolidayAutoSetupService()
@@ -2382,36 +2596,10 @@ def holiday_setup_management(request):
             else:
                 messages.error(request, '請填寫補班日期')
     
-    # 取得當前假期統計
+    # 取得當前日期
     current_date = date.today()
-    next_30_days = []
-    
-    for i in range(30):
-        check_date = current_date + timedelta(days=i)
-        next_30_days.append({
-            'date': check_date,
-            'is_workday': calendar_service.is_workday(check_date),
-            'weekday': check_date.strftime('%A'),
-            'holiday_name': ''
-        })
-    
-    # 檢查是否有假期事件
-    from scheduling.models import Event
-    holiday_events = Event.objects.filter(
-        type='holiday',
-        start__date__gte=current_date,
-        start__date__lt=current_date + timedelta(days=30)
-    )
-    
-    for event in holiday_events:
-        event_date = event.start.date()
-        for day_info in next_30_days:
-            if day_info['date'] == event_date:
-                day_info['holiday_name'] = event.title
-                break
     
     context = {
-        'next_30_days': next_30_days,
         'current_date': current_date,
     }
     return render(request, 'reporting/reporting/holiday_setup_management.html', context)
@@ -2419,29 +2607,18 @@ def holiday_setup_management(request):
 @login_required
 def execute_previous_workday_report(request):
     """手動執行前一個工作日報表"""
-    from .services import PreviousWorkdayReportScheduler
-    
     if request.method == 'POST':
         try:
-            scheduler = PreviousWorkdayReportScheduler()
+            scheduler = ReportScheduler()
             
-            # 強制執行（忽略時間限制）
-            report_date = scheduler.get_report_date()
+            # 使用 ReportGenerator 生成前一個工作日報表
+            generator = ReportGenerator()
+            report_date = generator._collect_previous_workday_data(timezone.now().date() - timedelta(days=1))['date']
             
-            # 收集資料
-            data = scheduler.collect_data(report_date)
+            # 生成報表（手動執行時預設生成 HTML 格式）
+            file_paths = generator.generate_previous_workday_report(report_date, 'html')
             
-            # 檢查是否有資料
-            if data['fill_works_count'] == 0 and data['onsite_reports_count'] == 0:
-                messages.warning(request, f'{report_date} 沒有找到任何填報或現場報工資料')
-                return redirect('reporting:index')
-            
-            # 生成報表
-            report_file = scheduler.generate_report(data)
-            
-            # 發送報表
-            scheduler.send_report(report_file, report_date)
-            
+            # 手動執行不發送郵件，因為沒有排程設定
             messages.success(request, f'前一個工作日報表執行成功！報表日期：{report_date}')
             
         except Exception as e:
@@ -2453,10 +2630,9 @@ def execute_previous_workday_report(request):
 @login_required
 def test_previous_workday_report(request):
     """測試前一個工作日報表功能"""
-    from .services import PreviousWorkdayReportScheduler
     from datetime import date, timedelta
     
-    scheduler = PreviousWorkdayReportScheduler()
+    scheduler = ReportScheduler()
     
     # 測試資料
     test_results = {
@@ -2501,11 +2677,11 @@ def test_previous_workday_report(request):
 @login_required
 def previous_workday_report_management(request):
     """前一個工作日報表管理"""
-    from .services import PreviousWorkdayReportScheduler, WorkdayCalendarService
+    from .workday_calendar import WorkdayCalendarService
     from datetime import date, timedelta
     import os
     
-    scheduler = PreviousWorkdayReportScheduler()
+    scheduler = ReportScheduler()
     calendar_service = WorkdayCalendarService()
     
     # 取得當前狀態
@@ -2586,7 +2762,7 @@ def previous_workday_report_management(request):
 @login_required
 def government_calendar_sync(request):
     """政府行事曆 API 同步管理"""
-    from .services import TaiwanGovernmentCalendarService
+    from .taiwan_government_calendar_service import TaiwanGovernmentCalendarService
     from datetime import datetime
     
     gov_service = TaiwanGovernmentCalendarService()
@@ -2652,7 +2828,7 @@ def government_calendar_sync(request):
 @login_required
 def csv_holiday_import(request):
     """CSV 國定假日匯入管理"""
-    from .services import CSVHolidayImportService
+    from .csv_holiday_import_service import CSVHolidayImportService
     from django.http import HttpResponse
     
     csv_service = CSVHolidayImportService()
@@ -2785,9 +2961,15 @@ class CompletedWorkOrderAnalysisListView(LoginRequiredMixin, ListView):
     """已完工工單分析列表"""
     model = CompletedWorkOrderAnalysis
     template_name = 'reporting/completed_workorder_analysis_list.html'
-    context_object_name = 'page_obj'
+    context_object_name = 'analyses'
     paginate_by = 20
     ordering = ['-created_at']
+    
+    def get_template_names(self):
+        # 如果是 AJAX 請求，使用部分模板
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return ['reporting/completed_workorder_analysis_list_ajax.html']
+        return super().get_template_names()
     
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -2796,6 +2978,16 @@ class CompletedWorkOrderAnalysisListView(LoginRequiredMixin, ListView):
         company = self.request.GET.get('company')
         if company:
             queryset = queryset.filter(company_code=company)
+        
+        # 工單編號篩選
+        workorder_id = self.request.GET.get('workorder_id')
+        if workorder_id:
+            queryset = queryset.filter(workorder_id__icontains=workorder_id)
+        
+        # 產品編號篩選
+        product_code = self.request.GET.get('product_code')
+        if product_code:
+            queryset = queryset.filter(product_code__icontains=product_code)
         
         # 日期範圍篩選
         start_date = self.request.GET.get('start_date')
@@ -2815,6 +3007,20 @@ class CompletedWorkOrderAnalysisListView(LoginRequiredMixin, ListView):
         if max_days:
             queryset = queryset.filter(total_execution_days__lte=max_days)
         
+        # 工作時數篩選
+        min_hours = self.request.GET.get('min_hours')
+        if min_hours:
+            queryset = queryset.filter(total_work_hours__gte=min_hours)
+        
+        max_hours = self.request.GET.get('max_hours')
+        if max_hours:
+            queryset = queryset.filter(total_work_hours__lte=max_hours)
+        
+        # 效率比率篩選
+        efficiency_min = self.request.GET.get('efficiency_min')
+        if efficiency_min:
+            queryset = queryset.filter(efficiency_rate__gte=efficiency_min)
+        
         return queryset
     
     def get_context_data(self, **kwargs):
@@ -2827,10 +3033,15 @@ class CompletedWorkOrderAnalysisListView(LoginRequiredMixin, ListView):
         
         # 篩選條件
         context['selected_company'] = self.request.GET.get('company', '')
+        context['selected_workorder_id'] = self.request.GET.get('workorder_id', '')
+        context['selected_product_code'] = self.request.GET.get('product_code', '')
         context['selected_start_date'] = self.request.GET.get('start_date', '')
         context['selected_end_date'] = self.request.GET.get('end_date', '')
         context['selected_min_days'] = self.request.GET.get('min_days', '')
         context['selected_max_days'] = self.request.GET.get('max_days', '')
+        context['selected_min_hours'] = self.request.GET.get('min_hours', '')
+        context['selected_max_hours'] = self.request.GET.get('max_hours', '')
+        context['selected_efficiency_min'] = self.request.GET.get('efficiency_min', '')
         
         return context
 
@@ -2847,30 +3058,50 @@ class CompletedWorkOrderAnalysisDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # 按第一筆記錄時間排序工序詳細資料，但出貨包裝永遠排在最後
+        # 按照工序的實際執行順序排列統計資料，與已完工工單詳情頁面完全一致
         if self.object.process_details:
-            # 分離出貨包裝和其他工序
-            shipping_processes = []
-            other_processes = []
+            # 定義工序優先順序，出貨包裝必須排在最後
+            def get_process_priority(process_name):
+                if process_name == "出貨包裝":
+                    return 9999  # 出貨包裝排在最後，不按時間順序
+                # 其他工序按第一次出現的順序排列
+                process_data = self.object.process_details.get(process_name, {})
+                return process_data.get('first_appearance_order', 999)
             
-            for name, data in self.object.process_details.items():
-                if name == '出貨包裝':
-                    shipping_processes.append((name, data))
-                else:
-                    other_processes.append((name, data))
+            # 按照工序執行順序排序統計資料
+            sorted_process_details = dict(sorted(
+                self.object.process_details.items(),
+                key=lambda x: get_process_priority(x[0])
+            ))
             
-            # 對其他工序按第一筆記錄時間排序
-            sorted_other_processes = sorted(
-                other_processes,
-                key=lambda x: x[1].get('first_record_date', '9999-12-31')
-            )
-            
-            # 組合：其他工序 + 出貨包裝
-            context['sorted_process_details'] = sorted_other_processes + shipping_processes
+            # 轉換為列表格式供模板使用
+            context['sorted_process_details'] = list(sorted_process_details.items())
         else:
             context['sorted_process_details'] = []
         
         return context
+    
+    def _get_sorted_process_details(self, process_details):
+        """取得按工序執行順序排序的工序詳細資料，與已完工工單詳情頁面完全一致"""
+        if not process_details:
+            return []
+        
+        # 定義工序優先順序，出貨包裝必須排在最後
+        def get_process_priority(process_name):
+            if process_name == "出貨包裝":
+                return 9999  # 出貨包裝排在最後，不按時間順序
+            # 其他工序按第一次出現的順序排列
+            process_data = process_details.get(process_name, {})
+            return process_data.get('first_appearance_order', 999)
+        
+        # 按照工序執行順序排序統計資料
+        sorted_process_details = dict(sorted(
+            process_details.items(),
+            key=lambda x: get_process_priority(x[0])
+        ))
+        
+        # 轉換為列表格式
+        return list(sorted_process_details.items())
     
     def post(self, request, *args, **kwargs):
         """處理匯出請求"""
@@ -2943,10 +3174,15 @@ class CompletedWorkOrderAnalysisDetailView(LoginRequiredMixin, DetailView):
             # 工作表3：工序分析
             if analysis.process_details:
                 process_data = []
-                for process_name, process_info in analysis.process_details.items():
+                # 按時間排序工序（與網頁顯示一致）
+                sorted_processes = self._get_sorted_process_details(analysis.process_details)
+                for process_name, process_info in sorted_processes:
                     process_data.append({
                         '工序名稱': process_name,
                         '總工作時數': process_info.get('total_hours', 0),
+                        '總加班時數': process_info.get('total_overtime_hours', 0),
+                        '總完成數量': process_info.get('total_quantity', 0),
+                        '每小時產能': f"{process_info.get('hourly_capacity', 0):.1f} pcs/hr" if process_info.get('hourly_capacity', 0) > 0 else '-',
                         '參與作業員數': process_info.get('operator_count', 0),
                         '第一筆記錄': process_info.get('first_record_date', ''),
                         '最後一筆記錄': process_info.get('last_record_date', ''),
@@ -3041,7 +3277,7 @@ class CompletedWorkOrderAnalysisDetailView(LoginRequiredMixin, DetailView):
                 '完工日期': analysis.completion_date.strftime('%Y-%m-%d') if analysis.completion_date else '',
                 '完工狀態': analysis.completion_status,
             },
-            'process_details': analysis.process_details or {},
+            'process_details': self._get_sorted_process_details(analysis.process_details or {}),
             'operator_details': analysis.operator_details or {},
             'statistics': {
                 '不重複工序數': analysis.unique_processes,
@@ -3134,7 +3370,7 @@ def analyze_single_workorder(request):
         })
     
     try:
-        from .services import WorkOrderAnalysisService
+        from .workorder_analysis_service import WorkOrderAnalysisService
         result = WorkOrderAnalysisService.analyze_completed_workorder(
             workorder_id, company_code, force=force
         )
@@ -3159,7 +3395,7 @@ def analyze_batch_workorders(request):
     end_date = request.POST.get('end_date')
     
     try:
-        from .services import WorkOrderAnalysisService
+        from .workorder_analysis_service import WorkOrderAnalysisService
         result = WorkOrderAnalysisService.analyze_completed_workorders_batch(
             start_date=start_date,
             end_date=end_date,

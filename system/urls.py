@@ -91,6 +91,13 @@ urlpatterns = [
     # 報表設定
     path("report_settings/", views.report_settings, name="report_settings"),
     path("manual_sync_reports/", views.manual_sync_reports, name="manual_sync_reports"),
+    path("sync_logs/", views.sync_logs, name="sync_logs"),
+    path("sync_logs/<int:log_id>/", views.sync_log_detail, name="sync_log_detail"),
+    
+    # 報表清理設定
+    path("report_cleanup_settings/", views.report_cleanup_settings, name="report_cleanup_settings"),
+    path("update_cleanup_settings/", views.update_cleanup_settings, name="update_cleanup_settings"),
+    path("execute_cleanup/", views.execute_cleanup, name="execute_cleanup"),
     
     # API 端點
     path("api/processes/", views.get_processes_api, name="get_processes_api"),

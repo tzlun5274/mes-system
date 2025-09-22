@@ -731,6 +731,7 @@ def workorder_process_detail(request, workorder_id):
     overall_progress = round(
         (total_completed / total_planned * 100) if total_planned > 0 else 0, 2
     )
+    
 
     # 取得所有工序名稱供下拉選單使用
     from process.models import ProcessName
@@ -830,6 +831,12 @@ def generate_completed_workorder_processes(workorder):
     
     for process_name, data in sorted_processes:
         if data['completed_quantity'] > 0:  # 只顯示有實際產出的工序
+            # 計算每小時產能
+            total_hours = data['total_work_hours'] + data['total_overtime_hours']
+            actual_hourly_capacity = 0
+            if total_hours > 0 and data['completed_quantity'] > 0:
+                actual_hourly_capacity = data['completed_quantity'] / total_hours
+            
             # 創建一個類似 WorkOrderProcess 的物件
             process_obj = type('CompletedProcess', (), {
                 'step_order': step_order,
@@ -843,6 +850,7 @@ def generate_completed_workorder_processes(workorder):
                 'actual_end_time': data['actual_end_time'],
                 'capacity_multiplier': len(data['assigned_operators']) or 1,
                 'target_hourly_output': 0,  # 完工工單不需要目標產能
+                'actual_hourly_capacity': actual_hourly_capacity,  # 實際每小時產能
                 'estimated_hours': data['total_work_hours'] + data['total_overtime_hours'],
                 'defect_quantity': data['defect_quantity'],
                 'abnormal_notes': '; '.join(data['abnormal_notes']) if data['abnormal_notes'] else '',
@@ -4800,10 +4808,10 @@ def get_process_list_unified(request):
             filtered_processes_queryset = ProcessName.objects.none()
         
         # 根據表單類型進一步過濾工序
-        if form_type == 'smt':
+        if form_type == 'smt' or form_type == 'smt_rd':
             # SMT表單：只顯示包含SMT的工序
             filtered_processes_queryset = filtered_processes_queryset.filter(name__icontains='SMT')
-        else:
+        elif form_type == 'operator' or form_type == 'operator_rd':
             # 作業員表單：排除包含SMT的工序
             filtered_processes_queryset = filtered_processes_queryset.exclude(name__icontains='SMT')
         
@@ -4837,10 +4845,10 @@ def get_equipment_list_unified(request):
             filtered_equipments_queryset = Equipment.objects.none()
         
         # 根據表單類型進一步過濾設備
-        if form_type == 'smt':
+        if form_type == 'smt' or form_type == 'smt_rd':
             # SMT表單：只顯示包含SMT的設備
             filtered_equipments_queryset = filtered_equipments_queryset.filter(name__icontains='SMT')
-        else:
+        elif form_type == 'operator' or form_type == 'operator_rd':
             # 作業員表單：排除包含SMT的設備
             filtered_equipments_queryset = filtered_equipments_queryset.exclude(name__icontains='SMT')
         
@@ -5188,13 +5196,13 @@ def active_workorders(request):
     workorders_with_approved_reports = []
     for fill_work in approved_fill_works:
         # 從填報記錄的公司名稱找到對應的公司代號
-        company_code = company_name_to_code.get(fill_work.company_name)
+        company_code = company_name_to_code.get(fill_work['company_name'])
         if company_code:
             # 根據多公司架構，需要同時檢查公司代號、工單號碼和產品編號
             workorder = WorkOrder.objects.filter(
                 company_code=company_code,
-                order_number=fill_work.workorder,
-                product_code=fill_work.product_id
+                order_number=fill_work['workorder'],
+                product_code=fill_work['product_id']
             ).first()
             if workorder:
                 workorders_with_approved_reports.append(workorder)
@@ -5262,13 +5270,13 @@ def active_workorders(request):
     # 計算有對應工單的已核准填報記錄數量（正確區分公司）
     total_approved_reports_with_workorder = 0
     for fill_work in approved_fill_works:
-        company_code = company_name_to_code.get(fill_work.company_name)
+        company_code = company_name_to_code.get(fill_work['company_name'])
         if company_code:
             # 根據多公司架構，需要同時檢查公司代號、工單號碼和產品編號
             workorder_exists = WorkOrder.objects.filter(
                 company_code=company_code,
-                order_number=fill_work.workorder,
-                product_code=fill_work.product_id
+                order_number=fill_work['workorder'],
+                product_code=fill_work['product_id']
             ).exists()
             if workorder_exists:
                 total_approved_reports_with_workorder += 1
@@ -5286,7 +5294,7 @@ def active_workorders(request):
     # 1. 填報記錄的出貨包裝數量
     packaging_fillwork_reports = FillWork.objects.filter(
         approval_status='approved',
-        process_name__exact='出貨包裝'  # 修正：使用 process_name 欄位
+        operation__exact='出貨包裝'  # 修正：使用 operation 欄位
     )
     fillwork_good_quantity = packaging_fillwork_reports.aggregate(
         total=Sum('work_quantity')

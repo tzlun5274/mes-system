@@ -3,14 +3,34 @@
 
 {% block content %}
 <div class="container-fluid mt-4">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/home/">首頁</a></li>
+            <li class="breadcrumb-item"><a href="/system/">系統管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">使用者管理</li>
+        </ol>
+    </nav>
+
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h3 class="mb-0">{{ title }}</h3>
-                    <a href="/system/users/create/" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> 新增使用者
-                    </a>
+                    <div class="btn-group" role="group">
+                        <a href="/system/user/export/" class="btn btn-success">
+                            <i class="fas fa-download"></i> 匯出
+                        </a>
+                        <a href="/system/user/export/excel/" class="btn btn-info">
+                            <i class="fas fa-file-excel"></i> 匯出 Excel
+                        </a>
+                        <a href="/system/user/import/" class="btn btn-warning">
+                            <i class="fas fa-upload"></i> 匯入
+                        </a>
+                        <a href="/system/user/add/" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> 新增使用者
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -38,9 +58,13 @@
                                             </span>
                                         </td>
                                         <td>
-                                            <span class="badge bg-{% if user.is_superuser %}danger{% else %}info{% endif %}">
-                                                {% if user.is_superuser %}超級管理員{% else %}一般使用者{% endif %}
-                                            </span>
+                                            {% if user.is_superuser %}
+                                                <span class="badge bg-danger">超級管理員</span>
+                                            {% elif user.is_staff %}
+                                                <span class="badge bg-warning">管理員</span>
+                                            {% else %}
+                                                <span class="badge bg-info">一般使用者</span>
+                                            {% endif %}
                                         </td>
                                         <td>
                                             {% if user.last_login %}
@@ -50,10 +74,10 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                            <a href="/system/users/{{ user.id }}/" class="btn btn-info btn-sm">
+                                            <a href="/system/user/detail/{{ user.id }}/" class="btn btn-info btn-sm">
                                                 <i class="fas fa-eye"></i> 查看
                                             </a>
-                                            <a href="/system/users/{{ user.id }}/edit/" class="btn btn-warning btn-sm">
+                                            <a href="/system/user/edit/{{ user.id }}/" class="btn btn-warning btn-sm">
                                                 <i class="fas fa-edit"></i> 編輯
                                             </a>
                                         </td>

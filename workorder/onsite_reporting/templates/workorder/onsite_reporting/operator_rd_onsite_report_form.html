@@ -59,15 +59,15 @@
 
                             <!-- 工單號碼 (固定值) -->
                             <div class="col-md-4 mb-3">
-                                <label for="order_number" class="form-label">工單號碼 <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="order_number" name="order_number" value="RD樣品" readonly required>
+                                <label for="order_number" class="form-label">工單號碼</label>
+                                <input type="text" class="form-control" id="order_number" name="order_number" value="RD樣品" readonly>
                                 <div class="form-text">RD樣品固定工單號碼</div>
                             </div>
 
                             <!-- 公司名稱 -->
                             <div class="col-md-4 mb-3">
-                                <label for="company_code" class="form-label">公司名稱 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="company_code" name="company_code" required>
+                                <label for="company_code" class="form-label">公司名稱</label>
+                                <select class="form-select" id="company_code" name="company_code">
                                     <option value="">請選擇公司名稱</option>
                                     {% for value, label in companies %}
                                         <option value="{{ value }}">{{ label }}</option>
@@ -78,8 +78,8 @@
 
                             <!-- 作業員 -->
                             <div class="col-md-4 mb-3">
-                                <label for="operator" class="form-label">作業員 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="operator" name="operator" required>
+                                <label for="operator" class="form-label">作業員</label>
+                                <select class="form-select" id="operator" name="operator">
                                     <option value="">請選擇作業員</option>
                                     {% for operator in operators %}
                                         <option value="{{ operator }}">{{ operator }}</option>
@@ -90,8 +90,8 @@
 
                             <!-- 工序 -->
                             <div class="col-md-4 mb-3">
-                                <label for="process" class="form-label">工序 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="process" name="process" required>
+                                <label for="process" class="form-label">工序</label>
+                                <select class="form-select" id="process" name="process">
                                     <option value="">請選擇工序</option>
                                     {% for process in processes %}
                                         <option value="{{ process }}">{{ process }}</option>
@@ -254,60 +254,9 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('作業員RD樣品現場報工：數量欄位固定為0且唯讀');
         }
 
-        // 表單驗證
+        // 移除所有表單驗證 - RD樣品表單完全無驗證
         validateForm(e) {
-            let isValid = true;
-
-            // 檢查公司名稱
-            const companyField = document.getElementById('company_code');
-            if (companyField && !companyField.value.trim()) {
-                companyField.classList.add('is-invalid');
-                isValid = false;
-            } else if (companyField) {
-                companyField.classList.remove('is-invalid');
-            }
-
-            // 檢查作業員
-            const operatorField = document.getElementById('operator');
-            if (operatorField && !operatorField.value.trim()) {
-                operatorField.classList.add('is-invalid');
-                isValid = false;
-            } else if (operatorField) {
-                operatorField.classList.remove('is-invalid');
-            }
-
-            // 檢查工序
-            const processField = document.getElementById('process');
-            if (processField && !processField.value.trim()) {
-                processField.classList.add('is-invalid');
-                isValid = false;
-            } else if (processField) {
-                processField.classList.remove('is-invalid');
-            }
-
-            // 檢查報工狀態 (radio button)
-            const statusRadios = document.querySelectorAll('input[name="status"]');
-            const selectedStatus = document.querySelector('input[name="status"]:checked');
-            if (!selectedStatus) {
-                // 為所有狀態 radio button 添加錯誤樣式
-                statusRadios.forEach(radio => {
-                    radio.closest('.form-check').classList.add('is-invalid');
-                });
-                isValid = false;
-            } else {
-                // 移除錯誤樣式
-                statusRadios.forEach(radio => {
-                    radio.closest('.form-check').classList.remove('is-invalid');
-                });
-            }
-
-            if (!isValid) {
-                e.preventDefault();
-                alert('請填寫所有必填欄位');
-                return false;
-            }
-
-            // 驗證通過，顯示載入指示器
+            // 直接顯示載入指示器，不進行任何驗證
             showLoading();
             return true;
         }
@@ -344,59 +293,8 @@ function hideLoading() {
     }
 }
 
-// 表單驗證
+// 移除所有表單驗證 - RD樣品表單完全無驗證
 function validateForm() {
-    let errorMessages = [];
-    
-    // 檢查公司名稱
-    const companyElement = document.getElementById('company_code');
-    const companyValue = companyElement ? companyElement.value : '';
-    if (!companyValue || companyValue === '') {
-        errorMessages.push('• 公司名稱 為必填欄位');
-    }
-    
-    // 檢查作業員
-    const operatorElement = document.getElementById('operator');
-    const operatorValue = operatorElement ? operatorElement.value : '';
-    if (!operatorValue || operatorValue === '') {
-        errorMessages.push('• 作業員 為必填欄位');
-    }
-    
-    // 檢查工序
-    const processElement = document.getElementById('process');
-    const processValue = processElement ? processElement.value : '';
-    if (!processValue || processValue === '') {
-        errorMessages.push('• 工序 為必填欄位');
-    }
-    
-    // 檢查報工狀態 (radio button)
-    const selectedStatus = document.querySelector('input[name="status"]:checked');
-    if (!selectedStatus) {
-        errorMessages.push('• 報工狀態 為必填欄位');
-    }
-    
-    // 驗證工作數量
-    const workQuantityElement = document.getElementById('work_quantity');
-    const workQuantity = workQuantityElement ? parseInt(workQuantityElement.value) : 0;
-    if (isNaN(workQuantity) || workQuantity < 0) {
-        errorMessages.push('• 工作數量 不能為負數');
-    }
-    
-    // 驗證不良品數量
-    const defectQuantityElement = document.getElementById('defect_quantity');
-    const defectQuantity = defectQuantityElement ? parseInt(defectQuantityElement.value) || 0 : 0;
-    if (defectQuantity < 0) {
-        errorMessages.push('• 不良品數量 不能為負數');
-    }
-    
-    // 如果有錯誤，顯示詳細錯誤訊息
-    if (errorMessages.length > 0) {
-        const errorTitle = '請修正以下錯誤：';
-        const errorContent = errorMessages.join('\n');
-        alert(`${errorTitle}\n\n${errorContent}`);
-        return false;
-    }
-    
     return true;
 }
 </script>

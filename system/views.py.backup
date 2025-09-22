@@ -405,10 +405,10 @@ PERMISSION_NAME_TRANSLATIONS = {
     "Can change 訂單同步日誌": "可以更改訂單同步日誌",
     "Can delete 訂單同步日誌": "可以刪除訂單同步日誌",
     "Can view 訂單同步日誌": "可以查看訂單同步日誌",
-    "Can add 訂單同步設定": "可以添加訂單同步設定",
-    "Can change 訂單同步設定": "可以更改訂單同步設定",
-    "Can delete 訂單同步設定": "可以刪除訂單同步設定",
-    "Can view 訂單同步設定": "可以查看訂單同步設定",
+    "Can add 訂單同步設定": "可以添加客戶訂單同步設定",
+    "Can change 訂單同步設定": "可以更改客戶訂單同步設定",
+    "Can delete 訂單同步設定": "可以刪除客戶訂單同步設定",
+    "Can view 訂單同步設定": "可以查看客戶訂單同步設定",
     "Can add 權限分類": "可以添加權限分類",
     "Can change 權限分類": "可以更改權限分類",
     "Can delete 權限分類": "可以刪除權限分類",
@@ -4019,7 +4019,7 @@ def manual_sync_reports(request):
 @user_passes_test(superuser_required, login_url="/accounts/login/")
 def order_sync_settings(request):
     """
-    訂單同步設定頁面
+    客戶訂單同步設定頁面
     """
     try:
         # 取得或創建設定
@@ -4040,7 +4040,7 @@ def order_sync_settings(request):
             form = OrderSyncSettingsForm(request.POST, instance=settings_obj)
             if form.is_valid():
                 form.save()
-                messages.success(request, "訂單同步設定已更新！")
+                messages.success(request, "客戶訂單同步設定已更新！")
                 
                 # 更新定時任務
                 update_order_sync_tasks(settings_obj)
@@ -4048,7 +4048,7 @@ def order_sync_settings(request):
                 # 不更新同步狀態，只更新定時任務配置
                 # 同步狀態只能由實際的同步任務執行來更新
                 
-                logger.info(f"訂單同步設定由 {request.user.username} 更新")
+                logger.info(f"客戶訂單同步設定由 {request.user.username} 更新")
                 return redirect('system:order_sync_settings')
         else:
             form = OrderSyncSettingsForm(instance=settings_obj)
@@ -4069,7 +4069,7 @@ def order_sync_settings(request):
         return render(request, 'system/order_sync_settings.html', context)
         
     except Exception as e:
-        logger.error(f"訂單同步設定頁面載入失敗: {str(e)}")
+        logger.error(f"客戶訂單同步設定頁面載入失敗: {str(e)}")
         messages.error(request, f"頁面載入失敗: {str(e)}")
         return redirect('system:index')
 

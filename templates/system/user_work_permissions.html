@@ -118,7 +118,7 @@
                             </div>
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <div class="form-check">
                                             {{ form.can_fill_work }}
                                             <label class="form-check-label" for="{{ form.can_fill_work.id_for_label }}">
@@ -126,7 +126,7 @@
                                             </label>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <div class="form-check">
                                             {{ form.can_onsite_reporting }}
                                             <label class="form-check-label" for="{{ form.can_onsite_reporting.id_for_label }}">
@@ -134,7 +134,15 @@
                                             </label>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            {{ form.can_operator_reporting }}
+                                            <label class="form-check-label" for="{{ form.can_operator_reporting.id_for_label }}">
+                                                可進行作業員報工
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
                                         <div class="form-check">
                                             {{ form.can_smt_reporting }}
                                             <label class="form-check-label" for="{{ form.can_smt_reporting.id_for_label }}">

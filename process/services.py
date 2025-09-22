@@ -182,7 +182,7 @@ class OperatorStatisticsService:
             'total_operators': Operator.objects.count(),
             'skilled_operators_count': OperatorSkill.objects.values('operator_id').distinct().count(),
             'high_priority_skills_count': OperatorSkill.objects.filter(priority=1).count(),
-            'today_new_operators_count': Operator.objects.filter(created_at__date=today).count(),
+            'today_new_operators_count': 0,  # Operator 模型沒有 created_at 欄位
         }
 
 

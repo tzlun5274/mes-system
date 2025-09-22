@@ -212,7 +212,7 @@ $(document).ready(function() {
         const button = $(this);
         
         $.ajax({
-            url: `/system/scheduled-tasks/${taskId}/toggle/`,
+            url: `/system/api/scheduled-task/${taskId}/`,
             method: 'POST',
             headers: {
                 'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
@@ -257,7 +257,7 @@ $(document).ready(function() {
     $('#confirmDelete').click(function() {
         const taskId = $(this).data('task-id');
         
-        window.location.href = `/system/scheduled-tasks/${taskId}/delete/`;
+        window.location.href = `/system/api/scheduled-task/${taskId}/`;
     });
     
     // 顯示提示訊息

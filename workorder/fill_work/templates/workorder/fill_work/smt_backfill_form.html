@@ -88,14 +88,17 @@
                                 <label for="operator_display" class="form-label">作業員 <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="operator_display" value="" readonly>
                                 <input type="hidden" id="operator" name="operator" value="">
+                                <div class="form-text">選擇設備後會自動填入設備名稱</div>
                             </div>
 
                             <!-- 工序 -->
                             <div class="col-md-4 mb-3">
                                 <label for="process" class="form-label">工序 <span class="text-danger">*</span></label>
-                                <select class="form-select" id="process" name="process" required>
+                                <select class="form-select" id="process" name="process_id" required>
                                     <option value="">請選擇此次填報的工序</option>
                                 </select>
+                                <!-- 隱藏的 process_name 欄位，由 JavaScript 自動填入 -->
+                                <input type="hidden" id="process_name" name="process_name" value="">
                                 <div class="form-text">請選擇此次填報的工序</div>
                             </div>
 
@@ -403,5 +406,27 @@ function validateForm() {
     
     return true;
 }
+
+// 工序選擇事件：自動填入 process_name
+document.addEventListener('DOMContentLoaded', function() {
+    const processSelect = document.getElementById('process');
+    const processNameInput = document.getElementById('process_name');
+    if (processSelect && processNameInput) {
+        console.log('綁定工序選擇事件');
+        processSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const processName = selectedOption.text;
+            console.log('工序選擇變更為:', processName);
+            processNameInput.value = processName;
+        });
+        
+        // 初始化時也要填入 process_name
+        if (processSelect.value) {
+            const selectedOption = processSelect.options[processSelect.selectedIndex];
+            const processName = selectedOption.text;
+            processNameInput.value = processName;
+        }
+    }
+});
 </script>
 {% endblock %}

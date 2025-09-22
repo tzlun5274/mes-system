@@ -30,5 +30,9 @@ urlpatterns = [
 # 靜態檔案路由
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=os.path.join(settings.BASE_DIR, "static"))
+    # 媒體檔案路由
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 else:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    # 媒體檔案路由
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

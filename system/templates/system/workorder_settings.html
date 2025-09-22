@@ -554,7 +554,26 @@
                                         <label for="completionTaskName">任務名稱</label>
                                         <input type="text" class="form-control" id="completionTaskName" placeholder="例如：每日完工檢查">
                                     </div>
+                                    
                                     <div class="form-group">
+                                        <label>執行方式</label>
+                                        <div class="form-check">
+                                            <input type="radio" class="form-check-input" id="executionTypeInterval" name="executionType" value="interval" checked onchange="toggleExecutionType()">
+                                            <label class="form-check-label" for="executionTypeInterval">間隔執行</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input type="radio" class="form-check-input" id="executionTypeFixed" name="executionType" value="fixed_time" onchange="toggleExecutionType()">
+                                            <label class="form-check-label" for="executionTypeFixed">固定時間執行</label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-group" id="completionIntervalSettings">
+                                        <label for="completionTaskInterval">執行間隔（分鐘）</label>
+                                        <input type="number" class="form-control" id="completionTaskInterval" value="30" min="5" max="1440">
+                                        <small class="form-text text-muted">建議設定：30-60分鐘</small>
+                                    </div>
+                                    
+                                    <div class="form-group" id="completionFixedTimeSettings" style="display: none;">
                                         <label for="completionTaskFixedTime">固定執行時間</label>
                                         <input type="time" class="form-control" id="completionTaskFixedTime" value="18:00">
                                         <small class="form-text text-muted">每天固定時間執行完工檢查</small>
@@ -587,36 +606,22 @@
                 <i class="fas fa-check-circle mr-2"></i>完工判斷設定
             </div>
             
+            <!-- 完工判斷工序設定 -->
             <div class="setting-item">
                 <div class="setting-header">
                     <div>
-                        <div class="setting-title">自動完工判斷</div>
-                        <div class="setting-description">啟用後，系統會自動檢查工單是否達到完工條件</div>
+                        <div class="setting-title">完工判斷工序設定</div>
+                        <div class="setting-description">設定用於完工判斷的工序名稱</div>
                     </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" name="completion_check_enabled" {% if completion_check_enabled %}checked{% endif %}>
-                        <span class="slider"></span>
-                    </label>
                 </div>
                 <div class="mt-3">
                     <div class="row">
                         <div class="col-md-6">
-                            <label class="form-label">檢查間隔</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" name="completion_check_interval" 
-                                       value="{{ completion_check_interval }}" min="5" max="1440">
-                                <div class="input-group-append">
-                                    <span class="input-group-text">分鐘</span>
-                                </div>
-                            </div>
-                            <small class="form-text text-muted">建議設定：30-60分鐘</small>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">完工判斷工序設定</label>
+                            <label class="form-label">完工判斷工序</label>
                             <select class="form-select" name="packaging_process_name" id="packaging_process_name">
                                 <option value="">請選擇工序...</option>
                             </select>
-                            <small class="form-text text-muted">用於完工判斷的工序名稱</small>
+                            <small class="form-text text-muted">用於完工判斷的工序名稱（預設：出貨包裝）</small>
                         </div>
                     </div>
                 </div>
@@ -638,11 +643,31 @@
                                 <label for="editCompletionTaskName">任務名稱</label>
                                 <input type="text" class="form-control" id="editCompletionTaskName" placeholder="例如：每日完工檢查">
                             </div>
+                            
                             <div class="form-group">
+                                <label>執行方式</label>
+                                <div class="form-check">
+                                    <input type="radio" class="form-check-input" id="editExecutionTypeInterval" name="editExecutionType" value="interval" onchange="toggleEditExecutionType()">
+                                    <label class="form-check-label" for="editExecutionTypeInterval">間隔執行</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="radio" class="form-check-input" id="editExecutionTypeFixed" name="editExecutionType" value="fixed_time" onchange="toggleEditExecutionType()">
+                                    <label class="form-check-label" for="editExecutionTypeFixed">固定時間執行</label>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group" id="editIntervalSettings">
+                                <label for="editCompletionTaskInterval">執行間隔（分鐘）</label>
+                                <input type="number" class="form-control" id="editCompletionTaskInterval" value="30" min="5" max="1440">
+                                <small class="form-text text-muted">建議設定：30-60分鐘</small>
+                            </div>
+                            
+                            <div class="form-group" id="editFixedTimeSettings">
                                 <label for="editCompletionTaskFixedTime">固定執行時間</label>
                                 <input type="time" class="form-control" id="editCompletionTaskFixedTime" value="18:00">
                                 <small class="form-text text-muted">每天固定時間執行完工檢查</small>
                             </div>
+                            
                             <div class="form-group">
                                 <label for="editCompletionTaskEnabled">任務狀態</label>
                                 <select class="form-control" id="editCompletionTaskEnabled">
@@ -664,7 +689,11 @@
                 <div class="setting-header">
                     <div>
                         <div class="setting-title">自動完工定時任務</div>
-                        <div class="setting-description">設定每天固定時間執行完工檢查</div>
+                        <div class="setting-description">設定自動執行完工檢查的定時任務，支援間隔執行或固定時間執行</div>
+                        <div class="alert alert-info alert-sm mt-2" role="alert">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>說明：</strong>可建立多個任務，支援間隔執行（每X分鐘）或固定時間執行（每天固定時間）
+                        </div>
                     </div>
                     <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addCompletionTaskModal">
                         <i class="fas fa-plus mr-1"></i>新增任務
@@ -678,7 +707,8 @@
                                 <thead>
                                     <tr>
                                         <th>任務名稱</th>
-                                        <th>執行時間</th>
+                                        <th>執行方式</th>
+                                        <th>執行時間/間隔</th>
                                         <th>狀態</th>
                                         <th>最後執行</th>
                                         <th>操作</th>
@@ -688,7 +718,20 @@
                                     {% for task in completion_tasks %}
                                     <tr>
                                         <td>{{ task.name }}</td>
-                                        <td>{{ task.fixed_time }}</td>
+                                        <td>
+                                            {% if task.execution_type == 'interval' %}
+                                                <span class="badge badge-primary">間隔執行</span>
+                                            {% else %}
+                                                <span class="badge badge-info">固定時間</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if task.execution_type == 'interval' %}
+                                                {{ task.interval_minutes }} 分鐘
+                                            {% else %}
+                                                {{ task.fixed_time|time:"H:i" }}
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             {% if task.is_enabled %}
                                                 <span class="badge bg-success">啟用</span>
@@ -731,14 +774,15 @@
                 </div>
             </div>
 
+            <!-- 智能自動完工與資料轉移 -->
             <div class="setting-item">
                 <div class="setting-header">
                     <div>
-                        <div class="setting-title">資料轉移功能</div>
-                        <div class="setting-description">啟用後，已完工工單會自動轉移到已完工模組</div>
+                        <div class="setting-title">智能自動完工與資料轉移</div>
+                        <div class="setting-description">啟用後，填報記錄提交時會自動檢查完工條件，達到條件時自動將工單轉移到已完工模組</div>
                     </div>
                     <label class="toggle-switch">
-                        <input type="checkbox" name="data_transfer_enabled" {% if data_transfer_enabled %}checked{% endif %}>
+                        <input type="checkbox" name="auto_completion_enabled" {% if auto_completion_enabled %}checked{% endif %}>
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -768,25 +812,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- 自動完工功能控制 -->
-            <div class="setting-item">
-                <div class="setting-header">
-                    <div>
-                        <div class="setting-title">智能自動完工</div>
-                        <div class="setting-description">啟用後，填報記錄提交時會自動檢查完工條件並觸發完工流程</div>
-                    </div>
-                    <div>
-                        <button type="button" class="btn btn-success btn-sm" onclick="enableAutoCompletion()">
-                            <i class="fas fa-play mr-1"></i>啟用
-                        </button>
-                        <button type="button" class="btn btn-warning btn-sm" onclick="disableAutoCompletion()">
-                            <i class="fas fa-pause mr-1"></i>停用
-                        </button>
-                    </div>
-                </div>
-                <div id="auto-completion-result" class="mt-2"></div>
             </div>
 
             <!-- 手動執行按鈕 -->
@@ -960,6 +985,11 @@ function showAddCompletionTaskModal() {
         keyboard: true
     });
     bootstrapModal.show();
+    
+    // 初始化執行類型設定
+    setTimeout(() => {
+        toggleExecutionType();
+    }, 100);
 }
 
 // 隱藏新增自動完工定時任務模態框
@@ -971,49 +1001,27 @@ function hideAddCompletionTaskModal() {
     }
 }
 
-// 新增自動完工定時任務
-function addNewCompletionTask() {
-    const name = document.getElementById('completionTaskName').value.trim();
-    const fixedTime = document.getElementById('completionTaskFixedTime').value;
+// 切換執行類型設定
+function toggleExecutionType() {
+    const executionType = document.querySelector('input[name="executionType"]:checked').value;
+    const intervalSettings = document.getElementById('completionIntervalSettings');
+    const fixedTimeSettings = document.getElementById('completionFixedTimeSettings');
     
-    if (!name) {
-        alert('請輸入任務名稱！');
-        return;
+    if (executionType === 'interval') {
+        intervalSettings.style.display = 'block';
+        fixedTimeSettings.style.display = 'none';
+    } else {
+        intervalSettings.style.display = 'none';
+        fixedTimeSettings.style.display = 'block';
     }
-    
-    if (!fixedTime) {
-        alert('請設定固定執行時間！');
-        return;
-    }
-    
-    // 發送 AJAX 請求
-    fetch('{% url "system:add_completion_task" %}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        },
-        body: `name=${encodeURIComponent(name)}&fixed_time=${fixedTime}`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            const modal = document.getElementById('addCompletionTaskModal');
-            const bootstrapModal = bootstrap.Modal.getInstance(modal);
-            if (bootstrapModal) {
-                bootstrapModal.hide();
-            }
-            location.reload(); // 重新載入頁面以顯示新任務
-        } else {
-            alert('新增失敗：' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('新增失敗：網路錯誤');
-    });
 }
+
+// 頁面載入時初始化執行類型設定
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化執行類型設定
+    toggleExecutionType();
+});
+
 
 // 執行自動完工定時任務
 function executeCompletionTask(taskId) {
@@ -1377,6 +1385,11 @@ function showEditCompletionTaskModal() {
         keyboard: true
     });
     bootstrapModal.show();
+    
+    // 初始化執行類型設定
+    setTimeout(() => {
+        toggleEditExecutionType();
+    }, 100);
 }
 
 // 隱藏編輯自動完工定時任務模態框
@@ -1392,7 +1405,9 @@ function hideEditCompletionTaskModal() {
 function updateCompletionTask() {
     const taskId = document.getElementById('editTaskId').value;
     const name = document.getElementById('editCompletionTaskName').value.trim();
+    const executionType = document.querySelector('input[name="editExecutionType"]:checked').value;
     const fixedTime = document.getElementById('editCompletionTaskFixedTime').value;
+    const intervalMinutes = document.getElementById('editCompletionTaskInterval').value;
     const enabled = document.getElementById('editCompletionTaskEnabled').value === 'true';
     
     if (!name) {
@@ -1400,9 +1415,27 @@ function updateCompletionTask() {
         return;
     }
     
-    if (!fixedTime) {
+    if (executionType === 'fixed_time' && !fixedTime) {
         alert('請設定固定執行時間！');
         return;
+    }
+    
+    if (executionType === 'interval' && !intervalMinutes) {
+        alert('請設定執行間隔！');
+        return;
+    }
+    
+    // 構建請求參數
+    const params = new URLSearchParams();
+    params.append('task_id', taskId);
+    params.append('name', name);
+    params.append('execution_type', executionType);
+    params.append('enabled', enabled);
+    
+    if (executionType === 'fixed_time') {
+        params.append('fixed_time', fixedTime);
+    } else {
+        params.append('interval_minutes', intervalMinutes);
     }
     
     // 發送 AJAX 請求
@@ -1412,7 +1445,7 @@ function updateCompletionTask() {
             'Content-Type': 'application/x-www-form-urlencoded',
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
         },
-        body: `task_id=${taskId}&name=${encodeURIComponent(name)}&fixed_time=${fixedTime}&enabled=${enabled}`
+        body: params.toString()
     })
     .then(response => response.json())
     .then(data => {
@@ -1519,6 +1552,82 @@ function disableAutoCompletion() {
 // 手動執行自動審核
 function executeAutoApproval() {
     executeAllAutoApproval();
+}
+
+// 切換執行方式顯示（重複函數已移除）
+
+// 切換編輯執行方式顯示
+function toggleEditExecutionType() {
+    const intervalRadio = document.getElementById('editExecutionTypeInterval');
+    const intervalSettings = document.getElementById('editIntervalSettings');
+    const fixedTimeSettings = document.getElementById('editFixedTimeSettings');
+    
+    if (intervalRadio.checked) {
+        intervalSettings.style.display = 'block';
+        fixedTimeSettings.style.display = 'none';
+    } else {
+        intervalSettings.style.display = 'none';
+        fixedTimeSettings.style.display = 'block';
+    }
+}
+
+// 新增完工判斷定時任務
+function addNewCompletionTask() {
+    const name = document.getElementById('completionTaskName').value.trim();
+    const executionType = document.querySelector('input[name="executionType"]:checked').value;
+    const interval = document.getElementById('completionTaskInterval').value;
+    const fixedTime = document.getElementById('completionTaskFixedTime').value;
+    
+    if (!name) {
+        alert('請輸入任務名稱');
+        return;
+    }
+    
+    if (executionType === 'interval') {
+        if (!interval || interval < 5 || interval > 1440) {
+            alert('請輸入有效的執行間隔（5-1440分鐘）');
+            return;
+        }
+    } else {
+        if (!fixedTime) {
+            alert('請選擇執行時間');
+            return;
+        }
+    }
+    
+    // 準備請求參數
+    const params = new URLSearchParams();
+    params.append('name', name);
+    params.append('execution_type', executionType);
+    
+    if (executionType === 'interval') {
+        params.append('interval_minutes', interval);
+    } else {
+        params.append('fixed_time', fixedTime);
+    }
+    
+    // 執行新增任務的API調用
+    fetch('{% url "system:add_completion_task" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString()
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => {
+        console.error('新增任務失敗:', error);
+        alert('新增任務失敗：' + error.message);
+    });
 }
 </script>
 {% endblock %} 

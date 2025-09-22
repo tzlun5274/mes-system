@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}編輯填報記錄{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-control:disabled {
+        background-color: #f8f9fa;
+        opacity: 1;
+    }
+    .readonly-field {
+        background-color: #f8f9fa;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-edit me-2"></i>編輯填報記錄
+                </h2>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'workorder:fill_work:fill_work_detail' fill_work.pk %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>返回詳情
+                    </a>
+                    <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-1"></i>返回列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 編輯表單 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clipboard-list me-2"></i>填報記錄資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row g-3">
+                            <!-- 作業員（下拉選單） -->
+                            <div class="col-md-3">
+                                <label for="{{ form.operator.id_for_label }}" class="form-label">
+                                    <i class="fas fa-user me-1"></i>作業員 <span class="text-danger">*</span>
+                                </label>
+                                <select name="operator" id="{{ form.operator.id_for_label }}" class="form-select" required>
+                                    <option value="">請選擇作業員</option>
+                                    {% for operator in operators %}
+                                        <option value="{{ operator.name }}" {% if form.operator.value == operator.name %}selected{% endif %}>
+                                            {{ operator.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form.operator.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.operator.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 工單號碼（唯讀） -->
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    <i class="fas fa-file-alt me-1"></i>工單號碼
+                                </label>
+                                <input type="text" class="form-control readonly-field" value="{{ fill_work.workorder }}" readonly>
+                            </div>
+                            
+                            <!-- 產品編號（唯讀） -->
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    <i class="fas fa-box me-1"></i>產品編號
+                                </label>
+                                <input type="text" class="form-control readonly-field" value="{{ fill_work.product_id }}" readonly>
+                            </div>
+                            
+                            <!-- 公司名稱（唯讀） -->
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    <i class="fas fa-building me-1"></i>公司名稱
+                                </label>
+                                <input type="text" class="form-control readonly-field" value="{{ fill_work.company_name }}" readonly>
+                            </div>
+                            
+                            <!-- 工序（下拉選單） -->
+                            <div class="col-md-3">
+                                <label for="{{ form.process_name.id_for_label }}" class="form-label">
+                                    <i class="fas fa-cogs me-1"></i>工序 <span class="text-danger">*</span>
+                                </label>
+                                <select name="process_name" id="{{ form.process_name.id_for_label }}" class="form-select" required>
+                                    <option value="">請選擇工序</option>
+                                    {% for process in process_names %}
+                                        <option value="{{ process.name }}" {% if form.process_name.value == process.name %}selected{% endif %}>
+                                            {{ process.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form.process_name.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.process_name.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 設備（下拉選單） -->
+                            <div class="col-md-3">
+                                <label for="{{ form.equipment.id_for_label }}" class="form-label">
+                                    <i class="fas fa-tools me-1"></i>設備
+                                </label>
+                                <select name="equipment" id="{{ form.equipment.id_for_label }}" class="form-select">
+                                    <option value="">請選擇設備</option>
+                                    {% for equipment in equipments %}
+                                        <option value="{{ equipment.name }}" {% if form.equipment.value == equipment.name %}selected{% endif %}>
+                                            {{ equipment.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form.equipment.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.equipment.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 工作日期 -->
+                            <div class="col-md-3">
+                                <label for="{{ form.work_date.id_for_label }}" class="form-label">
+                                    <i class="fas fa-calendar me-1"></i>工作日期 <span class="text-danger">*</span>
+                                </label>
+                                <input type="date" name="work_date" id="{{ form.work_date.id_for_label }}" 
+                                       class="form-control" value="{{ form.work_date.value|date:'Y-m-d' }}" required>
+                                {% if form.work_date.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.work_date.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 開始時間 -->
+                            <div class="col-md-3">
+                                <label for="{{ form.start_time.id_for_label }}" class="form-label">
+                                    <i class="fas fa-clock me-1"></i>開始時間 <span class="text-danger">*</span>
+                                </label>
+                                <input type="time" name="start_time" id="{{ form.start_time.id_for_label }}" 
+                                       class="form-control" value="{{ form.start_time.value|time:'H:i' }}" required>
+                                {% if form.start_time.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.start_time.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 結束時間 -->
+                            <div class="col-md-3">
+                                <label for="{{ form.end_time.id_for_label }}" class="form-label">
+                                    <i class="fas fa-clock me-1"></i>結束時間 <span class="text-danger">*</span>
+                                </label>
+                                <input type="time" name="end_time" id="{{ form.end_time.id_for_label }}" 
+                                       class="form-control" value="{{ form.end_time.value|time:'H:i' }}" required>
+                                {% if form.end_time.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.end_time.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 工作時數（自動計算，唯讀） -->
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    <i class="fas fa-hourglass-half me-1"></i>工作時數
+                                </label>
+                                <input type="text" class="form-control readonly-field" 
+                                       value="{{ fill_work.work_hours_calculated }} 小時" readonly>
+                            </div>
+                            
+                            <!-- 加班時數（自動計算，唯讀） -->
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    <i class="fas fa-moon me-1"></i>加班時數
+                                </label>
+                                <input type="text" class="form-control readonly-field" 
+                                       value="{{ fill_work.overtime_hours_calculated }} 小時" readonly>
+                            </div>
+                            
+                            <!-- 數量 -->
+                            <div class="col-md-3">
+                                <label for="{{ form.work_quantity.id_for_label }}" class="form-label">
+                                    <i class="fas fa-cubes me-1"></i>數量 <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" name="work_quantity" id="{{ form.work_quantity.id_for_label }}" 
+                                       class="form-control" value="{{ form.work_quantity.value }}" min="0" step="1" required>
+                                {% if form.work_quantity.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.work_quantity.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 不良數量 -->
+                            <div class="col-md-3">
+                                <label for="{{ form.defect_quantity.id_for_label }}" class="form-label">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>不良數量
+                                </label>
+                                <input type="number" name="defect_quantity" id="{{ form.defect_quantity.id_for_label }}" 
+                                       class="form-control" value="{{ form.defect_quantity.value }}" min="0" step="1">
+                                {% if form.defect_quantity.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.defect_quantity.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 狀態（唯讀） -->
+                            <div class="col-md-3">
+                                <label class="form-label">
+                                    <i class="fas fa-flag me-1"></i>狀態
+                                </label>
+                                <input type="text" class="form-control readonly-field" 
+                                       value="{{ fill_work.get_approval_status_display }}" readonly>
+                            </div>
+                            
+                            <!-- 備註 -->
+                            <div class="col-12">
+                                <label for="{{ form.remarks.id_for_label }}" class="form-label">
+                                    <i class="fas fa-sticky-note me-1"></i>備註
+                                </label>
+                                <textarea name="remarks" id="{{ form.remarks.id_for_label }}" 
+                                          class="form-control" rows="3" placeholder="請輸入備註...">{{ form.remarks.value|default:"" }}</textarea>
+                                {% if form.remarks.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.remarks.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 異常記錄 -->
+                            <div class="col-12">
+                                <label for="{{ form.abnormal_notes.id_for_label }}" class="form-label">
+                                    <i class="fas fa-exclamation-circle me-1"></i>異常記錄
+                                </label>
+                                <textarea name="abnormal_notes" id="{{ form.abnormal_notes.id_for_label }}" 
+                                          class="form-control" rows="3" placeholder="請輸入異常記錄...">{{ form.abnormal_notes.value|default:"" }}</textarea>
+                                {% if form.abnormal_notes.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.abnormal_notes.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- 表單按鈕 -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{% url 'workorder:fill_work:fill_work_detail' fill_work.pk %}" class="btn btn-secondary">
+                                        <i class="fas fa-times me-1"></i>取消
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>儲存變更
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 時間變更時自動計算工作時數
+    const startTimeInput = document.getElementById('{{ form.start_time.id_for_label }}');
+    const endTimeInput = document.getElementById('{{ form.end_time.id_for_label }}');
+    
+    function calculateWorkHours() {
+        const startTime = startTimeInput.value;
+        const endTime = endTimeInput.value;
+        
+        if (startTime && endTime) {
+            const start = new Date('2000-01-01 ' + startTime);
+            const end = new Date('2000-01-01 ' + endTime);
+            
+            if (end > start) {
+                const diffMs = end - start;
+                const diffHours = diffMs / (1000 * 60 * 60);
+                
+                // 更新工作時數顯示（這裡只是視覺提示，實際計算在後端）
+                console.log('工作時數:', diffHours.toFixed(2), '小時');
+            }
+        }
+    }
+    
+    startTimeInput.addEventListener('change', calculateWorkHours);
+    endTimeInput.addEventListener('change', calculateWorkHours);
+    
+    // 表單驗證
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        const startTime = startTimeInput.value;
+        const endTime = endTimeInput.value;
+        
+        if (startTime && endTime) {
+            const start = new Date('2000-01-01 ' + startTime);
+            const end = new Date('2000-01-01 ' + endTime);
+            
+            if (end <= start) {
+                e.preventDefault();
+                alert('結束時間必須晚於開始時間');
+                return false;
+            }
+        }
+        
+        return true;
+    });
+});
+</script>
+{% endblock %}

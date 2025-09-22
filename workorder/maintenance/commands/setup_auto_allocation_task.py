@@ -21,7 +21,7 @@ class Command(BaseCommand):
             '--interval',
             type=int,
             default=30,
-            help='執行間隔（分鐘），預設30分鐘'
+            help='執行間隔（分鐘），預設30分鐘，30-1440分鐘'
         )
         parser.add_argument(
             '--enable',

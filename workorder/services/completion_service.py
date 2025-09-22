@@ -271,7 +271,7 @@ class FillWorkCompletionService:
             fillwork_reports = FillWork.objects.filter(
                 workorder=workorder.order_number,
                 product_id=workorder.product_code,
-                process_name__exact=cls.PACKAGING_PROCESS_NAME,
+                operation__exact=cls.PACKAGING_PROCESS_NAME,
                 approval_status='approved'
             )
             
@@ -393,7 +393,9 @@ class FillWorkCompletionService:
                 packaging_quantity = dispatch.packaging_total_quantity
                 completion_rate = float(dispatch.completion_rate)
                 packaging_completion_rate = float(dispatch.packaging_completion_rate)
-                can_complete = dispatch.can_complete
+                
+                # 修復：直接計算完工條件，不依賴 dispatch.can_complete
+                can_complete = (packaging_quantity >= workorder.quantity and workorder.quantity > 0)
                 
                 # 檢查出貨包裝工序是否存在
                 from process.models import ProductProcessRoute, ProcessName
@@ -418,8 +420,6 @@ class FillWorkCompletionService:
                 # 判斷完工原因
                 if can_complete:
                     reason = "已達到完工條件"
-                elif packaging_quantity >= workorder.quantity:
-                    reason = "出貨包裝數量已達標，但其他條件未滿足"
                 elif total_quantity == 0:
                     reason = "尚未有任何報工記錄"
                 else:
@@ -863,7 +863,7 @@ class FillWorkCompletionService:
             fillwork_reports = FillWork.objects.filter(
                 workorder=workorder.order_number,
                 product_id=workorder.product_code,
-                process_name__exact="出貨包裝",  # 修正：使用 exact 而不是 icontains
+                operation__exact="出貨包裝",  # 修正：使用 operation 欄位而不是 process_name
                 approval_status='approved'
             )
             
@@ -1146,12 +1146,15 @@ class FillWorkCompletionService:
             }
     
     @classmethod
-    def transfer_completed_workorders(cls):
+    def transfer_completed_workorders(cls, batch_size=None):
         """
         資料轉移程式：偵測到「已完工」的工單後，將其所有詳細資料完整轉移至已完工工單資料庫
         觸發條件：工單狀態為「已完工」
         執行動作：完整轉移工單資料到已完工工單資料庫
         執行方式：支援排程自動執行與手動執行
+        
+        Args:
+            batch_size (int, optional): 批次處理大小，如果為 None 則處理所有工單
         
         Returns:
             dict: 轉移結果統計
@@ -1161,6 +1164,11 @@ class FillWorkCompletionService:
             
             # 查找所有狀態為已完成的工單
             completed_workorders = WorkOrder.objects.filter(status='completed')
+            
+            # 如果指定了批次大小，則限制處理數量
+            if batch_size:
+                completed_workorders = completed_workorders[:batch_size]
+                logger.info(f"批次處理模式：限制處理 {batch_size} 個工單")
             
             total_found = completed_workorders.count()
             transferred_count = 0

@@ -334,7 +334,7 @@ class AutoAllocationService:
             
             # 獲取該工單的所有工序紀錄
             production_reports = CompletedProductionReport.objects.filter(
-                completed_workorder=completed_workorder
+                completed_workorder_id=completed_workorder.id
             )
             
             # 排除出貨包裝工序
@@ -399,7 +399,7 @@ class AutoAllocationService:
                 report = FillWork.objects.get(id=report_id)
                 
                 # 檢查是否為出貨包裝工序
-                if self._is_packaging_process(report.operation):
+                if self._is_packaging_process(report.process_name):
                     return {
                         'success': False,
                         'message': '出貨包裝工序不參與數量分配'

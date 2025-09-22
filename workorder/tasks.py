@@ -237,3 +237,70 @@ def auto_convert_orders():
             'converted_count': 0,
             'timestamp': timezone.now().isoformat()
         }
+
+
+@shared_task
+def auto_data_transfer_task():
+    """
+    定時任務：自動轉移已完工工單資料
+    根據系統設定執行批次資料轉移
+    """
+    try:
+        from workorder.models import SystemConfig
+        from workorder.services.completion_service import CompletionService
+        
+        # 檢查智能自動完工功能是否啟用（資料轉移使用同一個開關）
+        try:
+            auto_completion_config = SystemConfig.objects.get(key="auto_completion_enabled")
+            transfer_enabled = auto_completion_config.value.lower() == 'true'
+        except SystemConfig.DoesNotExist:
+            transfer_enabled = True  # 預設啟用
+        
+        if not transfer_enabled:
+            logger.info("資料轉移功能已停用，跳過自動轉移任務")
+            return {
+                'success': True,
+                'message': '資料轉移功能已停用',
+                'transferred_count': 0,
+                'timestamp': timezone.now().isoformat()
+            }
+        
+        # 取得批次轉移數量設定
+        try:
+            batch_size_config = SystemConfig.objects.get(key="transfer_batch_size")
+            batch_size = int(batch_size_config.value)
+        except (SystemConfig.DoesNotExist, ValueError):
+            batch_size = 50  # 預設批次大小
+        
+        logger.info(f"開始執行自動資料轉移任務，批次大小：{batch_size}")
+        
+        # 執行資料轉移服務
+        result = CompletionService.transfer_completed_workorders(batch_size=batch_size)
+        
+        if result.get('success', False):
+            transferred_count = result.get('transferred_count', 0)
+            logger.info(f"自動資料轉移任務完成：轉移了 {transferred_count} 個工單")
+            return {
+                'success': True,
+                'message': f'自動資料轉移任務完成，轉移了 {transferred_count} 個工單',
+                'transferred_count': transferred_count,
+                'timestamp': timezone.now().isoformat()
+            }
+        else:
+            error_msg = result.get('error', '資料轉移失敗')
+            logger.error(f"自動資料轉移任務失敗：{error_msg}")
+            return {
+                'success': False,
+                'error': error_msg,
+                'transferred_count': 0,
+                'timestamp': timezone.now().isoformat()
+            }
+            
+    except Exception as e:
+        logger.error(f"自動資料轉移任務執行失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'自動資料轉移任務執行失敗: {str(e)}',
+            'transferred_count': 0,
+            'timestamp': timezone.now().isoformat()
+        }

@@ -414,12 +414,12 @@ class WorkOrderRollbackService:
         try:
             # 刪除生產報表記錄
             CompletedProductionReport.objects.filter(
-                completed_workorder=completed_workorder
+                completed_workorder_id=completed_workorder.id
             ).delete()
             
             # 刪除已完工工序記錄
             CompletedWorkOrderProcess.objects.filter(
-                completed_workorder=completed_workorder
+                completed_workorder_id=completed_workorder.id
             ).delete()
             
             # 刪除工單分析記錄（沒有外鍵約束，需要手動刪除）

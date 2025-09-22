@@ -231,10 +231,8 @@ class FillWorkController {
                     // 不進行產品過濾，因為產品編號本身不包含SMT字串
                     console.log('SMT表單：顯示所有產品');
                 } else if (formType === 'operator_rd') {
-                    // 作業員RD樣品表單：只顯示PFP-CCT開頭的產品
-                    filteredProducts = filteredProducts.filter(p => 
-                        p.product_id && p.product_id.toUpperCase().startsWith('PFP-CCT')
-                    );
+                    // 作業員RD樣品表單：顯示所有產品（取消PFP-CCT開頭限制）
+                    console.log('作業員RD樣品表單：顯示所有產品');
                 } else {
                     // 作業員表單：顯示所有產品（因為產品編號不包含SMT字串）
                     console.log('作業員表單：顯示所有產品');

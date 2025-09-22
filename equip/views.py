@@ -5,7 +5,6 @@ from django.contrib import messages
 from .models import Equipment, EquipOperationLog
 from django.utils import timezone
 from import_export import resources, fields
-from import_export.widgets import ForeignKeyWidget
 from django.http import HttpResponse, JsonResponse
 import tablib
 import json
@@ -31,8 +30,7 @@ equip_logger.setLevel(logging.INFO)
 class EquipmentResource(resources.ModelResource):
     production_line = fields.Field(
         column_name="production_line",
-        attribute="production_line",
-        widget=ForeignKeyWidget(ProductionLine, "line_name"),
+        attribute="production_line_name",
     )
 
     class Meta:
@@ -102,14 +100,22 @@ def add_equipment(request):
             )
 
         # 處理產線
-        production_line = None
+        production_line_id_str = ''
+        production_line_name = ''
         if production_line_id:
             production_line = ProductionLine.objects.filter(
                 id=production_line_id, is_active=True
             ).first()
+            if production_line:
+                production_line_id_str = str(production_line.id)
+                production_line_name = production_line.line_name
 
         equipment = Equipment(
-            name=name, model=model, status=status, production_line=production_line
+            name=name, 
+            model=model, 
+            status=status, 
+            production_line_id=production_line_id_str,
+            production_line_name=production_line_name
         )
         equipment.save()
 
@@ -227,16 +233,21 @@ def edit_equipment(request, equipment_id):
             )
 
         # 處理產線
-        production_line = None
+        production_line_id_str = ''
+        production_line_name = ''
         if production_line_id:
             production_line = ProductionLine.objects.filter(
                 id=production_line_id, is_active=True
             ).first()
+            if production_line:
+                production_line_id_str = str(production_line.id)
+                production_line_name = production_line.line_name
 
         equipment.name = name
         equipment.model = model
         equipment.status = status
-        equipment.production_line = production_line
+        equipment.production_line_id = production_line_id_str
+        equipment.production_line_name = production_line_name
         equipment.save()
 
         messages.success(request, f"設備 {name} 修改成功！")

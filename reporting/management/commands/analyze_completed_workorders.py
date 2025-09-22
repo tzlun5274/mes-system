@@ -4,7 +4,7 @@ Django 管理命令：分析已完工工單
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 from datetime import datetime, timedelta
-from reporting.services import WorkOrderAnalysisService
+from reporting.workorder_analysis_service import WorkOrderAnalysisService
 
 
 class Command(BaseCommand):

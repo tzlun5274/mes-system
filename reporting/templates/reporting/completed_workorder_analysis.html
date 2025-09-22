@@ -28,18 +28,10 @@
     <!-- 頁面標題 -->
     <div class="row">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2>
-                    <i class="fas fa-chart-line text-primary"></i>
-                    已完工工單分析報表
-                </h2>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}">報表管理</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">已完工工單分析報表</li>
-                    </ol>
-                </nav>
-            </div>
+            <h2 class="mb-4">
+                <i class="fas fa-chart-line text-primary"></i>
+                已完工工單分析報表
+            </h2>
         </div>
     </div>
 
@@ -233,7 +225,11 @@ const workHoursChart = new Chart(workHoursCtx, {
 
 // 載入最近分析記錄
 function loadRecentAnalyses() {
-    fetch('{% url "reporting:completed_workorder_analysis_list" %}?limit=5')
+    fetch('{% url "reporting:completed_workorder_analysis_list" %}?limit=5', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
         .then(response => response.text())
         .then(html => {
             document.getElementById('recentAnalyses').innerHTML = html;

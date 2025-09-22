@@ -123,7 +123,7 @@
         </div>
     </div>
 
-    <!-- 未來30天工作日曆 -->
+    <!-- 未來30天工作日曆 - 使用行事曆列表展示 -->
     <div class="row">
         <div class="col-12">
             <div class="card">
@@ -131,39 +131,28 @@
                     <h6 class="mb-0"><i class="fas fa-calendar-week"></i> 未來30天工作日曆</h6>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>日期</th>
-                                    <th>星期</th>
-                                    <th>工作日狀態</th>
-                                    <th>假期名稱</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for day in next_30_days %}
-                                <tr class="{% if day.is_workday %}table-success{% else %}table-danger{% endif %}">
-                                    <td>{{ day.date|date:"Y-m-d" }}</td>
-                                    <td>{{ day.weekday }}</td>
-                                    <td>
-                                        {% if day.is_workday %}
-                                            <span class="badge bg-success">工作日</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">非工作日</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if day.holiday_name %}
-                                            <span class="text-danger">{{ day.holiday_name }}</span>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        此處顯示未來30天的工作日曆，包含假期和工作日資訊。如需查看完整行事曆或進行編輯，請點擊下方按鈕。
+                    </div>
+                    
+                    <!-- 嵌入行事曆列表視圖 -->
+                    <div id="calendar-list-view" style="min-height: 400px;">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">載入中...</span>
+                            </div>
+                            <p class="mt-2">正在載入行事曆資料...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <a href="{% url 'scheduling:calendar' %}" class="btn btn-primary">
+                            <i class="fas fa-calendar"></i> 查看完整行事曆
+                        </a>
+                        <button type="button" class="btn btn-success" onclick="refreshCalendarList()">
+                            <i class="fas fa-sync-alt"></i> 重新整理
+                        </button>
                     </div>
                 </div>
             </div>
@@ -204,6 +193,152 @@ document.addEventListener('DOMContentLoaded', function() {
     // 設定預設日期為今天
     document.getElementById('holiday_date').value = new Date().toISOString().split('T')[0];
     document.getElementById('workday_date').value = new Date().toISOString().split('T')[0];
+    
+    // 載入行事曆列表
+    loadCalendarList();
 });
+
+// 載入行事曆列表
+function loadCalendarList() {
+    const container = document.getElementById('calendar-list-view');
+    
+    // 建立日期範圍（未來30天）
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + 30);
+    
+    // 調用行事曆 API 獲取事件
+    fetch('/scheduling/events/')
+        .then(response => response.json())
+        .then(events => {
+            // 過濾未來30天的事件
+            const futureEvents = events.filter(event => {
+                const eventDate = new Date(event.start);
+                return eventDate >= today && eventDate <= endDate;
+            });
+            
+            // 生成日期列表
+            const dateList = generateDateList(today, endDate, futureEvents);
+            
+            // 渲染列表
+            renderCalendarList(container, dateList);
+        })
+        .catch(error => {
+            console.error('載入行事曆失敗:', error);
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    載入行事曆失敗，請檢查網絡連接或聯繫管理員。
+                </div>
+            `;
+        });
+}
+
+// 生成日期列表
+function generateDateList(startDate, endDate, events) {
+    const dateList = [];
+    const currentDate = new Date(startDate);
+    
+    // 建立事件映射
+    const eventMap = {};
+    events.forEach(event => {
+        const eventDate = new Date(event.start).toDateString();
+        if (!eventMap[eventDate]) {
+            eventMap[eventDate] = [];
+        }
+        eventMap[eventDate].push(event);
+    });
+    
+    // 星期名稱對應
+    const weekdayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+    
+    while (currentDate <= endDate) {
+        const dateString = currentDate.toDateString();
+        const isWorkday = currentDate.getDay() >= 1 && currentDate.getDay() <= 5; // 週一到週五
+        const dayEvents = eventMap[dateString] || [];
+        
+        // 檢查是否有假期事件
+        const holidayEvent = dayEvents.find(event => event.extendedProps.type === 'holiday');
+        const workdayEvent = dayEvents.find(event => event.extendedProps.type === 'workday');
+        
+        let finalIsWorkday = isWorkday;
+        let holidayName = '';
+        
+        if (holidayEvent) {
+            finalIsWorkday = false;
+            holidayName = holidayEvent.title;
+        } else if (workdayEvent) {
+            finalIsWorkday = true;
+        } else if (!isWorkday) {
+            holidayName = '週末';
+        }
+        
+        dateList.push({
+            date: new Date(currentDate),
+            weekday: weekdayNames[currentDate.getDay()],
+            isWorkday: finalIsWorkday,
+            holidayName: holidayName,
+            events: dayEvents
+        });
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return dateList;
+}
+
+// 渲染行事曆列表
+function renderCalendarList(container, dateList) {
+    const html = `
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+                <thead class="table-dark">
+                    <tr>
+                        <th>日期</th>
+                        <th>星期</th>
+                        <th>工作日狀態</th>
+                        <th>假期名稱</th>
+                        <th>事件數量</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${dateList.map(day => `
+                        <tr class="${day.isWorkday ? 'table-success' : 'table-danger'}">
+                            <td>${day.date.toISOString().split('T')[0]}</td>
+                            <td>${day.weekday}</td>
+                            <td>
+                                <span class="badge ${day.isWorkday ? 'bg-success' : 'bg-danger'}">
+                                    ${day.isWorkday ? '工作日' : '非工作日'}
+                                </span>
+                            </td>
+                            <td>
+                                ${day.holidayName ? `<span class="text-danger">${day.holidayName}</span>` : '<span class="text-muted">-</span>'}
+                            </td>
+                            <td>
+                                <span class="badge bg-info">${day.events.length}</span>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+// 重新整理行事曆列表
+function refreshCalendarList() {
+    const container = document.getElementById('calendar-list-view');
+    container.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">載入中...</span>
+            </div>
+            <p class="mt-2">正在重新載入行事曆資料...</p>
+        </div>
+    `;
+    loadCalendarList();
+}
 </script>
 {% endblock %}

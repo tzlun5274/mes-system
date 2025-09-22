@@ -225,6 +225,16 @@ class OperatorBackfillForm(ModelForm):
         help_text="請選擇此次填報使用的設備,選擇後會自動填入作業員欄位",
     )
     
+    # 工序欄位 - 下拉式選單
+    process_id = forms.ModelChoiceField(
+        queryset=ProcessName.objects.none(),  # 在 __init__ 中設定
+        label="工序",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇此次填報的工序'}),
+        required=True,
+        help_text="請選擇此次填報的工序",
+        empty_label="請選擇工序..."
+    )
+    
     class Meta:
         model = FillWork
         fields = [
@@ -238,7 +248,6 @@ class OperatorBackfillForm(ModelForm):
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'defect_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'is_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'process_id': forms.Select(attrs={'class': 'form-select'}),
             'process_name': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
             'start_time': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -311,20 +320,20 @@ class OperatorBackfillForm(ModelForm):
             if self.user:
                 # 根據使用者權限過濾作業員
                 operators = get_user_filtered_operators(self.user, self.request)
-                print(f"DEBUG: User {self.user.username} filtered operators: {[op.name for op in operators]}")
+                print(f"除錯: 使用者 {self.user.username} 過濾的作業員: {[op.name for op in operators]}")
             else:
                 # 沒有使用者資訊，顯示全部
                 operators = Operator.objects.all().order_by('name')
-                print("DEBUG: No user, showing all operators")
+                print("除錯: 沒有使用者資訊，顯示全部作業員")
             
             for operator in operators:
                 choices.append((operator.name, operator.name))
-            print(f"DEBUG: Final operator choices: {choices}")
+            print(f"除錯: 最終作業員選項: {choices}")
         except ImportError as e:
-            print(f"DEBUG: ImportError in get_operator_choices: {e}")
+            print(f"除錯: 匯入錯誤在 get_operator_choices: {e}")
             pass
         except Exception as e:
-            print(f"DEBUG: Exception in get_operator_choices: {e}")
+            print(f"除錯: 例外錯誤在 get_operator_choices: {e}")
             pass
         return choices
     
@@ -384,6 +393,21 @@ class OperatorBackfillForm(ModelForm):
             return datetime.strptime(str(end_time), "%H:%M").time()
         except (ValueError, TypeError):
             raise forms.ValidationError("請輸入正確的時間格式：HH:MM（24小時制）")
+    
+    def clean(self):
+        """表單整體驗證，自動填入 process_name"""
+        cleaned_data = super().clean()
+        
+        # 自動填入 process_name
+        process_id = cleaned_data.get('process_id')
+        if process_id:
+            try:
+                process = ProcessName.objects.get(id=process_id.id if hasattr(process_id, 'id') else process_id)
+                cleaned_data['process_name'] = process.name
+            except ProcessName.DoesNotExist:
+                pass
+        
+        return cleaned_data
 
 
 class OperatorRDBackfillForm(ModelForm):
@@ -394,11 +418,11 @@ class OperatorRDBackfillForm(ModelForm):
         choices=[],
         label="填報日期",
         widget=forms.Select(attrs={'class': 'form-select'}),
-        required=True,
+        required=False,
         help_text="請選擇日期（預設今天）"
     )
     
-    # 公司名稱欄位 - 下拉式選單
+    # 公司名稱欄位 - 下拉式選單（必填）
     company_name = forms.ChoiceField(
         choices=[],
         label="公司名稱",
@@ -408,9 +432,12 @@ class OperatorRDBackfillForm(ModelForm):
         }),
         required=True,
         help_text="請選擇公司名稱",
+        error_messages={
+            'required': '請選擇公司名稱',
+        }
     )
     
-    # 作業員欄位 - 下拉式選單
+    # 作業員欄位 - 下拉式選單（必填）
     operator = forms.ChoiceField(
         choices=[],
         label="作業員",
@@ -420,6 +447,9 @@ class OperatorRDBackfillForm(ModelForm):
         }),
         required=True,
         help_text="請選擇作業員",
+        error_messages={
+            'required': '請選擇作業員',
+        }
     )
     
     # 使用的設備欄位 - 下拉式選單
@@ -434,6 +464,19 @@ class OperatorRDBackfillForm(ModelForm):
         help_text="請選擇使用的設備",
     )
     
+    # 工序欄位 - 下拉式選單（必填）
+    process_id = forms.ModelChoiceField(
+        queryset=ProcessName.objects.none(),  # 在 __init__ 中設定
+        label="工序",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇此次RD樣品作業的工序'}),
+        required=True,
+        help_text="請選擇此次RD樣品作業的工序",
+        empty_label="請選擇此次RD樣品作業的工序",
+        error_messages={
+            'required': '請選擇工序',
+        }
+    )
+    
     class Meta:
         model = FillWork
         fields = [
@@ -441,6 +484,29 @@ class OperatorRDBackfillForm(ModelForm):
             'planned_quantity', 'work_quantity', 'defect_quantity', 'is_completed',
             'work_date', 'start_time', 'end_time', 'remarks', 'abnormal_notes'
         ]
+        error_messages = {
+            'product_id': {
+                'required': '請輸入產品編號',
+            },
+            'workorder': {
+                'required': '請輸入工單號碼',
+            },
+            'work_quantity': {
+                'required': '請輸入工作數量',
+            },
+            'defect_quantity': {
+                'required': '請輸入不良品數量',
+            },
+            'start_time': {
+                'required': '請輸入開始時間',
+            },
+            'end_time': {
+                'required': '請輸入結束時間',
+            },
+            'process_name': {
+                'required': '請選擇工序',
+            },
+        }
         widgets = {
             'product_id': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -452,21 +518,22 @@ class OperatorRDBackfillForm(ModelForm):
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'defect_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'is_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'process_id': forms.Select(attrs={'class': 'form-select'}),
             'process_name': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
             'start_time': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'HH:MM',
                 'pattern': r'\d{2}:\d{2}',
                 'maxlength': '5',
-                'title': '請輸入24小時制時間格式，例如：08:30、17:30'
+                'title': '請輸入24小時制時間格式，例如：08:30、17:30',
+                'required': 'required'
             }),
             'end_time': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'HH:MM',
                 'pattern': r'\d{2}:\d{2}',
                 'maxlength': '5',
-                'title': '請輸入24小時制時間格式，例如：08:30、17:30'
+                'title': '請輸入24小時制時間格式，例如：08:30、17:30',
+                'required': 'required'
             }),
             'remarks': forms.Textarea(attrs={'class': 'form-control', 'rows': '3'}),
             'abnormal_notes': forms.Textarea(attrs={'class': 'form-control', 'rows': '3'}),
@@ -564,7 +631,7 @@ class OperatorRDBackfillForm(ModelForm):
         return choices
     
     def clean_start_time(self):
-        """驗證開始時間格式"""
+        """開始時間處理（移除驗證）"""
         start_time = self.cleaned_data.get('start_time')
         if not start_time:
             return start_time
@@ -574,24 +641,39 @@ class OperatorRDBackfillForm(ModelForm):
         try:
             return datetime.strptime(str(start_time), "%H:%M").time()
         except (ValueError, TypeError):
-            raise forms.ValidationError("請輸入正確的時間格式：HH:MM（24小時制）")
+            # 移除驗證錯誤，直接返回原始值
+            return start_time
     
     def clean_end_time(self):
-        """驗證結束時間格式"""
+        """結束時間處理（移除驗證）"""
         end_time = self.cleaned_data.get('end_time')
         if end_time:
             try:
-                # 驗證 HH:MM 格式
+                # 處理 HH:MM 格式
                 from datetime import datetime, time as time_cls
                 if isinstance(end_time, time_cls):
                     return end_time
                 time_obj = datetime.strptime(str(end_time), "%H:%M").time()
                 return time_obj
             except (ValueError, TypeError):
-                raise forms.ValidationError("請輸入正確的時間格式：HH:MM（24小時制）")
+                # 移除驗證錯誤，直接返回原始值
+                return end_time
         return end_time
-     
-
+    
+    def clean(self):
+        """表單整體驗證，自動填入 process_name（移除驗證）"""
+        cleaned_data = super().clean()
+        
+        # 自動填入 process_name
+        process_id = cleaned_data.get('process_id')
+        if process_id:
+            try:
+                process = ProcessName.objects.get(id=process_id.id if hasattr(process_id, 'id') else process_id)
+                cleaned_data['process_name'] = process.name
+            except ProcessName.DoesNotExist:
+                pass
+        
+        return cleaned_data
 
 
 class SMTBackfillForm(ModelForm):
@@ -629,16 +711,19 @@ class SMTBackfillForm(ModelForm):
         widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇公司名稱'}), required=True,
         help_text="選擇公司名稱會更新相關的產品編號選項"
     )
-    operator = forms.ChoiceField(
-        choices=[], label="作業員",
-        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇作業員'}), required=True,
-        help_text="請選擇作業員"
+    operator = forms.CharField(
+        label="作業員",
+        widget=forms.HiddenInput(),
+        required=False,
+        help_text="作業員（將自動從設備選擇中填入）"
     )
     equipment = forms.ChoiceField(
         choices=[], label="使用的設備",
         widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇使用的設備'}), required=True,
-        help_text="請選擇此次填報使用的設備,選擇後會自動填入作業員欄位"
+        help_text="請選擇此次填報使用的設備，選擇後會自動填入作業員欄位"
     )
+    
+    # 工序欄位 - 由前端 JavaScript 動態載入，不在表單中定義
     
     class Meta:
         model = FillWork
@@ -654,7 +739,6 @@ class SMTBackfillForm(ModelForm):
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'defect_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'is_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'process_id': forms.Select(attrs={'class': 'form-select'}),
             'process_name': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
             'start_time': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -694,6 +778,7 @@ class SMTBackfillForm(ModelForm):
         # 載入選項（根據使用者權限過濾）
         self.fields['company_name'].choices = self.get_company_choices()
         self.fields['equipment'].choices = self.get_equipment_choices()
+        self.fields['workorder'].choices = self.get_workorder_choices()
         
         # 最近30天日期選項
         from datetime import timedelta, date
@@ -718,18 +803,19 @@ class SMTBackfillForm(ModelForm):
         return choices
 
     def get_operator_choices(self):
+        """獲取作業員選項（SMT系統中設備即為作業員）"""
         choices = [("", "請選擇作業員")]
         try:
             if self.user:
-                # 根據使用者權限過濾作業員，並排除SMT相關
-                operators = get_user_filtered_operators(self.user, self.request)
-                operators = operators.exclude(name__icontains='SMT')
+                # 根據使用者權限過濾設備，並只顯示SMT相關（設備即為作業員）
+                filtered_equipments = get_user_filtered_equipments(self.user, self.request)
+                equipments = filtered_equipments.filter(name__icontains='SMT')
             else:
-                # 沒有使用者資訊，預設排除SMT相關
-                operators = Operator.objects.exclude(name__icontains='SMT').order_by('name')
+                # 沒有使用者資訊，預設只顯示SMT相關設備
+                equipments = Equipment.objects.filter(name__icontains='SMT').order_by('name')
             
-            for o in operators:
-                choices.append((o.name, o.name))
+            for e in equipments:
+                choices.append((e.name, e.name))
         except Exception:
             pass
         return choices
@@ -748,6 +834,18 @@ class SMTBackfillForm(ModelForm):
             for e in equipments:
                 choices.append((e.name, e.name))
         except Exception:
+            pass
+        return choices
+    
+    def get_workorder_choices(self):
+        """獲取工單號碼選項"""
+        choices = [("", "請選擇工單號碼")]
+        try:
+            from workorder.workorder_dispatch.models import WorkOrderDispatch
+            workorders = WorkOrderDispatch.objects.all().order_by('order_number')
+            for workorder in workorders:
+                choices.append((workorder.order_number, workorder.order_number))
+        except ImportError:
             pass
         return choices
     
@@ -776,6 +874,32 @@ class SMTBackfillForm(ModelForm):
             return datetime.strptime(str(end_time), "%H:%M").time()
         except (ValueError, TypeError):
             raise forms.ValidationError("請輸入正確的時間格式：HH:MM（24小時制）")
+    
+    def clean(self):
+        """表單整體驗證，自動填入 process_name、operation 和 operator"""
+        cleaned_data = super().clean()
+        
+        # 自動填入 process_name 和 operation
+        process_id = cleaned_data.get('process_id')
+        if process_id:
+            try:
+                # 如果 process_id 是字串，嘗試按名稱查找
+                if isinstance(process_id, str):
+                    process = ProcessName.objects.get(name=process_id)
+                else:
+                    # 如果是物件，使用 ID
+                    process = ProcessName.objects.get(id=process_id.id if hasattr(process_id, 'id') else process_id)
+                cleaned_data['process_name'] = process.name
+                cleaned_data['operation'] = process.name  # 填入 operation 欄位
+            except ProcessName.DoesNotExist:
+                pass
+        
+        # 自動填入 operator（設備即為作業員）
+        equipment = cleaned_data.get('equipment')
+        if equipment:
+            cleaned_data['operator'] = equipment
+        
+        return cleaned_data
 
 
 class SMTRDBackfillForm(ModelForm):
@@ -787,13 +911,20 @@ class SMTRDBackfillForm(ModelForm):
         label="填報日期",
         widget=forms.Select(attrs={'class': 'form-select'}),
         required=True,
-        help_text="請選擇日期（預設今天）"
+        help_text="請選擇日期（預設今天）",
+        error_messages={
+            'required': '請選擇填報日期',
+        }
     )
 
     # 公司名稱、作業員、設備（僅顯示SMT相關設備）
     company_name = forms.ChoiceField(
         choices=[], label="公司名稱",
-        widget=forms.Select(attrs={'class': 'form-select'}), required=True
+        widget=forms.Select(attrs={'class': 'form-select'}), 
+        required=True,
+        error_messages={
+            'required': '請選擇公司名稱',
+        }
     )
     operator = forms.CharField(
         label="作業員",
@@ -802,7 +933,24 @@ class SMTRDBackfillForm(ModelForm):
     )
     equipment = forms.ChoiceField(
         choices=[], label="使用的設備",
-        widget=forms.Select(attrs={'class': 'form-select'}), required=True
+        widget=forms.Select(attrs={'class': 'form-select'}), 
+        required=True,
+        error_messages={
+            'required': '請選擇設備',
+        }
+    )
+    
+    # 工序欄位 - 下拉式選單
+    process_id = forms.ModelChoiceField(
+        queryset=ProcessName.objects.none(),  # 在 __init__ 中設定
+        label="工序",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '請選擇此次填報的工序'}),
+        required=True,
+        help_text="請選擇此次填報的工序",
+        empty_label="請選擇工序...",
+        error_messages={
+            'required': '請選擇工序',
+        }
     )
     
     class Meta:
@@ -812,6 +960,29 @@ class SMTRDBackfillForm(ModelForm):
             'planned_quantity', 'work_quantity', 'defect_quantity', 'is_completed',
             'work_date', 'start_time', 'end_time', 'remarks', 'abnormal_notes'
         ]
+        error_messages = {
+            'product_id': {
+                'required': '請輸入產品編號',
+            },
+            'workorder': {
+                'required': '請輸入工單號碼',
+            },
+            'work_quantity': {
+                'required': '請輸入工作數量',
+            },
+            'defect_quantity': {
+                'required': '請輸入不良品數量',
+            },
+            'start_time': {
+                'required': '請輸入開始時間',
+            },
+            'end_time': {
+                'required': '請輸入結束時間',
+            },
+            'process_name': {
+                'required': '請選擇工序',
+            },
+        }
         widgets = {
             'product_id': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -823,7 +994,6 @@ class SMTRDBackfillForm(ModelForm):
             'work_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'defect_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
             'is_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'process_id': forms.Select(attrs={'class': 'form-select'}),
             'process_name': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
             'start_time': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -944,6 +1114,21 @@ class SMTRDBackfillForm(ModelForm):
             return datetime.strptime(str(end_time), "%H:%M").time()
         except (ValueError, TypeError):
             raise forms.ValidationError("請輸入正確的時間格式：HH:MM（24小時制）")
+    
+    def clean(self):
+        """表單整體驗證，自動填入 process_name"""
+        cleaned_data = super().clean()
+        
+        # 自動填入 process_name
+        process_id = cleaned_data.get('process_id')
+        if process_id:
+            try:
+                process = ProcessName.objects.get(id=process_id.id if hasattr(process_id, 'id') else process_id)
+                cleaned_data['process_name'] = process.name
+            except ProcessName.DoesNotExist:
+                pass
+        
+        return cleaned_data
 
 
 # ==================== 視圖類別定義 ====================
@@ -1026,6 +1211,15 @@ class OperatorBackfillCreateView(LoginRequiredMixin, CreateView):
             form.instance.created_by = self.request.user.username
             
             response = super().form_valid(form)
+            
+            # 記錄操作日誌
+            from workorder.models import WorkOrderOperationLog
+            WorkOrderOperationLog.objects.create(
+                user=self.request.user.username,
+                action=f"新增作業員補登填報紀錄 - 工單: {form.instance.workorder}, 產品: {form.instance.product_id}, 工序: {form.instance.operation}",
+                ip_address=self.request.META.get('REMOTE_ADDR')
+            )
+            
             messages.success(self.request, '作業員補登填報新增成功！')
             return response
         except Exception as e:
@@ -1033,12 +1227,33 @@ class OperatorBackfillCreateView(LoginRequiredMixin, CreateView):
             return self.form_invalid(form)
     
     def form_invalid(self, form):
+        # 欄位名稱對應表（英文轉中文）
+        field_names = {
+            'product_id': '產品編號',
+            'workorder': '工單號碼',
+            'company_name': '公司名稱',
+            'operator': '作業員',
+            'process_id': '工序',
+            'process_name': '工序',
+            'equipment': '設備',
+            'work_quantity': '工作數量',
+            'defect_quantity': '不良品數量',
+            'work_date': '填報日期',
+            'start_time': '開始時間',
+            'end_time': '結束時間',
+            'planned_quantity': '預定數量',
+            'is_completed': '是否完成',
+            'remarks': '備註',
+            'abnormal_notes': '異常備註',
+        }
+        
         # 彙整詳細欄位錯誤
         if form.errors:
             details = []
             for field, errs in form.errors.items():
+                field_display = field_names.get(field, field)  # 使用中文名稱，如果沒有則使用原名稱
                 for err in errs:
-                    details.append(f"{field}: {err}")
+                    details.append(f"{field_display}: {err}")
             if details:
                 messages.error(self.request, "資料有誤：" + "；".join(details))
         else:
@@ -1060,6 +1275,22 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
         kwargs['request'] = self.request
         return kwargs
     
+    def get_form(self, form_class=None):
+        """動態設定表單選項"""
+        form = super().get_form(form_class)
+        
+        # 動態設定工序選項（排除SMT相關工序）
+        from process.models import ProcessName
+        from django.db.models import Q
+        processes = ProcessName.objects.filter(
+            ~Q(name__icontains='SMT')
+        ).order_by('name')
+        
+        # 設定工序選項 - 使用 process_id 欄位
+        form.fields['process_id'].queryset = processes
+        
+        return form
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # 後端提供正確的時間選單：00-23 與 00-59
@@ -1078,13 +1309,14 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
             company_name = form.cleaned_data.get('company_name')
             product_code = form.cleaned_data.get('product_id')
             
-            # 取得公司代號
+            # 取得公司代號（移除驗證）
             company_config = CompanyConfig.objects.filter(company_name=company_name).first()
             if not company_config:
-                messages.error(self.request, '找不到對應的公司設定')
-                return self.form_invalid(form)
-            
-            company_code_value = company_config.company_code
+                # 移除驗證錯誤，使用預設值
+                company_code_value = 'DEFAULT'
+                messages.info(self.request, '使用預設公司代號')
+            else:
+                company_code_value = company_config.company_code
             
             # 直接使用 workorder 欄位的內容作為工單號碼
             workorder_number = form.cleaned_data.get('workorder')
@@ -1114,6 +1346,12 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
                 workorder_created = True
                 messages.info(self.request, f'建立新RD樣品工單: {workorder.order_number}')
             
+            # 取得工序資訊
+            process_id = form.cleaned_data.get('process_id')
+            process_name = ''
+            if process_id:
+                process_name = process_id.name
+            
             # 檢查並建立派工單（比對公司代號+工單號碼+產品編號+工序）
             existing_dispatch = WorkOrderDispatch.objects.filter(
                 company_code=company_code_value,
@@ -1132,18 +1370,18 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
                     company_code=company_code_value,
                     order_number=workorder_number,
                     product_code=product_code,
-                    product_name=f'{order_type}-{product_code}',
+                    product_name=f'RD樣品-{product_code}',
                     planned_quantity=0,
                     status='in_production',
                     dispatch_date=timezone.now().date(),
                     assigned_operator=form.cleaned_data.get('operator'),
                     assigned_equipment=form.cleaned_data.get('equipment') or '',
                     process_name=process_name,
-                    notes=f"作業員{order_type}補登填報自動建立 - 建立時間: {timezone.now()} - 注意：{order_type}無預定工序流程",
+                    notes=f"作業員RD樣品補登填報自動建立 - 建立時間: {timezone.now()} - 注意：RD樣品無預定工序流程",
                     created_by=self.request.user.username
                 )
                 dispatch_created = True
-                messages.info(self.request, f'建立新{order_type}派工單: {new_dispatch.order_number}')
+                messages.info(self.request, f'建立新RD樣品派工單: {new_dispatch.order_number}')
             
             # 設定休息時間（作業員RD填報：12:00-13:00）
             form.instance.has_break = True
@@ -1174,10 +1412,16 @@ class OperatorRDBackfillCreateView(LoginRequiredMixin, CreateView):
     
     def form_invalid(self, form):
         """表單驗證失敗時的處理"""
-        # 顯示錯誤訊息
-        messages.error(self.request, '請檢查表單資料，有必填欄位未填寫或格式不正確')
-        
-        # 返回表單頁面，讓使用者繼續編輯
+        # 彙整詳細欄位錯誤
+        if form.errors:
+            details = []
+            for field, errs in form.errors.items():
+                for err in errs:
+                    details.append(f"{field}: {err}")
+            if details:
+                messages.error(self.request, "資料有誤：" + "；".join(details))
+        else:
+            messages.error(self.request, '請檢查表單資料，有必填欄位未填寫或格式不正確')
         return self.render_to_response(self.get_context_data(form=form))
 
 
@@ -1250,12 +1494,33 @@ class SMTBackfillCreateView(LoginRequiredMixin, CreateView):
             return self.form_invalid(form)
 
     def form_invalid(self, form):
+        # 欄位名稱對應表（英文轉中文）
+        field_names = {
+            'product_id': '產品編號',
+            'workorder': '工單號碼',
+            'company_name': '公司名稱',
+            'operator': '作業員',
+            'process_id': '工序',
+            'process_name': '工序',
+            'equipment': '設備',
+            'work_quantity': '工作數量',
+            'defect_quantity': '不良品數量',
+            'work_date': '填報日期',
+            'start_time': '開始時間',
+            'end_time': '結束時間',
+            'planned_quantity': '預定數量',
+            'is_completed': '是否完成',
+            'remarks': '備註',
+            'abnormal_notes': '異常備註',
+        }
+        
         # 彙整詳細欄位錯誤
         if form.errors:
             details = []
             for field, errs in form.errors.items():
+                field_display = field_names.get(field, field)  # 使用中文名稱，如果沒有則使用原名稱
                 for err in errs:
-                    details.append(f"{field}: {err}")
+                    details.append(f"{field_display}: {err}")
             if details:
                 messages.error(self.request, "資料有誤：" + "；".join(details))
         else:
@@ -1294,13 +1559,14 @@ class SMTRDBackfillCreateView(LoginRequiredMixin, CreateView):
             company_name = form.cleaned_data.get('company_name')
             product_code = form.cleaned_data.get('product_id')
             
-            # 取得公司代號
+            # 取得公司代號（移除驗證）
             company_config = CompanyConfig.objects.filter(company_name=company_name).first()
             if not company_config:
-                messages.error(self.request, '找不到對應的公司設定')
-                return self.form_invalid(form)
-            
-            company_code_value = company_config.company_code
+                # 移除驗證錯誤，使用預設值
+                company_code_value = 'DEFAULT'
+                messages.info(self.request, '使用預設公司代號')
+            else:
+                company_code_value = company_config.company_code
             
             # 查找現有工單（只根據公司代號和工單號碼，因為唯一性約束是 (company_code, order_number)）
             existing_workorder = WorkOrder.objects.filter(
@@ -1383,11 +1649,33 @@ class SMTRDBackfillCreateView(LoginRequiredMixin, CreateView):
             return self.form_invalid(form)
     
     def form_invalid(self, form):
+        # 欄位名稱對應表（英文轉中文）
+        field_names = {
+            'product_id': '產品編號',
+            'workorder': '工單號碼',
+            'company_name': '公司名稱',
+            'operator': '作業員',
+            'process_id': '工序',
+            'process_name': '工序',
+            'equipment': '設備',
+            'work_quantity': '工作數量',
+            'defect_quantity': '不良品數量',
+            'work_date': '填報日期',
+            'start_time': '開始時間',
+            'end_time': '結束時間',
+            'planned_quantity': '預定數量',
+            'is_completed': '是否完成',
+            'remarks': '備註',
+            'abnormal_notes': '異常備註',
+        }
+        
+        # 彙整詳細欄位錯誤
         if form.errors:
             details = []
             for field, errs in form.errors.items():
+                field_display = field_names.get(field, field)  # 使用中文名稱，如果沒有則使用原名稱
                 for err in errs:
-                    details.append(f"{field}: {err}")
+                    details.append(f"{field_display}: {err}")
             if details:
                 messages.error(self.request, "資料有誤：" + "；".join(details))
         else:
@@ -1443,11 +1731,33 @@ class SMTBackfillUpdateView(LoginRequiredMixin, UpdateView):
             return self.form_invalid(form)
     
     def form_invalid(self, form):
+        # 欄位名稱對應表（英文轉中文）
+        field_names = {
+            'product_id': '產品編號',
+            'workorder': '工單號碼',
+            'company_name': '公司名稱',
+            'operator': '作業員',
+            'process_id': '工序',
+            'process_name': '工序',
+            'equipment': '設備',
+            'work_quantity': '工作數量',
+            'defect_quantity': '不良品數量',
+            'work_date': '填報日期',
+            'start_time': '開始時間',
+            'end_time': '結束時間',
+            'planned_quantity': '預定數量',
+            'is_completed': '是否完成',
+            'remarks': '備註',
+            'abnormal_notes': '異常備註',
+        }
+        
+        # 彙整詳細欄位錯誤
         if form.errors:
             details = []
             for field, errs in form.errors.items():
+                field_display = field_names.get(field, field)  # 使用中文名稱，如果沒有則使用原名稱
                 for err in errs:
-                    details.append(f"{field}: {err}")
+                    details.append(f"{field_display}: {err}")
             if details:
                 messages.error(self.request, "資料有誤：" + "；".join(details))
         else:
@@ -1486,11 +1796,33 @@ class OperatorBackfillUpdateView(LoginRequiredMixin, UpdateView):
             return self.form_invalid(form)
 
     def form_invalid(self, form):
+        # 欄位名稱對應表（英文轉中文）
+        field_names = {
+            'product_id': '產品編號',
+            'workorder': '工單號碼',
+            'company_name': '公司名稱',
+            'operator': '作業員',
+            'process_id': '工序',
+            'process_name': '工序',
+            'equipment': '設備',
+            'work_quantity': '工作數量',
+            'defect_quantity': '不良品數量',
+            'work_date': '填報日期',
+            'start_time': '開始時間',
+            'end_time': '結束時間',
+            'planned_quantity': '預定數量',
+            'is_completed': '是否完成',
+            'remarks': '備註',
+            'abnormal_notes': '異常備註',
+        }
+        
+        # 彙整詳細欄位錯誤
         if form.errors:
             details = []
             for field, errs in form.errors.items():
+                field_display = field_names.get(field, field)  # 使用中文名稱，如果沒有則使用原名稱
                 for err in errs:
-                    details.append(f"{field}: {err}")
+                    details.append(f"{field_display}: {err}")
             if details:
                 messages.error(self.request, "資料有誤：" + "；".join(details))
         else:
@@ -1554,6 +1886,56 @@ class FillWorkDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'fill_work'
 
 
+class FillWorkEditView(LoginRequiredMixin, UpdateView):
+    """填報記錄編輯視圖"""
+    model = FillWork
+    template_name = 'workorder/fill_work/fill_work_edit.html'
+    context_object_name = 'fill_work'
+    fields = ['operator', 'process_name', 'equipment', 'work_date', 'start_time', 'end_time', 'work_quantity', 'defect_quantity', 'remarks', 'abnormal_notes']
+    
+    def get_form_class(self):
+        """自定義表單類別，設定設備欄位為非必填"""
+        from django import forms
+        from .models import FillWork
+        
+        class FillWorkEditForm(forms.ModelForm):
+            class Meta:
+                model = FillWork
+                fields = self.fields
+                widgets = {
+                    'equipment': forms.Select(attrs={'class': 'form-select'}),
+                }
+            
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                # 設定設備欄位為非必填
+                self.fields['equipment'].required = False
+        
+        return FillWorkEditForm
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # 獲取下拉選單資料
+        context['operators'] = get_user_filtered_operators(self.request.user, self.request)
+        context['process_names'] = ProcessName.objects.all().order_by('name')
+        context['equipments'] = Equipment.objects.exclude(status='maintenance').order_by('name')
+        
+        return context
+    
+    def get_success_url(self):
+        return reverse_lazy('workorder:fill_work:fill_work_detail', kwargs={'pk': self.object.pk})
+    
+    def form_valid(self, form):
+        # 記錄編輯操作（使用 Django 的 logging 系統）
+        import logging
+        logger = logging.getLogger('workorder')
+        logger.info(f'使用者 {self.request.user.username} 編輯填報記錄 ID: {self.object.id}, 工單號碼: {self.object.workorder}, 作業員: {self.object.operator}, 產品編號: {self.object.product_id}')
+        
+        messages.success(self.request, '填報記錄已成功更新')
+        return super().form_valid(form)
+
+
 class FillWorkDeleteView(LoginRequiredMixin, DeleteView):
     """刪除填報記錄（僅允許待核准）"""
     model = FillWork
@@ -1570,6 +1952,20 @@ class FillWorkDeleteView(LoginRequiredMixin, DeleteView):
     def delete(self, request, *args, **kwargs):
         obj = self.get_object()
         obj_id = obj.id
+        
+        # 記錄刪除操作日誌
+        from system.models import OperationLog
+        OperationLog.objects.create(
+            user=request.user.username,
+            action='DELETE_FILL_WORK',
+            target_type='FillWork',
+            target_id=obj_id,
+            description=f'刪除填報記錄',
+            details=f'工單號碼: {obj.workorder}, 作業員: {obj.operator}, 產品編號: {obj.product_id}',
+            ip_address=request.META.get('REMOTE_ADDR', ''),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+        
         response = super().delete(request, *args, **kwargs)
         messages.success(request, f'已刪除填報記錄（ID: {obj_id}）')
         return response
@@ -1600,6 +1996,19 @@ def approve_fill_work(request, pk: int):
         )
         
         if approval_result['success']:
+            # 記錄核准操作日誌
+            from system.models import OperationLog
+            OperationLog.objects.create(
+                user=request.user.username,
+                action='APPROVE_FILL_WORK',
+                target_type='FillWork',
+                target_id=record.id,
+                description=f'核准填報記錄',
+                details=f'工單號碼: {record.workorder}, 作業員: {record.operator}, 產品編號: {record.product_id}',
+                ip_address=request.META.get('REMOTE_ADDR', ''),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
+            
             # 顯示核准成功訊息
             success_message = approval_result['message']
             
@@ -1802,6 +2211,19 @@ def reject_fill_work(request, pk: int):
         record.rejected_at = timezone.now()
         record.rejection_reason = request.POST.get('reason', '')
         record.save(update_fields=['approval_status', 'rejected_by', 'rejected_at', 'rejection_reason', 'updated_at'])
+        
+        # 記錄駁回操作日誌
+        from system.models import OperationLog
+        OperationLog.objects.create(
+            user=request.user.username,
+            action='REJECT_FILL_WORK',
+            target_type='FillWork',
+            target_id=record.id,
+            description=f'駁回填報記錄',
+            details=f'工單號碼: {record.workorder}, 作業員: {record.operator}, 產品編號: {record.product_id}, 駁回原因: {record.rejection_reason}',
+            ip_address=request.META.get('REMOTE_ADDR', ''),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
         
         # 如果是 AJAX 請求，返回 JSON 回應
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -2818,7 +3240,7 @@ class SupervisorReviewedListView(LoginRequiredMixin, UserPassesTestMixin, ListVi
         for row, record in enumerate(queryset, 2):
             # 判斷類型
             report_type = 'SMT' if ('SMT' in (record.operator or '').upper() or 
-                                   'SMT' in (record.process.name if record.process else '').upper()) else '作業員'
+                                   'SMT' in (record.process_name or '').upper()) else '作業員'
             
             # 狀態
             status = '已核准' if record.approval_status == 'approved' else '已駁回'
@@ -2838,7 +3260,7 @@ class SupervisorReviewedListView(LoginRequiredMixin, UserPassesTestMixin, ListVi
             ws.cell(row=row, column=10, value=record.defect_quantity or 0)
             ws.cell(row=row, column=11, value=record.work_hours_calculated or 0)
             ws.cell(row=row, column=12, value=record.overtime_hours_calculated or 0)
-            ws.cell(row=row, column=13, value=record.operation or (record.process.name if record.process else '') or '')
+            ws.cell(row=row, column=13, value=record.operation or record.process_name or '')
             ws.cell(row=row, column=14, value=record.remarks or '')
             ws.cell(row=row, column=15, value=record.abnormal_notes or '')
             ws.cell(row=row, column=16, value=record.approved_by or record.rejected_by or '')
@@ -3003,7 +3425,7 @@ def batch_approve_fill_work(request):
                             # 判斷類型：SMT 或 作業員
                             is_smt = False
                             try:
-                                if (fill_work.operator and 'SMT' in fill_work.operator.upper()) or (fill_work.process and 'SMT' in fill_work.process.name.upper()):
+                                if (fill_work.operator and 'SMT' in fill_work.operator.upper()) or (fill_work.process_name and 'SMT' in fill_work.process_name.upper()):
                                     is_smt = True
                             except Exception:
                                 is_smt = False
@@ -3011,7 +3433,7 @@ def batch_approve_fill_work(request):
 
                             ProductionReportSyncService._create_or_update_production_detail(
                                 workorder=workorder,
-                                process_name=(fill_work.process.name if fill_work.process else fill_work.operation or ''),
+                                process_name=(fill_work.process_name or fill_work.operation or ''),
                                 report_date=fill_work.work_date,
                                 report_time=timezone.now(),
                                 work_quantity=fill_work.work_quantity or 0,
@@ -3212,8 +3634,130 @@ def batch_unapprove_fill_work(request):
             unapproved_count += 1
         
         messages.success(request, f'成功取消審核 {unapproved_count} 筆填報記錄')
-        
+    
     except Exception as e:
         messages.error(request, f'批次取消審核失敗: {str(e)}')
     
     return redirect('workorder:fill_work:supervisor_reviewed_list')
+
+
+# ==================== 填報記錄動態編輯功能 ====================
+
+@login_required
+@require_POST
+def update_fill_work_field(request, pk):
+    """
+    動態更新填報記錄欄位
+    透過 AJAX 更新單一欄位值，並記錄操作日誌
+    """
+    try:
+        fill_work = get_object_or_404(FillWork, pk=pk)
+        
+        # 檢查是否為待核准狀態
+        if fill_work.approval_status != 'pending':
+            return JsonResponse({'success': False, 'message': '只有待核准狀態的記錄才能編輯'})
+        
+        # 取得要更新的欄位和值
+        field_name = request.POST.get('field')
+        field_value = request.POST.get('value')
+        
+        if not field_name:
+            return JsonResponse({'success': False, 'message': '缺少欄位名稱'})
+        
+        # 允許編輯的欄位列表
+        allowed_fields = [
+            'operator', 'process_name', 'equipment', 'work_date', 
+            'start_time', 'end_time', 'work_quantity', 'defect_quantity', 
+            'remarks', 'anomaly_record'
+        ]
+        
+        if field_name not in allowed_fields:
+            return JsonResponse({'success': False, 'message': '不允許編輯此欄位'})
+        
+        # 取得原始值
+        original_value = getattr(fill_work, field_name)
+        if original_value is None:
+            original_value = ""
+        
+        # 更新欄位值
+        if field_name in ['work_quantity', 'defect_quantity']:
+            # 數值欄位
+            try:
+                field_value = int(field_value) if field_value else 0
+            except ValueError:
+                return JsonResponse({'success': False, 'message': '數量必須為整數'})
+        elif field_name == 'work_date':
+            # 日期欄位
+            try:
+                field_value = datetime.strptime(field_value, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({'success': False, 'message': '日期格式錯誤'})
+        elif field_name in ['start_time', 'end_time']:
+            # 時間欄位
+            try:
+                field_value = datetime.strptime(field_value, '%H:%M').time()
+            except ValueError:
+                return JsonResponse({'success': False, 'message': '時間格式錯誤'})
+        
+        # 設定欄位值
+        setattr(fill_work, field_name, field_value)
+        
+        # 如果更新了時間相關欄位，重新計算工作時數
+        if field_name in ['start_time', 'end_time', 'work_date']:
+            if fill_work.start_time and fill_work.end_time:
+                start_datetime = datetime.combine(fill_work.work_date, fill_work.start_time)
+                end_datetime = datetime.combine(fill_work.work_date, fill_work.end_time)
+                
+                # 如果結束時間小於開始時間，表示跨日
+                if end_datetime <= start_datetime:
+                    end_datetime = end_datetime.replace(day=end_datetime.day + 1)
+                
+                # 計算總工作時間（小時）
+                work_duration = end_datetime - start_datetime
+                total_hours = work_duration.total_seconds() / 3600
+                
+                # 計算正常工時（8小時）和加班時數
+                normal_hours = min(total_hours, 8.0)
+                overtime_hours = max(0, total_hours - 8.0)
+                
+                fill_work.work_hours_calculated = round(Decimal(str(normal_hours)), 2)
+                fill_work.overtime_hours_calculated = round(Decimal(str(overtime_hours)), 2)
+        
+        # 儲存記錄
+        fill_work.save()
+        
+        # 記錄操作日誌
+        from system.models import OperationLog
+        OperationLog.objects.create(
+            user=request.user.username,
+            action='EDIT_FILL_WORK_FIELD',
+            target_type='FillWork',
+            target_id=fill_work.id,
+            description=f'編輯填報記錄欄位: {field_name}',
+            details=f'欄位: {field_name}, 原始值: {original_value}, 新值: {field_value}',
+            ip_address=request.META.get('REMOTE_ADDR', ''),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+        
+        return JsonResponse({
+            'success': True, 
+            'message': '更新成功',
+            'work_hours': str(fill_work.work_hours_calculated),
+            'overtime_hours': str(fill_work.overtime_hours_calculated)
+        })
+        
+    except Exception as e:
+        # 記錄錯誤日誌
+        from system.models import OperationLog
+        OperationLog.objects.create(
+            user=request.user.username,
+            action='EDIT_FILL_WORK_FIELD_ERROR',
+            target_type='FillWork',
+            target_id=pk,
+            description=f'編輯填報記錄欄位失敗: {field_name}',
+            details=f'錯誤: {str(e)}',
+            ip_address=request.META.get('REMOTE_ADDR', ''),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+        return JsonResponse({'success': False, 'message': f'更新失敗: {str(e)}'})
+

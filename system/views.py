@@ -12,7 +12,6 @@ from openpyxl.utils import get_column_letter
 from .forms import (
     UserCreationFormCustom,
     UserChangeFormCustom,
-    OperationLogConfigForm,
     EmailConfigForm,
     UserWorkPermissionForm,
     BackupScheduleForm,
@@ -22,7 +21,6 @@ from .models import (
     EmailConfig, 
     BackupSchedule, 
     OperationLogConfig,
-    AutoApprovalSettings,
     CleanupLog,
     OrderSyncSettings,
     OrderSyncLog,
@@ -87,6 +85,7 @@ MODULE_LOG_MODELS = {
     "kanban": "kanban.models.KanbanOperationLog",
     "erp_integration": "erp_integration.models.ERPIntegrationOperationLog",
     "ai": "ai.models.AIOperationLog",
+    # 注意：OrderSyncLog 不是通用的操作日誌模型，不應加入此處
 }
 
 
@@ -1189,26 +1188,16 @@ def import_users(request):
                 'message': f'用戶匯入失敗：{str(e)}'
             }, status=400)
         return redirect("system:user_list")
-    return redirect("system:user_list")
+    
+    # GET 請求：顯示匯入頁面
+    return render(request, "system/user_import.html", {
+        "title": "匯入使用者"
+    })
 
 
 @login_required
 @user_passes_test(superuser_required, login_url="/accounts/login/")
 def operation_log_manage(request):
-    config, created = OperationLogConfig.objects.get_or_create(id=1)
-    if request.method == "POST":
-        form = OperationLogConfigForm(request.POST, instance=config)
-        if form.is_valid():
-            form.save()
-            # 重新讀取配置以獲取更新後的值
-            config.refresh_from_db()
-            logger.info(f"操作紀錄保留天數更新為 {config.retention_days} 天")
-            messages.success(
-                request, f"操作紀錄保留天數已更新為 {config.retention_days} 天！"
-            )
-            return redirect("system:operation_log_manage")
-    else:
-        form = OperationLogConfigForm(instance=config)
 
     module = request.GET.get("module", "")
     user = request.GET.get("user", "")
@@ -1280,7 +1269,7 @@ def operation_log_manage(request):
         request,
         "system/operation_log_manage.html",
         {
-            "form": form,
+            "title": "操作日誌管理",
             "logs": logs,
             "module_choices": module_choices,
             "users": users,
@@ -2107,34 +2096,55 @@ def auto_approval_tasks(request):
         if action == 'create':
             # 建立新的定時任務
             name = request.POST.get('name')
+            execution_type = request.POST.get('execution_type', 'interval')
             interval_minutes = request.POST.get('interval_minutes')
+            fixed_time = request.POST.get('fixed_time')
             description = request.POST.get('description', '')
             
-            if not name or not interval_minutes:
-                messages.error(request, "任務名稱和執行間隔為必填欄位")
+            if not name:
+                messages.error(request, "任務名稱為必填欄位")
                 return redirect('system:auto_approval_tasks')
             
-            try:
-                interval_minutes = int(interval_minutes)
-                if interval_minutes < 1 or interval_minutes > 1440:
-                    messages.error(request, "執行間隔必須在1-1440分鐘之間")
+            # 根據執行類型驗證必填欄位
+            if execution_type == 'interval':
+                if not interval_minutes:
+                    messages.error(request, "間隔執行需要設定執行間隔")
                     return redirect('system:auto_approval_tasks')
-                
+            elif execution_type == 'fixed_time':
+                if not fixed_time:
+                    messages.error(request, "固定時間執行需要設定執行時間")
+                    return redirect('system:auto_approval_tasks')
+            
+            try:
                 # 檢查任務名稱是否重複
                 if ScheduledTask.objects.filter(name=name, task_type='auto_approve').exists():
                     messages.error(request, f"任務名稱 '{name}' 已存在")
                     return redirect('system:auto_approval_tasks')
                 
                 # 建立新任務
-                task = ScheduledTask.objects.create(
-                    name=name,
-                    task_type='auto_approve',
-                    task_function='system.tasks.auto_approve_work_reports',
-                    execution_type='interval',
-                    interval_minutes=interval_minutes,
-                    is_enabled=True,
-                    description=description
-                )
+                task_data = {
+                    'name': name,
+                    'task_type': 'auto_approve',
+                    'task_function': 'system.tasks.auto_approve_work_reports',
+                    'execution_type': execution_type,
+                    'is_enabled': True,
+                    'description': description
+                }
+                
+                if execution_type == 'interval':
+                    interval_minutes = int(interval_minutes)
+                    if interval_minutes < 1 or interval_minutes > 1440:
+                        messages.error(request, "執行間隔必須在1-1440分鐘之間")
+                        return redirect('system:auto_approval_tasks')
+                    task_data['interval_minutes'] = interval_minutes
+                elif execution_type == 'fixed_time':
+                    task_data['fixed_time'] = fixed_time
+                
+                task = ScheduledTask.objects.create(**task_data)
+                
+                # 同步到 Celery Beat
+                from system.tasks import sync_scheduled_tasks_to_celery
+                sync_result = sync_scheduled_tasks_to_celery()
                 
                 messages.success(request, f"定時任務 '{name}' 建立成功")
                 
@@ -2147,7 +2157,9 @@ def auto_approval_tasks(request):
             # 更新定時任務
             task_id = request.POST.get('task_id')
             name = request.POST.get('name')
+            execution_type = request.POST.get('execution_type', 'interval')
             interval_minutes = request.POST.get('interval_minutes')
+            fixed_time = request.POST.get('fixed_time')
             description = request.POST.get('description', '')
             is_enabled = request.POST.get('is_enabled') == 'on'
             
@@ -2159,10 +2171,28 @@ def auto_approval_tasks(request):
                     messages.error(request, f"任務名稱 '{name}' 已存在")
                     return redirect('system:auto_approval_tasks')
                 
+                # 根據執行類型驗證必填欄位
+                if execution_type == 'interval':
+                    if not interval_minutes:
+                        messages.error(request, "間隔執行需要設定執行間隔")
+                        return redirect('system:auto_approval_tasks')
+                elif execution_type == 'fixed_time':
+                    if not fixed_time:
+                        messages.error(request, "固定時間執行需要設定執行時間")
+                        return redirect('system:auto_approval_tasks')
+                
                 task.name = name
-                task.interval_minutes = int(interval_minutes)
+                task.execution_type = execution_type
                 task.description = description
                 task.is_enabled = is_enabled
+                
+                if execution_type == 'interval':
+                    task.interval_minutes = int(interval_minutes)
+                    task.fixed_time = None  # 清除固定時間
+                elif execution_type == 'fixed_time':
+                    task.fixed_time = fixed_time
+                    task.interval_minutes = None  # 清除間隔設定
+                
                 task.save()
                 
                 messages.success(request, f"定時任務 '{name}' 更新成功")
@@ -2182,6 +2212,11 @@ def auto_approval_tasks(request):
                 task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
                 task_name = task.name
                 task.delete()
+                
+                # 同步到 Celery Beat
+                from system.tasks import sync_scheduled_tasks_to_celery
+                sync_result = sync_scheduled_tasks_to_celery()
+                
                 messages.success(request, f"定時任務 '{task_name}' 刪除成功")
                 
             except ScheduledTask.DoesNotExist:
@@ -2197,6 +2232,10 @@ def auto_approval_tasks(request):
                 task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
                 task.is_enabled = not task.is_enabled
                 task.save()
+                
+                # 同步到 Celery Beat
+                from system.tasks import sync_scheduled_tasks_to_celery
+                sync_result = sync_scheduled_tasks_to_celery()
                 
                 status = "啟用" if task.is_enabled else "停用"
                 messages.success(request, f"定時任務 '{task.name}' 已{status}")
@@ -2259,7 +2298,9 @@ def auto_approval_task_detail(request, task_id):
     if request.method == 'POST':
         # 更新任務
         name = request.POST.get('name')
+        execution_type = request.POST.get('execution_type', 'interval')
         interval_minutes = request.POST.get('interval_minutes')
+        fixed_time = request.POST.get('fixed_time')
         description = request.POST.get('description', '')
         is_enabled = request.POST.get('is_enabled') == 'on'
         
@@ -2268,10 +2309,28 @@ def auto_approval_task_detail(request, task_id):
             if ScheduledTask.objects.filter(name=name, task_type='auto_approve').exclude(id=task_id).exists():
                 messages.error(request, f"任務名稱 '{name}' 已存在")
             else:
+                # 根據執行類型驗證必填欄位
+                if execution_type == 'interval':
+                    if not interval_minutes:
+                        messages.error(request, "間隔執行需要設定執行間隔")
+                        return redirect('system:auto_approval_task_detail', task_id=task_id)
+                elif execution_type == 'fixed_time':
+                    if not fixed_time:
+                        messages.error(request, "固定時間執行需要設定執行時間")
+                        return redirect('system:auto_approval_task_detail', task_id=task_id)
+                
                 task.name = name
-                task.interval_minutes = int(interval_minutes)
+                task.execution_type = execution_type
                 task.description = description
                 task.is_enabled = is_enabled
+                
+                if execution_type == 'interval':
+                    task.interval_minutes = int(interval_minutes)
+                    task.fixed_time = None  # 清除固定時間
+                elif execution_type == 'fixed_time':
+                    task.fixed_time = fixed_time
+                    task.interval_minutes = None  # 清除間隔設定
+                
                 task.save()
                 
                 messages.success(request, f"定時任務 '{name}' 更新成功")
@@ -2382,7 +2441,7 @@ def manual_sync_reports(request):
 @user_passes_test(superuser_required, login_url="/accounts/login/")
 def customer_order_sync_settings(request):
     """
-    訂單同步設定頁面
+    客戶訂單同步設定頁面
     """
     try:
         # 取得或創建設定
@@ -2403,7 +2462,7 @@ def customer_order_sync_settings(request):
             form = OrderSyncSettingsForm(request.POST, instance=settings_obj)
             if form.is_valid():
                 form.save()
-                messages.success(request, "訂單同步設定已更新！")
+                messages.success(request, "客戶訂單同步設定已更新！")
                 
                 # 更新定時任務
                 update_order_sync_tasks(settings_obj)
@@ -2411,7 +2470,7 @@ def customer_order_sync_settings(request):
                 # 不更新同步狀態，只更新定時任務配置
                 # 同步狀態只能由實際的同步任務執行來更新
                 
-                logger.info(f"訂單同步設定由 {request.user.username} 更新")
+                logger.info(f"客戶訂單同步設定由 {request.user.username} 更新")
                 return redirect('system:customer_order_sync_settings')
         else:
             form = OrderSyncSettingsForm(instance=settings_obj)
@@ -2432,7 +2491,7 @@ def customer_order_sync_settings(request):
         return render(request, 'system/customer_order_sync_settings.html', context)
         
     except Exception as e:
-        logger.error(f"訂單同步設定頁面載入失敗: {str(e)}")
+        logger.error(f"客戶訂單同步設定頁面載入失敗: {str(e)}")
         messages.error(request, f"頁面載入失敗: {str(e)}")
         return redirect('system:index')
 
@@ -2617,22 +2676,25 @@ def workorder_settings(request):
         exclude_operators = request.POST.get('exclude_operators', '')
         exclude_processes = request.POST.get('exclude_processes', '')
         
+        # 通知設定
+        auto_approval_notification_enabled = request.POST.get('auto_approval_notification_enabled') == 'on'
+        auto_approval_notification_recipients = request.POST.get('auto_approval_notification_recipients', '')
+        
         # 定時任務設定
         auto_allocation_enabled = request.POST.get('auto_allocation_enabled') == 'on'
         auto_allocation_interval = int(request.POST.get('auto_allocation_interval', 30))
         
-        # 完工判斷設定
-        completion_check_enabled = request.POST.get('completion_check_enabled') == 'on'
-        completion_check_interval = int(request.POST.get('completion_check_interval', 30))
+        # 資料轉移定時任務設定（目前模板中沒有對應欄位，使用預設值）
+        data_transfer_task_enabled = False  # 預設停用，因為模板中沒有對應的開關
+        data_transfer_task_interval = 60  # 預設 60 分鐘
+        
+        # 完工判斷設定（只保留工序設定）
         packaging_process_name = request.POST.get('packaging_process_name', '出貨包裝')
-        data_transfer_enabled = request.POST.get('data_transfer_enabled') == 'on'
+        auto_completion_enabled = request.POST.get('auto_completion_enabled') == 'on'
+        # 資料轉移功能使用同一個開關
+        data_transfer_enabled = auto_completion_enabled
         transfer_batch_size = int(request.POST.get('transfer_batch_size', 50))
         transfer_retention_days = int(request.POST.get('transfer_retention_days', 365))
-        
-        # 自動完工定時任務設定
-        completion_task_name = request.POST.get('completion_task_name', '')
-        completion_fixed_time = request.POST.get('completion_fixed_time', '')
-        completion_task_enabled = request.POST.get('completion_task_enabled') == 'on'
         
         # 更新系統設定
         SystemConfig.objects.update_or_create(key="auto_approval", defaults={"value": str(auto_approval)})
@@ -2651,59 +2713,34 @@ def workorder_settings(request):
         SystemConfig.objects.update_or_create(key="exclude_operators", defaults={"value": exclude_operators})
         SystemConfig.objects.update_or_create(key="exclude_processes", defaults={"value": exclude_processes})
         
-        # 更新完工判斷設定
-        SystemConfig.objects.update_or_create(key="completion_check_enabled", defaults={"value": str(completion_check_enabled)})
-        SystemConfig.objects.update_or_create(key="completion_check_interval", defaults={"value": str(completion_check_interval)})
+        # 儲存通知設定
+        SystemConfig.objects.update_or_create(key="auto_approval_notification_enabled", defaults={"value": str(auto_approval_notification_enabled)})
+        SystemConfig.objects.update_or_create(key="auto_approval_notification_recipients", defaults={"value": auto_approval_notification_recipients})
+        
+        # 更新完工判斷設定（只保留工序和資料轉移設定）
         SystemConfig.objects.update_or_create(key="packaging_process_name", defaults={"value": packaging_process_name})
+        SystemConfig.objects.update_or_create(key="auto_completion_enabled", defaults={"value": str(auto_completion_enabled)})
         SystemConfig.objects.update_or_create(key="data_transfer_enabled", defaults={"value": str(data_transfer_enabled)})
         SystemConfig.objects.update_or_create(key="transfer_batch_size", defaults={"value": str(transfer_batch_size)})
         SystemConfig.objects.update_or_create(key="transfer_retention_days", defaults={"value": str(transfer_retention_days)})
         
-        # 處理自動完工定時任務
-        if completion_task_name and completion_fixed_time:
-            try:
-                # 檢查是否已存在完工判斷定時任務
-                existing_task = ScheduledTask.objects.filter(
-                    task_type='completion_check',
-                    name=completion_task_name
-                ).first()
-                
-                if existing_task:
-                    # 更新現有任務
-                    existing_task.fixed_time = completion_fixed_time
-                    existing_task.is_enabled = completion_task_enabled
-                    existing_task.save()
-                else:
-                    # 創建新任務
-                    ScheduledTask.objects.create(
-                        name=completion_task_name,
-                        task_type='completion_check',
-                        fixed_time=completion_fixed_time,
-                        is_enabled=completion_task_enabled,
-                        created_by=request.user.username
-                    )
-                    
-            except Exception as e:
-                logger.error(f"處理自動完工定時任務失敗: {str(e)}")
-                messages.error(request, f"處理自動完工定時任務失敗：{str(e)}")
-        
         # 更新定時任務設定
         try:
             from django_celery_beat.models import IntervalSchedule
+            
             # 自動分配定時任務
-            auto_allocation_task = PeriodicTask.objects.get(name='自動分配任務')
-            auto_allocation_task.enabled = auto_allocation_enabled
-            if auto_allocation_interval != auto_allocation_task.interval.every:
-                interval_schedule, _ = IntervalSchedule.objects.get_or_create(
-                    every=auto_allocation_interval,
-                    period=IntervalSchedule.MINUTES,
-                )
-                auto_allocation_task.interval = interval_schedule
-            auto_allocation_task.save()
-        except PeriodicTask.DoesNotExist:
-            # 自動創建缺失的定時任務
             try:
-                from django_celery_beat.models import IntervalSchedule
+                auto_allocation_task = PeriodicTask.objects.get(name='自動分配任務')
+                auto_allocation_task.enabled = auto_allocation_enabled
+                if auto_allocation_interval != auto_allocation_task.interval.every:
+                    interval_schedule, _ = IntervalSchedule.objects.get_or_create(
+                        every=auto_allocation_interval,
+                        period=IntervalSchedule.MINUTES,
+                    )
+                    auto_allocation_task.interval = interval_schedule
+                auto_allocation_task.save()
+            except PeriodicTask.DoesNotExist:
+                # 自動創建缺失的定時任務
                 interval_schedule, _ = IntervalSchedule.objects.get_or_create(
                     every=auto_allocation_interval,
                     period=IntervalSchedule.MINUTES,
@@ -2715,8 +2752,34 @@ def workorder_settings(request):
                     enabled=auto_allocation_enabled
                 )
                 messages.info(request, "已自動創建缺失的定時任務：自動分配任務")
-            except Exception as create_error:
-                messages.warning(request, f"無法創建定時任務：{str(create_error)}")
+            
+            # 資料轉移定時任務
+            try:
+                data_transfer_task = PeriodicTask.objects.get(name='資料轉移定時任務')
+                data_transfer_task.enabled = data_transfer_task_enabled
+                if data_transfer_task_interval != data_transfer_task.interval.every:
+                    interval_schedule, _ = IntervalSchedule.objects.get_or_create(
+                        every=data_transfer_task_interval,
+                        period=IntervalSchedule.MINUTES,
+                    )
+                    data_transfer_task.interval = interval_schedule
+                data_transfer_task.save()
+            except PeriodicTask.DoesNotExist:
+                # 自動創建缺失的定時任務
+                interval_schedule, _ = IntervalSchedule.objects.get_or_create(
+                    every=data_transfer_task_interval,
+                    period=IntervalSchedule.MINUTES,
+                )
+                PeriodicTask.objects.create(
+                    name='資料轉移定時任務',
+                    task='workorder.tasks.auto_data_transfer_task',
+                    interval=interval_schedule,
+                    enabled=data_transfer_task_enabled
+                )
+                messages.info(request, "已自動創建缺失的定時任務：資料轉移定時任務")
+                
+        except Exception as create_error:
+            messages.warning(request, f"無法創建定時任務：{str(create_error)}")
         
         messages.success(request, "工單管理設定已成功更新！")
         return redirect('system:workorder_settings')
@@ -2752,11 +2815,15 @@ def workorder_settings(request):
     exclude_operators_text = get_config("exclude_operators", "")
     exclude_processes_text = get_config("exclude_processes", "")
     
-    # 完工判斷設定
-    completion_check_enabled = get_config("completion_check_enabled", True, bool)
-    completion_check_interval = get_config("completion_check_interval", 30, int)
+    # 通知設定
+    auto_approval_notification_enabled = get_config("auto_approval_notification_enabled", True, bool)
+    auto_approval_notification_recipients_text = get_config("auto_approval_notification_recipients", "")
+    
+    # 完工判斷設定（只保留工序和資料轉移設定）
     packaging_process_name = get_config("packaging_process_name", "出貨包裝")
-    data_transfer_enabled = get_config("data_transfer_enabled", True, bool)
+    auto_completion_enabled = get_config("auto_completion_enabled", True, bool)
+    # 資料轉移功能使用同一個開關
+    data_transfer_enabled = auto_completion_enabled
     transfer_batch_size = get_config("transfer_batch_size", 50, int)
     transfer_retention_days = get_config("transfer_retention_days", 365, int)
     
@@ -2778,6 +2845,16 @@ def workorder_settings(request):
             'last_run': None
         })
     
+    try:
+        data_transfer_task = PeriodicTask.objects.get(name='資料轉移定時任務')
+        data_transfer_task.interval_minutes = data_transfer_task.interval.every
+    except PeriodicTask.DoesNotExist:
+        data_transfer_task = type('obj', (object,), {
+            'enabled': False,
+            'interval_minutes': 60,
+            'last_run': None
+        })
+    
     context = {
         # 基本設定
         'auto_approval': auto_approval,
@@ -2796,10 +2873,13 @@ def workorder_settings(request):
         'exclude_operators_text': exclude_operators_text,
         'exclude_processes_text': exclude_processes_text,
         
-        # 完工判斷設定
-        'completion_check_enabled': completion_check_enabled,
-        'completion_check_interval': completion_check_interval,
+        # 通知設定
+        'auto_approval_notification_enabled': auto_approval_notification_enabled,
+        'auto_approval_notification_recipients_text': auto_approval_notification_recipients_text,
+        
+        # 完工判斷設定（只保留工序和資料轉移設定）
         'packaging_process_name': packaging_process_name,
+        'auto_completion_enabled': auto_completion_enabled,
         'data_transfer_enabled': data_transfer_enabled,
         'transfer_batch_size': transfer_batch_size,
         'transfer_retention_days': transfer_retention_days,
@@ -2809,6 +2889,7 @@ def workorder_settings(request):
         
         # 定時任務狀態
         'auto_allocation_task': auto_allocation_task,
+        'data_transfer_task': data_transfer_task,
     }
     
     return render(request, 'system/workorder_settings.html', context)
@@ -2928,7 +3009,9 @@ def update_completion_task(request):
     try:
         task_id = request.POST.get('task_id')
         name = request.POST.get('name', '').strip()
+        execution_type = request.POST.get('execution_type', 'fixed_time')
         fixed_time = request.POST.get('fixed_time', '')
+        interval_minutes = request.POST.get('interval_minutes', '')
         enabled = request.POST.get('enabled', 'false') == 'true'
         
         if not task_id:
@@ -2937,62 +3020,94 @@ def update_completion_task(request):
         if not name:
             return JsonResponse({'success': False, 'message': '請輸入任務名稱'})
         
-        if not fixed_time:
-            return JsonResponse({'success': False, 'message': '請設定執行時間'})
-        
         from system.models import ScheduledTask
         from datetime import datetime
         
         task = ScheduledTask.objects.get(id=task_id, task_type='completion_check')
         
-        # 解析時間
-        time_obj = datetime.strptime(fixed_time, '%H:%M').time()
-        
         # 更新 ScheduledTask
         task.name = name
-        task.fixed_time = time_obj
+        task.execution_type = execution_type
         task.is_enabled = enabled
+        
+        if execution_type == 'fixed_time':
+            if not fixed_time:
+                return JsonResponse({'success': False, 'message': '請設定固定執行時間'})
+            time_obj = datetime.strptime(fixed_time, '%H:%M').time()
+            task.fixed_time = time_obj
+            task.interval_minutes = None
+        else:  # interval
+            if not interval_minutes:
+                return JsonResponse({'success': False, 'message': '請設定執行間隔'})
+            task.interval_minutes = int(interval_minutes)
+            task.fixed_time = None
+        
         task.save()
         
         # 更新對應的 Celery Beat 任務
-        from django_celery_beat.models import PeriodicTask, CrontabSchedule
+        from django_celery_beat.models import PeriodicTask, CrontabSchedule, IntervalSchedule
         
         # 查找對應的 PeriodicTask
         periodic_task_name = f"Celery_{task.name}"
         try:
             periodic_task = PeriodicTask.objects.get(name=periodic_task_name)
             
-            # 更新 crontab 排程
-            crontab, created = CrontabSchedule.objects.get_or_create(
-                hour=time_obj.hour,
-                minute=time_obj.minute,
-                day_of_week='*',
-                day_of_month='*',
-                month_of_year='*'
-            )
+            if execution_type == 'fixed_time':
+                # 固定時間執行：使用 crontab
+                crontab, created = CrontabSchedule.objects.get_or_create(
+                    hour=time_obj.hour,
+                    minute=time_obj.minute,
+                    day_of_week='*',
+                    day_of_month='*',
+                    month_of_year='*'
+                )
+                periodic_task.crontab = crontab
+                periodic_task.interval = None
+            else:
+                # 間隔執行：使用 interval
+                interval, created = IntervalSchedule.objects.get_or_create(
+                    every=task.interval_minutes,
+                    period=IntervalSchedule.MINUTES
+                )
+                periodic_task.interval = interval
+                periodic_task.crontab = None
             
             # 更新 PeriodicTask
-            periodic_task.crontab = crontab
             periodic_task.enabled = enabled
             periodic_task.save()
             
         except PeriodicTask.DoesNotExist:
             # 如果找不到對應的 PeriodicTask，創建一個新的
-            crontab, created = CrontabSchedule.objects.get_or_create(
-                hour=time_obj.hour,
-                minute=time_obj.minute,
-                day_of_week='*',
-                day_of_month='*',
-                month_of_year='*'
-            )
-            
-            PeriodicTask.objects.create(
-                name=periodic_task_name,
-                task='workorder.tasks.workorder_archive_task',
-                crontab=crontab,
-                enabled=enabled,
-                description=f'自動執行工單歸檔任務 - {name}'
-            )
+            if execution_type == 'fixed_time':
+                crontab, created = CrontabSchedule.objects.get_or_create(
+                    hour=time_obj.hour,
+                    minute=time_obj.minute,
+                    day_of_week='*',
+                    day_of_month='*',
+                    month_of_year='*'
+                )
+                PeriodicTask.objects.create(
+                    name=periodic_task_name,
+                    task='workorder.tasks.workorder_archive_task',
+                    crontab=crontab,
+                    enabled=enabled,
+                    description=f'自動執行工單歸檔任務 - {name}'
+                )
+            else:
+                interval, created = IntervalSchedule.objects.get_or_create(
+                    every=task.interval_minutes,
+                    period=IntervalSchedule.MINUTES
+                )
+                PeriodicTask.objects.create(
+                    name=periodic_task_name,
+                    task='workorder.tasks.workorder_archive_task',
+                    interval=interval,
+                    enabled=enabled,
+                    description=f'自動執行工單歸檔任務 - {name}'
+                )
+        
+        # 記錄操作日誌
+        logger.info(f"用戶 {request.user.username} 更新完工判斷定時任務「{name}」: 執行類型={execution_type}, 啟用={enabled}")
         
         return JsonResponse({
             'success': True,
@@ -3100,6 +3215,7 @@ def delete_auto_approval_task(request):
     
     try:
         from system.models import ScheduledTask
+        from django_celery_beat.models import PeriodicTask
         
         task_id = request.POST.get('task_id')
         if not task_id:
@@ -3111,6 +3227,17 @@ def delete_auto_approval_task(request):
         try:
             task = ScheduledTask.objects.get(id=task_id, task_type='auto_approve')
             task_name = task.name
+            
+            # 刪除 Celery Beat 中對應的任務
+            celery_task_name = f"scheduled_task_{task_id}"
+            try:
+                celery_task = PeriodicTask.objects.get(name=celery_task_name)
+                celery_task.delete()
+                logger.info(f"已刪除 Celery Beat 任務: {celery_task_name}")
+            except PeriodicTask.DoesNotExist:
+                logger.warning(f"Celery Beat 中找不到對應任務: {celery_task_name}")
+            
+            # 刪除 ScheduledTask 記錄
             task.delete()
             
             return JsonResponse({
@@ -3288,12 +3415,14 @@ def add_completion_task(request):
     
     try:
         name = request.POST.get('name')
+        execution_type = request.POST.get('execution_type', 'fixed_time')
+        interval_minutes = request.POST.get('interval_minutes')
         fixed_time = request.POST.get('fixed_time')
         
-        if not name or not fixed_time:
+        if not name:
             return JsonResponse({
                 'success': False,
-                'message': '任務名稱和固定時間為必填欄位'
+                'message': '任務名稱為必填欄位'
             })
         
         # 檢查任務名稱是否重複
@@ -3303,45 +3432,77 @@ def add_completion_task(request):
                 'message': f'任務名稱 "{name}" 已存在'
             })
         
+        # 驗證執行方式參數
+        if execution_type == 'interval':
+            if not interval_minutes or int(interval_minutes) < 5 or int(interval_minutes) > 1440:
+                return JsonResponse({
+                    'success': False,
+                    'message': '執行間隔必須在 5-1440 分鐘之間'
+                })
+        else:  # fixed_time
+            if not fixed_time:
+                return JsonResponse({
+                    'success': False,
+                    'message': '固定時間為必填欄位'
+                })
+        
         # 創建 ScheduledTask 記錄
-        task = ScheduledTask.objects.create(
-            name=name,
-            task_type='completion_check',
-            fixed_time=fixed_time,
-            is_enabled=True,
-            created_by=request.user.username
-        )
+        task_data = {
+            'name': name,
+            'task_type': 'completion_check',
+            'execution_type': execution_type,
+            'is_enabled': True,
+            'task_function': 'workorder.tasks.workorder_archive_task'
+        }
+        
+        if execution_type == 'interval':
+            task_data['interval_minutes'] = int(interval_minutes)
+        else:
+            task_data['fixed_time'] = fixed_time
+        
+        task = ScheduledTask.objects.create(**task_data)
         
         # 創建真正的 Celery Beat 定時任務
-        from django_celery_beat.models import PeriodicTask, CrontabSchedule
-        from datetime import datetime
+        from django_celery_beat.models import PeriodicTask, CrontabSchedule, IntervalSchedule
         
-        # 解析時間
-        time_obj = datetime.strptime(fixed_time, '%H:%M').time()
-        
-        # 創建 crontab 排程（每天固定時間執行）
-        crontab, created = CrontabSchedule.objects.get_or_create(
-            hour=time_obj.hour,
-            minute=time_obj.minute,
-            day_of_week='*',
-            day_of_month='*',
-            month_of_year='*'
-        )
-        
-        # 創建 PeriodicTask
-        periodic_task, created = PeriodicTask.objects.get_or_create(
-            name=f"Celery_{name}",
-            defaults={
-                'task': 'workorder.tasks.workorder_archive_task',
-                'crontab': crontab,
-                'enabled': True,
-                'description': f'自動執行工單歸檔任務 - {name}'
-            }
-        )
-        
-        # 關聯 ScheduledTask 和 PeriodicTask
-        task.task_function = 'workorder.tasks.workorder_archive_task'
-        task.save()
+        if execution_type == 'interval':
+            # 間隔執行：使用 IntervalSchedule
+            interval_schedule, created = IntervalSchedule.objects.get_or_create(
+                every=int(interval_minutes),
+                period=IntervalSchedule.MINUTES
+            )
+            
+            periodic_task, created = PeriodicTask.objects.get_or_create(
+                name=f"Celery_{name}",
+                defaults={
+                    'task': 'workorder.tasks.workorder_archive_task',
+                    'interval': interval_schedule,
+                    'enabled': True,
+                    'description': f'自動執行工單歸檔任務 - {name} (間隔執行)'
+                }
+            )
+        else:
+            # 固定時間執行：使用 CrontabSchedule
+            from datetime import datetime
+            time_obj = datetime.strptime(fixed_time, '%H:%M').time()
+            
+            crontab, created = CrontabSchedule.objects.get_or_create(
+                hour=time_obj.hour,
+                minute=time_obj.minute,
+                day_of_week='*',
+                day_of_month='*',
+                month_of_year='*'
+            )
+            
+            periodic_task, created = PeriodicTask.objects.get_or_create(
+                name=f"Celery_{name}",
+                defaults={
+                    'task': 'workorder.tasks.workorder_archive_task',
+                    'crontab': crontab,
+                    'enabled': True,
+                    'description': f'自動執行工單歸檔任務 - {name} (固定時間)'
+                }
+            )
         
         return JsonResponse({
             'success': True,
@@ -3377,6 +3538,18 @@ def delete_completion_task(request):
         
         task = ScheduledTask.objects.get(id=task_id, task_type='completion_check')
         task_name = task.name
+        
+        # 刪除 Celery Beat 中對應的任務
+        from django_celery_beat.models import PeriodicTask
+        celery_task_name = f"Celery_{task_name}"
+        try:
+            celery_task = PeriodicTask.objects.get(name=celery_task_name)
+            celery_task.delete()
+            logger.info(f"已刪除 Celery Beat 任務: {celery_task_name}")
+        except PeriodicTask.DoesNotExist:
+            logger.warning(f"Celery Beat 中找不到對應任務: {celery_task_name}")
+        
+        # 刪除 ScheduledTask 記錄
         task.delete()
         
         return JsonResponse({
@@ -3906,7 +4079,7 @@ def bulk_work_permissions(request):
         updated_count = 0
         
         for user in users:
-            work_permission, created = UserWorkPermission.objects.get_or_create(user=user)
+            work_permission, created = UserWorkPermission.objects.get_or_create(user=user.username)
             
             # 更新作業員權限
             if operator_permission:
@@ -3990,7 +4163,298 @@ def bulk_work_permissions(request):
     return render(request, "system/bulk_work_permissions.html", context)
 
 
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def report_cleanup_settings(request):
+    """報表清理設定頁面"""
+    import os
+    from django.conf import settings
+    from reporting.models import ReportExecutionLog
+    from workorder.models import SystemConfig
+    
+    # 取得統計資料
+    reports_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
+    file_count = 0
+    total_size = 0
+    
+    if os.path.exists(reports_dir):
+        for filename in os.listdir(reports_dir):
+            file_path = os.path.join(reports_dir, filename)
+            if os.path.isfile(file_path):
+                file_count += 1
+                total_size += os.path.getsize(file_path)
+    
+    total_size_mb = total_size / (1024 * 1024)
+    log_count = ReportExecutionLog.objects.count()
+    
+    # 取得保留天數設定
+    file_retention_days = 7
+    log_retention_days = 30
+    auto_cleanup_enabled = True
+    
+    try:
+        config = SystemConfig.objects.get(key="report_file_retention_days")
+        file_retention_days = int(config.value)
+    except SystemConfig.DoesNotExist:
+        pass
+        
+    try:
+        config = SystemConfig.objects.get(key="report_log_retention_days")
+        log_retention_days = int(config.value)
+    except SystemConfig.DoesNotExist:
+        pass
+        
+    try:
+        config = SystemConfig.objects.get(key="auto_cleanup_enabled")
+        auto_cleanup_enabled = config.value.lower() == 'true'
+    except SystemConfig.DoesNotExist:
+        pass
+    
+    # 取得清理歷史記錄
+    cleanup_logs = CleanupLog.objects.order_by('-execution_time')[:20]
+    
+    context = {
+        'file_count': file_count,
+        'total_size_mb': total_size_mb,
+        'log_count': log_count,
+        'file_retention_days': file_retention_days,
+        'log_retention_days': log_retention_days,
+        'auto_cleanup_enabled': auto_cleanup_enabled,
+        'cleanup_logs': cleanup_logs,
+    }
+    
+    return render(request, 'system/report_cleanup_settings.html', context)
 
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def update_cleanup_settings(request):
+    """更新清理設定"""
+    if request.method == 'POST':
+        try:
+            from workorder.models import SystemConfig
+            
+            file_retention_days = int(request.POST.get('file_retention_days', 7))
+            log_retention_days = int(request.POST.get('log_retention_days', 30))
+            auto_cleanup_enabled = request.POST.get('auto_cleanup_enabled') == 'on'
+            
+            # 驗證輸入
+            if file_retention_days < 1 or file_retention_days > 365:
+                messages.error(request, '報表檔案保留天數必須在1-365天之間')
+                return redirect('system:report_cleanup_settings')
+            
+            if log_retention_days < 1 or log_retention_days > 365:
+                messages.error(request, '執行日誌保留天數必須在1-365天之間')
+                return redirect('system:report_cleanup_settings')
+            
+            # 更新系統設定
+            SystemConfig.objects.update_or_create(
+                key="report_file_retention_days",
+                defaults={"value": str(file_retention_days)}
+            )
+            
+            SystemConfig.objects.update_or_create(
+                key="report_log_retention_days",
+                defaults={"value": str(log_retention_days)}
+            )
+            
+            SystemConfig.objects.update_or_create(
+                key="auto_cleanup_enabled",
+                defaults={"value": str(auto_cleanup_enabled).lower()}
+            )
+            
+            # 更新 Celery 定時任務
+            from django_celery_beat.models import PeriodicTask, IntervalSchedule
+            
+            # 更新檔案清理任務
+            file_cleanup_task, created = PeriodicTask.objects.get_or_create(
+                name="報表檔案清理",
+                defaults={
+                    "task": "reporting.tasks.cleanup_report_files",
+                    "interval": IntervalSchedule.objects.get_or_create(
+                        every=24,
+                        period=IntervalSchedule.HOURS,
+                    )[0],
+                    "enabled": auto_cleanup_enabled,
+                },
+            )
+            
+            if not created:
+                file_cleanup_task.enabled = auto_cleanup_enabled
+                file_cleanup_task.save()
+            
+            # 更新日誌清理任務
+            log_cleanup_task, created = PeriodicTask.objects.get_or_create(
+                name="報表日誌清理",
+                defaults={
+                    "task": "reporting.tasks.cleanup_report_execution_logs",
+                    "interval": IntervalSchedule.objects.get_or_create(
+                        every=7,
+                        period=IntervalSchedule.DAYS,
+                    )[0],
+                    "enabled": auto_cleanup_enabled,
+                },
+            )
+            
+            if not created:
+                log_cleanup_task.enabled = auto_cleanup_enabled
+                log_cleanup_task.save()
+            
+            status_text = "啟用" if auto_cleanup_enabled else "停用"
+            messages.success(request, f'清理設定已更新：檔案保留{file_retention_days}天，日誌保留{log_retention_days}天，自動清理{status_text}')
+            
+            # 記錄操作日誌
+            CleanupLog.objects.create(
+                action='更新清理設定',
+                status='success',
+                details=f'檔案保留天數：{file_retention_days}天，日誌保留天數：{log_retention_days}天，自動清理：{status_text}',
+                user=request.user
+            )
+            
+        except ValueError:
+            messages.error(request, '請輸入有效的數字')
+        except Exception as e:
+            messages.error(request, f'更新設定失敗：{str(e)}')
+    
+    return redirect('system:report_cleanup_settings')
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def execute_cleanup(request):
+    """執行清理操作"""
+    if request.method == 'POST':
+        import json
+        from reporting.tasks import cleanup_report_files, cleanup_report_execution_logs
+        
+        try:
+            data = json.loads(request.body)
+            cleanup_type = data.get('cleanup_type')
+            
+            if cleanup_type == 'files':
+                # 執行檔案清理
+                result = cleanup_report_files.delay()
+                action = '手動清理報表檔案'
+            elif cleanup_type == 'logs':
+                # 執行日誌清理
+                result = cleanup_report_execution_logs.delay()
+                action = '手動清理執行日誌'
+            elif cleanup_type == 'report':
+                # 生成清理報告
+                from reporting.tasks import generate_system_cleanup_report
+                result = generate_system_cleanup_report.delay()
+                action = '生成清理報告'
+            else:
+                return JsonResponse({'success': False, 'error': '無效的清理類型'})
+            
+            # 記錄操作日誌
+            CleanupLog.objects.create(
+                action=action,
+                status='pending',
+                details=f'任務ID: {result.id}',
+                user=request.user
+            )
+            
+            return JsonResponse({'success': True, 'task_id': result.id})
+            
+        except Exception as e:
+            # 記錄失敗日誌
+            CleanupLog.objects.create(
+                action='執行清理操作',
+                status='failed',
+                details=f'錯誤: {str(e)}',
+                user=request.user
+            )
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': '無效的請求方法'})
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def sync_logs(request):
+    """
+    同步日誌列表頁面
+    顯示報表資料同步的歷史記錄
+    """
+    from system.models import ReportDataSyncLog
+    from django.core.paginator import Paginator
+    
+    # 取得篩選條件
+    status = request.GET.get('status', '')
+    report_type = request.GET.get('report_type', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    company = request.GET.get('company', '')
+    
+    # 建立查詢條件
+    sync_logs = ReportDataSyncLog.objects.all()
+    
+    if status:
+        sync_logs = sync_logs.filter(status=status)
+    if report_type:
+        sync_logs = sync_logs.filter(sync_type=report_type)
+    if start_date:
+        sync_logs = sync_logs.filter(started_at__date__gte=start_date)
+    if end_date:
+        sync_logs = sync_logs.filter(started_at__date__lte=end_date)
+    if company:
+        sync_logs = sync_logs.filter(company_code=company)
+    
+    # 按開始時間倒序排列
+    sync_logs = sync_logs.order_by('-started_at')
+    
+    # 分頁處理
+    paginator = Paginator(sync_logs, 20)  # 每頁顯示 20 筆記錄
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # 計算統計資訊
+    total_logs = ReportDataSyncLog.objects.all()
+    success_count = total_logs.filter(status='success').count()
+    failed_count = total_logs.filter(status='failed').count()
+    partial_count = total_logs.filter(status='partial').count()
+    
+    context = {
+        'page_obj': page_obj,
+        'sync_logs': page_obj,
+        'title': '同步日誌',
+        'success_count': success_count,
+        'failed_count': failed_count,
+        'partial_count': partial_count,
+        'filters': {
+            'status': status,
+            'report_type': report_type,
+            'start_date': start_date,
+            'end_date': end_date,
+            'company': company,
+        }
+    }
+    
+    return render(request, 'system/sync_logs.html', context)
+
+
+@login_required
+@user_passes_test(superuser_required, login_url="/accounts/login/")
+def sync_log_detail(request, log_id):
+    """
+    同步日誌詳情頁面
+    顯示單一同步記錄的詳細資訊
+    """
+    from system.models import ReportDataSyncLog
+    
+    try:
+        sync_log = ReportDataSyncLog.objects.get(id=log_id)
+    except ReportDataSyncLog.DoesNotExist:
+        messages.error(request, "找不到指定的同步記錄")
+        return redirect('system:sync_logs')
+    
+    context = {
+        'sync_log': sync_log,
+        'title': f'同步記錄詳情 - {sync_log.sync_type}'
+    }
+    
+    return render(request, 'system/sync_log_detail.html', context)
 
 
 

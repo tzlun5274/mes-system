@@ -197,19 +197,17 @@
         <div class="stat-card">
             <div class="stat-value text-primary">{{ total_completed }}</div>
             <div class="stat-label">已完工工單</div>
+            <div class="stat-description" style="font-size: 0.8rem; color: #6c757d; margin-top: 5px;">
+                排除 RD樣品工單
+            </div>
         </div>
         
-        <!-- 完工檢查功能卡片 -->
         <div class="stat-card">
-            <a href="{% url 'workorder:completion_check' %}" class="text-decoration-none">
-                <div class="stat-value text-success">
-                    <i class="fas fa-clipboard-check"></i>
-                </div>
-                <div class="stat-label">完工檢查</div>
-                <div class="stat-description" style="font-size: 0.8rem; color: #6c757d; margin-top: 5px;">
-                    檢查生產中工單完工狀態
-                </div>
-            </a>
+            <div class="stat-value text-warning">{{ total_rd_samples }}</div>
+            <div class="stat-label">RD樣品工單</div>
+            <div class="stat-description" style="font-size: 0.8rem; color: #6c757d; margin-top: 5px;">
+                研發樣品工單
+            </div>
         </div>
     </div>
 

@@ -139,7 +139,7 @@ def auto_analyze_completed_workorders():
     """
     from workorder.models import CompletedWorkOrder
     from .models import CompletedWorkOrderAnalysis
-    from .services import WorkOrderAnalysisService
+    # 移除不存在的服務導入
     from datetime import datetime, timedelta
     import logging
     
@@ -219,7 +219,7 @@ def batch_analyze_completed_workorders(start_date=None, end_date=None, company_c
     """
     批量分析已完工工單（手動觸發）
     """
-    from .services import WorkOrderAnalysisService
+    # 移除不存在的服務導入
     import logging
     
     logger = logging.getLogger(__name__)
@@ -243,4 +243,92 @@ def batch_analyze_completed_workorders(start_date=None, end_date=None, company_c
         return {
             'success': False,
             'error': f'批量分析任務執行失敗: {str(e)}'
+        }
+
+
+@shared_task
+def execute_scheduled_report(schedule_id):
+    """
+    執行排程報表
+    由 Celery Beat 定時觸發執行
+    """
+    try:
+        from .models import ReportSchedule, ReportExecutionLog
+        from .scheduler import ReportScheduler
+        
+        logger.info(f"開始執行排程報表，排程ID: {schedule_id}")
+        
+        # 取得排程設定
+        try:
+            schedule = ReportSchedule.objects.get(id=schedule_id)
+        except ReportSchedule.DoesNotExist:
+            logger.error(f"找不到排程設定，ID: {schedule_id}")
+            return {
+                'success': False,
+                'error': f'找不到排程設定，ID: {schedule_id}'
+            }
+        
+        # 檢查排程是否啟用
+        if schedule.status != 'active':
+            logger.info(f"排程已停用，跳過執行: {schedule.name}")
+            return {
+                'success': True,
+                'message': f'排程已停用，跳過執行: {schedule.name}'
+            }
+        
+        # 建立執行日誌
+        log_entry = ReportExecutionLog.objects.create(
+            report_schedule_id=str(schedule_id),
+            report_schedule_name=schedule.name,
+            status='running',
+            message='開始執行排程報表'
+        )
+        
+        try:
+            # 執行報表排程服務
+            scheduler = ReportScheduler()
+            result = scheduler.execute_single_schedule(schedule)
+            
+            if result['success']:
+                # 更新日誌為成功
+                log_entry.status = 'success'
+                log_entry.message = result.get('message', '報表執行成功')
+                log_entry.file_path = result.get('file_path', '')
+                log_entry.save()
+                
+                logger.info(f"排程報表執行成功: {schedule.name}")
+                return {
+                    'success': True,
+                    'message': f'排程報表執行成功: {schedule.name}',
+                    'file_path': result.get('file_path', '')
+                }
+            else:
+                # 更新日誌為失敗
+                log_entry.status = 'failed'
+                log_entry.message = result.get('error', '報表執行失敗')
+                log_entry.save()
+                
+                logger.error(f"排程報表執行失敗: {schedule.name}, 錯誤: {result.get('error', '未知錯誤')}")
+                return {
+                    'success': False,
+                    'error': f'排程報表執行失敗: {result.get("error", "未知錯誤")}'
+                }
+                
+        except Exception as e:
+            # 更新日誌為失敗
+            log_entry.status = 'failed'
+            log_entry.message = f'執行時發生異常: {str(e)}'
+            log_entry.save()
+            
+            logger.error(f"執行排程報表時發生異常: {schedule.name}, 錯誤: {str(e)}")
+            return {
+                'success': False,
+                'error': f'執行時發生異常: {str(e)}'
+            }
+            
+    except Exception as e:
+        logger.error(f"執行排程報表任務失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'執行排程報表任務失敗: {str(e)}'
         }

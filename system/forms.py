@@ -122,7 +122,7 @@ class UserWorkPermissionForm(forms.ModelForm):
             'can_operate_all_operators', 'allowed_operators',
             'can_operate_all_processes', 'allowed_processes',
             'can_operate_all_equipments', 'allowed_equipments',
-            'can_fill_work', 'can_onsite_reporting', 'can_smt_reporting',
+            'can_fill_work', 'can_onsite_reporting', 'can_operator_reporting', 'can_smt_reporting',
             'data_scope', 'can_view', 'can_add', 'can_edit', 'can_delete',
             'can_approve', 'can_reject', 'can_override_limits', 'can_export_data'
         ]
@@ -132,6 +132,7 @@ class UserWorkPermissionForm(forms.ModelForm):
             'can_operate_all_equipments': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'can_fill_work': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'can_onsite_reporting': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_operator_reporting': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'can_smt_reporting': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'can_view': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'can_add': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -220,7 +221,7 @@ class UserWorkPermissionForm(forms.ModelForm):
 
 
 class OrderSyncSettingsForm(forms.ModelForm):
-    """訂單同步設定表單"""
+    """客戶訂單同步設定表單"""
     
     class Meta:
         model = OrderSyncSettings

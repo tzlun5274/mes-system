@@ -7,9 +7,9 @@ from .supervisor import views as supervisor_views
 from .views.workorder_views import (
     WorkOrderListView, WorkOrderDetailView, WorkOrderCreateView, 
     WorkOrderUpdateView, WorkOrderDeleteView, ManufacturingOrderListView,
-    get_manufacturing_order_info, MesOrderListView, mes_orders_bulk_dispatch,
-    mes_order_dispatch, mes_order_delete, mes_orders_auto_dispatch,
-    mes_orders_set_auto_dispatch_interval, CreateMissingWorkOrdersView
+    get_manufacturing_order_info, MesOrderListView, unified_dispatch,
+    mes_order_delete, mes_orders_set_auto_dispatch_interval, CreateMissingWorkOrdersView,
+    update_dispatch_statistics
 )
 
 
@@ -55,6 +55,7 @@ urlpatterns = [
     path("edit/<int:pk>/", WorkOrderUpdateView.as_view(), name="edit"),
     path("delete/<int:pk>/", WorkOrderDeleteView.as_view(), name="delete"),
     path("detail/<int:pk>/", WorkOrderDetailView.as_view(), name="production_workorder_detail"),
+    path("update-statistics/<int:workorder_id>/", update_dispatch_statistics, name="update_dispatch_statistics"),
     path("force-complete/<int:pk>/", views_main.force_complete_workorder, name="force_complete_workorder"),
     path("auto-complete/<int:pk>/", views_main.auto_complete_workorder, name="auto_complete_workorder"),
     path("list/", WorkOrderListView.as_view(), name="list"),
@@ -187,10 +188,8 @@ urlpatterns = [
     
     # 其餘路由維持不變...
     path("mes-orders/", MesOrderListView.as_view(), name="mes_orders"),
-    path("mes-orders/bulk-dispatch/", mes_orders_bulk_dispatch, name="mes_orders_bulk_dispatch"),
-    path("mes-orders/dispatch/", mes_order_dispatch, name="mes_order_dispatch"),
+    path("mes-orders/dispatch/", unified_dispatch, name="unified_dispatch"),
     path("mes-orders/delete/", mes_order_delete, name="mes_order_delete"),
-    path("mes-orders/auto-dispatch/", mes_orders_auto_dispatch, name="mes_orders_auto_dispatch"),
     path("mes-orders/convert-to-production/", views_main.mes_orders_convert_to_production, name="mes_orders_convert_to_production"),
     path("mes-orders/set-auto-dispatch-interval/", mes_orders_set_auto_dispatch_interval, name="mes_orders_set_auto_dispatch_interval"),
 

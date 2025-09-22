@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}匯入產線資料 - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 麵包屑導航 -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/home/">首頁</a></li>
+            <li class="breadcrumb-item"><a href="/production/">生產管理</a></li>
+            <li class="breadcrumb-item"><a href="/production/lines/">產線管理</a></li>
+            <li class="breadcrumb-item active" aria-current="page">匯入產線資料</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-upload me-2"></i>匯入產線資料
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'production:import_production_lines' %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="file" class="form-label">選擇檔案</label>
+                            <input type="file" class="form-control" id="file" name="file" accept=".csv,.xlsx,.xls" required>
+                            <div class="form-text">支援 CSV 和 Excel 檔案格式</div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <h6>匯入格式說明：</h6>
+                            <p class="mb-1"><strong>必要欄位：</strong>產線編號、產線名稱</p>
+                            <p class="mb-1"><strong>時間格式：</strong>HH:MM（例如：08:00、17:00）</p>
+                            <p class="mb-1"><strong>工作日：</strong>週一、週二、週三、週四、週五</p>
+                            <p class="mb-0"><strong>狀態：</strong>啟用 或 停用</p>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <h6>CSV 檔案欄位順序：</h6>
+                            <p class="mb-0">產線編號, 產線名稱, 產線類型, 描述, 工作開始時間, 工作結束時間, 午休開始時間, 午休結束時間, 加班開始時間, 加班結束時間, 工作日設定, 狀態</p>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload me-1"></i>開始匯入
+                            </button>
+                            <a href="{% url 'production:line_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>返回產線列表
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

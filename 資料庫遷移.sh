@@ -12,17 +12,18 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# 檢查是否以 root 權限執行
-if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}❌ 請使用 sudo 執行此腳本${NC}"
-    exit 1
-fi
+# 檢查是否以 root 權限執行（已移除限制）
+# if [ "$EUID" -ne 0 ]; then
+#     echo -e "${RED}❌ 請使用 sudo 執行此腳本${NC}"
+#     exit 1
+# fi
 
 # 設定變數
 PROJECT_DIR="/var/www/mes"
-LOG_FILE="/var/log/mes/database_migration.log"
+LOG_FILE="/var/www/mes/logs/database_migration.log"
 
-# 確保日誌檔案存在
+# 確保日誌目錄和檔案存在
+mkdir -p "$(dirname $LOG_FILE)"
 touch $LOG_FILE
 
 echo "開始遷移時間: $(date)" | tee -a $LOG_FILE

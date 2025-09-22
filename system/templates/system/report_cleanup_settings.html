@@ -165,12 +165,32 @@
         
         <div class="retention-info">
             <h5><i class="fas fa-info-circle"></i> 當前保留設定</h5>
+            <p><strong>自動清理功能：</strong>
+                {% if auto_cleanup_enabled %}
+                    <span class="badge bg-success">啟用</span>
+                {% else %}
+                    <span class="badge bg-secondary">停用</span>
+                {% endif %}
+            </p>
             <p><strong>報表檔案保留天數：</strong>{{ file_retention_days }} 天</p>
             <p><strong>執行日誌保留天數：</strong>{{ log_retention_days }} 天</p>
         </div>
 
         <form method="post" action="{% url 'system:update_cleanup_settings' %}">
             {% csrf_token %}
+            
+            <!-- 啟用開關 -->
+            <div class="mb-4">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="auto_cleanup_enabled" 
+                           name="auto_cleanup_enabled" {% if auto_cleanup_enabled %}checked{% endif %}>
+                    <label class="form-check-label" for="auto_cleanup_enabled">
+                        <strong>啟用自動清理功能</strong>
+                    </label>
+                </div>
+                <div class="form-text">開啟後，系統會根據設定的保留天數自動清理過期的報表檔案和執行日誌</div>
+            </div>
+            
             <div class="row">
                 <div class="col-md-6">
                     <div class="mb-3">

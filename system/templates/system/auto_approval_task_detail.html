@@ -161,8 +161,13 @@
     <!-- 任務統計資訊 -->
     <div class="task-stats-grid">
         <div class="stat-card">
-            <div class="stat-value">{{ task.interval_minutes }}</div>
-            <div class="stat-label">執行間隔（分鐘）</div>
+            {% if task.execution_type == 'interval' %}
+                <div class="stat-value">{{ task.interval_minutes|default:'-' }}</div>
+                <div class="stat-label">執行間隔（分鐘）</div>
+            {% else %}
+                <div class="stat-value">{{ task.fixed_time|default:'-' }}</div>
+                <div class="stat-label">固定執行時間</div>
+            {% endif %}
         </div>
         <div class="stat-card">
             <div class="stat-value">{{ task.execution_count }}</div>
@@ -209,11 +214,32 @@
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
+                            <label for="execution_type">執行類型 *</label>
+                            <select class="form-control" id="execution_type" name="execution_type" required>
+                                <option value="interval" {% if task.execution_type == 'interval' %}selected{% endif %}>間隔執行</option>
+                                <option value="fixed_time" {% if task.execution_type == 'fixed_time' %}selected{% endif %}>固定時間</option>
+                            </select>
+                            <small class="form-text text-muted">選擇任務的執行方式</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group" id="interval_group" style="{% if task.execution_type == 'fixed_time' %}display: none;{% endif %}">
                             <label for="interval_minutes">執行間隔（分鐘） *</label>
                             <input type="number" class="form-control" id="interval_minutes" 
-                                   name="interval_minutes" value="{{ task.interval_minutes }}" 
-                                   min="1" max="1440" required>
+                                   name="interval_minutes" value="{{ task.interval_minutes|default:'' }}" 
+                                   min="1" max="1440">
                             <small class="form-text text-muted">建議設定：30-60分鐘</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group" id="fixed_time_group" style="{% if task.execution_type == 'interval' %}display: none;{% endif %}">
+                            <label for="fixed_time">固定執行時間 *</label>
+                            <input type="time" class="form-control" id="fixed_time" 
+                                   name="fixed_time" value="{{ task.fixed_time|default:'' }}">
+                            <small class="form-text text-muted">每天固定時間執行（格式：HH:MM）</small>
                         </div>
                     </div>
                 </div>
@@ -245,6 +271,9 @@
                     <a href="{% url 'system:auto_approval_tasks' %}" class="btn btn-secondary">
                         <i class="fas fa-times mr-2"></i>取消
                     </a>
+                    <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+                        <i class="fas fa-trash mr-2"></i>刪除任務
+                    </button>
                 </div>
             </form>
         </div>
@@ -306,6 +335,29 @@
 </div>
 
 <script>
+// 執行類型切換功能
+document.getElementById('execution_type').addEventListener('change', function() {
+    const executionType = this.value;
+    const intervalGroup = document.getElementById('interval_group');
+    const fixedTimeGroup = document.getElementById('fixed_time_group');
+    const intervalInput = document.getElementById('interval_minutes');
+    const fixedTimeInput = document.getElementById('fixed_time');
+    
+    if (executionType === 'interval') {
+        intervalGroup.style.display = 'block';
+        fixedTimeGroup.style.display = 'none';
+        intervalInput.required = true;
+        fixedTimeInput.required = false;
+        fixedTimeInput.value = ''; // 清除固定時間值
+    } else if (executionType === 'fixed_time') {
+        intervalGroup.style.display = 'none';
+        fixedTimeGroup.style.display = 'block';
+        intervalInput.required = false;
+        fixedTimeInput.required = true;
+        intervalInput.value = ''; // 清除間隔值
+    }
+});
+
 // 切換開關的即時更新
 document.querySelector('input[name="is_enabled"]').addEventListener('change', function() {
     const statusText = this.nextElementSibling.nextElementSibling;
@@ -315,6 +367,63 @@ document.querySelector('input[name="is_enabled"]').addEventListener('change', fu
         statusText.textContent = '停用';
     }
 });
+
+// 表單驗證
+document.querySelector('form').addEventListener('submit', function(e) {
+    const executionType = document.getElementById('execution_type').value;
+    const intervalInput = document.getElementById('interval_minutes');
+    const fixedTimeInput = document.getElementById('fixed_time');
+    
+    if (executionType === 'interval' && !intervalInput.value) {
+        e.preventDefault();
+        alert('間隔執行需要設定執行間隔');
+        intervalInput.focus();
+        return false;
+    }
+    
+    if (executionType === 'fixed_time' && !fixedTimeInput.value) {
+        e.preventDefault();
+        alert('固定時間執行需要設定執行時間');
+        fixedTimeInput.focus();
+        return false;
+    }
+});
+
+// 刪除確認函數
+function confirmDelete() {
+    if (confirm('確定要刪除此定時任務「{{ task.name }}」嗎？\n\n此操作無法復原，將會永久刪除此任務及其所有相關資料。')) {
+        // 創建隱藏的表單來提交刪除請求
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{% url "system:auto_approval_tasks" %}';
+        
+        // 添加 CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+        
+        // 添加 action
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'delete';
+        form.appendChild(actionInput);
+        
+        // 添加 task_id
+        const taskIdInput = document.createElement('input');
+        taskIdInput.type = 'hidden';
+        taskIdInput.name = 'task_id';
+        taskIdInput.value = '{{ task.id }}';
+        form.appendChild(taskIdInput);
+        
+        // 提交表單
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
 
 // 自動隱藏成功訊息
 setTimeout(function() {

@@ -230,6 +230,22 @@
                         {{ process_info.total_hours|default:0 }} 小時
                     </div>
                     <div class="info-item">
+                        <strong>總加班時數</strong>
+                        {{ process_info.total_overtime_hours|default:0 }} 小時
+                    </div>
+                    <div class="info-item">
+                        <strong>總完成數量</strong>
+                        {{ process_info.total_quantity|default:0 }} 件
+                    </div>
+                    <div class="info-item">
+                        <strong>每小時產能</strong>
+                        {% if process_info.hourly_capacity and process_info.hourly_capacity > 0 %}
+                            {{ process_info.hourly_capacity|floatformat:1 }} pcs/hr
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
+                    <div class="info-item">
                         <strong>參與作業員數</strong>
                         {{ process_info.operator_count|default:0 }} 人
                     </div>

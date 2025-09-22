@@ -19,7 +19,7 @@ from django.http import HttpResponse
 import csv
 import json
 
-from .models import OrderMain, OrderUpdateSchedule, CompanyView, SchedulingOperationLog
+from .models import OrderMain, OrderUpdateSchedule, SchedulingOperationLog
 
 logger = logging.getLogger("scheduling.customer_order_management")
 
@@ -34,7 +34,7 @@ class OrderManager:
 
     def sync_orders_from_erp(self, user=None, ip_address=None) -> Dict[str, any]:
         """
-        從 ERP 系統同步訂單資料
+        從 ERP 整合模組已同步的資料中提取訂單資料
 
         Args:
             user: 執行同步的使用者
@@ -44,27 +44,28 @@ class OrderManager:
             Dict 包含同步結果
         """
         try:
-            self.logger.info("開始執行客戶訂單同步")
+            self.logger.info("開始從 ERP 整合模組提取訂單資料")
 
             # 清空現有訂單資料
             OrderMain.objects.all().delete()
             self.logger.debug("已清空 OrderMain 表")
 
             orders = []
-            companies = CompanyView.objects.all()
-            self.logger.debug(f"從 CompanyView 獲取 {len(companies)} 家公司資料")
+            # 使用 ERP 模組的 API 獲取公司配置
+            companies_data = self._get_companies_via_api()
+            self.logger.debug(f"透過 API 獲取 {len(companies_data)} 家公司配置")
 
-            if not companies:
-                self.logger.warning("CompanyView 表為空，無法查詢訂單")
+            if not companies_data:
+                self.logger.warning("無公司配置資料，無法查詢訂單")
                 return {
                     "status": "error",
-                    "message": "無公司資料，請先同步公司數據",
+                    "message": "無公司配置，請先設定公司資料庫",
                     "total_orders": 0,
                 }
 
             # 處理每家公司
-            for company in companies:
-                manufacturing_orders = self._sync_manufacturing_orders(company)
+            for company_data in companies_data:
+                manufacturing_orders = self._sync_manufacturing_orders_from_company_data(company_data)
                 orders.extend(manufacturing_orders)
 
             # 儲存訂單資料
@@ -75,24 +76,24 @@ class OrderManager:
 
             # 記錄操作日誌
             if user:
-                self._log_operation(user, ip_address, f"同步 {len(orders)} 筆訂單")
+                self._log_operation(user, ip_address, f"提取 {len(orders)} 筆訂單")
 
-            self.logger.info(f"客戶訂單同步完成，共處理 {len(orders)} 筆訂單")
+            self.logger.info(f"訂單資料提取完成，共處理 {len(orders)} 筆訂單")
             return {
                 "status": "success",
-                "message": f"訂單數據同步成功，共 {len(orders)} 筆",
+                "message": f"訂單數據提取成功，共 {len(orders)} 筆",
                 "total_orders": len(orders),
             }
 
         except Exception as e:
-            self.logger.error(f"客戶訂單同步失敗: {str(e)}", exc_info=True)
+            self.logger.error(f"訂單資料提取失敗: {str(e)}", exc_info=True)
             return {
                 "status": "error",
-                "message": f"同步失敗: {str(e)}",
+                "message": f"提取失敗: {str(e)}",
                 "total_orders": 0,
             }
 
-    def _sync_manufacturing_orders(self, company: CompanyView) -> List[Dict]:
+    def _sync_manufacturing_orders(self, company) -> List[Dict]:
         """
         同步單一公司的訂單資料
 
@@ -285,6 +286,88 @@ class OrderManager:
             timestamp=timezone.now(),
             ip_address=ip_address,
         )
+
+    def _get_companies_via_api(self) -> List[Dict]:
+        """
+        使用 ERP 模組的 API 獲取公司配置資料
+        """
+        try:
+            from erp_integration.api import CompanyConfigAPIView
+            from django.test import RequestFactory
+            import json
+            
+            # 建立 API 請求
+            factory = RequestFactory()
+            request = factory.get('/api/erp/company-config/')
+            
+            # 調用 API
+            view = CompanyConfigAPIView()
+            response = view.get(request)
+            
+            if response.status_code == 200:
+                data = json.loads(response.content.decode())
+                if data.get('success'):
+                    companies_data = []
+                    for company in data.get('data', []):
+                        companies_data.append({
+                            'company_name': company.get('company_name'),
+                            'company_code': company.get('company_code'),
+                            'mssql_database': company.get('mssql_database'),
+                            'mes_database': company.get('mes_database'),
+                            'sync_tables': company.get('sync_tables')
+                        })
+                    return companies_data
+            
+            self.logger.error(f"API 調用失敗，狀態碼: {response.status_code}")
+            return []
+            
+        except Exception as e:
+            self.logger.error(f"透過 API 獲取公司配置失敗: {str(e)}")
+            return []
+
+    def _sync_manufacturing_orders_from_company_data(self, company_data: Dict) -> List[Dict]:
+        """
+        從公司資料字典同步訂單資料
+        """
+        orders = []
+        db_name = company_data.get('mes_database')
+        company_name = company_data.get('company_name')
+
+        if not db_name:
+            self.logger.warning(f"公司 {company_name} 的 mes_database 為空，跳過")
+            return orders
+
+        try:
+            # 建立資料庫連線
+            from django.db import connections
+            from django.conf import settings
+            
+            db_config = settings.DATABASES["default"].copy()
+            db_config["NAME"] = db_name
+            connections.databases[db_name] = db_config
+
+            with connections[db_name].cursor() as cursor:
+                # 檢查表是否存在
+                table_exists = self._check_tables_exist(cursor)
+
+                # 同步國內訂單
+                if table_exists["ordBillMain"]:
+                    domestic_orders = self._sync_domestic_orders(cursor, company_name)
+                    orders.extend(domestic_orders)
+
+                # 同步國外訂單
+                if table_exists["TraBillMain"]:
+                    foreign_orders = self._sync_foreign_orders(cursor, company_name)
+                    orders.extend(foreign_orders)
+
+        except Exception as e:
+            self.logger.error(f"從公司 {company_name} 的本地資料庫讀取訂單資料失敗: {str(e)}")
+        finally:
+            # 清理連線
+            if db_name in connections.databases:
+                del connections.databases[db_name]
+
+        return orders
 
 
 class OrderQueryManager:
@@ -704,6 +787,88 @@ class OrderAnalytics:
         except Exception as e:
             self.logger.error(f"取得交期分析失敗: {str(e)}")
             return {}
+
+    def _get_companies_via_api(self) -> List[Dict]:
+        """
+        使用 ERP 模組的 API 獲取公司配置資料
+        """
+        try:
+            from erp_integration.api import CompanyConfigAPIView
+            from django.test import RequestFactory
+            import json
+            
+            # 建立 API 請求
+            factory = RequestFactory()
+            request = factory.get('/api/erp/company-config/')
+            
+            # 調用 API
+            view = CompanyConfigAPIView()
+            response = view.get(request)
+            
+            if response.status_code == 200:
+                data = json.loads(response.content.decode())
+                if data.get('success'):
+                    companies_data = []
+                    for company in data.get('data', []):
+                        companies_data.append({
+                            'company_name': company.get('company_name'),
+                            'company_code': company.get('company_code'),
+                            'mssql_database': company.get('mssql_database'),
+                            'mes_database': company.get('mes_database'),
+                            'sync_tables': company.get('sync_tables')
+                        })
+                    return companies_data
+            
+            self.logger.error(f"API 調用失敗，狀態碼: {response.status_code}")
+            return []
+            
+        except Exception as e:
+            self.logger.error(f"透過 API 獲取公司配置失敗: {str(e)}")
+            return []
+
+    def _sync_manufacturing_orders_from_company_data(self, company_data: Dict) -> List[Dict]:
+        """
+        從公司資料字典同步訂單資料
+        """
+        orders = []
+        db_name = company_data.get('mes_database')
+        company_name = company_data.get('company_name')
+
+        if not db_name:
+            self.logger.warning(f"公司 {company_name} 的 mes_database 為空，跳過")
+            return orders
+
+        try:
+            # 建立資料庫連線
+            from django.db import connections
+            from django.conf import settings
+            
+            db_config = settings.DATABASES["default"].copy()
+            db_config["NAME"] = db_name
+            connections.databases[db_name] = db_config
+
+            with connections[db_name].cursor() as cursor:
+                # 檢查表是否存在
+                table_exists = self._check_tables_exist(cursor)
+
+                # 同步國內訂單
+                if table_exists["ordBillMain"]:
+                    domestic_orders = self._sync_domestic_orders(cursor, company_name)
+                    orders.extend(domestic_orders)
+
+                # 同步國外訂單
+                if table_exists["TraBillMain"]:
+                    foreign_orders = self._sync_foreign_orders(cursor, company_name)
+                    orders.extend(foreign_orders)
+
+        except Exception as e:
+            self.logger.error(f"從公司 {company_name} 的本地資料庫讀取訂單資料失敗: {str(e)}")
+        finally:
+            # 清理連線
+            if db_name in connections.databases:
+                del connections.databases[db_name]
+
+        return orders
 
 
 # 全域實例

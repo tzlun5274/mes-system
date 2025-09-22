@@ -187,10 +187,30 @@
                 </div>
                 <div class="col-md-6">
                     <div class="form-section">
+                        <label for="execution_type">執行類型 *</label>
+                        <select id="execution_type" name="execution_type" required onchange="toggleExecutionFields()">
+                            <option value="interval">間隔執行</option>
+                            <option value="fixed_time">固定時間</option>
+                        </select>
+                        <small class="form-text text-muted">選擇任務的執行方式</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-section" id="interval_group">
                         <label for="interval_minutes">執行間隔（分鐘） *</label>
                         <input type="number" id="interval_minutes" name="interval_minutes" 
-                               min="1" max="1440" value="30" required>
+                               min="1" max="1440" value="30">
                         <small class="form-text text-muted">建議設定：30-60分鐘</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-section" id="fixed_time_group" style="display: none;">
+                        <label for="fixed_time">固定執行時間 *</label>
+                        <input type="time" id="fixed_time" name="fixed_time">
+                        <small class="form-text text-muted">每天固定時間執行（格式：HH:MM）</small>
                     </div>
                 </div>
             </div>
@@ -231,9 +251,6 @@
                                 <i class="fas fa-ellipsis-v"></i>
                             </button>
                             <div class="dropdown-menu dropdown-menu-right">
-                                <a class="dropdown-item" href="#" onclick="alert('此功能已移除，請使用系統管理功能')">
-                                    <i class="fas fa-edit mr-2"></i>編輯
-                                </a>
                                 <form method="post" style="display: inline;">
                                     {% csrf_token %}
                                     <input type="hidden" name="action" value="toggle">
@@ -243,15 +260,6 @@
                                         {% if task.is_enabled %}停用{% else %}啟用{% endif %}
                                     </button>
                                 </form>
-                                <form method="post" style="display: inline;" 
-                                      onsubmit="return confirm('確定要刪除此定時任務嗎？')">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="task_id" value="{{ task.id }}">
-                                    <button type="submit" class="dropdown-item text-danger">
-                                        <i class="fas fa-trash mr-2"></i>刪除
-                                    </button>
-                                </form>
                             </div>
                         </div>
                     </div>
@@ -259,8 +267,13 @@
                     <div class="task-body">
                         <div class="task-stats">
                             <div class="stat-item">
-                                <div class="stat-value">{{ task.interval_minutes }}</div>
-                                <div class="stat-label">分鐘</div>
+                                {% if task.execution_type == 'interval' %}
+                                    <div class="stat-value">{{ task.interval_minutes|default:'-' }}</div>
+                                    <div class="stat-label">分鐘</div>
+                                {% else %}
+                                    <div class="stat-value">{{ task.fixed_time|default:'-' }}</div>
+                                    <div class="stat-label">固定時間</div>
+                                {% endif %}
                             </div>
                             <div class="stat-item">
                                 <div class="stat-value">{{ task.execution_count }}</div>
@@ -311,6 +324,16 @@
                                class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-cog mr-1"></i>設定
                             </a>
+                            
+                            <form method="post" style="display: inline;" 
+                                  onsubmit="return confirm('確定要刪除此定時任務「{{ task.name }}」嗎？此操作無法復原。')">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="task_id" value="{{ task.id }}">
+                                <button type="submit" class="btn btn-sm btn-danger">
+                                    <i class="fas fa-trash mr-1"></i>刪除
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -335,6 +358,54 @@ function toggleAddForm() {
         form.style.display = 'none';
     }
 }
+
+function toggleExecutionFields() {
+    const executionType = document.getElementById('execution_type').value;
+    const intervalGroup = document.getElementById('interval_group');
+    const fixedTimeGroup = document.getElementById('fixed_time_group');
+    const intervalInput = document.getElementById('interval_minutes');
+    const fixedTimeInput = document.getElementById('fixed_time');
+    
+    if (executionType === 'interval') {
+        intervalGroup.style.display = 'block';
+        fixedTimeGroup.style.display = 'none';
+        intervalInput.required = true;
+        fixedTimeInput.required = false;
+        fixedTimeInput.value = ''; // 清除固定時間值
+    } else if (executionType === 'fixed_time') {
+        intervalGroup.style.display = 'none';
+        fixedTimeGroup.style.display = 'block';
+        intervalInput.required = false;
+        fixedTimeInput.required = true;
+        intervalInput.value = ''; // 清除間隔值
+    }
+}
+
+// 表單驗證
+document.addEventListener('DOMContentLoaded', function() {
+    const addForm = document.querySelector('#addTaskForm form');
+    if (addForm) {
+        addForm.addEventListener('submit', function(e) {
+            const executionType = document.getElementById('execution_type').value;
+            const intervalInput = document.getElementById('interval_minutes');
+            const fixedTimeInput = document.getElementById('fixed_time');
+            
+            if (executionType === 'interval' && !intervalInput.value) {
+                e.preventDefault();
+                alert('間隔執行需要設定執行間隔');
+                intervalInput.focus();
+                return false;
+            }
+            
+            if (executionType === 'fixed_time' && !fixedTimeInput.value) {
+                e.preventDefault();
+                alert('固定時間執行需要設定執行時間');
+                fixedTimeInput.focus();
+                return false;
+            }
+        });
+    }
+});
 
 // 自動隱藏成功訊息
 setTimeout(function() {

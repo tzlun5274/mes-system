@@ -67,8 +67,7 @@ def fill_work_post_save(sender, instance, created, **kwargs):
     
     # 檢查是否為出貨包裝工序且已核准，觸發智能自動完工
     if (instance.approval_status == 'approved' and 
-        instance.process and 
-        instance.process.name == "出貨包裝"):
+        instance.operation == "出貨包裝"):
         
         # 檢查智能自動完工功能是否啟用
         try:
@@ -137,5 +136,5 @@ def fill_work_pre_save(sender, instance, **kwargs):
     填報作業儲存前的信號處理
     """
     # 自動設定工序名稱
-    if instance.process and not instance.operation:
-        instance.operation = instance.process.name 
+    if instance.process_name and not instance.operation:
+        instance.operation = instance.process_name 

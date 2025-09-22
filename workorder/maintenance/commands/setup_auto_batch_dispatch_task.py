@@ -36,6 +36,8 @@ class Command(BaseCommand):
 
         # 從 SystemConfig 讀取自動批次派工間隔設定（預設 60 分鐘）
         auto_dispatch_interval = 60
+        auto_dispatch_enabled = True
+        
         try:
             config = SystemConfig.objects.get(key="auto_batch_dispatch_interval")
             auto_dispatch_interval = int(config.value)
@@ -47,6 +49,18 @@ class Command(BaseCommand):
             # 只有在不存在時才建立預設設定
             SystemConfig.objects.create(key="auto_batch_dispatch_interval", value="60")
             auto_dispatch_interval = 60
+            
+        try:
+            config = SystemConfig.objects.get(key="auto_batch_dispatch_enabled")
+            auto_dispatch_enabled = config.value.lower() == 'true'
+            workorder_logger.info(
+                f"讀取到自動批次派工啟用狀態：{'啟用' if auto_dispatch_enabled else '停用'}"
+            )
+        except SystemConfig.DoesNotExist:
+            workorder_logger.warning("未找到自動批次派工啟用狀態設定，使用預設值啟用")
+            # 只有在不存在時才建立預設設定
+            SystemConfig.objects.create(key="auto_batch_dispatch_enabled", value="true")
+            auto_dispatch_enabled = True
 
         # 建立或更新間隔排程
         interval, created = IntervalSchedule.objects.get_or_create(
@@ -65,7 +79,7 @@ class Command(BaseCommand):
             defaults={
                 "task": task_name,
                 "interval": interval,
-                "enabled": True,
+                "enabled": auto_dispatch_enabled,
             },
         )
 
@@ -73,12 +87,13 @@ class Command(BaseCommand):
             # 更新現有任務
             periodic_task.task = task_name
             periodic_task.interval = interval
-            periodic_task.enabled = True
+            periodic_task.enabled = auto_dispatch_enabled
             periodic_task.save()
-            workorder_logger.info(f"更新定時任務：{display_name}")
+            workorder_logger.info(f"更新定時任務：{display_name}，狀態：{'啟用' if auto_dispatch_enabled else '停用'}")
         else:
-            workorder_logger.info(f"建立定時任務：{display_name}")
+            workorder_logger.info(f"建立定時任務：{display_name}，狀態：{'啟用' if auto_dispatch_enabled else '停用'}")
 
+        status_text = "啟用" if auto_dispatch_enabled else "停用"
         self.stdout.write(
-            f"✓ {display_name} 任務已設定（每 {auto_dispatch_interval} 分鐘執行）"
+            f"✓ {display_name} 任務已設定（每 {auto_dispatch_interval} 分鐘執行，狀態：{status_text}）"
         ) 

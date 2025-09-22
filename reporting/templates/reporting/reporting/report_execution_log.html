@@ -220,6 +220,12 @@
                                             <i class="fas fa-eye"></i> 詳情
                                         </button>
                                         {% if log.file_path %}
+                                            {% if '.html' in log.file_path %}
+                                                <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                        onclick="viewReport('{{ log.file_path }}')">
+                                                    <i class="fas fa-eye"></i> 檢視
+                                                </button>
+                                            {% endif %}
                                             <a href="#" class="btn btn-sm btn-outline-success" 
                                                onclick="downloadFile('{{ log.file_path }}')">
                                                 <i class="fas fa-download"></i> 下載
@@ -301,6 +307,11 @@
                                         <div class="modal-footer">
                                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
                                             {% if log.file_path %}
+                                                {% if '.html' in log.file_path %}
+                                                    <button type="button" class="btn btn-primary" onclick="viewReport('{{ log.file_path }}')">
+                                                        <i class="fas fa-eye"></i> 檢視報表
+                                                    </button>
+                                                {% endif %}
                                                 <a href="#" class="btn btn-success" onclick="downloadFile('{{ log.file_path }}')">
                                                     <i class="fas fa-download"></i> 下載檔案
                                                 </a>
@@ -372,9 +383,15 @@
 
 <script>
 function downloadFile(filePath) {
-    // 這裡可以實作檔案下載功能
-    // 實際實作需要根據檔案路徑和權限來處理
-    alert('檔案下載功能：' + filePath);
+    // 下載檔案
+    const url = '{% url "reporting:view_report_file" file_path="PLACEHOLDER" %}'.replace('PLACEHOLDER', encodeURIComponent(filePath));
+    window.open(url, '_blank');
+}
+
+function viewReport(filePath) {
+    // 檢視 HTML 報表
+    const url = '{% url "reporting:view_report_file" file_path="PLACEHOLDER" %}'.replace('PLACEHOLDER', encodeURIComponent(filePath));
+    window.open(url, '_blank');
 }
 
 // 自動重新整理（每30秒）

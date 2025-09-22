@@ -50,9 +50,12 @@ class CompletedWorkOrderListView(LoginRequiredMixin, ListView):
         """添加上下文資料"""
         context = super().get_context_data(**kwargs)
         
-        # 統計資料 - 只保留已完工工單數量
+        # 統計資料 - 排除 RD樣品的已完工工單數量
         queryset = self.get_queryset()
-        context['total_completed'] = queryset.count()
+        context['total_completed'] = queryset.exclude(order_number__icontains='RD樣品').count()
+        
+        # RD樣品工單統計
+        context['total_rd_samples'] = queryset.filter(order_number__icontains='RD樣品').count()
         
         # 為每個工單添加公司名稱和重新計算工作時數
         try:
@@ -193,17 +196,23 @@ class CompletedWorkOrderDetailView(LoginRequiredMixin, DetailView):
         total_stats['unique_equipment'] = list(total_stats['unique_equipment'])
         
         # 按照工序的實際執行順序排列統計資料
-        # 根據填報記錄的時間順序，確定工序的執行順序
+        # 根據填報記錄的時間順序，確定工序的執行順序，但出貨包裝必須排在最後
         process_order = {}
         for i, report in enumerate(production_reports):
             process_name = report.process_name
             if process_name not in process_order:
                 process_order[process_name] = i
         
+        # 定義工序優先順序，出貨包裝必須排在最後
+        def get_process_priority(process_name):
+            if process_name == "出貨包裝":
+                return 9999  # 出貨包裝排在最後，不按時間順序
+            return process_order.get(process_name, 999)  # 其他工序按第一次出現的時間順序
+        
         # 按照工序執行順序排序統計資料
         sorted_stats_by_process = dict(sorted(
             stats_by_process.items(),
-            key=lambda x: process_order.get(x[0], 999)  # 如果找不到順序，排在最後
+            key=lambda x: get_process_priority(x[0])
         ))
         
         # 獲取工序資料

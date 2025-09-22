@@ -5,7 +5,7 @@
 
 from django.shortcuts import render
 from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import JsonResponse
 from django.views import View
 from django.db.models import Count
@@ -13,12 +13,17 @@ from django.utils import timezone
 from workorder.models import ConsistencyCheckResult
 from workorder.services.consistency_check_service import ConsistencyCheckService
 
-class ConsistencyCheckHomeView(LoginRequiredMixin, TemplateView):
+class ConsistencyCheckHomeView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     """
     相符性檢查首頁視圖
     顯示系統維護功能的相符性檢查卡片介面，排除RD樣品工單
+    只有超級用戶可以訪問
     """
     template_name = 'workorder/consistency_check_home.html'
+    
+    def test_func(self):
+        """只有超級用戶可以訪問"""
+        return self.request.user.is_superuser
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -56,11 +61,16 @@ class ConsistencyCheckHomeView(LoginRequiredMixin, TemplateView):
         
         return context
 
-class ConsistencyCheckAjaxView(LoginRequiredMixin, View):
+class ConsistencyCheckAjaxView(LoginRequiredMixin, UserPassesTestMixin, View):
     """
     相符性檢查AJAX視圖
     處理各種相符性檢查的AJAX請求，排除RD樣品工單
+    只有超級用戶可以訪問
     """
+    
+    def test_func(self):
+        """只有超級用戶可以訪問"""
+        return self.request.user.is_superuser
     
     def post(self, request, *args, **kwargs):
         """處理相符性檢查請求"""
@@ -177,12 +187,17 @@ class ConsistencyCheckAjaxView(LoginRequiredMixin, View):
                 'message': f'操作失敗：{str(e)}'
             })
 
-class ConsistencyCheckDetailView(LoginRequiredMixin, TemplateView):
+class ConsistencyCheckDetailView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     """
     相符性檢查詳細資料視圖
     顯示特定檢查類型的詳細結果，排除RD樣品工單
+    只有超級用戶可以訪問
     """
     template_name = 'workorder/consistency_check_detail.html'
+    
+    def test_func(self):
+        """只有超級用戶可以訪問"""
+        return self.request.user.is_superuser
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -214,11 +229,16 @@ class ConsistencyCheckDetailView(LoginRequiredMixin, TemplateView):
         
         return context
 
-class ConsistencyCheckFixView(LoginRequiredMixin, View):
+class ConsistencyCheckFixView(LoginRequiredMixin, UserPassesTestMixin, View):
     """
     相符性問題修復視圖
     處理相符性問題的修復請求
+    只有超級用戶可以訪問
     """
+    
+    def test_func(self):
+        """只有超級用戶可以訪問"""
+        return self.request.user.is_superuser
     
     def post(self, request, *args, **kwargs):
         """處理修復請求"""
@@ -249,11 +269,16 @@ class ConsistencyCheckFixView(LoginRequiredMixin, View):
                 'message': f'修復失敗：{str(e)}'
             })
 
-class ConsistencyCheckExportView(LoginRequiredMixin, View):
+class ConsistencyCheckExportView(LoginRequiredMixin, UserPassesTestMixin, View):
     """
     相符性檢查結果匯出視圖
     匯出檢查結果為Excel或CSV格式
+    只有超級用戶可以訪問
     """
+    
+    def test_func(self):
+        """只有超級用戶可以訪問"""
+        return self.request.user.is_superuser
     
     def get(self, request, *args, **kwargs):
         """匯出檢查結果"""

@@ -18,7 +18,8 @@ def generate_reports():
     print("=" * 60)
     
     try:
-        from reporting.services import WorkTimeReportService, ReportGeneratorService
+        from reporting.work_hour_report_service import WorkHourReportService
+        from reporting.report_generator import ReportGenerator
         from reporting.models import WorkTimeReportSummary, ReportSchedule, OperatorProcessCapacityScore
         from workorder.models import WorkOrder
         from workorder.fill_work.models import FillWork

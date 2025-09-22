@@ -199,7 +199,7 @@
                                     <td>{{ fill_work.operator }}</td>
                                     <td>{{ fill_work.workorder }}</td>
                                     <td>{{ fill_work.product_id }}</td>
-                                    <td>{{ fill_work.process.name }}</td>
+                                    <td>{{ fill_work.process_name|default:fill_work.operation|default:"未指定" }}</td>
                                     <td>{{ fill_work.equipment }}</td>
                                     <td>{{ fill_work.work_date|date:"Y-m-d" }}</td>
                                     <td>{{ fill_work.start_time|time:"H:i" }}</td>
@@ -219,12 +219,15 @@
                                     </td>
                                     <td style="position: sticky; right: 0; background: white; z-index: 10;">
                                         <div class="btn-group" role="group">
+                                            <!-- 查看詳情按鈕：所有使用者都可以看到 -->
                                             <a href="{% url 'workorder:fill_work:fill_work_detail' fill_work.id %}"
                                                class="btn btn-sm btn-outline-primary btn-action"
                                                title="查看詳情">
                                                 <i class="fas fa-eye"></i>
                                             </a>
-                                            {% if fill_work.approval_status == 'pending' %}
+                                            
+                                            <!-- 核准和駁回按鈕：只有管理員和超級管理員可以看到 -->
+                                            {% if fill_work.approval_status == 'pending' and request.user.is_staff or request.user.is_superuser %}
                                             <a href="{% url 'workorder:fill_work:approve_fill_work' fill_work.id %}"
                                                class="btn btn-sm btn-outline-success btn-action"
                                                title="核准">

@@ -26,6 +26,10 @@ class WorkorderConfig(AppConfig):
             # 載入現場報工信號處理器
             import workorder.onsite_reporting.signals
             
+            # 註冊資料轉移信號
+            from .signals.data_transfer_signals import register_data_transfer_signals
+            register_data_transfer_signals()
+            
         except Exception as e:
             # 避免在遷移時出現錯誤
             pass

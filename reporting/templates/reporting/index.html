@@ -692,18 +692,33 @@ function syncData(event) {
         method: 'POST',
         headers: {
             'X-CSRFToken': csrfToken,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
-        // 顯示成功訊息
-        button.innerHTML = '<i class="fas fa-check"></i> 同步完成';
-        button.className = 'btn btn-sm btn-success';
-        
-        // 更新統計資料
-        loadDashboardStats();
-        loadReportData();
+        if (data.success) {
+            // 顯示成功訊息
+            button.innerHTML = '<i class="fas fa-check"></i> 同步完成';
+            button.className = 'btn btn-sm btn-success';
+            
+            // 顯示詳細訊息
+            if (data.message) {
+                console.log('同步成功:', data.message);
+            }
+            
+            // 更新統計資料
+            loadDashboardStats();
+            loadReportData();
+        } else {
+            throw new Error(data.error || '同步失敗');
+        }
         
         // 3秒後恢復原狀
         setTimeout(function() {
@@ -713,6 +728,8 @@ function syncData(event) {
         }, 3000);
     })
     .catch(error => {
+        console.error('同步錯誤:', error);
+        
         // 顯示錯誤訊息
         button.innerHTML = '<i class="fas fa-times"></i> 同步失敗';
         button.className = 'btn btn-sm btn-danger';

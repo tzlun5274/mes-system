@@ -5,7 +5,7 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from datetime import datetime, timedelta
-from reporting.services import OperatorCapacityService
+from reporting.operator_capacity_service import OperatorCapacityService
 
 
 class Command(BaseCommand):

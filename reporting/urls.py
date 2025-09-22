@@ -47,7 +47,10 @@ urlpatterns = [
     path('schedule/<int:schedule_id>/edit/', views.report_schedule_form, name='report_schedule_edit'),
     path('schedule/<int:schedule_id>/delete/', views.delete_report_schedule, name='report_schedule_delete'),
     path('schedule/<int:schedule_id>/execute/', views.execute_report_schedule, name='execute_report_schedule'),
+    path('schedule/sync/', views.sync_report_schedules, name='sync_report_schedules'),
     path('schedule/logs/', views.report_execution_log, name='report_execution_log'),
+    path('api/execution-logs/', views.api_report_execution_logs, name='api_report_execution_logs'),
+    path('view-report/<path:file_path>/', views.view_report_file, name='view_report_file'),
     
     # 資料同步
     path('sync/', views.sync_report_data, name='sync_report_data'),

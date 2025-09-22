@@ -796,7 +796,7 @@ class AutoAllocationSettings(models.Model):
     interval_minutes = models.IntegerField(
         default=30,
         verbose_name="執行頻率（分鐘）",
-        help_text="自動執行的間隔時間"
+        help_text="自動執行的間隔時間（30-1440分鐘）"
     )
     
     start_time = models.TimeField(

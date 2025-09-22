@@ -39,10 +39,6 @@ class ProcessNameAPIView(View):
                         'id': process.id,
                         'name': process.name,
                         'description': process.description,
-                        'process_type': process.process_type,
-                        'is_active': process.is_active,
-                        'created_at': process.created_at.isoformat(),
-                        'updated_at': process.updated_at.isoformat(),
                     }
                     return JsonResponse({
                         'success': True,
@@ -62,10 +58,6 @@ class ProcessNameAPIView(View):
                         'id': process.id,
                         'name': process.name,
                         'description': process.description,
-                        'process_type': process.process_type,
-                        'is_active': process.is_active,
-                        'created_at': process.created_at.isoformat(),
-                        'updated_at': process.updated_at.isoformat(),
                     })
                 
                 return JsonResponse({
@@ -110,9 +102,6 @@ def get_operator_skills(request):
                 'process_name_id': skill.process_name_id,
                 'process_name': skill.process_name,
                 'priority': skill.priority,
-                'is_certified': skill.is_certified,
-                'created_at': skill.created_at.isoformat(),
-                'updated_at': skill.updated_at.isoformat(),
             })
         
         return JsonResponse({
@@ -185,17 +174,15 @@ def get_process_operation_logs(request):
     try:
         limit = int(request.GET.get('limit', 50))
         
-        logs = ProcessOperationLog.objects.all().order_by('-created_at')[:limit]
+        logs = ProcessOperationLog.objects.all().order_by('-timestamp')[:limit]
         
         data = []
         for log in logs:
             data.append({
                 'id': log.id,
-                'operation_type': log.operation_type,
-                'process_name': log.process_name,
+                'action': log.action,
                 'user': log.user,
-                'description': log.description,
-                'created_at': log.created_at.isoformat(),
+                'timestamp': log.timestamp.isoformat(),
             })
         
         return JsonResponse({
@@ -235,9 +222,6 @@ def get_process_by_name(request):
                 'id': process.id,
                 'name': process.name,
                 'description': process.description,
-                'process_type': process.process_type,
-                'is_active': process.is_active,
-                'created_at': process.created_at.isoformat(),
             }
             
             return JsonResponse({
@@ -268,7 +252,7 @@ def get_active_processes(request):
     GET /api/process/active-processes/
     """
     try:
-        processes = ProcessName.objects.filter(is_active=True)
+        processes = ProcessName.objects.all()
         
         data = []
         for process in processes:
@@ -276,8 +260,6 @@ def get_active_processes(request):
                 'id': process.id,
                 'name': process.name,
                 'description': process.description,
-                'process_type': process.process_type,
-                'created_at': process.created_at.isoformat(),
             })
         
         return JsonResponse({
@@ -311,7 +293,7 @@ def get_skilled_operators(request):
                 'message': '請提供 process_name_id 參數'
             }, status=400)
         
-        skills = OperatorSkill.objects.filter(process_name_id=process_name_id, is_certified=True).order_by('priority')
+        skills = OperatorSkill.objects.filter(process_name_id=process_name_id).order_by('priority')
         
         data = []
         for skill in skills:
@@ -322,8 +304,6 @@ def get_skilled_operators(request):
                 'process_name_id': skill.process_name_id,
                 'process_name': skill.process_name,
                 'priority': skill.priority,
-                'is_certified': skill.is_certified,
-                'created_at': skill.created_at.isoformat(),
             })
         
         return JsonResponse({

@@ -17,8 +17,17 @@ def sync_orders_task():
     """
     try:
         from .customer_order_management import OrderManager
+        from system.models import OrderSyncLog
         
         logger.info("開始執行客戶訂單同步定時任務")
+        
+        # 創建同步日誌
+        log = OrderSyncLog.objects.create(
+            sync_type='sync',
+            status='running',
+            message='定時任務執行同步',
+            started_at=timezone.now()
+        )
         
         # 創建客戶訂單管理器
         order_manager = OrderManager()

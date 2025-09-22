@@ -603,6 +603,14 @@ def add_inventory_transaction(request):
                 ),
             )
 
+            # 記錄操作日誌
+            from material.models import MaterialOperationLog
+            MaterialOperationLog.objects.create(
+                user=request.user.username if request.user.is_authenticated else "system",
+                action=f"新增庫存交易 - 物料: {material.material_code}, 類型: {transaction_type}, 數量: {quantity}, 倉庫: {warehouse}",
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+            
             # 更新庫存
             inventory, created = MaterialInventoryManagement.objects.get_or_create(
                 material=material,

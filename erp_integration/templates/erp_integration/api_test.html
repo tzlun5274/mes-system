@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}ERP 整合 API 測試{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-code"></i> ERP 整合 API 測試
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>公司配置 API</h5>
+                            <div class="btn-group-vertical w-100 mb-3">
+                                <button class="btn btn-primary" onclick="testAPI('/erp_integration/api/company-config/', 'company-list')">
+                                    獲取所有公司配置
+                                </button>
+                                <button class="btn btn-info" onclick="testAPI('/erp_integration/api/company-config/1/', 'company-detail')">
+                                    獲取公司配置 (ID: 1)
+                                </button>
+                                <button class="btn btn-success" onclick="testAPI('/erp_integration/api/company-by-code/?company_code=10', 'company-by-code')">
+                                    根據公司代號查詢 (10)
+                                </button>
+                                <button class="btn btn-warning" onclick="testAPI('/erp_integration/api/active-companies/', 'active-companies')">
+                                    獲取所有公司
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>ERP 配置 API</h5>
+                            <div class="btn-group-vertical w-100 mb-3">
+                                <button class="btn btn-primary" onclick="testAPI('/erp_integration/api/erp-config/', 'erp-config-list')">
+                                    獲取所有 ERP 配置
+                                </button>
+                                <button class="btn btn-info" onclick="testAPI('/erp_integration/api/erp-config/1/', 'erp-config-detail')">
+                                    獲取 ERP 配置 (ID: 1)
+                                </button>
+                                <button class="btn btn-warning" onclick="testAPI('/erp_integration/api/active-erp-configs/', 'active-erp-configs')">
+                                    獲取所有 ERP 配置
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <h5>操作日誌 API</h5>
+                            <div class="btn-group-vertical w-100 mb-3">
+                                <button class="btn btn-secondary" onclick="testAPI('/erp_integration/api/erp-operation-logs/?limit=10', 'operation-logs')">
+                                    獲取操作日誌 (限制 10 筆)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <h5>API 回應結果</h5>
+                            <div class="card">
+                                <div class="card-body">
+                                    <pre id="api-result" class="bg-light p-3" style="min-height: 300px; max-height: 500px; overflow-y: auto;">
+點擊上方按鈕測試 API...
+                                    </pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function testAPI(url, testName) {
+    const resultDiv = document.getElementById('api-result');
+    resultDiv.innerHTML = `正在測試 ${testName}...\nURL: ${url}\n\n`;
+    
+    fetch(url)
+        .then(response => {
+            resultDiv.innerHTML += `狀態碼: ${response.status}\n`;
+            return response.json();
+        })
+        .then(data => {
+            resultDiv.innerHTML += `\n回應內容:\n${JSON.stringify(data, null, 2)}`;
+        })
+        .catch(error => {
+            resultDiv.innerHTML += `\n錯誤: ${error.message}`;
+        });
+}
+</script>
+{% endblock %}

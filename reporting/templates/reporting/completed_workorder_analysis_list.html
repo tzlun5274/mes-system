@@ -29,19 +29,10 @@
     <!-- 頁面標題 -->
     <div class="row">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2>
-                    <i class="fas fa-list text-primary"></i>
-                    已完工工單分析列表
-                </h2>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'reporting:index' %}">報表管理</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'reporting:completed_workorder_analysis' %}">已完工工單分析報表</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">分析列表</li>
-                    </ol>
-                </nav>
-            </div>
+            <h2 class="mb-4">
+                <i class="fas fa-list text-primary"></i>
+                已完工工單分析列表
+            </h2>
         </div>
     </div>
 
@@ -56,44 +47,84 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="get" class="row g-3">
-                        <div class="col-md-2">
-                            <label for="company" class="form-label">公司</label>
-                            <select class="form-select" id="company" name="company">
-                                <option value="">全部公司</option>
-                                {% for company_code, company_name in companies %}
-                                <option value="{{ company_code }}" {% if selected_company == company_code %}selected{% endif %}>
-                                    {{ company_name }}
-                                </option>
-                                {% endfor %}
-                            </select>
+                    <form method="get" id="filterForm" onsubmit="return handleFilterSubmit(event)">
+                        <!-- 第一行篩選條件 -->
+                        <div class="row g-3">
+                            <div class="col-md-2">
+                                <label for="company" class="form-label">公司</label>
+                                <select class="form-select" id="company" name="company">
+                                    <option value="">全部公司</option>
+                                    {% for company_code, company_name in companies %}
+                                    <option value="{{ company_code }}" {% if selected_company == company_code %}selected{% endif %}>
+                                        {{ company_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="workorder_id" class="form-label">工單編號</label>
+                                <input type="text" class="form-control" id="workorder_id" name="workorder_id" 
+                                       value="{{ selected_workorder_id }}" placeholder="輸入工單編號">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="product_code" class="form-label">產品編號</label>
+                                <input type="text" class="form-control" id="product_code" name="product_code" 
+                                       value="{{ selected_product_code }}" placeholder="輸入產品編號">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="start_date" class="form-label">開始日期</label>
+                                <input type="date" class="form-control" id="start_date" name="start_date" 
+                                       value="{{ selected_start_date }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="end_date" class="form-label">結束日期</label>
+                                <input type="date" class="form-control" id="end_date" name="end_date" 
+                                       value="{{ selected_end_date }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search"></i> 篩選
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-2">
-                            <label for="start_date" class="form-label">開始日期</label>
-                            <input type="date" class="form-control" id="start_date" name="start_date" 
-                                   value="{{ selected_start_date }}">
-                        </div>
-                        <div class="col-md-2">
-                            <label for="end_date" class="form-label">結束日期</label>
-                            <input type="date" class="form-control" id="end_date" name="end_date" 
-                                   value="{{ selected_end_date }}">
-                        </div>
-                        <div class="col-md-2">
-                            <label for="min_days" class="form-label">最少天數</label>
-                            <input type="number" class="form-control" id="min_days" name="min_days" 
-                                   value="{{ selected_min_days }}" min="0">
-                        </div>
-                        <div class="col-md-2">
-                            <label for="max_days" class="form-label">最多天數</label>
-                            <input type="number" class="form-control" id="max_days" name="max_days" 
-                                   value="{{ selected_max_days }}" min="0">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label">&nbsp;</label>
-                            <div class="d-grid">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-search"></i> 篩選
-                                </button>
+                        
+                        <!-- 第二行篩選條件 -->
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-2">
+                                <label for="min_days" class="form-label">最少天數</label>
+                                <input type="number" class="form-control" id="min_days" name="min_days" 
+                                       value="{{ selected_min_days }}" min="0">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="max_days" class="form-label">最多天數</label>
+                                <input type="number" class="form-control" id="max_days" name="max_days" 
+                                       value="{{ selected_max_days }}" min="0">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="min_hours" class="form-label">最少時數</label>
+                                <input type="number" class="form-control" id="min_hours" name="min_hours" 
+                                       value="{{ selected_min_hours }}" min="0" step="0.1">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="max_hours" class="form-label">最多時數</label>
+                                <input type="number" class="form-control" id="max_hours" name="max_hours" 
+                                       value="{{ selected_max_hours }}" min="0" step="0.1">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="efficiency_min" class="form-label">效率比率(最低)</label>
+                                <input type="number" class="form-control" id="efficiency_min" name="efficiency_min" 
+                                       value="{{ selected_efficiency_min }}" min="0" step="0.1">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-grid">
+                                    <a href="{% url 'reporting:completed_workorder_analysis_list' %}" class="btn btn-secondary">
+                                        <i class="fas fa-undo"></i> 清除篩選
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </form>
@@ -120,7 +151,7 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    {% if page_obj %}
+                    {% if analyses %}
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead class="table-light">
@@ -138,7 +169,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for analysis in page_obj %}
+                                {% for analysis in analyses %}
                                 <tr>
                                     <td>
                                         <strong>{{ analysis.workorder_id }}</strong>
@@ -191,56 +222,8 @@
                         </table>
                     </div>
 
-                    <!-- 分頁 -->
-                    {% if page_obj.has_other_pages %}
-                    <nav aria-label="分頁導航">
-                        <ul class="pagination justify-content-center">
-                            {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1{% if selected_company %}&company={{ selected_company }}{% endif %}{% if selected_start_date %}&start_date={{ selected_start_date }}{% endif %}{% if selected_end_date %}&end_date={{ selected_end_date }}{% endif %}{% if selected_min_days %}&min_days={{ selected_min_days }}{% endif %}{% if selected_max_days %}&max_days={{ selected_max_days }}{% endif %}">
-                                    <i class="fas fa-angle-double-left"></i>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if selected_company %}&company={{ selected_company }}{% endif %}{% if selected_start_date %}&start_date={{ selected_start_date }}{% endif %}{% if selected_end_date %}&end_date={{ selected_end_date }}{% endif %}{% if selected_min_days %}&min_days={{ selected_min_days }}{% endif %}{% if selected_max_days %}&max_days={{ selected_max_days }}{% endif %}">
-                                    <i class="fas fa-angle-left"></i>
-                                </a>
-                            </li>
-                            {% endif %}
-
-                            {% for num in page_obj.paginator.page_range %}
-                                {% if page_obj.number == num %}
-                                <li class="page-item active">
-                                    <span class="page-link">{{ num }}</span>
-                                </li>
-                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if selected_company %}&company={{ selected_company }}{% endif %}{% if selected_start_date %}&start_date={{ selected_start_date }}{% endif %}{% if selected_end_date %}&end_date={{ selected_end_date }}{% endif %}{% if selected_min_days %}&min_days={{ selected_min_days }}{% endif %}{% if selected_max_days %}&max_days={{ selected_max_days }}{% endif %}">{{ num }}</a>
-                                </li>
-                                {% endif %}
-                            {% endfor %}
-
-                            {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if selected_company %}&company={{ selected_company }}{% endif %}{% if selected_start_date %}&start_date={{ selected_start_date }}{% endif %}{% if selected_end_date %}&end_date={{ selected_end_date }}{% endif %}{% if selected_min_days %}&min_days={{ selected_min_days }}{% endif %}{% if selected_max_days %}&max_days={{ selected_max_days }}{% endif %}">
-                                    <i class="fas fa-angle-right"></i>
-                                </a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if selected_company %}&company={{ selected_company }}{% endif %}{% if selected_start_date %}&start_date={{ selected_start_date }}{% endif %}{% if selected_end_date %}&end_date={{ selected_end_date }}{% endif %}{% if selected_min_days %}&min_days={{ selected_min_days }}{% endif %}{% if selected_max_days %}&max_days={{ selected_max_days }}{% endif %}">
-                                    <i class="fas fa-angle-double-right"></i>
-                                </a>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </nav>
-                    {% endif %}
-
-                    <div class="text-center mt-3">
-                        <small class="text-muted">
-                            顯示第 {{ page_obj.start_index }} 到 {{ page_obj.end_index }} 筆，共 {{ page_obj.paginator.count }} 筆記錄
-                        </small>
-                    </div>
+                    <!-- 全域分頁組件 -->
+                    {% include 'includes/pagination.html' with page_obj=page_obj %}
 
                     {% else %}
                     <div class="text-center py-5">
@@ -288,6 +271,74 @@
 <script>
 let currentWorkorderId = '';
 let currentCompanyCode = '';
+
+// 處理篩選表單提交
+function handleFilterSubmit(event) {
+    console.log('篩選表單提交中...');
+    
+    // 收集表單資料
+    const formData = new FormData(event.target);
+    const params = new URLSearchParams();
+    
+    for (let [key, value] of formData.entries()) {
+        if (value.trim() !== '') {
+            params.append(key, value);
+            console.log(`篩選條件: ${key} = ${value}`);
+        }
+    }
+    
+    // 顯示載入狀態
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 篩選中...';
+    submitBtn.disabled = true;
+    
+    // 使用 AJAX 提交篩選請求
+    fetch(window.location.pathname + '?' + params.toString(), {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'text/html'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.text();
+        }
+        throw new Error('篩選請求失敗');
+    })
+    .then(html => {
+        // 更新結果區域 - 直接替換整個結果卡片
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // 查找新的結果卡片
+        const newResultsCard = doc.querySelector('.card:last-child');
+        const currentResultsCard = document.querySelector('.card:last-child');
+        
+        if (newResultsCard && currentResultsCard) {
+            // 直接替換整個結果卡片
+            currentResultsCard.outerHTML = newResultsCard.outerHTML;
+        }
+        
+        // 更新 URL 但不重新載入頁面
+        const newUrl = window.location.pathname + '?' + params.toString();
+        window.history.pushState({}, '', newUrl);
+        
+        console.log('篩選完成，結果已更新');
+    })
+    .catch(error => {
+        console.error('篩選錯誤:', error);
+        alert('篩選失敗，請稍後再試');
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+    
+    return false; // 阻止預設表單提交
+}
 
 function reanalyzeWorkorder(workorderId, companyCode) {
     currentWorkorderId = workorderId;

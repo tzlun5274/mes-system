@@ -40,7 +40,7 @@
             <select name="production_line" id="production_line" class="form-control">
                 <option value="">{% trans "請選擇產線" %}</option>
                 {% for production_line in production_lines %}
-                <option value="{{ production_line.id }}" {% if equipment.production_line and equipment.production_line.id == production_line.id %}selected{% endif %}>
+                <option value="{{ production_line.id }}" {% if equipment.production_line_id == production_line.id|stringformat:"s" %}selected{% endif %}>
                     {{ production_line.line_name }} ({{ production_line.line_code }})
                 </option>
                 {% endfor %}

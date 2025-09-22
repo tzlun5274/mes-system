@@ -143,7 +143,7 @@ python3 manage.py generate_operator_capacity_scores --force
 ### 2. 程式化生成評分
 
 ```python
-from reporting.services import OperatorCapacityService
+from reporting.operator_capacity_service import OperatorCapacityService
 from datetime import date
 
 # 計算單筆作業員工序產能評分
@@ -168,7 +168,7 @@ report = OperatorCapacityService.generate_operator_capacity_report(
 ### 3. 生成評分報表
 
 ```python
-from reporting.services import ScoringService
+from reporting.scoring_service import ScoringService
 from datetime import date
 
 # 生成月度評分報表

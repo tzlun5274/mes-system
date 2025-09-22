@@ -51,7 +51,7 @@ def process_names(request):
     enhanced_process_names = []
     for process in process_names:
         # 通過 ProcessEquipment 模型獲取設備ID
-        equip_ids = [str(pe.equipment_id) for pe in ProcessEquipment.objects.filter(process_name_id=process.name)]
+        equip_ids = [str(pe.equipment_id) for pe in ProcessEquipment.objects.filter(process_name=process.name)]
         equip_names = [
             equip_id_to_name.get(eid, f"未知設備({eid})") for eid in equip_ids
         ]
@@ -103,7 +103,9 @@ def add_process_name(request):
         for equip_id in equip_ids:
             if equip_id.strip().isdigit():
                 ProcessEquipment.objects.get_or_create(
-                    process_name=process_name, equipment_id=int(equip_id)
+                    process_name_id=str(process_name.id),
+                    process_name=process_name.name,
+                    equipment_id=int(equip_id)
                 )
         log_user_operation(
             request.user.username, "process", f"成功添加工序工藝名稱: {process_name}"
@@ -123,7 +125,7 @@ def edit_process_name(request, name_id):
     equipments = get_equipment_options(request)
     # 預處理設備 ID 列表
     normal_equip_ids = list(
-        ProcessEquipment.objects.filter(process_name_id=process_name.name).values_list("equipment_id", flat=True)
+        ProcessEquipment.objects.filter(process_name=process_name.name).values_list("equipment_id", flat=True)
     )
     if request.method == "POST":
         new_name = request.POST.get("name")
@@ -142,15 +144,23 @@ def edit_process_name(request, name_id):
                     "normal_equip_ids": normal_equip_ids,
                 },
             )
+        # 先儲存工序名稱的變更
+        old_name = process_name.name
         process_name.name = new_name
         process_name.description = description
         process_name.save()
-        ProcessEquipment.objects.filter(process_name_id=process_name.name).delete()
+        
+        # 刪除舊的設備關聯（使用舊名稱）
+        ProcessEquipment.objects.filter(process_name=old_name).delete()
+        
+        # 建立新的設備關聯
         equip_ids = request.POST.getlist("usable_equipment_ids[]")
         for equip_id in equip_ids:
             if equip_id.strip().isdigit():
                 ProcessEquipment.objects.get_or_create(
-                    process_name=process_name, equipment_id=int(equip_id)
+                    process_name_id=str(process_name.id),
+                    process_name=process_name.name,
+                    equipment_id=int(equip_id)
                 )
         log_user_operation(
             request.user.username, "process", f"成功編輯工序工藝名稱: {process_name}"
@@ -201,7 +211,7 @@ def export_process_names(request):
     row_num = 2
     for process in process_names:
         # 通過 ProcessEquipment 模型獲取設備ID
-        equip_ids = [str(pe.equipment_id) for pe in ProcessEquipment.objects.filter(process_name_id=process.name)]
+        equip_ids = [str(pe.equipment_id) for pe in ProcessEquipment.objects.filter(process_name=process.name)]
         equip_names = [
             equip_id_to_name.get(eid, f"未知設備({eid})") for eid in equip_ids
         ]
@@ -246,12 +256,14 @@ def import_process_names(request):
                     process_name, created = ProcessName.objects.get_or_create(name=name)
                     process_name.description = description
                     process_name.save()
-                    ProcessEquipment.objects.filter(process_name_id=process_name.name).delete()
+                    ProcessEquipment.objects.filter(process_name=process_name.name).delete()
                     for equip_name in equip_names:
                         equip_id = equip_name_to_id.get(equip_name.strip())
                         if equip_id and equip_id.isdigit():
                             ProcessEquipment.objects.get_or_create(
-                                process_name=process_name, equipment_id=int(equip_id)
+                                process_name_id=str(process_name.id),
+                                process_name=process_name.name,
+                                equipment_id=int(equip_id)
                             )
                 log_user_operation(
                     request.user.username, "process", "匯入工序工藝名稱數據（覆蓋模式）"
@@ -321,7 +333,9 @@ def import_process_names(request):
                         equip_id = equip_name_to_id.get(equip_name.strip())
                         if equip_id and equip_id.isdigit():
                             ProcessEquipment.objects.get_or_create(
-                                process_name=process_name, equipment_id=int(equip_id)
+                                process_name_id=str(process_name.id),
+                                process_name=process_name.name,
+                                equipment_id=int(equip_id)
                             )
                 log_user_operation(
                     request.user.username, "process", "匯入工序工藝名稱數據"

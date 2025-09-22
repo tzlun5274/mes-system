@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load reporting_extras %}
 
 {% block title %}報表排程管理{% endblock %}
 
@@ -27,9 +28,17 @@
     <div class="row mb-4">
         <div class="col-12 d-flex justify-content-between align-items-center">
             <h2 class="mb-0"><i class="fas fa-clock text-primary"></i> 報表排程管理</h2>
-            <a href="{% url 'reporting:report_schedule_add' %}" class="btn btn-success">
-                <i class="fas fa-plus"></i> 新增排程
-            </a>
+            <div class="btn-group">
+                <form method="post" action="{% url 'reporting:sync_report_schedules' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-warning" onclick="return confirm('確定要同步所有排程到 Celery Beat 嗎？')">
+                        <i class="fas fa-sync-alt"></i> 同步排程
+                    </button>
+                </form>
+                <a href="{% url 'reporting:report_schedule_add' %}" class="btn btn-success">
+                    <i class="fas fa-plus"></i> 新增排程
+                </a>
+            </div>
         </div>
     </div>
 
@@ -50,6 +59,7 @@
                                 <th>執行時間</th>
                                 <th>執行日期</th>
                                 <th>狀態</th>
+                                <th>同步狀態</th>
                                 <th>收件人</th>
                                 <th>建立時間</th>
                                 <th>操作</th>
@@ -85,6 +95,34 @@
                                     {% else %}
                                         <span class="badge bg-secondary">停用</span>
                                     {% endif %}
+                                </td>
+                                <td>
+                                    {% with status=schedule_sync_status|get_item:schedule.id %}
+                                        {% if status %}
+                                            {% if status.synced %}
+                                                {% if status.enabled %}
+                                                    <span class="badge bg-success" title="已同步並啟用">
+                                                        <i class="fas fa-check-circle"></i> 已同步
+                                                    </span>
+                                                    {% if status.last_run %}
+                                                        <br><small class="text-muted">最後執行: {{ status.last_run|date:"m-d H:i" }}</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="badge bg-warning" title="已同步但停用">
+                                                        <i class="fas fa-pause-circle"></i> 已同步(停用)
+                                                    </span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge bg-danger" title="未同步到 Celery Beat">
+                                                    <i class="fas fa-exclamation-triangle"></i> 未同步
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-danger" title="未同步到 Celery Beat">
+                                                <i class="fas fa-exclamation-triangle"></i> 未同步
+                                            </span>
+                                        {% endif %}
+                                    {% endwith %}
                                 </td>
                                 <td>
                                     {% if schedule.email_recipients %}

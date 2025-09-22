@@ -1,33 +1,53 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
-{% load auth_extras %}
 
 {% block title %}填報記錄詳情{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row mb-3">
-        <div class="col-12 d-flex justify-content-between align-items-center">
-            <h2 class="mb-0"><i class="fas fa-file-alt text-primary"></i> 填報記錄詳情</h2>
-            <div>
-                {% if request.user.is_superuser or request.user|has_group:'主管' %}
-                <a href="{% url 'workorder:fill_work:supervisor_pending_list' %}" class="btn btn-warning me-2">
-                    <i class="fas fa-user-check"></i> 返回 主管待審核填報作業
-                </a>
-                {% endif %}
-                <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-secondary">
-                    <i class="fas fa-list"></i> 返回列表
-                </a>
-                <a href="{% url 'workorder:fill_work:operator_index' %}" class="btn btn-outline-secondary">
-                    <i class="fas fa-home"></i> 返回首頁
-                </a>
-                {% if fill_work.approval_status == 'pending' %}
-                <a href="{% url 'workorder:fill_work:fill_work_delete' fill_work.id %}"
-                   class="btn btn-outline-danger ms-2"
-                   onclick="return confirm('確認刪除？刪除後無法復原。');">
-                    <i class="fas fa-trash-alt"></i> 刪除
-                </a>
-                {% endif %}
+    <!-- 頁面標題 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-clipboard-list me-2"></i>填報記錄詳情
+                </h2>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'workorder:fill_work:fill_work_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-1"></i>返回列表
+                    </a>
+                    <a href="{% url 'workorder:fill_work:operator_index' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-home me-1"></i>返回首頁
+                    </a>
+                    
+                    {% if fill_work.approval_status == 'pending' %}
+                        <!-- 編輯按鈕：所有使用者都可以編輯待核准的記錄 -->
+                        <a href="{% url 'workorder:fill_work:fill_work_edit' fill_work.id %}" class="btn btn-outline-primary">
+                            <i class="fas fa-edit me-1"></i>編輯
+                        </a>
+                        
+                        <!-- 刪除按鈕：所有使用者都可以刪除待核准的記錄 -->
+                        <a href="{% url 'workorder:fill_work:fill_work_delete' fill_work.id %}"
+                           class="btn btn-outline-danger"
+                           onclick="return confirm('確認刪除？刪除後無法復原。');">
+                            <i class="fas fa-trash-alt me-1"></i>刪除
+                        </a>
+                    {% endif %}
+                    
+                    <!-- 管理員操作按鈕：只有管理員和超級管理員可以看到 -->
+                    {% if fill_work.approval_status == 'pending' and request.user.is_staff or request.user.is_superuser %}
+                    <a href="{% url 'workorder:fill_work:approve_fill_work' fill_work.id %}"
+                       class="btn btn-success"
+                       onclick="return confirm('確定要核准此填報記錄嗎？');">
+                        <i class="fas fa-check me-1"></i>核准
+                    </a>
+                    <a href="{% url 'workorder:fill_work:reject_fill_work' fill_work.id %}"
+                       class="btn btn-danger"
+                       onclick="return confirm('確定要駁回此填報記錄嗎？');">
+                        <i class="fas fa-times me-1"></i>駁回
+                    </a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
@@ -35,76 +55,171 @@
     <div class="card">
         <div class="card-body">
             <div class="row g-3">
+                <!-- 作業員 -->
                 <div class="col-md-3">
-                    <label class="form-label">作業員</label>
+                    <label class="form-label">
+                        <i class="fas fa-user me-1"></i>作業員
+                    </label>
                     <div class="form-control">{{ fill_work.operator }}</div>
                 </div>
+                
+                <!-- 工單號碼（唯讀） -->
                 <div class="col-md-3">
-                    <label class="form-label">工單號碼</label>
+                    <label class="form-label">
+                        <i class="fas fa-file-alt me-1"></i>工單號碼
+                    </label>
                     <div class="form-control">{{ fill_work.workorder }}</div>
                 </div>
+                
+                <!-- 產品編號（唯讀） -->
                 <div class="col-md-3">
-                    <label class="form-label">產品編號</label>
+                    <label class="form-label">
+                        <i class="fas fa-box me-1"></i>產品編號
+                    </label>
                     <div class="form-control">{{ fill_work.product_id }}</div>
                 </div>
+                
+                <!-- 公司名稱（唯讀） -->
                 <div class="col-md-3">
-                    <label class="form-label">公司名稱</label>
+                    <label class="form-label">
+                        <i class="fas fa-building me-1"></i>公司名稱
+                    </label>
                     <div class="form-control">{{ fill_work.company_name }}</div>
                 </div>
 
+                <!-- 工序 -->
                 <div class="col-md-3">
-                    <label class="form-label">工序</label>
-                    <div class="form-control">{{ fill_work.process.name }}</div>
+                    <label class="form-label">
+                        <i class="fas fa-cogs me-1"></i>工序
+                    </label>
+                    <div class="form-control">{{ fill_work.process_name|default:fill_work.operation|default:"未指定" }}</div>
                 </div>
+                
+                <!-- 設備 -->
                 <div class="col-md-3">
-                    <label class="form-label">設備</label>
+                    <label class="form-label">
+                        <i class="fas fa-tools me-1"></i>設備
+                    </label>
                     <div class="form-control">{{ fill_work.equipment }}</div>
                 </div>
+                
+                <!-- 工作日期 -->
                 <div class="col-md-3">
-                    <label class="form-label">工作日期</label>
+                    <label class="form-label">
+                        <i class="fas fa-calendar me-1"></i>工作日期
+                    </label>
                     <div class="form-control">{{ fill_work.work_date|date:"Y-m-d" }}</div>
                 </div>
+                
+                <!-- 開始時間 -->
                 <div class="col-md-3">
-                    <label class="form-label">開始/結束</label>
-                    <div class="form-control">{{ fill_work.start_time|time:"H:i" }} ~ {{ fill_work.end_time|time:"H:i" }}</div>
+                    <label class="form-label">
+                        <i class="fas fa-clock me-1"></i>開始時間
+                    </label>
+                    <div class="form-control">{{ fill_work.start_time|time:"H:i" }}</div>
                 </div>
+                
+                <!-- 結束時間 -->
                 <div class="col-md-3">
-                    <label class="form-label">工作時數</label>
+                    <label class="form-label">
+                        <i class="fas fa-clock me-1"></i>結束時間
+                    </label>
+                    <div class="form-control">{{ fill_work.end_time|time:"H:i" }}</div>
+                </div>
+                
+                <!-- 工作時數 -->
+                <div class="col-md-3">
+                    <label class="form-label">
+                        <i class="fas fa-hourglass-half me-1"></i>工作時數
+                    </label>
                     <div class="form-control">{{ fill_work.work_hours_calculated }} 小時</div>
                 </div>
+                
+                <!-- 加班時數 -->
                 <div class="col-md-3">
-                    <label class="form-label">加班時數</label>
+                    <label class="form-label">
+                        <i class="fas fa-moon me-1"></i>加班時數
+                    </label>
                     <div class="form-control">{{ fill_work.overtime_hours_calculated }} 小時</div>
                 </div>
+                
+                <!-- 數量 -->
                 <div class="col-md-3">
-                    <label class="form-label">數量</label>
-                    <div class="form-control">{{ fill_work.work_quantity }}（不良：{{ fill_work.defect_quantity }}）</div>
+                    <label class="form-label">
+                        <i class="fas fa-cubes me-1"></i>數量
+                    </label>
+                    <div class="form-control">{{ fill_work.work_quantity }}</div>
                 </div>
+                
+                <!-- 不良數量 -->
                 <div class="col-md-3">
-                    <label class="form-label">狀態</label>
+                    <label class="form-label">
+                        <i class="fas fa-exclamation-triangle me-1"></i>不良數量
+                    </label>
+                    <div class="form-control">{{ fill_work.defect_quantity }}</div>
+                </div>
+                
+                <!-- 狀態 -->
+                <div class="col-md-3">
+                    <label class="form-label">
+                        <i class="fas fa-flag me-1"></i>狀態
+                    </label>
                     <div class="d-flex align-items-center gap-2">
                         <div class="form-control">{{ fill_work.get_approval_status_display }}</div>
                         {% if fill_work.approval_status == 'approved' %}
-                            {% if request.user.is_superuser or request.user|has_group:'主管' %}
-                            <a href="{% url 'workorder:fill_work:cancel_approve_fill_work' fill_work.id %}"
-                               class="btn btn-outline-warning"
-                               onclick="return confirm('確定要取消核准？取消後此筆將回到待審核，並自生產監控移除對應明細。');">
-                                <i class="fas fa-undo"></i> 取消核准
-                            </a>
+                            {% if request.user.is_superuser or request.user.is_staff %}
+                                <a href="{% url 'workorder:fill_work:cancel_approve_fill_work' fill_work.id %}"
+                                   class="btn btn-outline-warning btn-sm"
+                                   onclick="return confirm('確定要取消核准此填報記錄嗎？');">
+                                    <i class="fas fa-undo"></i>
+                                </a>
                             {% endif %}
                         {% endif %}
                     </div>
                 </div>
-                <div class="col-md-12">
-                    <label class="form-label">備註</label>
-                    <div class="form-control">{{ fill_work.remarks }}</div>
+                
+                <!-- 備註 -->
+                <div class="col-12">
+                    <label class="form-label">
+                        <i class="fas fa-sticky-note me-1"></i>備註
+                    </label>
+                    <div class="form-control" style="min-height: 80px;">{{ fill_work.remarks|default:"無" }}</div>
                 </div>
-                <div class="col-md-12">
-                    <label class="form-label">異常記錄</label>
-                    <div class="form-control">{{ fill_work.abnormal_notes }}</div>
+                
+                <!-- 異常記錄 -->
+                <div class="col-12">
+                    <label class="form-label">
+                        <i class="fas fa-exclamation-circle me-1"></i>異常記錄
+                    </label>
+                    <div class="form-control" style="min-height: 80px;">{{ fill_work.abnormal_notes|default:"無" }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 記錄資訊 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>記錄資訊
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>建立時間：</strong>{{ fill_work.created_at|date:"Y-m-d H:i:s" }}</p>
+                            <p class="mb-1"><strong>建立者：</strong>{{ fill_work.created_by|default:"系統" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>最後更新：</strong>{{ fill_work.updated_at|date:"Y-m-d H:i:s" }}</p>
+                            <p class="mb-1"><strong>更新者：</strong>{{ fill_work.updated_by|default:"系統" }}</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock %} 
+{% endblock %}

@@ -143,7 +143,7 @@
 							<td>{{ r.company_name }}</td>
 							<td>{{ r.workorder }}</td>
 							<td>{{ r.product_id }}</td>
-							<td>{% if r.operation %}{{ r.operation }}{% else %}{{ r.process.name }}{% endif %}</td>
+							<td>{% if r.operation %}{{ r.operation }}{% else %}{{ r.process_name }}{% endif %}</td>
 							<td>{{ r.equipment }}</td>
 							<td>{{ r.work_date|date:'Y-m-d' }}</td>
 							<td>{{ r.start_time|time:'H:i' }}</td>

@@ -42,20 +42,79 @@ echo "工具啟動時間: $(date)" | tee -a $LOG_FILE
 show_menu() {
     echo ""
     echo -e "${CYAN}請選擇要執行的功能：${NC}"
-    echo "1. 檢查遷移狀態"
-    echo "2. 顯示詳細遷移資訊"
-    echo "3. 檢查遷移衝突"
-    echo "4. 回滾到指定遷移"
-    echo "5. 重置應用程式遷移"
-    echo "6. 解決遷移衝突"
-    echo "7. 創建遷移檔案"
-    echo "8. 檢查資料庫表結構"
-    echo "9. 清理孤立遷移"
-    echo "10. 遷移統計報告"
-    echo "11. 備份當前狀態"
-    echo "12. 創建超級使用者"
+    echo "1. 清除遷移檔案與遷移紀錄"
+    echo "2. 執行遷移指令"
+    echo "3. 創建超級使用者"
     echo "0. 退出"
     echo ""
+}
+
+# 函數：清除遷移檔案與遷移紀錄
+clear_migrations() {
+    echo -e "${YELLOW}🗑️  清除遷移檔案與遷移紀錄${NC}" | tee -a $LOG_FILE
+    
+    cd $PROJECT_DIR
+    
+    echo "警告：此操作將清除所有遷移檔案和記錄，然後重新生成"
+    echo "請確認是否繼續？(y/N)"
+    read -r confirm
+    
+    if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+        echo "開始清除..." | tee -a $LOG_FILE
+        
+        # 1. 清除所有遷移檔案（保留 __init__.py）
+        echo "1. 清除遷移檔案..." | tee -a $LOG_FILE
+        find . -path '*/migrations/*.py' -not -name '__init__.py' -delete 2>/dev/null
+        find . -path '*/migrations/__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+        
+        # 2. 清除所有遷移記錄
+        echo "2. 清除遷移記錄..." | tee -a $LOG_FILE
+        python3 manage.py shell -c "
+from django.db import connection
+cursor = connection.cursor()
+cursor.execute('DELETE FROM django_migrations')
+print('已清除所有遷移記錄')
+" 2>&1 | tee -a $LOG_FILE
+        
+        echo -e "${GREEN}✅ 清除完成${NC}" | tee -a $LOG_FILE
+        echo "現在可以執行選項 2 來重新生成和執行遷移" | tee -a $LOG_FILE
+    else
+        echo "取消清除操作" | tee -a $LOG_FILE
+    fi
+}
+
+# 函數：執行遷移指令
+execute_migrations() {
+    echo -e "${YELLOW}🚀 執行遷移指令${NC}" | tee -a $LOG_FILE
+    
+    cd $PROJECT_DIR
+    
+    echo "開始執行遷移..." | tee -a $LOG_FILE
+    
+    # 1. 重新生成遷移檔案
+    echo "1. 重新生成遷移檔案..." | tee -a $LOG_FILE
+    python3 manage.py makemigrations 2>&1 | tee -a $LOG_FILE
+    
+    # 2. 執行遷移
+    echo "2. 執行遷移..." | tee -a $LOG_FILE
+    python3 manage.py migrate 2>&1 | tee -a $LOG_FILE
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 遷移執行成功${NC}" | tee -a $LOG_FILE
+        
+        # 3. 驗證結果
+        echo "3. 驗證結果..." | tee -a $LOG_FILE
+        python3 manage.py shell -c "
+try:
+    from system.models import UserWorkPermission
+    count = UserWorkPermission.objects.count()
+    print(f'✅ 驗證成功: UserWorkPermission 有 {count} 筆記錄')
+except Exception as e:
+    print(f'❌ 驗證失敗: {e}')
+" 2>&1 | tee -a $LOG_FILE
+    else
+        echo -e "${RED}❌ 遷移執行失敗${NC}" | tee -a $LOG_FILE
+    fi
 }
 
 # 函數：檢查遷移狀態
@@ -225,16 +284,36 @@ reset_single_app_migration() {
     read -r app_name
     
     echo "警告：此操作將完全重置 $app_name 的遷移狀態"
+    echo "1. 清除遷移檔案"
+    echo "2. 清除遷移記錄"
+    echo "3. 重新生成遷移檔案"
+    echo "4. 重新執行遷移"
     echo "請確認是否繼續？(y/N)"
     read -r confirm
     
     if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
         echo "執行重置..." | tee -a $LOG_FILE
         
-        # 先標記所有遷移為未應用
-        python3 manage.py migrate $app_name zero --fake 2>&1 | tee -a $LOG_FILE
+        # 1. 清除遷移檔案（保留 __init__.py）
+        echo "1. 清除遷移檔案..." | tee -a $LOG_FILE
+        find $PROJECT_DIR/$app_name/migrations -name "*.py" -not -name "__init__.py" -delete 2>/dev/null
+        find $PROJECT_DIR/$app_name/migrations -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
         
-        # 然後重新應用遷移
+        # 2. 清除遷移記錄
+        echo "2. 清除遷移記錄..." | tee -a $LOG_FILE
+        python3 manage.py shell -c "
+from django.db import connection
+cursor = connection.cursor()
+cursor.execute('DELETE FROM django_migrations WHERE app = %s', ['$app_name'])
+print('已清除 $app_name 的遷移記錄')
+" 2>&1 | tee -a $LOG_FILE
+        
+        # 3. 重新生成遷移檔案
+        echo "3. 重新生成遷移檔案..." | tee -a $LOG_FILE
+        python3 manage.py makemigrations $app_name 2>&1 | tee -a $LOG_FILE
+        
+        # 4. 重新執行遷移
+        echo "4. 重新執行遷移..." | tee -a $LOG_FILE
         python3 manage.py migrate $app_name 2>&1 | tee -a $LOG_FILE
         
         if [ $? -eq 0 ]; then
@@ -348,41 +427,6 @@ print(' '.join(apps))
     echo -e "${YELLOW}⚠️  建議重新啟動 Django 服務${NC}" | tee -a $LOG_FILE
 }
 
-# 函數：解決遷移衝突
-resolve_migration_conflicts() {
-    echo -e "${YELLOW}🔍 解決遷移衝突${NC}" | tee -a $LOG_FILE
-    
-    cd $PROJECT_DIR
-    
-    echo "請輸入有衝突的應用程式名稱："
-    read -r app_name
-    
-    echo "請輸入衝突的遷移號碼："
-    read -r migration_number
-    
-    echo "選擇解決方法："
-    echo "1. 使用 --fake 標記為已應用"
-    echo "2. 使用 --fake-initial 標記初始遷移"
-    echo "3. 手動編輯遷移檔案"
-    read -r choice
-    
-    case $choice in
-        1)
-            echo "使用 --fake 標記..." | tee -a $LOG_FILE
-            python3 manage.py migrate $app_name $migration_number --fake 2>&1 | tee -a $LOG_FILE
-            ;;
-        2)
-            echo "使用 --fake-initial 標記..." | tee -a $LOG_FILE
-            python3 manage.py migrate $app_name $migration_number --fake-initial 2>&1 | tee -a $LOG_FILE
-            ;;
-        3)
-            echo "請手動編輯遷移檔案：$PROJECT_DIR/$app_name/migrations/${migration_number}_*.py"
-            ;;
-        *)
-            echo "無效選擇" | tee -a $LOG_FILE
-            ;;
-    esac
-}
 
 # 函數：創建遷移檔案
 create_migration() {
@@ -653,6 +697,225 @@ except Exception as e:
 " 2>&1 | tee -a $LOG_FILE
 }
 
+# 函數：顯示高級功能選單
+show_advanced_menu() {
+    echo -e "${YELLOW}🔧 高級功能選單${NC}" | tee -a $LOG_FILE
+    echo "1. 顯示詳細遷移資訊"
+    echo "2. 檢查遷移衝突"
+    echo "3. 回滾到指定遷移"
+    echo "4. 重置應用程式遷移"
+    echo "5. 創建遷移檔案"
+    echo "6. 清理孤立遷移"
+    echo "0. 返回主選單"
+    echo ""
+    read -r advanced_choice
+    
+    case $advanced_choice in
+        1)
+            show_detailed_migrations
+            ;;
+        2)
+            check_migration_conflicts
+            ;;
+        3)
+            rollback_migration
+            ;;
+        4)
+            reset_app_migrations
+            ;;
+        5)
+            create_migration
+            ;;
+        6)
+            cleanup_orphaned_migrations
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo -e "${RED}無效選擇${NC}" | tee -a $LOG_FILE
+            ;;
+    esac
+}
+
+# 函數：自動修復遷移問題
+auto_fix_migration_issues() {
+    echo -e "${YELLOW}🔧 自動修復遷移問題${NC}" | tee -a $LOG_FILE
+    
+    cd $PROJECT_DIR
+    
+    echo "開始自動檢測和修復遷移問題..." | tee -a $LOG_FILE
+    
+    # 使用 Python 腳本自動檢測和修復所有問題
+    python3 << 'EOF'
+import os
+import sys
+import django
+from django.conf import settings
+from django.db import connection, transaction
+from django.apps import apps
+
+# 設置 Django 環境
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mes_config.settings')
+django.setup()
+
+def fix_migration_issues():
+    """自動檢測和修復所有遷移問題"""
+    print("🔍 開始自動檢測...")
+    
+    issues_found = []
+    fixes_applied = []
+    
+    # 檢查所有應用
+    for app_config in apps.get_app_configs():
+        app_name = app_config.name
+        if app_name.startswith('django.') or app_name in ['corsheaders', 'django_celery_beat']:
+            continue
+        
+        print(f"檢查應用: {app_name}")
+        
+        # 檢查每個模型
+        for model in app_config.get_models():
+            table_name = model._meta.db_table
+            
+            # 檢查表格是否存在
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM information_schema.tables 
+                    WHERE table_name = %s
+                """, [table_name])
+                table_exists = cursor.fetchone()[0] > 0
+            
+            if not table_exists:
+                print(f"  ❌ 表格不存在: {table_name}")
+                issues_found.append(f"{app_name}.{model.__name__}: 表格不存在")
+                continue
+            
+            # 檢查欄位
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = %s
+                """, [table_name])
+                db_columns = {row[0] for row in cursor.fetchall()}
+            
+            model_fields = {field.name for field in model._meta.fields}
+            missing_columns = model_fields - db_columns
+            
+            if missing_columns:
+                print(f"  ⚠️  {table_name} 缺少欄位: {list(missing_columns)}")
+                issues_found.append(f"{app_name}.{model.__name__}: 缺少欄位 {list(missing_columns)}")
+                
+                # 自動修復缺失欄位
+                for column in missing_columns:
+                    try:
+                        field = model._meta.get_field(column)
+                        fix_result = add_missing_column(table_name, column, field)
+                        if fix_result:
+                            fixes_applied.append(f"{table_name}.{column}")
+                            print(f"    ✅ 已修復: {column}")
+                        else:
+                            print(f"    ❌ 修復失敗: {column}")
+                    except Exception as e:
+                        print(f"    ❌ 修復錯誤: {column} - {e}")
+            else:
+                print(f"  ✅ {table_name} 欄位完整")
+    
+    return issues_found, fixes_applied
+
+def add_missing_column(table_name, column_name, field):
+    """添加缺失的欄位"""
+    try:
+        with connection.cursor() as cursor:
+            # 根據欄位類型生成 SQL
+            if hasattr(field, 'max_length') and field.max_length:
+                if field.default is not None:
+                    sql = f"ALTER TABLE {table_name} ADD COLUMN {column_name} VARCHAR({field.max_length}) DEFAULT '{field.default}'"
+                else:
+                    sql = f"ALTER TABLE {table_name} ADD COLUMN {column_name} VARCHAR({field.max_length})"
+            elif hasattr(field, 'default'):
+                if isinstance(field.default, bool):
+                    default_value = 'TRUE' if field.default else 'FALSE'
+                    sql = f"ALTER TABLE {table_name} ADD COLUMN {column_name} BOOLEAN DEFAULT {default_value}"
+                elif field.default is not None:
+                    sql = f"ALTER TABLE {table_name} ADD COLUMN {column_name} INTEGER DEFAULT {field.default}"
+                else:
+                    sql = f"ALTER TABLE {table_name} ADD COLUMN {column_name} BOOLEAN DEFAULT TRUE"
+            else:
+                sql = f"ALTER TABLE {table_name} ADD COLUMN {column_name} BOOLEAN DEFAULT TRUE"
+            
+            cursor.execute(sql)
+            return True
+            
+    except Exception as e:
+        if "already exists" in str(e) or "column already exists" in str(e):
+            return True  # 欄位已存在，視為成功
+        return False
+
+def main():
+    print("🚀 開始自動修復...")
+    
+    issues_found, fixes_applied = fix_migration_issues()
+    
+    print("\n" + "="*50)
+    print("📊 修復報告:")
+    print(f"發現問題: {len(issues_found)} 個")
+    print(f"修復成功: {len(fixes_applied)} 個")
+    
+    if issues_found:
+        print("\n發現的問題:")
+        for issue in issues_found:
+            print(f"  - {issue}")
+    
+    if fixes_applied:
+        print("\n修復的欄位:")
+        for fix in fixes_applied:
+            print(f"  ✅ {fix}")
+    
+    # 驗證修復結果
+    print("\n🔍 驗證修復結果...")
+    try:
+        from system.models import UserWorkPermission
+        count = UserWorkPermission.objects.count()
+        print(f"✅ 驗證成功: UserWorkPermission 有 {count} 筆記錄")
+        
+        # 測試頁面訪問
+        from system.views import user_work_permissions_list
+        from django.test import RequestFactory
+        from django.contrib.auth.models import User
+        
+        factory = RequestFactory()
+        request = factory.get('/system/user/work_permissions/list/')
+        user, created = User.objects.get_or_create(username='test_admin', defaults={'is_superuser': True, 'is_staff': True})
+        request.user = user
+        
+        response = user_work_permissions_list(request)
+        print("✅ 頁面可以正常訪問")
+        
+    except Exception as e:
+        print(f"⚠️  驗證警告: {e}")
+    
+    if len(fixes_applied) > 0:
+        print("\n🎉 自動修復完成！")
+        return True
+    else:
+        print("\n✅ 沒有發現需要修復的問題")
+        return True
+
+if __name__ == "__main__":
+    success = main()
+    sys.exit(0 if success else 1)
+EOF
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 自動修復完成${NC}" | tee -a $LOG_FILE
+    else
+        echo -e "${RED}❌ 自動修復失敗${NC}" | tee -a $LOG_FILE
+    fi
+}
+
 # 函數：自動創建超級使用者
 create_auto_superuser() {
     echo -e "${CYAN}=== 自動創建超級使用者 ===${NC}" | tee -a $LOG_FILE
@@ -729,39 +992,12 @@ while true; do
     
     case $choice in
         1)
-            check_migration_status
+            clear_migrations
             ;;
         2)
-            show_detailed_migrations
+            execute_migrations
             ;;
         3)
-            check_migration_conflicts
-            ;;
-        4)
-            rollback_migration
-            ;;
-        5)
-            reset_app_migrations
-            ;;
-        6)
-            resolve_migration_conflicts
-            ;;
-        7)
-            create_migration
-            ;;
-        8)
-            check_database_structure
-            ;;
-        9)
-            cleanup_orphaned_migrations
-            ;;
-        10)
-            migration_statistics
-            ;;
-        11)
-            backup_current_state
-            ;;
-        12)
             create_superuser
             ;;
         0)

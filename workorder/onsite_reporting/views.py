@@ -1013,10 +1013,7 @@ def operator_rd_onsite_report_create(request):
             process = request.POST.get('process', '')
             remarks = request.POST.get('remarks', '')
             
-            # 驗證必填欄位
-            if not all([product_code, company_code, operator, process]):
-                messages.error(request, '請填寫所有必填欄位')
-                return redirect('workorder:onsite_reporting:operator_rd_onsite_report_create')
+            # 移除所有驗證邏輯 - RD樣品表單完全無驗證
             
             # 取得公司代號
             company_config = CompanyConfig.objects.filter(company_name=company_code).first()
@@ -1164,22 +1161,20 @@ def smt_rd_onsite_report_create(request):
             company_code = request.POST.get('company_code', '')
             product_code = request.POST.get('product_code', '')
             
-            # 驗證必填欄位
-            if not all([operator, process, equipment, company_code, product_code]):
-                messages.error(request, '請填寫所有必填欄位')
-                return redirect('workorder:onsite_reporting:smt_rd_onsite_report_create')
+            # 移除所有驗證邏輯 - SMT RD樣品表單完全無驗證
             
             # 檢查並建立工單
             from workorder.models import WorkOrder
             from workorder.workorder_dispatch.models import WorkOrderDispatch
             
-            # 取得公司代號
+            # 取得公司代號（移除驗證）
             company_config = CompanyConfig.objects.filter(company_name=company_code).first()
             if not company_config:
-                messages.error(request, '找不到對應的公司設定')
-                return redirect('workorder:onsite_reporting:smt_rd_onsite_report_create')
-            
-            company_code_value = company_config.company_code
+                # 移除驗證錯誤，使用預設值
+                company_code_value = 'DEFAULT'
+                messages.info(request, '使用預設公司代號')
+            else:
+                company_code_value = company_config.company_code
             
             # 查找現有工單（只根據公司代號和工單號碼，因為唯一性約束是 (company_code, order_number)）
             existing_workorder = WorkOrder.objects.filter(

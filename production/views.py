@@ -441,7 +441,7 @@ def api_production_lines(request):
     API：取得產線列表
     """
     production_lines = ProductionLine.objects.filter(is_active=True).values(
-        "id", "line_code", "line_name", "line_type__type_name"
+        "id", "line_code", "line_name", "line_type_name"
     )
     return JsonResponse({"production_lines": list(production_lines)})
 
@@ -635,6 +635,12 @@ def import_production_lines(request):
     """
     匯入產線資料
     """
+    if request.method == 'GET':
+        # GET 請求：顯示匯入頁面
+        return render(request, "production/line_import.html", {
+            "title": "匯入產線資料"
+        })
+    
     if request.method == 'POST':
         try:
             uploaded_file = request.FILES.get('file')
@@ -666,18 +672,10 @@ def import_production_lines(request):
                             error_count += 1
                             continue
                         
-                        # 取得或創建產線類型
+                        # 取得產線類型名稱
                         type_name = row.get('產線類型', '').strip()
-                        line_type = None
-                        if type_name:
-                            line_type, created = ProductionLineType.objects.get_or_create(
-                                type_name=type_name,
-                                defaults={
-                                    'type_code': type_name[:20],  # 使用名稱前20字作為代號
-                                    'description': f'自動創建的產線類型：{type_name}',
-                                    'is_active': True
-                                }
-                            )
+                        line_type_id = ''
+                        line_type_name = type_name
                         
                         # 處理時間欄位
                         work_start_time = None
@@ -749,7 +747,8 @@ def import_production_lines(request):
                             line_code=row['產線編號'].strip(),
                             defaults={
                                 'line_name': row['產線名稱'].strip(),
-                                'line_type': line_type,
+                                'line_type_id': line_type_id,
+                                'line_type_name': line_type_name,
                                 'description': row.get('描述', '').strip(),
                                 'work_start_time': work_start_time,
                                 'work_end_time': work_end_time,
@@ -813,18 +812,10 @@ def import_production_lines(request):
                             error_count += 1
                             continue
                         
-                        # 取得或創建產線類型
+                        # 取得產線類型名稱
                         type_name = str(row_data['產線類型']).strip() if row_data['產線類型'] else ''
-                        line_type = None
-                        if type_name:
-                            line_type, created = ProductionLineType.objects.get_or_create(
-                                type_name=type_name,
-                                defaults={
-                                    'type_code': type_name[:20],
-                                    'description': f'自動創建的產線類型：{type_name}',
-                                    'is_active': True
-                                }
-                            )
+                        line_type_id = ''
+                        line_type_name = type_name
                         
                         # 處理時間欄位
                         work_start_time = None
@@ -856,8 +847,49 @@ def import_production_lines(request):
                                 error_count += 1
                                 continue
                         
-                        # 處理其他時間欄位（類似邏輯）
-                        # ... 簡化處理，避免過長
+                        if row_data['午休開始時間']:
+                            try:
+                                if isinstance(row_data['午休開始時間'], str):
+                                    lunch_start_time = datetime.strptime(row_data['午休開始時間'], '%H:%M').time()
+                                else:
+                                    lunch_start_time = row_data['午休開始時間'].time()
+                            except:
+                                errors.append(f"第{row_num}行：午休開始時間格式錯誤")
+                                error_count += 1
+                                continue
+                        
+                        if row_data['午休結束時間']:
+                            try:
+                                if isinstance(row_data['午休結束時間'], str):
+                                    lunch_end_time = datetime.strptime(row_data['午休結束時間'], '%H:%M').time()
+                                else:
+                                    lunch_end_time = row_data['午休結束時間'].time()
+                            except:
+                                errors.append(f"第{row_num}行：午休結束時間格式錯誤")
+                                error_count += 1
+                                continue
+                        
+                        if row_data['加班開始時間']:
+                            try:
+                                if isinstance(row_data['加班開始時間'], str):
+                                    overtime_start_time = datetime.strptime(row_data['加班開始時間'], '%H:%M').time()
+                                else:
+                                    overtime_start_time = row_data['加班開始時間'].time()
+                            except:
+                                errors.append(f"第{row_num}行：加班開始時間格式錯誤")
+                                error_count += 1
+                                continue
+                        
+                        if row_data['加班結束時間']:
+                            try:
+                                if isinstance(row_data['加班結束時間'], str):
+                                    overtime_end_time = datetime.strptime(row_data['加班結束時間'], '%H:%M').time()
+                                else:
+                                    overtime_end_time = row_data['加班結束時間'].time()
+                            except:
+                                errors.append(f"第{row_num}行：加班結束時間格式錯誤")
+                                error_count += 1
+                                continue
                         
                         # 處理工作日設定
                         work_days = '["1","2","3","4","5"]'
@@ -872,7 +904,8 @@ def import_production_lines(request):
                             line_code=str(row_data['產線編號']).strip(),
                             defaults={
                                 'line_name': str(row_data['產線名稱']).strip(),
-                                'line_type': line_type,
+                                'line_type_id': line_type_id,
+                                'line_type_name': line_type_name,
                                 'description': str(row_data.get('描述', '')).strip(),
                                 'work_start_time': work_start_time,
                                 'work_end_time': work_end_time,
@@ -1029,6 +1062,6 @@ def import_line_types(request):
         except Exception as e:
             messages.error(request, f'匯入失敗：{str(e)}')
         
-        return redirect('production:line_type_list')
+        return redirect('production:line_list')
     
-    return redirect('production:line_type_list')
+    return redirect('production:line_list')

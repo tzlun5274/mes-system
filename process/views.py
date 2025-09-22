@@ -82,7 +82,7 @@ def api_process_names(request):
     processes = []
     for process in ProcessName.objects.all():
         # 獲取設備 ID
-        equipment_ids = list(ProcessEquipment.objects.filter(process_name_id=process.name).values_list("equipment_id", flat=True))
+        equipment_ids = list(ProcessEquipment.objects.filter(process_name=process.name).values_list("equipment_id", flat=True))
 
         processes.append(
             {
@@ -102,8 +102,8 @@ def api_operators(request):
     log_user_operation(request.user.username, "process", "API 請求: 獲取作業員列表")
     operators = []
     for operator in Operator.objects.all():
-        skills = OperatorSkill.objects.filter(operator=operator).values(
-            "process_name__id", "process_name__name", "priority"
+        skills = OperatorSkill.objects.filter(operator_id=str(operator.id)).values(
+            "process_name_id", "process_name", "priority"
         )
         operators.append(
             {"id": operator.id, "name": operator.name, "skills": list(skills)}
@@ -124,10 +124,9 @@ def api_product_routes(request):
         queryset = queryset.filter(product_id=product_id)
     routes = queryset.values(
         "product_id",
-        "process_name__id",
-        "process_name__name",
+        "process_name_id",
+        "process_name",
         "step_order",
-        "capacity_per_hour",
         "usable_equipment_ids",
         "dependent_semi_product",
     )
@@ -365,6 +364,15 @@ def standard_capacity_create(request):
                 changed_by=request.user.username,
                 change_reason="新增標準產能設定",
             )
+            
+            # 記錄操作日誌
+            from process.models import ProcessOperationLog
+            ProcessOperationLog.objects.create(
+                user=request.user.username,
+                action=f"新增標準產能設定 - 產品: {obj.product_code}, 工序: {obj.process_name}, 設備類型: {obj.equipment_type}",
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+            
             return JsonResponse({"success": True, "message": "新增成功"})
         except Exception as e:
             return JsonResponse({"success": False, "message": f"新增失敗：{str(e)}"})

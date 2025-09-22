@@ -20,6 +20,7 @@ urlpatterns = [
     path("table_search/", views.table_search, name="table_search"),
     path("manual_search/", views.manual_search, name="manual_search"),
     path("operation_log/", views.operation_log, name="operation_log"),
+    path("api_test/", views.api_test, name="api_test"),
     path("api/config/", views.get_config, name="get_config"),
     path("api/companies/", views.get_companies, name="get_companies"),
     path("api/operation_logs/", views.get_operation_logs, name="get_operation_logs"),

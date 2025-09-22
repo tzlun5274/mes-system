@@ -170,7 +170,7 @@ class ConsistencyCheckService:
     def check_wrong_company(self):
         """
         檢查公司代號/名稱錯誤
-        比對條件：先根據工單號碼+產品編號找到對應的工單，再檢查該工單的公司代號與填報紀錄的公司名稱是否一致
+        比對條件：工單號碼+產品編號相同，公司代號不同
         排除RD樣品工單
         """
         try:
@@ -189,29 +189,27 @@ class ConsistencyCheckService:
                     # 如果找不到公司配置，使用公司代號作為公司名稱
                     correct_company_name = workorder.company_code
                 
-                # 正確的比對邏輯：先根據工單號碼+產品編號找到對應的工單
-                # 再檢查該工單的公司代號與填報紀錄的公司名稱是否一致
-                # 如果不一致，才算是錯誤
+                # 比對條件：工單號碼+產品編號相同，公司代號不同
+                # 查找填報記錄中工單號碼和產品編號相同，但公司名稱不同的記錄
                 fill_works = FillWork.objects.filter(
                     workorder=workorder.order_number,
                     product_id=workorder.product_code
-                )
+                ).exclude(company_name=correct_company_name)
                 
-                # 檢查填報紀錄的公司名稱是否與工單對應的公司名稱一致
+                # 檢查填報紀錄的公司名稱是否與工單對應的公司名稱不一致
                 for fill_work in fill_works:
-                    if fill_work.company_name != correct_company_name:
-                        ConsistencyCheckResult.objects.create(
-                            check_type='wrong_company',
-                            company_code=workorder.company_code,
-                            company_name=correct_company_name,
-                            workorder=workorder.order_number,
-                            product_code=workorder.product_code,
-                            wrong_company_code=fill_work.company_code,
-                            wrong_company_name=fill_work.company_name,
-                            operator=fill_work.operator,
-                            work_date=fill_work.work_date,
-                        )
-                        wrong_count += 1
+                    ConsistencyCheckResult.objects.create(
+                        check_type='wrong_company',
+                        company_code=workorder.company_code,
+                        company_name=correct_company_name,
+                        workorder=workorder.order_number,
+                        product_code=workorder.product_code,
+                        wrong_company_code=fill_work.company_code,
+                        wrong_company_name=fill_work.company_name,
+                        operator=fill_work.operator,
+                        work_date=fill_work.work_date,
+                    )
+                    wrong_count += 1
             
             self.logger.info(f"公司代號/名稱錯誤檢查完成，發現 {wrong_count} 筆問題")
             return wrong_count
@@ -223,7 +221,7 @@ class ConsistencyCheckService:
     def check_wrong_workorder(self):
         """
         檢查工單號碼錯誤
-        比對條件：公司代號或公司名稱+產品編號，工單號碼不同
+        比對條件：公司代號+產品編號相同，工單號碼不同
         排除RD樣品工單
         """
         try:
@@ -242,21 +240,15 @@ class ConsistencyCheckService:
                     # 如果找不到公司配置，使用公司代號作為公司名稱
                     correct_company_name = workorder.company_code
                 
-                # 檢查填報紀錄中工單號碼錯誤的記錄
-                # 修正：只檢查有填報紀錄的工單，且工單號碼不匹配的記錄
+                # 比對條件：公司代號+產品編號相同，工單號碼不同
+                # 查找填報記錄中公司名稱和產品編號相同，但工單號碼不同的記錄
                 fill_works = FillWork.objects.filter(
                     company_name=correct_company_name,
                     product_id=workorder.product_code
-                )
+                ).exclude(workorder=workorder.order_number)
                 
-                # 如果沒有填報紀錄，跳過
-                if not fill_works.exists():
-                    continue
-                
-                # 檢查是否有工單號碼不匹配的記錄
-                wrong_workorder_fill_works = fill_works.exclude(workorder=workorder.order_number)
-                
-                for fill_work in wrong_workorder_fill_works:
+                # 檢查填報紀錄的工單號碼是否與工單的工單號碼不一致
+                for fill_work in fill_works:
                     ConsistencyCheckResult.objects.create(
                         check_type='wrong_workorder',
                         company_code=workorder.company_code,

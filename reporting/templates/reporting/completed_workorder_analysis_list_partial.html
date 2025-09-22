@@ -1,0 +1,203 @@
+<!-- 篩選條件 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card filter-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-filter text-info"></i>
+                    篩選條件
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="get" id="filterForm" onsubmit="return handleFilterSubmit(event)">
+                    <!-- 第一行篩選條件 -->
+                    <div class="row g-3">
+                        <div class="col-md-2">
+                            <label for="company" class="form-label">公司</label>
+                            <select class="form-select" id="company" name="company">
+                                <option value="">全部公司</option>
+                                {% for company_code, company_name in companies %}
+                                <option value="{{ company_code }}" {% if selected_company == company_code %}selected{% endif %}>
+                                    {{ company_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="workorder_id" class="form-label">工單編號</label>
+                            <input type="text" class="form-control" id="workorder_id" name="workorder_id" 
+                                   value="{{ selected_workorder_id }}" placeholder="輸入工單編號">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="product_code" class="form-label">產品編號</label>
+                            <input type="text" class="form-control" id="product_code" name="product_code" 
+                                   value="{{ selected_product_code }}" placeholder="輸入產品編號">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="start_date" class="form-label">開始日期</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" 
+                                   value="{{ selected_start_date }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="end_date" class="form-label">結束日期</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" 
+                                   value="{{ selected_end_date }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> 篩選
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 第二行篩選條件 -->
+                    <div class="row g-3 mt-2">
+                        <div class="col-md-2">
+                            <label for="min_days" class="form-label">最少天數</label>
+                            <input type="number" class="form-control" id="min_days" name="min_days" 
+                                   value="{{ selected_min_days }}" min="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="max_days" class="form-label">最多天數</label>
+                            <input type="number" class="form-control" id="max_days" name="max_days" 
+                                   value="{{ selected_max_days }}" min="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="min_hours" class="form-label">最少時數</label>
+                            <input type="number" class="form-control" id="min_hours" name="min_hours" 
+                                   value="{{ selected_min_hours }}" min="0" step="0.1">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="max_hours" class="form-label">最多時數</label>
+                            <input type="number" class="form-control" id="max_hours" name="max_hours" 
+                                   value="{{ selected_max_hours }}" min="0" step="0.1">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="efficiency_min" class="form-label">效率比率(最低)</label>
+                            <input type="number" class="form-control" id="efficiency_min" name="efficiency_min" 
+                                   value="{{ selected_efficiency_min }}" min="0" step="0.1">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <a href="{% url 'reporting:completed_workorder_analysis_list' %}" class="btn btn-secondary">
+                                    <i class="fas fa-undo"></i> 清除篩選
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 分析列表 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-table text-success"></i>
+                        分析結果列表
+                    </h5>
+                    <div>
+                        <a href="{% url 'reporting:workorder_analysis_management' %}" class="btn btn-success btn-sm">
+                            <i class="fas fa-cogs"></i> 分析管理
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if page_obj %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>工單編號</th>
+                                <th>公司</th>
+                                <th>產品</th>
+                                <th>完工日期</th>
+                                <th>執行天數</th>
+                                <th>工作時數</th>
+                                <th>工序數</th>
+                                <th>效率比率</th>
+                                <th>分析時間</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for analysis in page_obj %}
+                            <tr>
+                                <td>
+                                    <strong>{{ analysis.workorder_id }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ analysis.company_code }}</span>
+                                    <br><small>{{ analysis.company_name }}</small>
+                                </td>
+                                <td>
+                                    <div>{{ analysis.product_code }}</div>
+                                    <small class="text-muted">{{ analysis.product_name|truncatechars:30 }}</small>
+                                </td>
+                                <td>{{ analysis.completion_date|date:"Y-m-d" }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ analysis.total_execution_days }}天</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ analysis.total_work_hours|floatformat:1 }}小時</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-warning">{{ analysis.total_processes }}個</span>
+                                </td>
+                                <td>
+                                    {% if analysis.efficiency_rate >= 100 %}
+                                        <span class="badge bg-success">{{ analysis.efficiency_rate|floatformat:1 }}%</span>
+                                    {% elif analysis.efficiency_rate >= 80 %}
+                                        <span class="badge bg-warning">{{ analysis.efficiency_rate|floatformat:1 }}%</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">{{ analysis.efficiency_rate|floatformat:1 }}%</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>{{ analysis.created_at|date:"m-d H:i" }}</small>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{% url 'reporting:completed_workorder_analysis_detail' analysis.id %}" 
+                                           class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-outline-warning btn-sm" 
+                                                onclick="reanalyzeWorkorder('{{ analysis.workorder_id }}', '{{ analysis.company_code }}')">
+                                            <i class="fas fa-sync-alt"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 全域分頁組件 -->
+                {% include 'includes/pagination.html' with page_obj=page_obj %}
+
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">沒有找到分析記錄</h5>
+                    <p class="text-muted">請先執行工單分析或調整篩選條件</p>
+                    <a href="{% url 'reporting:workorder_analysis_management' %}" class="btn btn-primary">
+                        <i class="fas fa-cogs"></i> 前往分析管理
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

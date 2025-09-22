@@ -143,6 +143,19 @@
             </div>
         </div>
 
+        <!-- 報表清理設定 -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-broom"></i> 報表清理設定</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">管理報表檔案和執行日誌的自動清理功能，設定保留天數和啟用狀態，避免系統空間不足。</p>
+                    <a href="{% url 'system:report_cleanup_settings' %}" class="btn btn-danger"><i class="bi bi-gear"></i> 清理設定</a>
+                </div>
+            </div>
+        </div>
+
 
 
 

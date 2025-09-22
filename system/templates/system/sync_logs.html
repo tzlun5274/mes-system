@@ -276,8 +276,8 @@
 
 <script>
 function viewLogDetail(logId) {
-    // 實作查看日誌詳情功能
-    alert('查看日誌詳情功能開發中... 日誌ID：' + logId);
+    // 跳轉到日誌詳情頁面
+    window.location.href = "{% url 'system:sync_log_detail' 0 %}".replace('0', logId);
 }
 </script>
 {% endblock %} 

@@ -218,11 +218,11 @@
                             <tbody>
                                 {% for user in users %}
                                 <tr>
-                            <td>
-                                <div class="user-avatar">
-                                    {{ user.username|first|upper }}
-                                </div>
-                            </td>
+                                    <td>
+                                        <div class="user-avatar">
+                                            {{ user.username|first|upper }}
+                                        </div>
+                                    </td>
                                     <td>
                                         <strong>{{ user.username }}</strong>
                                     </td>
@@ -230,77 +230,77 @@
                                         {% if user.first_name or user.last_name %}
                                             {{ user.first_name }} {{ user.last_name }}
                                         {% else %}
-                                    <span class="text-muted">未設定</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if user.email %}
-                                    <a href="mailto:{{ user.email }}" class="text-decoration-none">
-                                        {{ user.email }}
-                                    </a>
-                                {% else %}
-                                    <span class="text-muted">未設定</span>
+                                            <span class="text-muted">未設定</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.email %}
+                                            <a href="mailto:{{ user.email }}" class="text-decoration-none">
+                                                {{ user.email }}
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">未設定</span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if user.is_active %}
-                                    <span class="badge bg-success status-badge">
-                                        <i class="fas fa-check me-1"></i>啟用
-                                    </span>
+                                            <span class="badge bg-success status-badge">
+                                                <i class="fas fa-check me-1"></i>啟用
+                                            </span>
                                         {% else %}
-                                    <span class="badge bg-danger status-badge">
-                                        <i class="fas fa-times me-1"></i>停用
-                                    </span>
+                                            <span class="badge bg-danger status-badge">
+                                                <i class="fas fa-times me-1"></i>停用
+                                            </span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if user.is_superuser %}
-                                    <span class="badge bg-info status-badge">
-                                        <i class="fas fa-crown me-1"></i>超級用戶
-                                    </span>
+                                            <span class="badge bg-info status-badge">
+                                                <i class="fas fa-crown me-1"></i>超級用戶
+                                            </span>
                                         {% elif user.is_staff %}
-                                    <span class="badge bg-warning status-badge">
-                                        <i class="fas fa-user-shield me-1"></i>管理員
-                                    </span>
+                                            <span class="badge bg-warning status-badge">
+                                                <i class="fas fa-user-shield me-1"></i>管理員
+                                            </span>
                                         {% else %}
-                                    <span class="badge bg-secondary status-badge">
-                                        <i class="fas fa-user me-1"></i>一般用戶
-                                    </span>
+                                            <span class="badge bg-secondary status-badge">
+                                                <i class="fas fa-user me-1"></i>一般用戶
+                                            </span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if user.last_login %}
-                                    <small class="text-muted">
-                                            {{ user.last_login|date:"Y-m-d H:i" }}
-                                    </small>
+                                            <small class="text-muted">
+                                                {{ user.last_login|date:"Y-m-d H:i" }}
+                                            </small>
                                         {% else %}
-                                    <span class="text-muted">從未登入</span>
+                                            <span class="text-muted">從未登入</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                <div class="action-buttons">
-                                    <a href="{% url 'system:user_detail' user.id %}" 
-                                       class="btn btn-sm btn-outline-info" 
-                                       title="查看詳情">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="{% url 'system:user_edit' user.id %}" 
-                                       class="btn btn-sm btn-outline-primary" 
-                                       title="編輯">
+                                        <div class="action-buttons">
+                                            <a href="{% url 'system:user_detail' user.id %}" 
+                                               class="btn btn-sm btn-outline-info" 
+                                               title="查看詳情">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'system:user_edit' user.id %}" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               title="編輯">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                    <a href="{% url 'system:user_change_password' user.id %}" 
-                                       class="btn btn-sm btn-outline-warning" 
-                                       title="修改密碼">
+                                            <a href="{% url 'system:user_change_password' user.id %}" 
+                                               class="btn btn-sm btn-outline-warning" 
+                                               title="修改密碼">
                                                 <i class="fas fa-key"></i>
                                             </a>
-                                    {% if not user.is_superuser or user.id != request.user.id %}
-                                    <button type="button" 
-                                            class="btn btn-sm btn-outline-danger" 
-                                            onclick="confirmDelete({{ user.id }}, '{{ user.username }}')"
-                                            title="刪除">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                            {% if not user.is_superuser or user.id != request.user.id %}
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-outline-danger" 
+                                                    onclick="confirmDelete({{ user.id }}, '{{ user.username }}')"
+                                                    title="刪除">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
                                             {% endif %}
                                         </div>
                                     </td>

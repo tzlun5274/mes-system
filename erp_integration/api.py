@@ -40,9 +40,13 @@ class CompanyConfigAPIView(View):
                         'company_code': company.company_code,
                         'company_name': company.company_name,
                         'database': company.database,
-                        'is_active': company.is_active,
-                        'created_at': company.created_at.isoformat(),
-                        'updated_at': company.updated_at.isoformat(),
+                        'mssql_database': company.mssql_database,
+                        'mes_database': company.mes_database,
+                        'notes': company.notes,
+                        'sync_tables': company.sync_tables,
+                        'last_sync_version': company.last_sync_version,
+                        'last_sync_time': company.last_sync_time.isoformat() if company.last_sync_time else None,
+                        'sync_interval_minutes': company.sync_interval_minutes,
                     }
                     return JsonResponse({
                         'success': True,
@@ -63,9 +67,13 @@ class CompanyConfigAPIView(View):
                         'company_code': company.company_code,
                         'company_name': company.company_name,
                         'database': company.database,
-                        'is_active': company.is_active,
-                        'created_at': company.created_at.isoformat(),
-                        'updated_at': company.updated_at.isoformat(),
+                        'mssql_database': company.mssql_database,
+                        'mes_database': company.mes_database,
+                        'notes': company.notes,
+                        'sync_tables': company.sync_tables,
+                        'last_sync_version': company.last_sync_version,
+                        'last_sync_time': company.last_sync_time.isoformat() if company.last_sync_time else None,
+                        'sync_interval_minutes': company.sync_interval_minutes,
                     })
                 
                 return JsonResponse({
@@ -104,14 +112,9 @@ class ERPConfigAPIView(View):
                     config = ERPConfig.objects.get(id=config_id)
                     data = {
                         'id': config.id,
-                        'config_name': config.config_name,
-                        'server_host': config.server_host,
-                        'server_port': config.server_port,
-                        'database_name': config.database_name,
+                        'server': config.server,
                         'username': config.username,
-                        'is_active': config.is_active,
-                        'created_at': config.created_at.isoformat(),
-                        'updated_at': config.updated_at.isoformat(),
+                        'last_updated': config.last_updated.isoformat(),
                     }
                     return JsonResponse({
                         'success': True,
@@ -129,14 +132,9 @@ class ERPConfigAPIView(View):
                 for config in configs:
                     data.append({
                         'id': config.id,
-                        'config_name': config.config_name,
-                        'server_host': config.server_host,
-                        'server_port': config.server_port,
-                        'database_name': config.database_name,
+                        'server': config.server,
                         'username': config.username,
-                        'is_active': config.is_active,
-                        'created_at': config.created_at.isoformat(),
-                        'updated_at': config.updated_at.isoformat(),
+                        'last_updated': config.last_updated.isoformat(),
                     })
                 
                 return JsonResponse({
@@ -177,9 +175,13 @@ def get_company_by_code(request):
                 'company_code': company.company_code,
                 'company_name': company.company_name,
                 'database': company.database,
-                'is_active': company.is_active,
-                'created_at': company.created_at.isoformat(),
-                'updated_at': company.updated_at.isoformat(),
+                'mssql_database': company.mssql_database,
+                'mes_database': company.mes_database,
+                'notes': company.notes,
+                'sync_tables': company.sync_tables,
+                'last_sync_version': company.last_sync_version,
+                'last_sync_time': company.last_sync_time.isoformat() if company.last_sync_time else None,
+                'sync_interval_minutes': company.sync_interval_minutes,
             }
             
             return JsonResponse({
@@ -212,18 +214,15 @@ def get_erp_operation_logs(request):
     try:
         limit = int(request.GET.get('limit', 50))
         
-        logs = ERPIntegrationOperationLog.objects.all().order_by('-created_at')[:limit]
+        logs = ERPIntegrationOperationLog.objects.all().order_by('-timestamp')[:limit]
         
         data = []
         for log in logs:
             data.append({
                 'id': log.id,
-                'operation_type': log.operation_type,
-                'table_name': log.table_name,
-                'company_code': log.company_code,
-                'status': log.status,
-                'message': log.message,
-                'created_at': log.created_at.isoformat(),
+                'user': log.user,
+                'action': log.action,
+                'timestamp': log.timestamp.isoformat(),
             })
         
         return JsonResponse({
@@ -249,7 +248,7 @@ def get_active_companies(request):
     GET /api/erp/active-companies/
     """
     try:
-        companies = CompanyConfig.objects.filter(is_active=True)
+        companies = CompanyConfig.objects.all()
         
         data = []
         for company in companies:
@@ -258,7 +257,13 @@ def get_active_companies(request):
                 'company_code': company.company_code,
                 'company_name': company.company_name,
                 'database': company.database,
-                'created_at': company.created_at.isoformat(),
+                'mssql_database': company.mssql_database,
+                'mes_database': company.mes_database,
+                'notes': company.notes,
+                'sync_tables': company.sync_tables,
+                'last_sync_version': company.last_sync_version,
+                'last_sync_time': company.last_sync_time.isoformat() if company.last_sync_time else None,
+                'sync_interval_minutes': company.sync_interval_minutes,
             })
         
         return JsonResponse({
@@ -284,18 +289,15 @@ def get_active_erp_configs(request):
     GET /api/erp/active-erp-configs/
     """
     try:
-        configs = ERPConfig.objects.filter(is_active=True)
+        configs = ERPConfig.objects.all()
         
         data = []
         for config in configs:
             data.append({
                 'id': config.id,
-                'config_name': config.config_name,
-                'server_host': config.server_host,
-                'server_port': config.server_port,
-                'database_name': config.database_name,
+                'server': config.server,
                 'username': config.username,
-                'created_at': config.created_at.isoformat(),
+                'last_updated': config.last_updated.isoformat(),
             })
         
         return JsonResponse({

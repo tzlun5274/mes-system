@@ -118,6 +118,9 @@
                             <th>產能倍數</th>
                             <th>目標每小時產出</th>
                             {% endif %}
+                            {% if is_completed_workorder %}
+                            <th>每小時產能 <small class="text-muted">(pcs/hr)</small></th>
+                            {% endif %}
                             <th>預計工時</th>
                             <th>開始時間</th>
                             {% if is_completed_workorder %}
@@ -146,6 +149,17 @@
                             {% if not is_completed_workorder %}
                             <td>{{ process.capacity_multiplier }}</td>
                             <td>{{ process.target_hourly_output|default:'-' }}</td>
+                            {% endif %}
+                            {% if is_completed_workorder %}
+                            <td>
+                                {% if process.actual_hourly_capacity and process.actual_hourly_capacity > 0 %}
+                                    <span class="badge bg-info" title="實際每小時產能：{{ process.actual_hourly_capacity|floatformat:1 }} 件/小時">
+                                        {{ process.actual_hourly_capacity|floatformat:1 }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted" title="尚未有報工記錄或產能為0">-</span>
+                                {% endif %}
+                            </td>
                             {% endif %}
                             <td>{{ process.estimated_hours }}</td>
                             <td>{{ process.actual_start_time|date:'Y-m-d H:i'|default:'-' }}</td>
