@@ -162,34 +162,48 @@ class WorkOrderRollbackService:
             
             # 重建工單工序記錄
             for completed_process in completed_processes:
-                # 檢查是否已存在相同的工序記錄
-                existing_process = WorkOrderProcess.objects.filter(
-                    workorder_id=workorder.id,
-                    process_name=completed_process.process_name
-                ).first()
-                
-                if not existing_process:
-                    # 建立新的工序記錄
-                    WorkOrderProcess.objects.create(
+                try:
+                    # 檢查必要欄位是否存在
+                    if not completed_process.process_name:
+                        logger.warning(f"工序記錄缺少工序名稱，跳過：{completed_process.id}")
+                        continue
+                    
+                    if completed_process.process_order is None:
+                        logger.warning(f"工序記錄缺少工序順序，使用預設值：{completed_process.id}")
+                        process_order = 1
+                    else:
+                        process_order = completed_process.process_order
+                    
+                    # 檢查是否已存在相同的工序記錄
+                    existing_process = WorkOrderProcess.objects.filter(
                         workorder_id=workorder.id,
-                        process_name=completed_process.process_name,
-                        planned_quantity=completed_process.planned_quantity,
-                        completed_quantity=completed_process.completed_quantity,
-                        status='in_progress',  # 回朔為生產中狀態
-                        assigned_operator=completed_process.assigned_operator or '',
-                        assigned_equipment=completed_process.assigned_equipment or '',
-                        start_date=completed_process.start_date,
-                        end_date=None,  # 清除結束時間
-                        work_hours=completed_process.work_hours or 0,
-                        overtime_hours=completed_process.overtime_hours or 0,
-                        good_quantity=completed_process.good_quantity or 0,
-                        defect_quantity=completed_process.defect_quantity or 0
-                    )
-                else:
-                    # 更新現有工序記錄
-                    existing_process.status = 'in_progress'
-                    existing_process.end_date = None
-                    existing_process.save()
+                        process_name=completed_process.process_name
+                    ).first()
+                    
+                    if not existing_process:
+                        # 建立新的工序記錄
+                        WorkOrderProcess.objects.create(
+                            workorder_id=workorder.id,
+                            process_name=completed_process.process_name,
+                            step_order=process_order,
+                            planned_quantity=completed_process.planned_quantity or 0,
+                            completed_quantity=completed_process.completed_quantity or 0,
+                            status='in_progress',  # 回朔為生產中狀態
+                            assigned_operator=completed_process.assigned_operator or '',
+                            assigned_equipment=completed_process.assigned_equipment or '',
+                            # 移除不存在的欄位：start_date, end_date, work_hours, overtime_hours, good_quantity, defect_quantity
+                        )
+                        logger.info(f"建立工序記錄：{completed_process.process_name}")
+                    else:
+                        # 更新現有工序記錄
+                        existing_process.status = 'in_progress'
+                        existing_process.save()
+                        logger.info(f"更新工序記錄：{completed_process.process_name}")
+                        
+                except Exception as e:
+                    logger.error(f"處理工序記錄失敗 {completed_process.id}: {str(e)}")
+                    # 繼續處理下一個工序記錄，不中斷整個回朔過程
+                    continue
             
             logger.info(f"回寫工單工序記錄完成：工單 {workorder.order_number}")
             
@@ -229,7 +243,7 @@ class WorkOrderRollbackService:
                             process_name=completed_process.process_name,
                             operator=completed_process.assigned_operator,
                             equipment=completed_process.assigned_equipment or '',
-                            assigned_date=completed_process.start_date or timezone.now().date(),
+                            assigned_date=timezone.now().date(),
                             status='assigned'
                         )
             
@@ -311,35 +325,48 @@ class WorkOrderRollbackService:
             
             # 回寫派工單工序明細
             for completed_process in completed_processes:
-                # 檢查是否已存在相同的工序明細
-                existing_process = WorkOrderDispatchProcess.objects.filter(
-                    workorder_dispatch_id=str(dispatch.id),
-                    process_name=completed_process.process_name
-                ).first()
-                
-                if not existing_process:
-                    # 建立新的工序明細
-                    WorkOrderDispatchProcess.objects.create(
+                try:
+                    # 檢查必要欄位是否存在
+                    if not completed_process.process_name:
+                        logger.warning(f"工序記錄缺少工序名稱，跳過：{completed_process.id}")
+                        continue
+                    
+                    if completed_process.process_order is None:
+                        logger.warning(f"工序記錄缺少工序順序，使用預設值：{completed_process.id}")
+                        process_order = 1
+                    else:
+                        process_order = completed_process.process_order
+                    
+                    # 檢查是否已存在相同的工序明細
+                    existing_process = WorkOrderDispatchProcess.objects.filter(
                         workorder_dispatch_id=str(dispatch.id),
-                        workorder_dispatch_name=dispatch.order_number,
-                        process_name=completed_process.process_name,
-                        planned_quantity=completed_process.planned_quantity,
-                        completed_quantity=completed_process.completed_quantity,
-                        status='in_progress',  # 回朔為生產中狀態
-                        assigned_operator=completed_process.assigned_operator or '',
-                        assigned_equipment=completed_process.assigned_equipment or '',
-                        start_date=completed_process.start_date,
-                        end_date=None,  # 清除結束時間
-                        work_hours=completed_process.work_hours or 0,
-                        overtime_hours=completed_process.overtime_hours or 0,
-                        good_quantity=completed_process.good_quantity or 0,
-                        defect_quantity=completed_process.defect_quantity or 0
-                    )
-                else:
-                    # 更新現有工序明細
-                    existing_process.status = 'in_progress'
-                    existing_process.end_date = None
-                    existing_process.save()
+                        process_name=completed_process.process_name
+                    ).first()
+                    
+                    if not existing_process:
+                        # 建立新的工序明細
+                        WorkOrderDispatchProcess.objects.create(
+                            workorder_dispatch_id=str(dispatch.id),
+                            workorder_dispatch_name=dispatch.order_number,
+                            process_name=completed_process.process_name,
+                            step_order=process_order,
+                            planned_quantity=completed_process.planned_quantity or 0,
+                            assigned_operator=completed_process.assigned_operator or '',
+                            assigned_equipment=completed_process.assigned_equipment or '',
+                            dispatch_status='in_progress',  # 回朔為生產中狀態
+                            # 移除不存在的欄位：start_date, end_date, work_hours, overtime_hours, good_quantity, defect_quantity, completed_quantity, status
+                        )
+                        logger.info(f"建立派工單工序記錄：{completed_process.process_name}")
+                    else:
+                        # 更新現有工序明細
+                        existing_process.dispatch_status = 'in_progress'
+                        existing_process.save()
+                        logger.info(f"更新派工單工序記錄：{completed_process.process_name}")
+                        
+                except Exception as e:
+                    logger.error(f"處理派工單工序記錄失敗 {completed_process.id}: {str(e)}")
+                    # 繼續處理下一個工序記錄，不中斷整個回朔過程
+                    continue
             
             logger.info(f"回寫派工單工序明細完成：工單 {workorder.order_number}")
             

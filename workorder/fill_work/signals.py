@@ -57,8 +57,38 @@ def fill_work_post_save(sender, instance, created, **kwargs):
         
         if dispatch:
             # 更新派工單統計資料
-            dispatch.update_all_statistics()
+            from workorder.services.dispatch_statistics_service import DispatchStatisticsService
+            DispatchStatisticsService.update_dispatch_statistics(dispatch)
             logger.info(f"已更新派工單統計資料: {dispatch.order_number}")
+            
+            # 如果是出貨包裝工序且已核准，特別記錄完工狀態更新
+            if (instance.operation == '出貨包裝' and 
+                instance.approval_status == 'approved'):
+                logger.info(f"出貨包裝填報記錄已核准，派工單完工狀態: 可以完工={dispatch.can_complete}, 閾值達成={dispatch.completion_threshold_met}")
+                
+                # 如果達到完工條件，觸發自動完工檢查
+                if dispatch.can_complete:
+                    logger.info(f"派工單 {dispatch.order_number} 達到完工條件，觸發自動完工檢查")
+                    try:
+                        from workorder.services.completion_service import FillWorkCompletionService
+                        from workorder.models import WorkOrder
+                        
+                        # 查找對應的工單
+                        workorder = WorkOrder.objects.get(
+                            order_number=dispatch.order_number,
+                            product_code=dispatch.product_code,
+                            company_code=dispatch.company_code
+                        )
+                        
+                        # 執行自動完工
+                        result = FillWorkCompletionService.auto_complete_workorder(workorder.id)
+                        if result.get('success'):
+                            logger.info(f"工單 {workorder.order_number} 自動完工成功")
+                        else:
+                            logger.warning(f"工單 {workorder.order_number} 自動完工失敗: {result.get('message', '未知錯誤')}")
+                            
+                    except Exception as e:
+                        logger.error(f"觸發自動完工失敗: {str(e)}")
         else:
             logger.warning(f"找不到對應的派工單：{instance.workorder} - {instance.product_id}")
             

@@ -11,6 +11,7 @@ from django.db import transaction
 from django.utils import timezone
 from workorder.models import WorkOrder
 from workorder.workorder_dispatch.models import WorkOrderDispatch
+from workorder.services.completion_service import FillWorkCompletionService
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,6 @@ def workorder_archive_task():
     執行方式：排程自動執行
     """
     try:
-        from workorder.services.completion_service import FillWorkCompletionService
         from django.utils import timezone
         
         # 執行完整的工單歸檔流程
@@ -240,6 +240,74 @@ def auto_convert_orders():
 
 
 @shared_task
+def auto_check_workorder_completion():
+    """
+    自動檢查工單完工狀態
+    檢查所有生產中的工單是否達到完工條件
+    """
+    try:
+        logger.info("開始執行自動完工檢查任務")
+        
+        # 取得所有生產中的工單
+        production_workorders = WorkOrder.objects.filter(status='in_progress')
+        total_count = production_workorders.count()
+        
+        if total_count == 0:
+            logger.info("沒有生產中的工單需要檢查")
+            return {
+                'success': True,
+                'message': '沒有生產中的工單需要檢查',
+                'checked_count': 0,
+                'completed_count': 0
+            }
+        
+        completed_count = 0
+        error_count = 0
+        
+        for workorder in production_workorders:
+            try:
+                # 檢查完工條件
+                summary = FillWorkCompletionService.get_completion_summary(workorder.id)
+                
+                if summary.get('can_complete', False):
+                    # 執行自動完工
+                    result = FillWorkCompletionService.auto_complete_workorder(workorder.id)
+                    
+                    if result.get('success', False):
+                        completed_count += 1
+                        logger.info(f"工單 {workorder.order_number} 自動完工成功")
+                    else:
+                        error_count += 1
+                        logger.warning(f"工單 {workorder.order_number} 自動完工失敗：{result.get('message', '未知錯誤')}")
+                else:
+                    logger.debug(f"工單 {workorder.order_number} 尚未達到完工條件")
+                    
+            except Exception as e:
+                error_count += 1
+                logger.error(f"檢查工單 {workorder.order_number} 完工狀態時發生錯誤：{str(e)}")
+        
+        logger.info(f"自動完工檢查任務完成：檢查了 {total_count} 個工單，完工 {completed_count} 個，錯誤 {error_count} 個")
+        
+        return {
+            'success': True,
+            'message': f'自動完工檢查任務完成，檢查了 {total_count} 個工單',
+            'checked_count': total_count,
+            'completed_count': completed_count,
+            'error_count': error_count
+        }
+        
+    except Exception as e:
+        logger.error(f"自動完工檢查任務執行失敗: {str(e)}")
+        return {
+            'success': False,
+            'error': f'自動完工檢查任務執行失敗: {str(e)}',
+            'checked_count': 0,
+            'completed_count': 0,
+            'error_count': 1
+        }
+
+
+@shared_task
 def auto_data_transfer_task():
     """
     定時任務：自動轉移已完工工單資料
@@ -247,7 +315,6 @@ def auto_data_transfer_task():
     """
     try:
         from workorder.models import SystemConfig
-        from workorder.services.completion_service import CompletionService
         
         # 檢查智能自動完工功能是否啟用（資料轉移使用同一個開關）
         try:
@@ -274,8 +341,37 @@ def auto_data_transfer_task():
         
         logger.info(f"開始執行自動資料轉移任務，批次大小：{batch_size}")
         
-        # 執行資料轉移服務
-        result = CompletionService.transfer_completed_workorders(batch_size=batch_size)
+        # 執行統一資料轉移服務
+        from workorder.services.unified_transfer_service import UnifiedTransferService
+        
+        # 獲取需要轉移的工單
+        from workorder.models import WorkOrder, CompletedWorkOrder
+        completed_workorders = WorkOrder.objects.filter(
+            status='completed'
+        ).exclude(
+            id__in=CompletedWorkOrder.objects.values_list('original_workorder_id', flat=True)
+        )[:batch_size]
+        
+        transferred_count = 0
+        errors = []
+        
+        for workorder in completed_workorders:
+            try:
+                transfer_result = UnifiedTransferService.transfer_workorder_to_completed(
+                    workorder.id, "定時自動轉移"
+                )
+                if transfer_result.get('success'):
+                    transferred_count += 1
+                else:
+                    errors.append(f'工單 {workorder.order_number}: {transfer_result.get("error", "轉移失敗")}')
+            except Exception as e:
+                errors.append(f'工單 {workorder.order_number}: {str(e)}')
+        
+        result = {
+            'success': True,
+            'transferred_count': transferred_count,
+            'errors': errors
+        }
         
         if result.get('success', False):
             transferred_count = result.get('transferred_count', 0)

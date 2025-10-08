@@ -25,12 +25,12 @@ from .models import (
     WorkOrderReportData, ReportSchedule, ReportExecutionLog,
     OperatorProcessCapacityScore, CompletedWorkOrderAnalysis
 )
+from .batch_export_service import BatchExportService
 from .forms import (
     GenerateScoringReportForm, 
     SupervisorScoreForm, OperatorScoreFilterForm
 )
 from .scheduler import ReportScheduler
-from .report_generator import ReportGenerator
 from .report_schedule_sync_service import ReportScheduleSyncService
 from django.utils import timezone
 from datetime import timedelta
@@ -927,6 +927,168 @@ def work_hour_report_index(request):
 
 
 @login_required
+def work_hour_report_management(request):
+    """工作時數報表檔案管理"""
+    import os
+    from django.conf import settings
+    
+    # 獲取報表檔案目錄
+    report_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
+    report_files = []
+    
+    if os.path.exists(report_dir):
+        files = os.listdir(report_dir)
+        # 顯示所有報表檔案
+        work_hour_files = [f for f in files if f.endswith(('.html', '.xlsx', '.pdf'))]
+        work_hour_files.sort(reverse=True)  # 最新的檔案在前
+        
+        for file in work_hour_files[:20]:  # 只顯示最近20個檔案
+            file_path = os.path.join(report_dir, file)
+            if os.path.isfile(file_path):
+                file_stat = os.stat(file_path)
+                file_size = file_stat.st_size
+                file_time = datetime.fromtimestamp(file_stat.st_mtime)
+                
+                # 判斷檔案類型
+                file_type = 'HTML'
+                if file.endswith('.xlsx'):
+                    file_type = 'Excel'
+                elif file.endswith('.pdf'):
+                    file_type = 'PDF'
+                
+                # 格式化檔案大小
+                if file_size < 1024:
+                    size_text = f"{file_size} B"
+                elif file_size < 1048576:
+                    size_text = f"{file_size / 1024:.1f} KB"
+                else:
+                    size_text = f"{file_size / 1048576:.1f} MB"
+                
+                report_files.append({
+                    'name': file,
+                    'path': file_path,
+                    'size': file_size,
+                    'size_text': size_text,
+                    'time': file_time,
+                    'type': file_type,
+                    'url': f'/media/reports/{file}'
+                })
+    
+    # 計算各類型檔案數量
+    excel_count = len([f for f in report_files if f['type'] == 'Excel'])
+    html_count = len([f for f in report_files if f['type'] == 'HTML'])
+    pdf_count = len([f for f in report_files if f['type'] == 'PDF'])
+    
+    context = {
+        'report_files': report_files,
+        'total_files': len(report_files),
+        'excel_count': excel_count,
+        'html_count': html_count,
+        'pdf_count': pdf_count
+    }
+    
+    return render(request, 'reporting/reporting/work_hour_report_management.html', context)
+
+
+@login_required
+def work_hour_report_files_api(request):
+    """工作時數報表檔案 API"""
+    import os
+    from django.conf import settings
+    from django.http import JsonResponse
+    
+    # 獲取報表檔案目錄
+    report_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
+    report_files = []
+    
+    if os.path.exists(report_dir):
+        files = os.listdir(report_dir)
+        # 顯示所有報表檔案
+        work_hour_files = [f for f in files if f.endswith(('.html', '.xlsx', '.pdf'))]
+        work_hour_files.sort(reverse=True)  # 最新的檔案在前
+        
+        for file in work_hour_files[:50]:  # 顯示最近50個檔案
+            file_path = os.path.join(report_dir, file)
+            if os.path.isfile(file_path):
+                file_stat = os.stat(file_path)
+                file_size = file_stat.st_size
+                file_time = datetime.fromtimestamp(file_stat.st_mtime)
+                
+                # 判斷檔案類型
+                file_type = 'HTML'
+                if file.endswith('.xlsx'):
+                    file_type = 'Excel'
+                elif file.endswith('.pdf'):
+                    file_type = 'PDF'
+                
+                report_files.append({
+                    'name': file,
+                    'size': file_size,
+                    'time': file_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'type': file_type,
+                    'url': f'/media/reports/{file}'
+                })
+    
+    return JsonResponse({
+        'files': report_files,
+        'total': len(report_files)
+    })
+
+
+@login_required
+def batch_delete_files(request):
+    """批次刪除報表檔案"""
+    import os
+    from django.conf import settings
+    from django.http import JsonResponse
+    
+    if request.method == 'POST':
+        try:
+            import json
+            data = json.loads(request.body)
+            file_names = data.get('files', [])
+            
+            if not file_names:
+                return JsonResponse({
+                    'success': False,
+                    'message': '沒有選擇要刪除的檔案'
+                })
+            
+            report_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
+            deleted_files = []
+            failed_files = []
+            
+            for file_name in file_names:
+                file_path = os.path.join(report_dir, file_name)
+                try:
+                    if os.path.exists(file_path) and os.path.isfile(file_path):
+                        os.remove(file_path)
+                        deleted_files.append(file_name)
+                    else:
+                        failed_files.append(f"{file_name} (檔案不存在)")
+                except Exception as e:
+                    failed_files.append(f"{file_name} (刪除失敗: {str(e)})")
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'成功刪除 {len(deleted_files)} 個檔案',
+                'deleted_files': deleted_files,
+                'failed_files': failed_files
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f'批次刪除失敗: {str(e)}'
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'message': '無效的請求方法'
+    })
+
+
+@login_required
 def daily_report(request):
     """日報表預覽"""
     if request.method == 'POST':
@@ -1586,10 +1748,27 @@ def report_schedule_form(request, schedule_id=None):
             if report_type == 'data_sync':
                 company = 'ALL'  # 填報與現場記錄資料同步不分公司，自動設為 ALL
             
-            # 處理執行時間：填報與現場記錄資料同步類型可以為空
+            # 處理執行時間
             schedule_time = request.POST.get('schedule_time')
-            if report_type == 'data_sync' and not schedule_time:
-                schedule_time = '09:00:00'  # 填報與現場記錄資料同步預設時間
+            
+            # 如果時間為空或無效，設定預設值
+            if not schedule_time or schedule_time.strip() == '' or schedule_time.strip() == '""':
+                schedule_time = '09:00:00'  # 預設時間
+            else:
+                # 清理時間字串，移除可能的引號和空白
+                schedule_time = schedule_time.strip().strip('"').strip("'")
+                
+                # 如果清理後為空，使用預設值
+                if not schedule_time:
+                    schedule_time = '09:00:00'
+                # 確保時間格式正確 - 所有報表類型都需要處理
+                elif len(schedule_time) == 5:  # HH:MM 格式
+                    schedule_time = schedule_time + ':00'  # 轉換為 HH:MM:SS 格式
+                elif len(schedule_time) == 8:  # HH:MM:SS 格式，直接使用
+                    pass
+                else:
+                    # 其他格式，使用預設值
+                    schedule_time = '09:00:00'
             
             if schedule:
                 # 更新現有排程
@@ -1601,7 +1780,22 @@ def report_schedule_form(request, schedule_id=None):
                 schedule.file_format = request.POST.get('file_format', 'html')
                 schedule.sync_execution_type = request.POST.get('sync_execution_type', 'interval')
                 schedule.sync_interval_minutes = request.POST.get('sync_interval_minutes', 60)
-                schedule.sync_fixed_time = request.POST.get('sync_fixed_time') or None
+                # 處理固定同步時間
+                sync_fixed_time = request.POST.get('sync_fixed_time')
+                if sync_fixed_time and sync_fixed_time.strip() and sync_fixed_time.strip() != '""':
+                    # 清理時間字串
+                    sync_fixed_time = sync_fixed_time.strip().strip('"').strip("'")
+                    if sync_fixed_time:
+                        # 確保時間格式正確
+                        if len(sync_fixed_time) == 5:  # HH:MM 格式
+                            sync_fixed_time = sync_fixed_time + ':00'  # 轉換為 HH:MM:SS 格式
+                        elif len(sync_fixed_time) != 8:  # 不是 HH:MM:SS 格式
+                            sync_fixed_time = None
+                    else:
+                        sync_fixed_time = None
+                else:
+                    sync_fixed_time = None
+                schedule.sync_fixed_time = sync_fixed_time
                 schedule.status = request.POST.get('status')
                 schedule.email_recipients = request.POST.get('email_recipients', '')
                 schedule.save()
@@ -1612,6 +1806,22 @@ def report_schedule_form(request, schedule_id=None):
                 
                 messages.success(request, '報表排程更新成功')
             else:
+                # 處理固定同步時間（建立新排程時）
+                sync_fixed_time = request.POST.get('sync_fixed_time')
+                if sync_fixed_time and sync_fixed_time.strip() and sync_fixed_time.strip() != '""':
+                    # 清理時間字串
+                    sync_fixed_time = sync_fixed_time.strip().strip('"').strip("'")
+                    if sync_fixed_time:
+                        # 確保時間格式正確
+                        if len(sync_fixed_time) == 5:  # HH:MM 格式
+                            sync_fixed_time = sync_fixed_time + ':00'  # 轉換為 HH:MM:SS 格式
+                        elif len(sync_fixed_time) != 8:  # 不是 HH:MM:SS 格式
+                            sync_fixed_time = None
+                    else:
+                        sync_fixed_time = None
+                else:
+                    sync_fixed_time = None
+                
                 # 建立新排程
                 schedule = ReportSchedule.objects.create(
                     name=request.POST.get('name'),
@@ -1622,7 +1832,7 @@ def report_schedule_form(request, schedule_id=None):
                     file_format=request.POST.get('file_format', 'html'),
                     sync_execution_type=request.POST.get('sync_execution_type', 'interval'),
                     sync_interval_minutes=request.POST.get('sync_interval_minutes', 60),
-                    sync_fixed_time=request.POST.get('sync_fixed_time') or None,
+                    sync_fixed_time=sync_fixed_time,
                     status=request.POST.get('status'),
                     email_recipients=request.POST.get('email_recipients', ''),
                 )
@@ -1861,11 +2071,31 @@ def sync_report_schedules(request):
 def sync_report_data(request):
     """同步報表資料"""
     try:
-        from .data_sync import DataSyncService
+        from django.core.management import call_command
+        from io import StringIO
+        import sys
         
-        # 使用統一的資料同步核心函數
-        # 手動同步：同步所有資料，不強制同步（會跳過已存在的記錄）
-        result = DataSyncService.sync_fill_work_and_onsite_data(force_sync=False)
+        # 使用管理命令進行資料同步
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+        
+        try:
+            call_command('sync_report_data')
+            output = captured_output.getvalue()
+            
+            # 解析輸出結果
+            result = {
+                'success': True,
+                'message': f'資料同步完成: {output.strip()}',
+                'fill_works_synced': 0,  # 管理命令的輸出格式需要解析
+                'onsite_synced': 0,
+                'total_synced': 0,
+                'fill_works_skipped': 0,
+                'onsite_skipped': 0,
+                'total_skipped': 0
+            }
+        finally:
+            sys.stdout = old_stdout
         
         if result['success']:
             # 檢查是否為 AJAX 請求
@@ -1924,7 +2154,7 @@ def chart_data(request):
         daily_data = WorkOrderReportData.objects.filter(
             work_date__range=[start_date, end_date]
         ).values('work_date').annotate(
-            total_hours=Sum('daily_work_hours')
+            total_hours=Sum('work_hours')
         ).order_by('work_date')
         
         labels = []
@@ -1940,9 +2170,14 @@ def chart_data(request):
         })
     
     elif chart_type == 'company_distribution':
-        # 公司工作時數分布圖資料
-        company_data = WorkOrderReportData.objects.values('company').annotate(
-            total_hours=Sum('daily_work_hours')
+        # 公司工作時數分布圖資料（最近90天）
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=90)
+        
+        company_data = WorkOrderReportData.objects.filter(
+            work_date__range=[start_date, end_date]
+        ).values('company').annotate(
+            total_hours=Sum('work_hours')
         ).order_by('-total_hours')[:5]
         
         labels = []
@@ -1976,16 +2211,28 @@ def report_data_list(request):
     """提供報表資料列表的 API"""
     from django.http import JsonResponse
     from django.core.paginator import Paginator
+    from django.db.models import Sum, Count
+    from datetime import timedelta, date
     
     # 取得分頁參數
     page = request.GET.get('page', 1)
     per_page = 20  # 每頁顯示20筆
     
-    # 取得所有資料，按日期排序
-    queryset = WorkOrderReportData.objects.all().order_by('-work_date')
+    # 計算三個月前的日期
+    three_months_ago = date.today() - timedelta(days=90)
+    
+    # 按工單編號、公司、日期分組，合併計算工作時數，只顯示最近三個月
+    grouped_data = WorkOrderReportData.objects.filter(
+        work_date__gte=three_months_ago
+    ).values(
+        'workorder_id', 'company', 'work_date'
+    ).annotate(
+        total_daily_hours=Sum('work_hours'),
+        operator_count=Count('operator_name', distinct=True)
+    ).order_by('-work_date')
     
     # 建立分頁器
-    paginator = Paginator(queryset, per_page)
+    paginator = Paginator(grouped_data, per_page)
     
     try:
         page_obj = paginator.page(page)
@@ -1994,14 +2241,35 @@ def report_data_list(request):
     
     data = []
     for item in page_obj:
+        # 計算週工作時數（按工單編號、公司、週範圍）
+        start_of_week = item['work_date'] - timedelta(days=item['work_date'].weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        weekly_hours = WorkOrderReportData.objects.filter(
+            workorder_id=item['workorder_id'],
+            company=item['company'],
+            work_date__range=[start_of_week, end_of_week]
+        ).aggregate(total=Sum('work_hours'))['total'] or 0
+        
+        # 計算月工作時數（按工單編號、公司、月範圍）
+        start_of_month = item['work_date'].replace(day=1)
+        if item['work_date'].month == 12:
+            end_of_month = item['work_date'].replace(year=item['work_date'].year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            end_of_month = item['work_date'].replace(month=item['work_date'].month + 1, day=1) - timedelta(days=1)
+        monthly_hours = WorkOrderReportData.objects.filter(
+            workorder_id=item['workorder_id'],
+            company=item['company'],
+            work_date__range=[start_of_month, end_of_month]
+        ).aggregate(total=Sum('work_hours'))['total'] or 0
+        
         data.append({
-            'workorder_id': item.workorder_id,
-            'company': item.company or '未指定',
-            'work_date': item.work_date.strftime('%Y-%m-%d'),
-            'daily_work_hours': float(item.daily_work_hours or 0),
-            'weekly_work_hours': float(item.weekly_work_hours or 0),
-            'monthly_work_hours': float(item.monthly_work_hours or 0),
-            'operator_count': item.operator_count or 0,
+            'workorder_id': item['workorder_id'],
+            'company': item['company'] or '未指定',
+            'work_date': item['work_date'].strftime('%Y-%m-%d'),
+            'daily_work_hours': float(item['total_daily_hours'] or 0),
+            'weekly_work_hours': float(weekly_hours),
+            'monthly_work_hours': float(monthly_hours),
+            'operator_count': item['operator_count'] or 0,
         })
     
     # 返回分頁資訊
@@ -2609,17 +2877,24 @@ def execute_previous_workday_report(request):
     """手動執行前一個工作日報表"""
     if request.method == 'POST':
         try:
+            # 創建一個臨時的 schedule 物件用於手動執行
+            class TempSchedule:
+                def __init__(self):
+                    self.file_format = 'html'  # 手動執行預設生成 HTML
+                    self.email_recipients = ''  # 手動執行不發送郵件
+                    self.name = "手動執行前一個工作日報表"
+                    self.report_type = 'previous_workday'  # 指定報表類型
+            
+            temp_schedule = TempSchedule()
+            
+            # 使用統一的 ReportScheduler 執行報表
             scheduler = ReportScheduler()
+            result = scheduler.execute_single_schedule(temp_schedule)
             
-            # 使用 ReportGenerator 生成前一個工作日報表
-            generator = ReportGenerator()
-            report_date = generator._collect_previous_workday_data(timezone.now().date() - timedelta(days=1))['date']
-            
-            # 生成報表（手動執行時預設生成 HTML 格式）
-            file_paths = generator.generate_previous_workday_report(report_date, 'html')
-            
-            # 手動執行不發送郵件，因為沒有排程設定
-            messages.success(request, f'前一個工作日報表執行成功！報表日期：{report_date}')
+            if result.get('success', False):
+                messages.success(request, f'前一個工作日報表執行成功！報表日期：{result.get("message", "")}')
+            else:
+                messages.error(request, f'執行前一個工作日報表失敗：{result.get("message", "未知錯誤")}')
             
         except Exception as e:
             messages.error(request, f'執行前一個工作日報表失敗：{str(e)}')
@@ -2627,52 +2902,6 @@ def execute_previous_workday_report(request):
     return redirect('reporting:index')
 
 
-@login_required
-def test_previous_workday_report(request):
-    """測試前一個工作日報表功能"""
-    from datetime import date, timedelta
-    
-    scheduler = ReportScheduler()
-    
-    # 測試資料
-    test_results = {
-        'current_date': date.today(),
-        'current_time': timezone.now().time(),
-        'should_execute': scheduler.should_execute(),
-        'report_date': scheduler.get_report_date(),
-        'next_5_days': [],
-    }
-    
-    # 測試未來5天的報表日期
-    for i in range(5):
-        test_date = date.today() + timedelta(days=i)
-        test_results['next_5_days'].append({
-            'date': test_date,
-            'report_date': scheduler.calendar_service.get_previous_workday(test_date),
-            'is_workday': scheduler.calendar_service.is_workday(test_date),
-        })
-    
-    # 測試資料收集
-    try:
-        data = scheduler.collect_data(test_results['report_date'])
-        test_results['data_collection'] = {
-            'success': True,
-            'fill_works_count': data['fill_works_count'],
-            'onsite_reports_count': data['onsite_reports_count'],
-            'total_work_hours': data['total_work_hours'],
-            'total_operators': data['total_operators'],
-            'total_equipment': data['total_equipment'],
-        }
-    except Exception as e:
-        test_results['data_collection'] = {
-            'success': False,
-            'error': str(e)
-        }
-    
-    context = {
-        'test_results': test_results,
-    }
-    return render(request, 'reporting/reporting/test_previous_workday_report.html', context)
 
 @login_required
 def previous_workday_report_management(request):
@@ -2690,15 +2919,17 @@ def previous_workday_report_management(request):
     current_datetime = timezone.localtime(timezone.now())
     current_time = current_datetime.time()
     report_date = scheduler.get_report_date()
-    should_execute = scheduler.should_execute()
+    should_execute = True  # 移除時間檢查，直接執行
     
     # 檢查報表檔案
-    report_dir = os.path.join(settings.MEDIA_ROOT, 'reports', 'previous_workday')
+    report_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
     report_files = []
     if os.path.exists(report_dir):
         files = os.listdir(report_dir)
-        files.sort(reverse=True)  # 最新的檔案在前
-        for file in files[:10]:  # 只顯示最近10個檔案
+        # 顯示所有報表檔案，不限制類型
+        all_report_files = [f for f in files if f.endswith(('.html', '.xlsx', '.pdf'))]
+        all_report_files.sort(reverse=True)  # 最新的檔案在前
+        for file in all_report_files[:20]:  # 顯示最近20個檔案
             file_path = os.path.join(report_dir, file)
             file_stat = os.stat(file_path)
             report_files.append({
@@ -2729,17 +2960,49 @@ def previous_workday_report_management(request):
             'is_workday': calendar_service.is_workday(test_date),
         })
     
-    # 測試資料收集
+    # 測試資料收集 - 使用實際有資料的日期
     try:
-        data = scheduler.collect_data(report_date)
-        data_collection = {
-            'success': True,
-            'fill_works_count': data['fill_works_count'],
-            'onsite_reports_count': data['onsite_reports_count'],
-            'total_work_hours': data['total_work_hours'],
-            'total_operators': data['total_operators'],
-            'total_equipment': data['total_equipment'],
-        }
+        # 先檢查報表日期是否有資料，如果沒有則往前找最近有資料的日期
+        from .models import WorkOrderReportData
+        actual_report_date = report_date
+        if not WorkOrderReportData.objects.filter(work_date=report_date).exists():
+            # 往前找最近有資料的日期
+            recent_dates = WorkOrderReportData.objects.values_list('work_date', flat=True).order_by('-work_date')[:5]
+            if recent_dates:
+                actual_report_date = recent_dates[0]
+                logger.info(f"報表日期 {report_date} 無資料，使用最近有資料的日期 {actual_report_date}")
+        
+        # 使用 DataCollector 收集資料
+        from .data_collector import DataCollector
+        data_collector = DataCollector()
+        data_result = data_collector.collect_report_data(
+            start_date=actual_report_date,
+            end_date=actual_report_date,
+            company_code='ALL'
+        )
+        
+        if data_result.get('success', False):
+            summary = data_result.get('summary', {})
+            data_collection = {
+                'success': True,
+                'fill_works_count': summary.get('total_records', 0),
+                'onsite_reports_count': summary.get('onsite_records', 0),
+                'total_work_hours': summary.get('total_work_hours', 0),
+                'total_operators': summary.get('operator_count', 0),
+                'total_equipment': summary.get('equipment_count', 0),
+                'actual_report_date': actual_report_date,  # 記錄實際使用的日期
+            }
+        else:
+            data_collection = {
+                'success': False,
+                'error': data_result.get('error', '資料收集失敗'),
+                'fill_works_count': 0,
+                'onsite_reports_count': 0,
+                'total_work_hours': 0,
+                'total_operators': 0,
+                'total_equipment': 0,
+                'actual_report_date': actual_report_date,
+            }
     except Exception as e:
         data_collection = {
             'success': False,
@@ -2825,80 +3088,6 @@ def government_calendar_sync(request):
     
     return render(request, 'reporting/reporting/government_calendar_sync.html', context)
 
-@login_required
-def csv_holiday_import(request):
-    """CSV 國定假日匯入管理"""
-    from .csv_holiday_import_service import CSVHolidayImportService
-    from django.http import HttpResponse
-    
-    csv_service = CSVHolidayImportService()
-    
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        
-        if action == 'import_csv':
-            # 處理 CSV 檔案匯入
-            if 'csv_file' in request.FILES:
-                csv_file = request.FILES['csv_file']
-                
-                # 檢查檔案類型
-                if not csv_file.name.endswith('.csv'):
-                    messages.error(request, '請上傳 CSV 格式的檔案')
-                    return redirect('reporting:csv_holiday_import')
-                
-                # 檢查檔案大小（限制 5MB）
-                if csv_file.size > 5 * 1024 * 1024:
-                    messages.error(request, '檔案大小不能超過 5MB')
-                    return redirect('reporting:csv_holiday_import')
-                
-                # 匯入 CSV 檔案
-                result = csv_service.import_holidays_from_csv(csv_file)
-                
-                if result['success']:
-                    messages.success(request, result['message'])
-                else:
-                    messages.error(request, result['message'])
-                
-                # 如果有錯誤，顯示詳細錯誤訊息
-                if result.get('errors'):
-                    for error in result['errors'][:5]:  # 只顯示前5個錯誤
-                        messages.warning(request, error)
-                    if len(result['errors']) > 5:
-                        messages.warning(request, f"... 還有 {len(result['errors']) - 5} 個錯誤")
-                
-            else:
-                messages.error(request, '請選擇要匯入的 CSV 檔案')
-                
-        elif action == 'download_sample':
-            # 下載範例 CSV 檔案
-            sample_content = csv_service.generate_sample_csv()
-            response = HttpResponse(sample_content, content_type='text/csv; charset=utf-8')
-            response['Content-Disposition'] = 'attachment; filename="holiday_sample.csv"'
-            return response
-    
-    # 取得匯入統計
-    from scheduling.models import Event
-    from datetime import datetime
-    
-    current_year = datetime.now().year
-    csv_imported_holidays = Event.objects.filter(
-        type='holiday',
-        created_by='csv_import',
-        start__year=current_year
-    ).count()
-    
-    total_holidays = Event.objects.filter(
-        type='holiday',
-        start__year=current_year
-    ).count()
-    
-    context = {
-        'current_year': current_year,
-        'csv_imported_holidays': csv_imported_holidays,
-        'total_holidays': total_holidays,
-    }
-    
-    return render(request, 'reporting/reporting/csv_holiday_import.html', context)
 
 class CompletedWorkOrderAnalysisIndexView(LoginRequiredMixin, TemplateView):
     """已完工工單分析報表首頁"""
@@ -3320,7 +3509,8 @@ class WorkOrderAnalysisManagementView(LoginRequiredMixin, TemplateView):
         
         # 計算已分析工單數（唯一工單）
         total_analyzed = CompletedWorkOrderAnalysis.objects.values('workorder_id', 'company_code', 'product_code').distinct().count()
-        total_completed = CompletedWorkOrder.objects.count()
+        # 排除RD樣品計算已完工工單數
+        total_completed = CompletedWorkOrder.objects.exclude(order_number__icontains='RD樣品').count()
         pending_analysis = total_completed - total_analyzed
         
         last_analysis = CompletedWorkOrderAnalysis.objects.order_by('-created_at').first()
@@ -3358,6 +3548,7 @@ class WorkOrderAnalysisManagementView(LoginRequiredMixin, TemplateView):
 def analyze_single_workorder(request):
     """分析單一工單"""
     from django.http import JsonResponse
+    from .workorder_analysis_service import WorkOrderAnalysisService
     
     workorder_id = request.POST.get('workorder_id')
     company_code = request.POST.get('company_code')
@@ -3370,7 +3561,6 @@ def analyze_single_workorder(request):
         })
     
     try:
-        from .workorder_analysis_service import WorkOrderAnalysisService
         result = WorkOrderAnalysisService.analyze_completed_workorder(
             workorder_id, company_code, force=force
         )
@@ -3389,13 +3579,17 @@ def analyze_single_workorder(request):
 def analyze_batch_workorders(request):
     """批量分析工單"""
     from django.http import JsonResponse
+    from .workorder_analysis_service import WorkOrderAnalysisService
     
     company_code = request.POST.get('company_code')
     start_date = request.POST.get('start_date')
     end_date = request.POST.get('end_date')
     
+    # 處理公司代號為空或"全部公司"的情況
+    if not company_code or company_code == '全部公司':
+        company_code = None
+    
     try:
-        from .workorder_analysis_service import WorkOrderAnalysisService
         result = WorkOrderAnalysisService.analyze_completed_workorders_batch(
             start_date=start_date,
             end_date=end_date,
@@ -3517,4 +3711,51 @@ def get_analysis_schedule_status(request):
         return JsonResponse({
             'has_schedule': False,
             'error': str(e)
+        })
+
+
+@login_required
+@require_POST
+def batch_export_workorder_analysis(request):
+    """批次匯出工單分析"""
+    try:
+        # 取得請求參數
+        analysis_ids = json.loads(request.POST.get('analysis_ids', '[]'))
+        export_type = request.POST.get('export_type', 'single')
+        export_format = request.POST.get('export_format', 'excel')
+        include_details = request.POST.get('include_details', 'false').lower() == 'true'
+        
+        if not analysis_ids:
+            return JsonResponse({
+                'success': False,
+                'message': '請選擇要匯出的工單'
+            })
+        
+        # 執行批次匯出
+        result = BatchExportService.export_workorder_analysis(
+            analysis_ids=analysis_ids,
+            export_type=export_type,
+            export_format=export_format,
+            include_details=include_details
+        )
+        
+        if result is None:
+            return JsonResponse({
+                'success': False,
+                'message': '匯出失敗，請稍後再試'
+            })
+        
+        return result
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON 解析錯誤: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': '請求參數格式錯誤'
+        })
+    except Exception as e:
+        logger.error(f"批次匯出工單分析失敗: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'匯出失敗: {str(e)}'
         })

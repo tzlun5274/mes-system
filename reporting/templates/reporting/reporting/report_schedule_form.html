@@ -190,7 +190,7 @@
                                             <i class="fas fa-clock text-primary"></i> 執行時間 <span class="text-danger">*</span>
                                         </label>
                                         <input type="time" class="form-control" id="schedule_time" name="schedule_time" 
-                                               value="{{ schedule.schedule_time|time:'H:i'|default:'' }}" required>
+                                               value="{% if schedule.schedule_time %}{{ schedule.schedule_time|time:'H:i' }}{% else %}09:00{% endif %}" required>
                                         <div class="form-text">設定每日執行時間</div>
                                     </div>
                                     <div class="col-md-6">
@@ -199,10 +199,10 @@
                                         </label>
                                         <input type="number" class="form-control" id="schedule_day" name="schedule_day" 
                                                value="{{ schedule.schedule_day|default:'' }}" 
-                                               min="1" max="31"
+                                               min="1" max="30"
                                                placeholder="請選擇執行日期">
                                         <div class="form-text">
-                                            <span id="schedule_day_help">週報表：週幾(1-7)，月報表：每月幾號(1-31)，年報表：每年幾號(1-31)</span>
+                                            <span id="schedule_day_help">週報表：週幾(1-7)，月報表：每月幾號(1-30)，年報表：每年1月幾號(1-30)</span>
                                         </div>
                                     </div>
                                 </div>
@@ -271,38 +271,34 @@
                     <div class="mb-3">
                         <h6 class="text-primary">📈 週報表</h6>
                         <ul class="small mb-2">
-                            <li><strong>本週報表：</strong>從週一到現在的工作資料</li>
                             <li><strong>上週報表：</strong>上週一到上週日的完整資料</li>
                         </ul>
-                        <p class="small text-muted">執行時間：每週一早上9點後</p>
+                        <p class="small text-muted">執行時間：可自訂每週幾執行（1-7），建議設定為週一</p>
                     </div>
                     
                     <div class="mb-3">
                         <h6 class="text-primary">📊 月報表</h6>
                         <ul class="small mb-2">
-                            <li><strong>本月報表：</strong>從本月1號到現在的工作資料</li>
                             <li><strong>上月報表：</strong>上個月1號到月底的完整資料</li>
                         </ul>
-                        <p class="small text-muted">執行時間：每月1號早上9點後</p>
+                        <p class="small text-muted">執行時間：可自訂每月幾號執行（1-31），建議設定為1號</p>
                     </div>
                     
                     <div class="mb-3">
                         <h6 class="text-primary">📈 季報表</h6>
                         <ul class="small mb-2">
-                            <li><strong>本季報表：</strong>從本季第一天到現在的工作資料</li>
                             <li><strong>上季報表：</strong>上個季度的完整期間資料</li>
                         </ul>
-                        <p class="small text-muted">執行時間：可自訂每季第幾天執行（1-31）</p>
+                        <p class="small text-muted">執行時間：可自訂每季第幾天執行（1-31），建議設定為1號</p>
                         <p class="small text-muted">季度定義：Q1(1-3月)、Q2(4-6月)、Q3(7-9月)、Q4(10-12月)</p>
                     </div>
                     
                     <div class="mb-3">
                         <h6 class="text-primary">📊 年報表</h6>
                         <ul class="small mb-2">
-                            <li><strong>本年報表：</strong>從今年1月1號到現在的工作資料</li>
-                            <li><strong>上年報表：</strong>去年的完整年度資料</li>
+                            <li><strong>去年報表：</strong>去年的完整年度資料</li>
                         </ul>
-                        <p class="small text-muted">執行時間：每年1月1號早上9點後</p>
+                        <p class="small text-muted">執行時間：可自訂每年1月幾號執行（1-31），建議設定為1號</p>
                     </div>
                     
                     <hr>
@@ -405,10 +401,10 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('company_field').style.display = 'block';
             scheduleTimeInput.placeholder = '建議設定為 09:00';
             scheduleDayInput.min = '1';
-            scheduleDayInput.max = '31';
-            scheduleDayInput.placeholder = '1-31';
-            scheduleDayHelp.textContent = '月報表：每月幾號(1-31)';
-            executionTimeInfo.innerHTML = '<p class="small text-primary"><strong>📊 月報表：</strong>可自訂每月幾號執行（1-31），建議設定為1號</p>';
+            scheduleDayInput.max = '30';
+            scheduleDayInput.placeholder = '1-30';
+            scheduleDayHelp.textContent = '月報表：每月幾號(1-30，建議設定1號)';
+            executionTimeInfo.innerHTML = '<p class="small text-primary"><strong>📊 月報表：</strong>可自訂每月幾號執行（1-30），建議設定為1號</p>';
         } else if (reportType.includes('quarter')) {
             // 季報表：可自訂每季第幾天
             scheduleTimeInput.parentElement.style.display = 'block';
@@ -418,10 +414,10 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('company_field').style.display = 'block';
             scheduleTimeInput.placeholder = '建議設定為 09:00';
             scheduleDayInput.min = '1';
-            scheduleDayInput.max = '31';
-            scheduleDayInput.placeholder = '1-31';
-            scheduleDayHelp.textContent = '季報表：每季第幾天(1-31)';
-            executionTimeInfo.innerHTML = '<p class="small text-primary"><strong>📈 季報表：</strong>可自訂每季第幾天執行（1-31），建議設定為1號</p>';
+            scheduleDayInput.max = '30';
+            scheduleDayInput.placeholder = '1-30';
+            scheduleDayHelp.textContent = '季報表：每季第幾天(1-30，建議設定1號)';
+            executionTimeInfo.innerHTML = '<p class="small text-primary"><strong>📈 季報表：</strong>可自訂每季第幾天執行（1-30），建議設定為1號</p>';
         } else if (reportType.includes('year')) {
             // 年報表：可自訂每年幾號
             scheduleTimeInput.parentElement.style.display = 'block';
@@ -431,10 +427,10 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('company_field').style.display = 'block';
             scheduleTimeInput.placeholder = '建議設定為 09:00';
             scheduleDayInput.min = '1';
-            scheduleDayInput.max = '31';
-            scheduleDayInput.placeholder = '1-31';
-            scheduleDayHelp.textContent = '年報表：每年幾號(1-31)';
-            executionTimeInfo.innerHTML = '<p class="small text-primary"><strong>📊 年報表：</strong>可自訂每年幾號執行（1-31），建議設定為1號</p>';
+            scheduleDayInput.max = '30';
+            scheduleDayInput.placeholder = '1-30';
+            scheduleDayHelp.textContent = '年報表：每年1月幾號(1-30，建議設定1號)';
+            executionTimeInfo.innerHTML = '<p class="small text-primary"><strong>📊 年報表：</strong>可自訂每年1月幾號執行（1-30），建議設定為1號</p>';
         } else {
             // 其他報表類型
             scheduleTimeInput.parentElement.style.display = 'block';
@@ -513,8 +509,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
         
-        // 只有非填報與現場記錄資料同步類型才需要驗證執行時間
-        if (reportType !== 'data_sync' && !scheduleTime) {
+        // 驗證執行時間（所有報表類型都需要）
+        if (!scheduleTime) {
             e.preventDefault();
             alert('請設定執行時間');
             console.log('驗證失敗: 缺少執行時間');

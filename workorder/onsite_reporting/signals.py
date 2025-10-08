@@ -33,8 +33,10 @@ def onsite_report_post_save(sender, instance, created, **kwargs):
             ).first()
             
             if dispatch:
-                # 更新派工單統計資料
-                dispatch.update_all_statistics()
+                # 更新派工單統計資料 - 簡化版本
+                dispatch.completion_threshold_met = (dispatch.packaging_total_quantity >= dispatch.planned_quantity and dispatch.planned_quantity > 0)
+                dispatch.can_complete = dispatch.completion_threshold_met
+                dispatch.save()
                 logger.info(f"已更新派工單統計資料: {dispatch.order_number}")
             else:
                 logger.warning(f"找不到對應的派工單：{instance.workorder} - {instance.product_id}")

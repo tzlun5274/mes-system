@@ -73,14 +73,103 @@ class ReportScheduleSyncService:
                                 month_of_year='*',
                             )
                     else:
-                        # 其他報表類型：使用原有的 schedule_time
-                        cron_schedule, created = CrontabSchedule.objects.get_or_create(
-                            hour=schedule.schedule_time.hour,
-                            minute=schedule.schedule_time.minute,
-                            day_of_week='*',
-                            day_of_month='*',
-                            month_of_year='*',
-                        )
+                        # 其他報表類型：根據報表類型設定不同的執行日期
+                        if schedule.report_type == 'previous_workday':
+                            # 前一個工作日報表：每天執行，由執行時檢查行事曆
+                            cron_schedule, created = CrontabSchedule.objects.get_or_create(
+                                hour=schedule.schedule_time.hour,
+                                minute=schedule.schedule_time.minute,
+                                day_of_week='*',  # 每天執行
+                                day_of_month='*',
+                                month_of_year='*',
+                            )
+                        elif schedule.report_type == 'previous_week':
+                            # 上週報表：根據 schedule_day 設定星期幾執行
+                            if schedule.schedule_day and 1 <= schedule.schedule_day <= 7:
+                                # 將 schedule_day (1-7) 轉換為 day_of_week (0-6, 0=週日)
+                                day_of_week = schedule.schedule_day % 7
+                                cron_schedule, created = CrontabSchedule.objects.get_or_create(
+                                    hour=schedule.schedule_time.hour,
+                                    minute=schedule.schedule_time.minute,
+                                    day_of_week=day_of_week,
+                                    day_of_month='*',
+                                    month_of_year='*',
+                                )
+                            else:
+                                # 如果沒有設定星期幾，預設週一執行
+                                cron_schedule, created = CrontabSchedule.objects.get_or_create(
+                                    hour=schedule.schedule_time.hour,
+                                    minute=schedule.schedule_time.minute,
+                                    day_of_week=1,  # 週一
+                                    day_of_month='*',
+                                    month_of_year='*',
+                                )
+                        elif schedule.report_type == 'previous_month':
+                            # 上月報表：根據 schedule_day 設定每月第幾天執行
+                            if schedule.schedule_day and 1 <= schedule.schedule_day <= 30:
+                                cron_schedule, created = CrontabSchedule.objects.get_or_create(
+                                    hour=schedule.schedule_time.hour,
+                                    minute=schedule.schedule_time.minute,
+                                    day_of_week='*',
+                                    day_of_month=schedule.schedule_day,
+                                    month_of_year='*',
+                                )
+                            else:
+                                # 如果沒有設定日期，預設每月1號執行
+                                cron_schedule, created = CrontabSchedule.objects.get_or_create(
+                                    hour=schedule.schedule_time.hour,
+                                    minute=schedule.schedule_time.minute,
+                                    day_of_week='*',
+                                    day_of_month=1,
+                                    month_of_year='*',
+                                )
+                        elif schedule.report_type == 'previous_quarter':
+                            # 上季報表：根據 schedule_day 設定每季第幾天執行
+                            if schedule.schedule_day and 1 <= schedule.schedule_day <= 30:
+                                cron_schedule, created = CrontabSchedule.objects.get_or_create(
+                                    hour=schedule.schedule_time.hour,
+                                    minute=schedule.schedule_time.minute,
+                                    day_of_week='*',
+                                    day_of_month=schedule.schedule_day,
+                                    month_of_year='1,4,7,10',  # 每季第一個月
+                                )
+                            else:
+                                # 如果沒有設定，預設每季1號執行
+                                cron_schedule, created = CrontabSchedule.objects.get_or_create(
+                                    hour=schedule.schedule_time.hour,
+                                    minute=schedule.schedule_time.minute,
+                                    day_of_week='*',
+                                    day_of_month=1,
+                                    month_of_year='1,4,7,10',  # 每季第一個月
+                                )
+                        elif schedule.report_type == 'previous_year':
+                            # 去年報表：根據 schedule_day 設定每年1月第幾天執行
+                            if schedule.schedule_day and 1 <= schedule.schedule_day <= 30:
+                                cron_schedule, created = CrontabSchedule.objects.get_or_create(
+                                    hour=schedule.schedule_time.hour,
+                                    minute=schedule.schedule_time.minute,
+                                    day_of_week='*',
+                                    day_of_month=schedule.schedule_day,
+                                    month_of_year=1,
+                                )
+                            else:
+                                # 如果沒有設定日期，預設每年1月1號執行
+                                cron_schedule, created = CrontabSchedule.objects.get_or_create(
+                                    hour=schedule.schedule_time.hour,
+                                    minute=schedule.schedule_time.minute,
+                                    day_of_week='*',
+                                    day_of_month=1,
+                                    month_of_year=1,
+                                )
+                        else:
+                            # 預設：每天執行
+                            cron_schedule, created = CrontabSchedule.objects.get_or_create(
+                                hour=schedule.schedule_time.hour,
+                                minute=schedule.schedule_time.minute,
+                                day_of_week='*',
+                                day_of_month='*',
+                                month_of_year='*',
+                            )
                     
                     # 建立週期任務
                     task_name = f'report_schedule_{schedule.id}'

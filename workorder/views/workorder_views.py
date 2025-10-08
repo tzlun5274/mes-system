@@ -1294,8 +1294,10 @@ def update_dispatch_statistics(request, workorder_id):
         if not dispatch:
             return JsonResponse({'error': '找不到對應的派工單'}, status=404)
         
-        # 手動更新統計資料
-        dispatch.update_all_statistics()
+        # 手動更新統計資料 - 簡化版本
+        dispatch.completion_threshold_met = (dispatch.packaging_total_quantity >= dispatch.planned_quantity and dispatch.planned_quantity > 0)
+        dispatch.can_complete = dispatch.completion_threshold_met
+        dispatch.save()
         
         # 取得更新後的統計資料
         updated_stats = {

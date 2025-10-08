@@ -1,6 +1,6 @@
 """
 工單分析服務
-提供已完工工單的詳細分析功能，包括時間分析、工序分析、作業員分析等
+提供已完工工單的分析功能，所有分析都基於批量分析核心函數
 """
 
 import logging
@@ -16,7 +16,7 @@ class WorkOrderAnalysisService:
     @staticmethod
     def analyze_completed_workorder(workorder_id, company_code, product_code=None, force=False):
         """
-        分析單一已完工工單
+        分析單一已完工工單（調用批量分析核心函數）
         
         Args:
             workorder_id: 工單編號
@@ -27,230 +27,34 @@ class WorkOrderAnalysisService:
         Returns:
             dict: 分析結果
         """
-        from workorder.models import CompletedWorkOrder, CompletedWorkOrderProcess
-        from .models import CompletedWorkOrderAnalysis
-        
         try:
-            # 檢查是否已經分析過
-            if not force:
-                existing_analysis = CompletedWorkOrderAnalysis.objects.filter(
-                    workorder_id=workorder_id,
-                    company_code=company_code
-                ).first()
-                
-                if existing_analysis:
-                    return {
-                        'success': True,
-                        'message': f'工單 {workorder_id} 已經分析過，跳過分析',
-                        'analysis_id': existing_analysis.id,
-                        'created': False,
-                        'skipped': True
-                    }
+            logger.info(f"開始分析單一工單: {workorder_id} ({company_code})")
             
-            # 取得已完工工單（使用公司名稱+工單號碼+產品編號作為唯一識別）
-            filter_kwargs = {
-                'order_number': workorder_id,
-                'company_code': company_code
-            }
-            if product_code:
-                filter_kwargs['product_code'] = product_code
-                
-            completed_workorder = CompletedWorkOrder.objects.filter(**filter_kwargs).first()
-            
-            if not completed_workorder:
-                return {
-                    'success': False,
-                    'error': f'找不到工單 {workorder_id}'
-                }
-            
-            # 從填報記錄取得詳細資料
-            from workorder.fill_work.models import FillWork
-            
-            # 查詢填報記錄（填報記錄的 company_code 可能為 None，所以不加入公司代號條件）
-            work_records = FillWork.objects.filter(
-                workorder=workorder_id,
-                product_id=completed_workorder.product_code
-            ).order_by('work_date', 'start_time')
-            
-            if not work_records.exists():
-                return {
-                    'success': False,
-                    'error': f'工單 {workorder_id} 沒有找到填報記錄'
-                }
-            
-            # 計算時間分析
-            first_record = work_records.first()
-            last_record = work_records.last()
-            first_date = first_record.work_date
-            last_date = last_record.work_date
-            
-            # 計算真正的完工日期：出貨包裝工序的最後一個日期
-            packaging_records = work_records.filter(operation='出貨包裝')
-            if packaging_records.exists():
-                completion_date = packaging_records.order_by('work_date', 'start_time').last().work_date
-            else:
-                # 如果沒有出貨包裝記錄，使用最後一筆記錄的日期
-                completion_date = last_date
-            
-            total_execution_days = (last_date - first_date).days + 1
-            
-            # 計算總工作時數
-            total_work_hours = sum(float(record.work_hours_calculated or 0) for record in work_records)
-            total_overtime_hours = sum(float(record.overtime_hours_calculated or 0) for record in work_records)
-            average_daily_hours = total_work_hours / total_execution_days if total_execution_days > 0 else 0
-            
-            # 計算效率比率（假設標準工時為8小時/天）
-            standard_hours = total_execution_days * 8
-            efficiency_rate = min(999.99, (total_work_hours / standard_hours * 100) if standard_hours > 0 else 0)
-            
-            # 工序分析
-            process_records = {}
-            process_order = []  # 記錄工序的出現順序
-            
-            for record in work_records:
-                process_name = record.operation or '未知工序'
-                if process_name not in process_records:
-                    process_records[process_name] = {
-                        'total_hours': 0,
-                        'total_overtime_hours': 0,
-                        'total_quantity': 0,
-                        'records': [],
-                        'operators': set(),
-                        'first_appearance_order': len(process_order)  # 記錄第一次出現的順序
-                    }
-                    process_order.append(process_name)
-                process_records[process_name]['total_hours'] += float(record.work_hours_calculated or 0)
-                process_records[process_name]['total_overtime_hours'] += float(record.overtime_hours_calculated or 0)
-                process_records[process_name]['total_quantity'] += float(record.work_quantity or 0)
-                process_records[process_name]['records'].append({
-                    'date': record.work_date.strftime('%Y-%m-%d'),
-                    'operator': record.operator,
-                    'hours': float(record.work_hours_calculated or 0),
-                    'overtime': float(record.overtime_hours_calculated or 0),
-                    'quantity': float(record.work_quantity or 0),
-                    'work_date': record.work_date.strftime('%Y-%m-%d'),
-                    'start_time': getattr(record, 'start_time', None).strftime('%H:%M') if getattr(record, 'start_time', None) else None
-                })
-                if record.operator:
-                    process_records[process_name]['operators'].add(record.operator)
-            
-            # 對每個工序的記錄按時間排序，並記錄第一筆時間，計算每小時產能
-            # 使用與已完工工單詳情頁面相同的排序邏輯：按 report_date 和 start_time 排序
-            for process_name in process_records:
-                # 按工作日期和開始時間排序（與已完工工單詳情頁面一致）
-                def sort_key(record):
-                    from datetime import datetime, time
-                    work_date_str = record['work_date']
-                    start_time_str = record.get('start_time')
-                    
-                    # 將字串轉換為日期物件
-                    work_date = datetime.strptime(work_date_str, '%Y-%m-%d').date()
-                    
-                    if start_time_str:
-                        # 如果有開始時間，使用日期+時間排序
-                        start_time = datetime.strptime(start_time_str, '%H:%M').time()
-                        return datetime.combine(work_date, start_time)
-                    else:
-                        # 如果沒有開始時間，只按日期排序
-                        return datetime.combine(work_date, time.min)
-                
-                process_records[process_name]['records'].sort(key=sort_key)
-                
-                # 記錄第一筆記錄的時間，用於排序
-                if process_records[process_name]['records']:
-                    first_record = process_records[process_name]['records'][0]
-                    process_records[process_name]['first_record_date'] = first_record['date']
-                else:
-                    process_records[process_name]['first_record_date'] = '9999-12-31'  # 沒有記錄的工序排在最後
-                
-                # 計算每小時產能
-                total_all_hours = process_records[process_name]['total_hours'] + process_records[process_name]['total_overtime_hours']
-                if total_all_hours > 0 and process_records[process_name]['total_quantity'] > 0:
-                    process_records[process_name]['hourly_capacity'] = process_records[process_name]['total_quantity'] / total_all_hours
-                else:
-                    process_records[process_name]['hourly_capacity'] = 0
-            
-            # 作業員分析
-            operator_records = {}
-            for record in work_records:
-                operator_name = record.operator or '未知作業員'
-                if operator_name not in operator_records:
-                    operator_records[operator_name] = {
-                        'total_hours': 0,
-                        'overtime_hours': 0,
-                        'processes': set(),
-                        'work_days': set()
-                    }
-                operator_records[operator_name]['total_hours'] += float(record.work_hours_calculated or 0)
-                operator_records[operator_name]['overtime_hours'] += float(record.overtime_hours_calculated or 0)
-                if record.operation:
-                    operator_records[operator_name]['processes'].add(record.operation)
-                operator_records[operator_name]['work_days'].add(record.work_date)
-            
-            # 準備分析資料
-            analysis_data = {
-                'workorder_id': workorder_id,
-                'company_code': company_code,
-                'company_name': completed_workorder.company_name,
-                'product_code': completed_workorder.product_code,
-                'product_name': completed_workorder.product_code,  # CompletedWorkOrder 沒有 product_name 欄位
-                'order_quantity': completed_workorder.completed_quantity,
-                'first_record_date': first_date.strftime('%Y-%m-%d'),
-                'last_record_date': last_date.strftime('%Y-%m-%d'),
-                'total_execution_days': total_execution_days,
-                'total_work_hours': total_work_hours,
-                'total_overtime_hours': total_overtime_hours,
-                'average_daily_hours': average_daily_hours,
-                'efficiency_rate': efficiency_rate,
-                'total_processes': len(process_records),
-                'unique_processes': len(set(record.operation for record in work_records if record.operation)),
-                'total_operators': len(operator_records),
-                'process_details': {
-                    name: {
-                        'total_hours': data['total_hours'],
-                        'total_overtime_hours': data['total_overtime_hours'],
-                        'total_quantity': data['total_quantity'],
-                        'hourly_capacity': data['hourly_capacity'],
-                        'records': data['records'][:5],  # 只保留前5筆記錄
-                        'operators': list(data['operators']),
-                        'first_record_date': data.get('first_record_date', '9999-12-31'),
-                        'first_appearance_order': data.get('first_appearance_order', 999)  # 記錄工序第一次出現的順序
-                    }
-                    for name, data in process_records.items()
-                },
-                'operator_details': {
-                    name: {
-                        'total_hours': data['total_hours'],
-                        'overtime_hours': data['overtime_hours'],
-                        'processes': list(data['processes']),
-                        'work_days': len(data['work_days'])
-                    }
-                    for name, data in operator_records.items()
-                },
-                'completion_date': completion_date.strftime('%Y-%m-%d'),
-                'completion_status': 'completed'
-            }
-            
-            # 儲存或更新分析資料
-            analysis, created = CompletedWorkOrderAnalysis.objects.update_or_create(
-                workorder_id=workorder_id,
+            # 調用批量分析核心函數，但只分析指定的工單
+            result = WorkOrderAnalysisService.analyze_completed_workorders_batch(
+                start_date=None,  # 不限制日期
+                end_date=None,    # 不限制日期
                 company_code=company_code,
-                product_code=completed_workorder.product_code,
-                defaults=analysis_data
+                specific_workorder_id=workorder_id,  # 指定特定工單
+                force=force
             )
             
-            return {
-                'success': True,
-                'message': f'工單 {workorder_id} 分析完成',
-                'analysis_id': analysis.id,
-                'created': created
-            }
-            
-        except CompletedWorkOrder.DoesNotExist:
-            return {
-                'success': False,
-                'error': f'找不到工單 {workorder_id}'
-            }
+            if result['success']:
+                if result['success_count'] > 0:
+                    return {
+                        'success': True,
+                        'message': f'工單 {workorder_id} 分析完成',
+                        'analysis_id': result.get('analysis_id'),
+                        'created': result.get('created', False)
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': f'工單 {workorder_id} 沒有找到或無法分析'
+                    }
+            else:
+                return result
+                
         except Exception as e:
             return {
                 'success': False,
@@ -258,19 +62,22 @@ class WorkOrderAnalysisService:
             }
     
     @staticmethod
-    def analyze_completed_workorders_batch(start_date=None, end_date=None, company_code=None):
+    def analyze_completed_workorders_batch(start_date=None, end_date=None, company_code=None, specific_workorder_id=None, force=False):
         """
-        批量分析已完工工單
+        批量分析已完工工單（核心分析函數）
         
         Args:
             start_date: 開始日期 (YYYY-MM-DD 格式)
             end_date: 結束日期 (YYYY-MM-DD 格式)
             company_code: 公司代號
+            specific_workorder_id: 指定特定工單編號（用於單一工單分析）
+            force: 是否強制重新分析
             
         Returns:
             dict: 批量分析結果
         """
-        from workorder.models import CompletedWorkOrder
+        from workorder.models import CompletedWorkOrder, CompletedWorkOrderProcess
+        from .models import CompletedWorkOrderAnalysis
         
         try:
             logger.info(f"開始批量分析 - 公司代號: {company_code}, 開始日期: {start_date}, 結束日期: {end_date}")
@@ -282,6 +89,11 @@ class WorkOrderAnalysisService:
             if company_code:
                 queryset = queryset.filter(company_code=company_code)
                 logger.info(f"按公司代號過濾後數量: {queryset.count()}")
+            
+            # 如果指定特定工單，只分析該工單
+            if specific_workorder_id:
+                queryset = queryset.filter(order_number=specific_workorder_id)
+                logger.info(f"指定工單過濾後數量: {queryset.count()}")
             
             # 處理日期格式轉換
             if start_date:
@@ -321,30 +133,247 @@ class WorkOrderAnalysisService:
             success_count = 0
             error_count = 0
             errors = []
+            analysis_id = None
+            created = False
             
             logger.info(f"開始分析 {len(completed_workorders)} 筆工單")
             
             for completed_workorder in completed_workorders:
                 order_number = completed_workorder.order_number
-                company_code = completed_workorder.company_code
+                workorder_company_code = completed_workorder.company_code
                 product_code = completed_workorder.product_code
-                logger.info(f"分析工單: {order_number} ({company_code}) - {product_code}")
-                result = WorkOrderAnalysisService.analyze_completed_workorder(order_number, company_code, product_code, force=True)
-                if result['success']:
+                logger.info(f"分析工單: {order_number} ({workorder_company_code}) - {product_code}")
+                
+                # 檢查是否已經分析過
+                if not force:
+                    existing_analysis = CompletedWorkOrderAnalysis.objects.filter(
+                        workorder_id=order_number,
+                        company_code=workorder_company_code
+                    ).first()
+                    
+                    if existing_analysis:
+                        logger.info(f'工單 {order_number} 已經分析過，跳過分析')
+                        success_count += 1
+                        continue
+                
+                # 執行工單分析
+                try:
+                    # 檢查必要欄位
+                    if not completed_workorder.completed_at:
+                        raise ValueError("工單沒有完工時間")
+                    
+                    # 使用計劃數量作為完成數量的替代
+                    order_quantity = completed_workorder.completed_quantity or completed_workorder.planned_quantity
+                    if not order_quantity:
+                        raise ValueError("工單沒有完成數量且沒有計劃數量")
+                    
+                    # 收集工序詳細資料
+                    process_details = {}
+                    operator_details = {}
+                    total_processes = 0
+                    unique_processes = set()
+                    total_operators = set()
+                    
+                    # 主要從已完工生產報工記錄收集資料（工序表可能為空）
+                    from workorder.models import CompletedProductionReport
+                    production_reports = CompletedProductionReport.objects.filter(
+                        completed_workorder_id=completed_workorder.id
+                    ).order_by('report_date', 'start_time')
+                    
+                    # 按工序分組統計
+                    process_stats = {}
+                    operator_stats = {}
+                    
+                    for report in production_reports:
+                        process_name = report.process_name
+                        operator = report.operator
+                        
+                        # 統計工序資料
+                        if process_name not in process_stats:
+                            process_stats[process_name] = {
+                                'total_hours': 0,
+                                'total_quantity': 0,
+                                'total_defect': 0,
+                                'operators': set(),
+                                'equipment': set(),
+                                'report_count': 0
+                            }
+                        
+                        process_stats[process_name]['total_hours'] += float(report.work_hours)
+                        process_stats[process_name]['total_quantity'] += report.work_quantity
+                        process_stats[process_name]['total_defect'] += report.defect_quantity
+                        process_stats[process_name]['operators'].add(operator)
+                        if report.equipment:
+                            process_stats[process_name]['equipment'].add(report.equipment)
+                        process_stats[process_name]['report_count'] += 1
+                        
+                        # 統計作業員資料
+                        if operator not in operator_stats:
+                            operator_stats[operator] = {
+                                'total_hours': 0,
+                                'total_quantity': 0,
+                                'processes': set(),
+                                'report_count': 0,
+                                'overtime_hours': 0
+                            }
+                        
+                        operator_stats[operator]['total_hours'] += float(report.work_hours)
+                        operator_stats[operator]['total_quantity'] += report.work_quantity
+                        operator_stats[operator]['processes'].add(process_name)
+                        operator_stats[operator]['report_count'] += 1
+                        
+                        # 計算加班時數（假設超過8小時為加班）
+                        if float(report.work_hours) > 8:
+                            operator_stats[operator]['overtime_hours'] += float(report.work_hours) - 8
+                    
+                    # 建立工序詳細資料
+                    for process_name, stats in process_stats.items():
+                        unique_processes.add(process_name)
+                        total_processes += 1
+                        
+                        process_details[process_name] = {
+                            'process_order': 999,  # 未知順序
+                            'planned_quantity': 0,
+                            'completed_quantity': stats['total_quantity'],
+                            'status': 'completed',
+                            'assigned_operator': list(stats['operators'])[0] if stats['operators'] else '',
+                            'assigned_equipment': list(stats['equipment'])[0] if stats['equipment'] else '',
+                            'total_work_hours': stats['total_hours'],
+                            'total_hours': stats['total_hours'],  # 模板期望的欄位名稱
+                            'total_good_quantity': stats['total_quantity'],
+                            'total_defect_quantity': stats['total_defect'],
+                            'report_count': stats['report_count'],
+                            'operators': list(stats['operators']),
+                            'equipment': list(stats['equipment']),
+                            'hourly_capacity': stats['total_quantity'] / max(1, stats['total_hours']) if stats['total_hours'] > 0 else 0
+                        }
+                    
+                    # 建立作業員詳細資料
+                    for operator, stats in operator_stats.items():
+                        total_operators.add(operator)
+                        
+                        # 計算作業員的實際工作天數
+                        operator_reports = production_reports.filter(operator=operator)
+                        if operator_reports.exists():
+                            # 判斷是否為SMT作業員（根據作業員名稱或設備判斷）
+                            is_smt_operator = any('SMT' in operator or 'SMT' in str(report.equipment) for report in operator_reports)
+                            
+                            # 設定工作時間參數
+                            normal_hours_per_day = 8  # 一般工作時間：8小時
+                            overtime_hours_per_day = 4 if is_smt_operator else 3  # SMT加班時間：4小時，一般：3小時
+                            
+                            # 計算工作天數（考慮一般工作時間和加班時間）
+                            total_hours = stats['total_hours']
+                            max_hours_per_day = normal_hours_per_day + overtime_hours_per_day  # 一天最多的工作時數
+                            
+                            if total_hours <= max_hours_per_day:
+                                # 不超過一天的最大工作時數，算1天
+                                work_days = 1
+                            else:
+                                # 超過一天的最大工作時數，計算需要多少天
+                                work_days = int(total_hours // max_hours_per_day)
+                                remaining_hours = total_hours % max_hours_per_day
+                                
+                                if remaining_hours > 0:
+                                    # 還有剩餘時數，需要額外1天
+                                    work_days += 1
+                        else:
+                            work_days = 1
+                        
+                        operator_details[operator] = {
+                            'processes': list(stats['processes']),
+                            'total_work_hours': stats['total_hours'],
+                            'total_hours': stats['total_hours'],  # 模板期望的欄位名稱
+                            'total_quantity': stats['total_quantity'],
+                            'report_count': stats['report_count'],
+                            'work_days': work_days,  # 根據實際工作日期計算
+                            'overtime_hours': stats['overtime_hours']
+                        }
+                    
+                    # 從報工記錄計算正確的日期範圍（使用實際工作時間，不是填報日期）
+                    if production_reports.exists():
+                        # 使用實際的工作時間來計算，不是填報日期
+                        first_work_time = min(report.start_time for report in production_reports if report.start_time)
+                        last_work_time = max(report.end_time for report in production_reports if report.end_time)
+                        
+                        if first_work_time and last_work_time:
+                            first_record_date = first_work_time.date()
+                            last_record_date = last_work_time.date()
+                            total_execution_days = (last_record_date - first_record_date).days + 1
+                        else:
+                            # 如果沒有實際工作時間，使用填報日期
+                            first_record_date = min(report.report_date for report in production_reports)
+                            last_record_date = max(report.report_date for report in production_reports)
+                            total_execution_days = (last_record_date - first_record_date).days + 1
+                    else:
+                        # 如果沒有報工記錄，使用已完工工單的時間
+                        first_record_date = completed_workorder.started_at.date() if completed_workorder.started_at else completed_workorder.created_at.date()
+                        last_record_date = completed_workorder.completed_at.date()
+                        total_execution_days = (completed_workorder.completed_at.date() - (completed_workorder.started_at.date() if completed_workorder.started_at else completed_workorder.created_at.date())).days + 1
+                    
+                    # 建立分析記錄
+                    analysis_data = {
+                        'workorder_id': order_number,
+                        'company_code': workorder_company_code,
+                        'company_name': completed_workorder.company_name,
+                        'product_code': product_code,
+                        'product_name': product_code,  # 使用產品編號作為產品名稱
+                        'order_quantity': order_quantity,
+                        'first_record_date': first_record_date,
+                        'last_record_date': last_record_date,
+                        'total_execution_days': total_execution_days,
+                        'total_work_hours': completed_workorder.total_work_hours or 0,
+                        'total_overtime_hours': completed_workorder.total_overtime_hours or 0,
+                        'average_daily_hours': (completed_workorder.total_work_hours or 0) / max(1, total_execution_days),
+                        'efficiency_rate': min(999.99, ((completed_workorder.total_work_hours or 0) / max(1, total_execution_days) * 8) * 100),
+                        'total_processes': total_processes,
+                        'unique_processes': len(unique_processes),
+                        'total_operators': len(total_operators),
+                        'completion_date': completed_workorder.completed_at.date(),
+                        'completion_status': 'completed',
+                        'process_details': process_details,
+                        'operator_details': operator_details
+                    }
+                    
+                    # 儲存分析資料
+                    analysis, created = CompletedWorkOrderAnalysis.objects.update_or_create(
+                        workorder_id=order_number,
+                        company_code=workorder_company_code,
+                        defaults=analysis_data
+                    )
+                    
+                    analysis_id = analysis.id
                     success_count += 1
                     logger.info(f"工單 {order_number} 分析成功")
-                else:
+                    
+                except Exception as e:
                     error_count += 1
-                    error_msg = f'工單 {order_number}-{product_code}: {result["error"]}'
+                    error_msg = f'工單 {order_number}-{product_code}: {str(e)}'
                     errors.append(error_msg)
-                    logger.error(error_msg)
+                    logger.error(f"工單 {order_number} 分析失敗: {str(e)}")
+                    
+                    # 記錄詳細錯誤資訊到資料庫
+                    try:
+                        from .models import AnalysisErrorLog
+                        AnalysisErrorLog.objects.create(
+                            workorder_id=order_number,
+                            company_code=workorder_company_code,
+                            product_code=product_code,
+                            error_message=str(e),
+                            error_type=type(e).__name__,
+                            analysis_date=datetime.now()
+                        )
+                    except Exception as log_error:
+                        logger.error(f"無法記錄錯誤日誌: {str(log_error)}")
             
             return {
                 'success': True,
                 'message': f'批量分析完成，成功: {success_count}，失敗: {error_count}',
                 'success_count': success_count,
                 'error_count': error_count,
-                'errors': errors
+                'errors': errors,
+                'analysis_id': analysis_id,
+                'created': created
             }
             
         except Exception as e:

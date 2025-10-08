@@ -31,6 +31,9 @@ urlpatterns = [
     
     # 工作時數報表
     path('work-hour/', views.work_hour_report_index, name='work_hour_report_index'),
+    path('work-hour/management/', views.work_hour_report_management, name='work_hour_report_management'),
+    path('work-hour/files-api/', views.work_hour_report_files_api, name='work_hour_report_files_api'),
+    path('work-hour/batch-delete/', views.batch_delete_files, name='batch_delete_files'),
     path('work-hour/unified/', views.unified_report_form, name='unified_report_form'),
     path('work-hour/daily/', views.daily_report, name='daily_report'),
     path('work-hour/daily/export/', views.daily_report_export, name='daily_report_export'),
@@ -69,6 +72,9 @@ urlpatterns = [
     path('workorder-analysis/setup-schedule/', views.setup_analysis_schedule, name='setup_analysis_schedule'),
     path('workorder-analysis/schedule-status/', views.get_analysis_schedule_status, name='get_analysis_schedule_status'),
     
+    # 批次匯出工單分析
+    path('batch-export-workorder-analysis/', views.batch_export_workorder_analysis, name='batch_export_workorder_analysis'),
+    
     # API 端點
     path('api/chart-data/', views.chart_data, name='chart_data'),
     path('api/report-data/', views.report_data_list, name='report_data_list'),
@@ -84,14 +90,12 @@ urlpatterns = [
     
     # 前一個工作日報表
     path('execute-previous-workday-report/', views.execute_previous_workday_report, name='execute_previous_workday_report'),
-    path('test-previous-workday-report/', views.test_previous_workday_report, name='test_previous_workday_report'),
     path('previous-workday-report-management/', views.previous_workday_report_management, name='previous_workday_report_management'),
     
     # 政府行事曆 API 同步
     path('government-calendar-sync/', views.government_calendar_sync, name='government_calendar_sync'),
     
     # CSV 國定假日匯入
-    path('csv-holiday-import/', views.csv_holiday_import, name='csv_holiday_import'),
     # reporting API 路由
     path("api/workorder-report/", api.WorkOrderReportAPIView.as_view(), name="api_workorder_report_list"),
     path("api/workorder-report/<int:report_id>/", api.WorkOrderReportAPIView.as_view(), name="api_workorder_report_detail"),

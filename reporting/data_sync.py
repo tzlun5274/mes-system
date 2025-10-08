@@ -1,6 +1,6 @@
 """
 資料同步服務
-只負責資料同步相關的邏輯
+簡單的 A 到 B 資料同步
 """
 
 import logging
@@ -10,194 +10,147 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
-class DataSyncService:
-    """資料同步服務 - 只負責資料同步"""
-    
-    def __init__(self):
-        pass
-    
-    def execute_sync(self, schedule):
-        """執行資料同步"""
-        try:
-            # 根據執行方式設定同步時間範圍
-            if schedule.sync_execution_type == 'interval':
-                # 間隔執行：根據設定的分鐘數同步資料
-                sync_minutes = schedule.sync_interval_minutes
-                sync_time = timezone.now() - timedelta(minutes=sync_minutes)
-            elif schedule.sync_execution_type == 'fixed_time':
-                # 固定時間執行：同步最近1小時的資料
-                sync_time = timezone.now() - timedelta(hours=1)
-            else:
-                # 預設：同步最近1小時的資料
-                sync_time = timezone.now() - timedelta(hours=1)
-            
-            # 使用統一的資料同步核心函數
-            # 排程同步：根據時間範圍同步，不強制同步（會跳過已存在的記錄）
-            result = self.sync_fill_work_and_onsite_data(
-                sync_time_range=sync_time, 
-                force_sync=False
-            )
-            
-            if result['success']:
-                return {
-                    'success': True,
-                    'filename': f'data_sync_{timezone.now().strftime("%Y%m%d_%H%M")}.txt',
-                    'file_path': '',  # 填報與現場記錄資料同步不需要附件檔案
-                    'message': result['message']
-                }
-            else:
-                return {
-                    'success': False,
-                    'filename': '',
-                    'file_path': '',
-                    'message': result['error']
-                }
-            
-        except Exception as e:
-            logger.error(f"填報與現場記錄資料同步失敗: {str(e)}")
-            return {
-                'success': False,
-                'filename': '',
-                'file_path': '',
-                'message': f'填報與現場記錄資料同步失敗: {str(e)}'
-            }
-    
-    @staticmethod
-    def sync_fill_work_and_onsite_data(sync_time_range=None, force_sync=False):
-        """
-        填報與現場記錄資料同步核心函數
+def create_report_data_from_fill_work(fill_work):
+    """從填報資料建立報表資料 - 純粹同步，不計算"""
+    try:
+        from reporting.models import WorkOrderReportData
         
-        Args:
-            sync_time_range: 同步時間範圍（datetime 物件）
-            force_sync: 是否強制同步（True=覆蓋已存在的記錄，False=跳過已存在的記錄）
-            
-        Returns:
-            dict: 同步結果
-        """
-        try:
-            from workorder.fill_work.models import FillWork
-            from workorder.onsite_reporting.models import OnsiteReport
-            
-            # 設定預設同步時間範圍
-            if sync_time_range is None:
-                sync_time_range = timezone.now() - timedelta(hours=1)
-            
-            logger.info(f"開始同步資料，時間範圍：{sync_time_range}，強制同步：{force_sync}")
-            
-            # 同步填報資料
-            fill_work_result = DataSyncService._sync_fill_work_data(sync_time_range, force_sync)
-            
-            # 同步現場報工資料
-            onsite_report_result = DataSyncService._sync_onsite_report_data(sync_time_range, force_sync)
-            
-            # 統計同步結果
-            total_synced = fill_work_result['synced_count'] + onsite_report_result['synced_count']
-            total_skipped = fill_work_result['skipped_count'] + onsite_report_result['skipped_count']
-            
-            message = f"資料同步完成：同步 {total_synced} 筆，跳過 {total_skipped} 筆"
-            logger.info(message)
-            
-            return {
-                'success': True,
-                'message': message,
-                'fill_work_synced': fill_work_result['synced_count'],
-                'fill_work_skipped': fill_work_result['skipped_count'],
-                'onsite_report_synced': onsite_report_result['synced_count'],
-                'onsite_report_skipped': onsite_report_result['skipped_count'],
-                'total_synced': total_synced,
-                'total_skipped': total_skipped
-            }
-            
-        except Exception as e:
-            error_msg = f"資料同步失敗: {str(e)}"
-            logger.error(error_msg)
-            return {
-                'success': False,
-                'error': error_msg
-            }
+        # 純粹的資料複製，不做任何計算
+        report_data = WorkOrderReportData.objects.create(
+            workorder_id=fill_work.workorder,
+            company=fill_work.company_name,
+            operator_name=fill_work.operator or '',
+            product_code=fill_work.product_id or '',
+            process_name=fill_work.operation or fill_work.process_name or '',
+            work_date=fill_work.work_date,
+            work_week=0,  # 預設值，不計算
+            work_month=0,  # 預設值，不計算
+            work_quarter=0,  # 預設值，不計算
+            work_year=0,  # 預設值，不計算
+            start_time=fill_work.start_time,
+            end_time=fill_work.end_time,
+            work_hours=fill_work.work_hours_calculated or 0,
+            overtime_hours=fill_work.overtime_hours_calculated or 0,
+            total_hours=0,  # 預設值，不計算
+            daily_work_hours=0,  # 預設值，不計算
+            weekly_work_hours=0,  # 預設值，不計算
+            monthly_work_hours=0,  # 預設值，不計算
+            operator_count=1,  # 預設值
+            equipment_hours=0,  # 預設值，不計算
+            work_quantity=fill_work.work_quantity or 0,
+            defect_quantity=fill_work.defect_quantity or 0,
+        )
+        
+        return report_data
+        
+    except Exception as e:
+        logger.error(f"建立報表資料失敗 {fill_work.id}: {str(e)}")
+        return None
+
+
+def sync_data():
+    """同步資料 - 簡單的 A 到 B"""
+    try:
+        from workorder.fill_work.models import FillWork
+        from reporting.models import WorkOrderReportData
+        
+        logger.info("開始同步資料")
+        
+        # 同步填報資料
+        fill_works = FillWork.objects.filter(approval_status='approved')
+        fill_synced = 0
+        fill_failed = 0
+        
+        logger.info(f"找到 {fill_works.count()} 筆填報資料需要同步")
+        
+        for fill_work in fill_works:
+            try:
+                # 檢查必要欄位
+                if not fill_work.work_date or not fill_work.workorder or not fill_work.company_name:
+                    fill_failed += 1
+                    logger.warning(f"跳過填報資料 {fill_work.id}: 缺少必要欄位")
+                    continue
+                
+                # 檢查是否已存在（使用更精確的唯一性檢查）
+                existing = WorkOrderReportData.objects.filter(
+                    workorder_id=fill_work.workorder,
+                    company=fill_work.company_name,
+                    work_date=fill_work.work_date,
+                    operator_name=fill_work.operator or '',
+                    start_time=fill_work.start_time
+                ).exists()
+                
+                if existing:
+                    # 已存在，跳過
+                    continue
+                
+                # 使用專用的同步函數
+                report_data = create_report_data_from_fill_work(fill_work)
+                
+                if report_data:
+                    fill_synced += 1
+                    logger.info(f"新增報表資料: {fill_work.workorder}")
+                else:
+                    fill_failed += 1
+                    logger.warning(f"同步填報資料失敗 {fill_work.id}: 無法建立報表資料")
+            except Exception as e:
+                fill_failed += 1
+                logger.error(f"同步填報資料失敗 {fill_work.id}: {str(e)}")
+                import traceback
+                logger.error(f"詳細錯誤: {traceback.format_exc()}")
+        
+        # 暫時不同步現場報工資料，先測試填報資料
+        onsite_synced = 0
+        
+        total_synced = fill_synced + onsite_synced
+        message = f"資料同步完成：填報成功 {fill_synced} 筆，失敗 {fill_failed} 筆，現場報工 {onsite_synced} 筆，總計 {total_synced} 筆"
+        logger.info(message)
+        
+        return {
+            'success': True,
+            'message': message,
+            'total_synced': total_synced,
+            'fill_synced': fill_synced,
+            'fill_failed': fill_failed
+        }
+        
+    except Exception as e:
+        error_msg = f"資料同步失敗: {str(e)}"
+        logger.error(error_msg)
+        import traceback
+        logger.error(f"詳細錯誤: {traceback.format_exc()}")
+        return {
+            'success': False,
+            'error': error_msg
+        }
+
+
+# 直接執行資料同步
+if __name__ == "__main__":
+    """
+    直接執行資料同步
+    使用方法：
+    python data_sync.py
+    """
+    import sys
+    import os
     
-    @staticmethod
-    def _sync_fill_work_data(sync_time_range, force_sync):
-        """同步填報資料"""
-        try:
-            from workorder.fill_work.models import FillWork
-            
-            # 取得需要同步的填報資料
-            fill_works = FillWork.objects.filter(
-                created_at__gte=sync_time_range
-            )
-            
-            synced_count = 0
-            skipped_count = 0
-            
-            for fill_work in fill_works:
-                try:
-                    # 這裡可以添加具體的同步邏輯
-                    # 例如：檢查是否已存在、更新資料等
-                    
-                    if force_sync:
-                        # 強制同步：更新或創建記錄
-                        synced_count += 1
-                    else:
-                        # 非強制同步：檢查是否已存在
-                        # 這裡需要根據實際業務邏輯來判斷
-                        synced_count += 1
-                        
-                except Exception as e:
-                    logger.error(f"同步填報資料失敗 {fill_work.id}: {str(e)}")
-                    skipped_count += 1
-            
-            return {
-                'synced_count': synced_count,
-                'skipped_count': skipped_count
-            }
-            
-        except Exception as e:
-            logger.error(f"同步填報資料失敗: {str(e)}")
-            return {
-                'synced_count': 0,
-                'skipped_count': 0
-            }
+    # 添加 Django 專案路徑
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(current_dir)
+    sys.path.append(project_root)
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mes_config.settings')
     
-    @staticmethod
-    def _sync_onsite_report_data(sync_time_range, force_sync):
-        """同步現場報工資料"""
-        try:
-            from workorder.onsite_reporting.models import OnsiteReport
-            
-            # 取得需要同步的現場報工資料
-            onsite_reports = OnsiteReport.objects.filter(
-                created_at__gte=sync_time_range
-            )
-            
-            synced_count = 0
-            skipped_count = 0
-            
-            for onsite_report in onsite_reports:
-                try:
-                    # 這裡可以添加具體的同步邏輯
-                    # 例如：檢查是否已存在、更新資料等
-                    
-                    if force_sync:
-                        # 強制同步：更新或創建記錄
-                        synced_count += 1
-                    else:
-                        # 非強制同步：檢查是否已存在
-                        # 這裡需要根據實際業務邏輯來判斷
-                        synced_count += 1
-                        
-                except Exception as e:
-                    logger.error(f"同步現場報工資料失敗 {onsite_report.id}: {str(e)}")
-                    skipped_count += 1
-            
-            return {
-                'synced_count': synced_count,
-                'skipped_count': skipped_count
-            }
-            
-        except Exception as e:
-            logger.error(f"同步現場報工資料失敗: {str(e)}")
-            return {
-                'synced_count': 0,
-                'skipped_count': 0
-            }
+    # 初始化 Django
+    import django
+    django.setup()
+    
+    # 執行資料同步
+    print("開始執行資料同步...")
+    result = sync_data()
+    
+    if result['success']:
+        print(f"資料同步成功: {result['message']}")
+    else:
+        print(f"資料同步失敗: {result.get('error', '未知錯誤')}")
+        sys.exit(1)

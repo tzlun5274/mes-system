@@ -40,12 +40,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const workQuantity = parseInt(workQuantityInput.value) || 0;
             const defectQuantity = parseInt(defectQuantityInput.value) || 0;
             
-            // 如果選擇完工或停工，必須填寫工作數量
-            if ((selectedStatus === 'completed' || selectedStatus === 'stopped') && workQuantity === 0) {
-                e.preventDefault();
-                alert('完工或停工時必須填寫工作數量');
-                return false;
-            }
+            // 移除強制要求工作數量的驗證，允許填寫0
+            // 完工或停工時可以填寫0作為工作數量
             
             // 檢查不良品數量不能超過工作數量
             if (defectQuantity > workQuantity) {
@@ -374,13 +370,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                             <div class="col-md-4 mb-3">
                                                 <label for="work_quantity" class="form-label">工作數量</label>
                                                 <input type="number" class="form-control" id="work_quantity" name="work_quantity" min="0" value="{{ onsite_report.work_quantity }}" readonly>
-                                                <div class="form-text">只有完工或停工時才能填寫</div>
+                                                <div class="form-text">只有完工或停工時才能填寫（可填寫0）</div>
                                             </div>
                                             
                                             <div class="col-md-4 mb-3">
                                                 <label for="defect_quantity" class="form-label">不良品數量</label>
                                                 <input type="number" class="form-control" id="defect_quantity" name="defect_quantity" min="0" value="{{ onsite_report.defect_quantity }}" readonly>
-                                                <div class="form-text">只有完工或停工時才能填寫</div>
+                                                <div class="form-text">只有完工或停工時才能填寫（可填寫0）</div>
                                             </div>
                                         </div>
                                         

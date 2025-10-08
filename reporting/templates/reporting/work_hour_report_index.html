@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}工作時數報表{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-clock"></i> 工作時數報表
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">日報表</h4>
+                                            <p class="card-text">每日工作時數統計</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-calendar-day fa-2x"></i>
+                                        </div>
+                                    </div>
+                                    <a href="{% url 'reporting:daily_report' %}" class="btn btn-light">
+                                        <i class="fas fa-eye"></i> 查看
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">週報表</h4>
+                                            <p class="card-text">每週工作時數統計</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-calendar-week fa-2x"></i>
+                                        </div>
+                                    </div>
+                                    <a href="{% url 'reporting:weekly_report' %}" class="btn btn-light">
+                                        <i class="fas fa-eye"></i> 查看
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">月報表</h4>
+                                            <p class="card-text">每月工作時數統計</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-calendar-alt fa-2x"></i>
+                                        </div>
+                                    </div>
+                                    <a href="{% url 'reporting:monthly_report' %}" class="btn btn-light">
+                                        <i class="fas fa-eye"></i> 查看
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">自訂報表</h4>
+                                            <p class="card-text">自訂時間範圍報表</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-cog fa-2x"></i>
+                                        </div>
+                                    </div>
+                                    <a href="{% url 'reporting:custom_report' %}" class="btn btn-light">
+                                        <i class="fas fa-eye"></i> 查看
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-3">
+                            <div class="card bg-secondary text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">季報表</h4>
+                                            <p class="card-text">每季工作時數統計</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-calendar fa-2x"></i>
+                                        </div>
+                                    </div>
+                                    <a href="{% url 'reporting:quarterly_report' %}" class="btn btn-light">
+                                        <i class="fas fa-eye"></i> 查看
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="card bg-dark text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">年報表</h4>
+                                            <p class="card-text">每年工作時數統計</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-calendar-check fa-2x"></i>
+                                        </div>
+                                    </div>
+                                    <a href="{% url 'reporting:yearly_report' %}" class="btn btn-light">
+                                        <i class="fas fa-eye"></i> 查看
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">統一報表</h4>
+                                            <p class="card-text">統一報表表單</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-file-alt fa-2x"></i>
+                                        </div>
+                                    </div>
+                                    <a href="{% url 'reporting:unified_report_form' %}" class="btn btn-light">
+                                        <i class="fas fa-eye"></i> 查看
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h4 class="card-title">報表排程</h4>
+                                            <p class="card-text">管理報表排程</p>
+                                        </div>
+                                        <div class="align-self-center">
+                                            <i class="fas fa-tasks fa-2x"></i>
+                                        </div>
+                                    </div>
+                                    <a href="{% url 'reporting:report_schedule_list' %}" class="btn btn-light">
+                                        <i class="fas fa-eye"></i> 查看
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 檔案管理區域 -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-folder-open"></i> 檔案管理
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6 class="text-primary">📁 最近生成的報表檔案</h6>
+                                            <p class="text-muted">查看和管理最近生成的工作時數報表檔案</p>
+                                            <a href="{% url 'reporting:work_hour_report_management' %}" class="btn btn-info">
+                                                <i class="fas fa-folder-open"></i> 檔案管理
+                                            </a>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6 class="text-success">📊 報表排程管理</h6>
+                                            <p class="text-muted">設定自動生成報表的排程</p>
+                                            <a href="{% url 'reporting:report_schedule_list' %}" class="btn btn-success">
+                                                <i class="fas fa-clock"></i> 排程管理
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

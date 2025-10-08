@@ -77,7 +77,19 @@
                                     </span>
                                 </td>
                                 <td>{{ schedule.company }}</td>
-                                <td>{{ schedule.schedule_time|time:"H:i" }}</td>
+                                <td>
+                                    {% if schedule.report_type == 'data_sync' %}
+                                        {% if schedule.sync_fixed_time %}
+                                            {{ schedule.sync_fixed_time|time:"H:i" }}
+                                        {% else %}
+                                            自動
+                                        {% endif %}
+                                    {% elif schedule.schedule_time %}
+                                        {{ schedule.schedule_time|time:"H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if schedule.schedule_day %}
                                         {% if schedule.report_type == 'weekly' %}

@@ -25,7 +25,10 @@ MODULE_LOG_MODELS = {
 
 @shared_task
 def auto_backup_database():
+    """自動資料庫備份任務"""
     backup_dir = "/var/www/mes/backups_DB"
+    os.makedirs(backup_dir, exist_ok=True)
+    
     try:
         database_url = os.environ.get("DATABASE_URL")
         if not database_url:
@@ -61,42 +64,72 @@ def auto_backup_database():
             raise Exception(f"pg_dump 失敗: {result.stderr}")
         del os.environ["PGPASSWORD"]
         logger.info(f"自動資料庫備份成功: {backup_filename}")
+        
+        # 更新最後備份時間
         from system.models import BackupSchedule
-
         try:
             schedule = BackupSchedule.objects.get(id=1)
-            retention_days = schedule.retention_days
-            cutoff_date = timezone.now() - datetime.timedelta(days=retention_days)
+            schedule.last_backup = timezone.now()
+            schedule.save()
+        except BackupSchedule.DoesNotExist:
+            logger.warning("未找到備份排程設定，無法更新最後備份時間")
             
-            # 清理超過保留天數的備份文件
-            backup_files = [
-                f
-                for f in os.listdir(backup_dir)
-                if os.path.isfile(os.path.join(backup_dir, f))
-                and f.startswith("auto_backup_")
-                and f.endswith(".sql")
-            ]
-            
-            deleted_count = 0
-            for backup_file in backup_files:
-                backup_path = os.path.join(backup_dir, backup_file)
+    except Exception as e:
+        logger.error(f"自動資料庫備份失敗: {str(e)}")
+    
+    # 無論備份是否成功，都要執行清理舊備份檔案
+    cleanup_old_backup_files()
+
+
+@shared_task
+def cleanup_old_backup_files():
+    """清理超過保留天數的備份檔案"""
+    backup_dir = "/var/www/mes/backups_DB"
+    
+    if not os.path.exists(backup_dir):
+        logger.warning(f"備份目錄不存在: {backup_dir}")
+        return
+    
+    try:
+        from system.models import BackupSchedule
+        schedule = BackupSchedule.objects.get(id=1)
+        retention_days = schedule.retention_days
+        cutoff_date = timezone.now() - datetime.timedelta(days=retention_days)
+        
+        # 清理超過保留天數的備份文件
+        backup_files = [
+            f
+            for f in os.listdir(backup_dir)
+            if os.path.isfile(os.path.join(backup_dir, f))
+            and f.startswith("auto_backup_")
+            and f.endswith(".sql")
+        ]
+        
+        deleted_count = 0
+        for backup_file in backup_files:
+            backup_path = os.path.join(backup_dir, backup_file)
+            try:
                 file_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(backup_path))
-                # 將文件時間轉換為時區感知的datetime
-                file_mtime = timezone.make_aware(file_mtime)
+                # 將文件時間轉換為台北時區的datetime
+                import pytz
+                taipei_tz = pytz.timezone('Asia/Taipei')
+                file_mtime = taipei_tz.localize(file_mtime)
                 if file_mtime < cutoff_date:
                     os.remove(backup_path)
                     deleted_count += 1
                     logger.info(f"刪除超過保留天數的備份文件: {backup_file}")
+            except Exception as e:
+                logger.error(f"處理備份文件 {backup_file} 時發生錯誤: {str(e)}")
+        
+        if deleted_count > 0:
+            logger.info(f"清理完成，共刪除 {deleted_count} 個超過 {retention_days} 天的備份文件")
+        else:
+            logger.info(f"沒有需要清理的備份文件（保留天數：{retention_days}天）")
             
-            if deleted_count > 0:
-                logger.info(f"清理完成，共刪除 {deleted_count} 個超過 {retention_days} 天的備份文件")
-            else:
-                logger.info(f"沒有需要清理的備份文件（保留天數：{retention_days}天）")
-                
-        except BackupSchedule.DoesNotExist:
-            logger.error("未找到自動備份排程設定，無法管理保留天數")
+    except BackupSchedule.DoesNotExist:
+        logger.error("未找到自動備份排程設定，無法管理保留天數")
     except Exception as e:
-        logger.error(f"自動資料庫備份失敗: {str(e)}")
+        logger.error(f"清理備份文件時發生錯誤: {str(e)}")
 
 
 @shared_task

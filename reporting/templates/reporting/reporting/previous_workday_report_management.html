@@ -105,9 +105,6 @@
                     <a href="{% url 'reporting:test_workday_calendar' %}" class="btn btn-info">
                         <i class="fas fa-calendar-check"></i> 工作日曆測試
                     </a>
-                    <a href="{% url 'reporting:test_previous_workday_report' %}" class="btn btn-warning">
-                        <i class="fas fa-test-tube"></i> 功能測試
-                    </a>
                     <a href="{% url 'reporting:index' %}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> 返回報表管理
                     </a>
@@ -201,10 +198,10 @@
                                         <td>{{ file.created_time|date:"Y-m-d H:i:s" }}</td>
                                         <td>{{ file.modified_time|date:"Y-m-d H:i:s" }}</td>
                                         <td>
-                                            <a href="/media/reports/previous_workday/{{ file.filename }}" target="_blank" class="btn btn-sm btn-primary">
+                                            <a href="/media/reports/{{ file.filename }}" target="_blank" class="btn btn-sm btn-primary">
                                                 <i class="fas fa-eye"></i> 查看
                                             </a>
-                                            <a href="/media/reports/previous_workday/{{ file.filename }}" download class="btn btn-sm btn-success">
+                                            <a href="/media/reports/{{ file.filename }}" download class="btn btn-sm btn-success">
                                                 <i class="fas fa-download"></i> 下載
                                             </a>
                                         </td>
@@ -345,7 +342,7 @@
                             <h6><i class="fas fa-file-alt"></i> 報表輸出</h6>
                             <ul>
                                 <li>HTML 格式報表</li>
-                                <li>自動儲存到 media/reports/previous_workday/</li>
+                                <li>自動儲存到 media/reports/</li>
                                 <li>支援線上查看和下載</li>
                                 <li>保留最近10個檔案</li>
                             </ul>

@@ -44,6 +44,7 @@ class WorkdayCalendarService:
     def is_workday(self, check_date):
         """
         檢查指定日期是否為工作日
+        完全依照行事曆系統的設定
         
         Args:
             check_date: 要檢查的日期
@@ -52,19 +53,57 @@ class WorkdayCalendarService:
             bool: True 表示是工作日，False 表示不是工作日
         """
         try:
+            # 從行事曆系統查詢該日期的事件
+            from scheduling.models import Event
+            from django.utils import timezone
+            
+            # 將日期轉換為 datetime 範圍（當天的開始和結束時間）
+            start_datetime = timezone.make_aware(
+                timezone.datetime.combine(check_date, timezone.datetime.min.time())
+            )
+            end_datetime = timezone.make_aware(
+                timezone.datetime.combine(check_date, timezone.datetime.max.time())
+            )
+            
+            # 查詢該日期的所有事件
+            events = Event.objects.filter(
+                start__lte=end_datetime,
+                end__gte=start_datetime,
+                all_day=True
+            )
+            
+            # 檢查是否有明確的工作日事件
+            has_workday_event = events.filter(type='workday').exists()
+            if has_workday_event:
+                logger.info(f"日期 {check_date} 有明確的工作日事件，視為工作日")
+                return True
+            
+            # 檢查是否有放假日事件
+            has_holiday_event = events.filter(type='holiday').exists()
+            if has_holiday_event:
+                logger.info(f"日期 {check_date} 有放假日事件，視為非工作日")
+                return False
+            
+            # 如果沒有明確的事件設定，使用預設邏輯
             # 檢查是否為週末
             if check_date.weekday() >= 5:  # 週六(5) 或 週日(6)
+                logger.info(f"日期 {check_date} 是週末，視為非工作日")
                 return False
             
             # 檢查是否為國定假日
             if self.is_holiday(check_date):
+                logger.info(f"日期 {check_date} 是國定假日，視為非工作日")
                 return False
             
+            # 預設為工作日
+            logger.info(f"日期 {check_date} 沒有特殊設定，預設為工作日")
             return True
             
         except Exception as e:
             logger.error(f"檢查工作日失敗: {str(e)}")
-            # 如果出錯，預設為工作日
+            # 如果出錯，使用預設邏輯
+            if check_date.weekday() >= 5:
+                return False
             return True
     
     def is_holiday(self, check_date):
@@ -95,6 +134,7 @@ class WorkdayCalendarService:
             logger.error(f"檢查國定假日失敗: {str(e)}")
             # 如果出錯，預設為非國定假日
             return False
+    
     
     def _is_lunar_new_year(self, check_date):
         """檢查是否為農曆新年（簡化版）"""

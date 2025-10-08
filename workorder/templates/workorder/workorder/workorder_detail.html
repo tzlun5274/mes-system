@@ -1412,8 +1412,8 @@ function autoCompleteWorkorder() {
         .then(data => {
             if (data.success) {
                 alert('工單自動完工成功！\n\n' + data.message);
-                // 重新載入頁面以顯示更新後的狀態
-                location.reload();
+                // 跳轉到工單管理功能入口
+                window.location.href = '/workorder/';
             } else {
                 alert('自動完工失敗：' + data.message);
             }

@@ -5204,8 +5204,24 @@ def active_workorders(request):
                 order_number=fill_work['workorder'],
                 product_code=fill_work['product_id']
             ).first()
-            if workorder:
+            
+            # 檢查工單是否存在且未完工
+            if workorder and workorder.status != 'completed':
                 workorders_with_approved_reports.append(workorder)
+            elif not workorder:
+                # 如果工單不存在於 WorkOrder 表中，檢查是否已完工
+                from workorder.models import CompletedWorkOrder
+                completed_workorder = CompletedWorkOrder.objects.filter(
+                    company_code=company_code,
+                    order_number=fill_work['workorder'],
+                    product_code=fill_work['product_id']
+                ).first()
+                
+                # 如果工單已完工，則不加入執行中工單列表
+                if completed_workorder:
+                    workorder_logger.debug(f"工單 {fill_work['workorder']} 已完工，不顯示在執行中工單列表")
+                else:
+                    workorder_logger.warning(f"工單 {fill_work['workorder']} 不存在於任何工單表中")
     
     # 獲取狀態為生產中的派工單對應的工單
     try:

@@ -44,6 +44,11 @@ class WorkOrderReportData(models.Model):
     operator_count = models.IntegerField(default=1, verbose_name="作業員人數")
     equipment_hours = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="設備使用時數")
     
+    # 工作數量資料
+    work_quantity = models.IntegerField(default=0, verbose_name="工作數量")
+    defect_quantity = models.IntegerField(default=0, verbose_name="不良品數量")
+    completed_quantity = models.IntegerField(default=0, verbose_name="完成數量")
+    
     # 時間戳記
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新時間")
@@ -63,153 +68,6 @@ class WorkOrderReportData(models.Model):
     def __str__(self):
         return f"{self.company}-{self.workorder_id}-{self.work_date}"
     
-    @classmethod
-    def create_from_fill_work(cls, fill_work):
-        """從填報資料建立報表資料"""
-        from datetime import datetime
-        import calendar
-        
-        work_date = fill_work.work_date
-        if not work_date:
-            return None
-        
-        # 計算時間維度
-        work_year = work_date.year
-        work_month = work_date.month
-        
-        # 計算週數
-        week_num = work_date.isocalendar()[1]
-        
-        # 計算季度
-        work_quarter = (work_month - 1) // 3 + 1
-        
-        # 計算工作時數
-        daily_work_hours = fill_work.work_hours_calculated or Decimal('0')
-        
-        # 計算詳細時數
-        work_hours = fill_work.work_hours_calculated or Decimal('0')
-        overtime_hours = fill_work.overtime_hours_calculated or Decimal('0')
-        total_hours = work_hours + overtime_hours
-        
-        # 建立或更新報表資料
-        report_data, created = cls.objects.get_or_create(
-            workorder_id=fill_work.workorder,
-            company=fill_work.company_name,
-            work_date=work_date,
-            defaults={
-                'operator_name': fill_work.operator,
-                'product_code': fill_work.product_id,
-                'process_name': fill_work.operation or fill_work.process_name or '',
-                'start_time': fill_work.start_time,
-                'end_time': fill_work.end_time,
-                'work_hours': work_hours,
-                'overtime_hours': overtime_hours,
-                'total_hours': total_hours,
-                'work_week': week_num,
-                'work_month': work_month,
-                'work_quarter': work_quarter,
-                'work_year': work_year,
-                'daily_work_hours': daily_work_hours,
-                'weekly_work_hours': daily_work_hours,
-                'monthly_work_hours': daily_work_hours,
-                'operator_count': 1,
-                'equipment_hours': daily_work_hours,
-            }
-        )
-        
-        if not created:
-            # 更新現有記錄
-            report_data.operator_name = fill_work.operator
-            report_data.product_code = fill_work.product_id
-            report_data.process_name = fill_work.operation or fill_work.process_name or ''
-            report_data.start_time = fill_work.start_time
-            report_data.end_time = fill_work.end_time
-            report_data.work_hours = work_hours
-            report_data.overtime_hours = overtime_hours
-            report_data.total_hours = total_hours
-            report_data.daily_work_hours = daily_work_hours
-            report_data.weekly_work_hours += daily_work_hours
-            report_data.monthly_work_hours += daily_work_hours
-            report_data.equipment_hours = daily_work_hours
-            report_data.save()
-        
-        return report_data
-
-    @classmethod
-    def create_from_onsite_report(cls, onsite_report):
-        """從現場報工資料建立報表資料"""
-        from datetime import datetime
-        import calendar
-        
-        # 檢查是否為已完成的報工記錄
-        if onsite_report.status != 'completed':
-            return None
-        
-        # 取得工作日期
-        work_date = onsite_report.start_datetime.date()
-        
-        # 計算時間維度
-        work_year = work_date.year
-        work_month = work_date.month
-        
-        # 計算週數
-        week_num = work_date.isocalendar()[1]
-        
-        # 計算季度
-        work_quarter = (work_month - 1) // 3 + 1
-        
-        # 計算工作時數（分鐘轉小時）
-        work_minutes = onsite_report.work_minutes or 0
-        daily_work_hours = Decimal(str(work_minutes / 60)).quantize(Decimal('0.01'))
-        
-        # 計算詳細時數
-        work_hours = daily_work_hours
-        overtime_hours = Decimal('0')  # 現場報工暫時不計算加班時數
-        total_hours = work_hours + overtime_hours
-        
-        # 建立或更新報表資料
-        report_data, created = cls.objects.get_or_create(
-            workorder_id=onsite_report.workorder,
-            company=onsite_report.company_name,
-            work_date=work_date,
-            defaults={
-                'operator_name': onsite_report.operator,
-                'product_code': onsite_report.product_id,
-                'process_name': onsite_report.process,
-                'start_time': onsite_report.start_datetime.time(),
-                'end_time': onsite_report.end_datetime.time() if onsite_report.end_datetime else None,
-                'work_hours': work_hours,
-                'overtime_hours': overtime_hours,
-                'total_hours': total_hours,
-                'work_week': week_num,
-                'work_month': work_month,
-                'work_quarter': work_quarter,
-                'work_year': work_year,
-                'daily_work_hours': daily_work_hours,
-                'weekly_work_hours': daily_work_hours,
-                'monthly_work_hours': daily_work_hours,
-                'operator_count': 1,
-                'equipment_hours': daily_work_hours,
-            }
-        )
-        
-        if not created:
-            # 更新現有記錄
-            report_data.operator_name = onsite_report.operator
-            report_data.product_code = onsite_report.product_id
-            report_data.process_name = onsite_report.process
-            report_data.start_time = onsite_report.start_datetime.time()
-            report_data.end_time = onsite_report.end_datetime.time() if onsite_report.end_datetime else None
-            report_data.work_hours = work_hours
-            report_data.overtime_hours = overtime_hours
-            report_data.total_hours = total_hours
-            report_data.daily_work_hours = daily_work_hours
-            report_data.weekly_work_hours += daily_work_hours
-            report_data.monthly_work_hours += daily_work_hours
-            report_data.equipment_hours = daily_work_hours
-            report_data.save()
-        
-        return report_data
 
 
 
@@ -221,14 +79,10 @@ class ReportSchedule(models.Model):
     REPORT_TYPES = [
         ('data_sync', '填報與現場記錄資料同步'),
         ('previous_workday', '前一個工作日報表'),
-        ('current_week', '本週報表'),
         ('previous_week', '上週報表'),
-        ('current_month', '本月報表'),
         ('previous_month', '上月報表'),
-        ('current_quarter', '本季報表'),
         ('previous_quarter', '上季報表'),
-        ('current_year', '本年報表'),
-        ('previous_year', '上年報表'),
+        ('previous_year', '去年報表'),
     ]
     
     FILE_FORMATS = [
@@ -248,7 +102,7 @@ class ReportSchedule(models.Model):
     
     # 排程設定
     schedule_time = models.TimeField(verbose_name="執行時間")
-    schedule_day = models.IntegerField(null=True, blank=True, verbose_name="執行日期", help_text="週報表：週幾(1-7)，月報表：每月幾號(1-31)")
+    schedule_day = models.IntegerField(null=True, blank=True, verbose_name="執行日期", help_text="週報表：週幾(1-7)，月報表：每月幾號(1-30)")
     
     # 檔案格式設定
     file_format = models.CharField(
@@ -403,69 +257,6 @@ class OperatorProcessCapacityScore(models.Model):
     def __str__(self):
         return f"{self.operator_name} - {self.process_name} - {self.work_date}"
     
-    def calculate_capacity_score(self):
-        """計算產能評分"""
-        if self.capacity_ratio >= 1.0:
-            return Decimal('100.00')
-        elif self.capacity_ratio >= 0.8:
-            return Decimal('80.00') + (self.capacity_ratio - Decimal('0.8')) * Decimal('100.00')
-        elif self.capacity_ratio >= 0.6:
-            return Decimal('60.00') + (self.capacity_ratio - Decimal('0.6')) * Decimal('100.00')
-        else:
-            return self.capacity_ratio * Decimal('100.00')
-    
-    def calculate_quality_score(self):
-        """計算品質評分"""
-        if self.defect_rate == 0:
-            return Decimal('100.00')
-        elif self.defect_rate <= 0.02:  # 2%以下
-            return Decimal('90.00') - (self.defect_rate * Decimal('500.00'))
-        elif self.defect_rate <= 0.05:  # 5%以下
-            return Decimal('80.00') - ((self.defect_rate - Decimal('0.02')) * Decimal('333.33'))
-        else:
-            return max(Decimal('0.00'), Decimal('60.00') - (self.defect_rate * Decimal('200.00')))
-    
-    def calculate_total_score(self):
-        """計算總評分（包含主管評分）"""
-        # 生產效率權重：70%
-        # 生產效率 = 產能評分（基於產能比率計算）
-        production_score = self.capacity_score * Decimal('0.70')
-        
-        # 主管評分權重：30%
-        # 如果主管已主動評分，使用實際評分；否則使用預設80分
-        supervisor_weighted = self.supervisor_score * Decimal('0.30')
-        total = production_score + supervisor_weighted
-        
-        return total
-    
-    def get_grade(self, score):
-        """根據分數取得等級"""
-        if score >= 90:
-            return '優秀'
-        elif score >= 80:
-            return '良好'
-        elif score >= 70:
-            return '及格'
-        else:
-            return '不及格'
-    
-    def save(self, *args, **kwargs):
-        """儲存時自動計算評分"""
-        if not self.capacity_score:
-            self.capacity_score = self.calculate_capacity_score()
-        
-        # 品質評分不再自動計算，由主管手動評分
-        
-        if not self.total_score:
-            self.total_score = self.calculate_total_score()
-        
-        if not self.grade:
-            self.grade = self.get_grade(self.capacity_score)
-        
-        if not self.overall_grade:
-            self.overall_grade = self.get_grade(self.total_score)
-        
-        super().save(*args, **kwargs) 
 
 
 class CompletedWorkOrderAnalysis(models.Model):
@@ -515,4 +306,30 @@ class CompletedWorkOrderAnalysis(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.workorder_id} - {self.company_name} - {self.completion_date}" 
+        return f"{self.workorder_id} - {self.company_name} - {self.completion_date}"
+
+
+class AnalysisErrorLog(models.Model):
+    """工單分析錯誤日誌"""
+    workorder_id = models.CharField(max_length=50, verbose_name="工單編號")
+    company_code = models.CharField(max_length=10, verbose_name="公司代號")
+    product_code = models.CharField(max_length=100, verbose_name="產品編號", null=True, blank=True)
+    error_message = models.TextField(verbose_name="錯誤訊息")
+    error_type = models.CharField(max_length=100, verbose_name="錯誤類型")
+    analysis_date = models.DateTimeField(verbose_name="分析時間")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="建立時間")
+    
+    class Meta:
+        verbose_name = "分析錯誤日誌"
+        verbose_name_plural = "分析錯誤日誌"
+        db_table = 'analysis_error_log'
+        ordering = ['-analysis_date']
+        indexes = [
+            models.Index(fields=['workorder_id']),
+            models.Index(fields=['company_code']),
+            models.Index(fields=['analysis_date']),
+            models.Index(fields=['error_type']),
+        ]
+    
+    def __str__(self):
+        return f"{self.workorder_id} - {self.error_type} - {self.analysis_date.strftime('%Y-%m-%d %H:%M')}" 

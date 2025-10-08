@@ -3452,7 +3452,7 @@ def add_completion_task(request):
             'task_type': 'completion_check',
             'execution_type': execution_type,
             'is_enabled': True,
-            'task_function': 'workorder.tasks.workorder_archive_task'
+            'task_function': 'workorder.tasks.auto_check_workorder_completion'
         }
         
         if execution_type == 'interval':
@@ -3475,7 +3475,7 @@ def add_completion_task(request):
             periodic_task, created = PeriodicTask.objects.get_or_create(
                 name=f"Celery_{name}",
                 defaults={
-                    'task': 'workorder.tasks.workorder_archive_task',
+                    'task': 'workorder.tasks.auto_check_workorder_completion',
                     'interval': interval_schedule,
                     'enabled': True,
                     'description': f'自動執行工單歸檔任務 - {name} (間隔執行)'
@@ -3497,7 +3497,7 @@ def add_completion_task(request):
             periodic_task, created = PeriodicTask.objects.get_or_create(
                 name=f"Celery_{name}",
                 defaults={
-                    'task': 'workorder.tasks.workorder_archive_task',
+                    'task': 'workorder.tasks.auto_check_workorder_completion',
                     'crontab': crontab,
                     'enabled': True,
                     'description': f'自動執行工單歸檔任務 - {name} (固定時間)'

@@ -60,8 +60,10 @@ class Command(BaseCommand):
             self._show_dispatch_status(dispatch, "同步前")
             
             if not dry_run:
-                # 執行統計更新
-                dispatch.update_all_statistics()
+                # 執行統計更新 - 簡化版本
+                dispatch.completion_threshold_met = (dispatch.packaging_total_quantity >= dispatch.planned_quantity and dispatch.planned_quantity > 0)
+                dispatch.can_complete = dispatch.completion_threshold_met
+                dispatch.save()
                 
                 # 顯示同步後狀態
                 self._show_dispatch_status(dispatch, "同步後")
@@ -98,8 +100,10 @@ class Command(BaseCommand):
                 self.stdout.write(f'🔄 [{i}/{total_count}] 同步派工單 {dispatch.order_number}...')
                 
                 if not dry_run:
-                    # 執行統計更新
-                    dispatch.update_all_statistics()
+                    # 執行統計更新 - 簡化版本
+                    dispatch.completion_threshold_met = (dispatch.packaging_total_quantity >= dispatch.planned_quantity and dispatch.planned_quantity > 0)
+                    dispatch.can_complete = dispatch.completion_threshold_met
+                    dispatch.save()
                     success_count += 1
                 else:
                     # 乾跑模式，只顯示狀態

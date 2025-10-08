@@ -16,7 +16,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 
 from ..models import CompletedWorkOrder, CompletedWorkOrderProcess, CompletedProductionReport
-from ..services.completion_service import FillWorkCompletionService
 
 import logging
 
@@ -250,12 +249,21 @@ def transfer_workorder_to_completed(request, workorder_id):
             })
         
         # 執行轉移
-        completed_workorder = FillWorkCompletionService.transfer_workorder_to_completed(workorder_id)
+        from ..services.unified_transfer_service import UnifiedTransferService
+        transfer_result = UnifiedTransferService.transfer_workorder_to_completed(workorder_id, "手動轉移")
+        
+        if not transfer_result.get('success'):
+            return JsonResponse({
+                'success': False,
+                'error': transfer_result.get('error', '轉移失敗')
+            })
+        
+        completed_workorder_id = transfer_result.get('completed_workorder_id')
         
         return JsonResponse({
             'success': True,
             'message': f'工單 {workorder.order_number} 成功轉移到已完工模組',
-            'completed_workorder_id': completed_workorder.id
+            'completed_workorder_id': completed_workorder_id
         })
         
     except WorkOrder.DoesNotExist:
@@ -292,8 +300,13 @@ def batch_transfer_completed_workorders(request):
         
         for workorder in completed_workorders:
             try:
-                FillWorkCompletionService.transfer_workorder_to_completed(workorder.id)
-                transferred_count += 1
+                from ..services.unified_transfer_service import UnifiedTransferService
+                transfer_result = UnifiedTransferService.transfer_workorder_to_completed(workorder.id, "批次轉移")
+                
+                if transfer_result.get('success'):
+                    transferred_count += 1
+                else:
+                    errors.append(f'工單 {workorder.order_number}: {transfer_result.get("error", "轉移失敗")}')
             except Exception as e:
                 errors.append(f'工單 {workorder.order_number}: {str(e)}')
         

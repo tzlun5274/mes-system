@@ -26,9 +26,14 @@ class WorkOrderDispatchService:
         """
         try:
             dispatch = WorkOrderDispatch.objects.get(id=dispatch_id)
-            dispatch.update_all_statistics()
+            # 使用新的統計服務
+            from workorder.services.dispatch_statistics_service import DispatchStatisticsService
+            result = DispatchStatisticsService.update_all_statistics(dispatch)
             
-            logger.info(f"派工單 {dispatch.order_number} 統計資料更新成功")
+            if result:
+                logger.info(f"派工單 {dispatch.order_number} 統計資料更新成功")
+            else:
+                logger.warning(f"派工單 {dispatch.order_number} 統計資料更新失敗")
             
             return {
                 'success': True,
@@ -66,8 +71,14 @@ class WorkOrderDispatchService:
             
             for dispatch in dispatches:
                 try:
-                    dispatch.update_all_statistics()
-                    success_count += 1
+                    # 使用新的統計服務
+                    from workorder.services.dispatch_statistics_service import DispatchStatisticsService
+                    result = DispatchStatisticsService.update_all_statistics(dispatch)
+                    if result:
+                        success_count += 1
+                    else:
+                        error_count += 1
+                        logger.error(f"更新派工單 {dispatch.order_number} 統計資料失敗")
                 except Exception as e:
                     error_count += 1
                     logger.error(f"更新派工單 {dispatch.order_number} 統計資料失敗: {str(e)}")
@@ -100,9 +111,14 @@ class WorkOrderDispatchService:
             dict: 更新結果
         """
         try:
-            dispatch.update_all_statistics()
+            # 使用新的統計服務
+            from workorder.services.dispatch_statistics_service import DispatchStatisticsService
+            result = DispatchStatisticsService.update_all_statistics(dispatch)
             
-            logger.info(f"派工單 {dispatch.order_number} 監控資料更新成功")
+            if result:
+                logger.info(f"派工單 {dispatch.order_number} 監控資料更新成功")
+            else:
+                logger.warning(f"派工單 {dispatch.order_number} 監控資料更新失敗")
             
             return {
                 'success': True,
@@ -136,8 +152,14 @@ class WorkOrderDispatchService:
             
             for dispatch in dispatches:
                 try:
-                    dispatch.update_all_statistics()
-                    success_count += 1
+                    # 使用新的統計服務
+                    from workorder.services.dispatch_statistics_service import DispatchStatisticsService
+                    result = DispatchStatisticsService.update_all_statistics(dispatch)
+                    if result:
+                        success_count += 1
+                    else:
+                        error_count += 1
+                        logger.error(f"更新派工單 {dispatch.order_number} 統計資料失敗")
                 except Exception as e:
                     error_count += 1
                     logger.error(f"更新派工單 {dispatch.order_number} 統計資料失敗: {str(e)}")

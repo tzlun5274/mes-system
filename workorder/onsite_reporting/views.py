@@ -401,10 +401,8 @@ class OnsiteReportDetailView(LoginRequiredMixin, DetailView):
                 messages.error(request, f'無法從 {self.object.get_status_display()} 變更為 {dict(OnsiteReport.STATUS_CHOICES).get(new_status, new_status)}')
                 return self.get(request)
             
-            # 驗證數量
-            if new_status in ['completed', 'stopped'] and work_quantity == 0:
-                messages.error(request, '完工或停工時必須填寫工作數量')
-                return self.get(request)
+            # 驗證數量 - 允許工作數量為0
+            # 移除強制要求工作數量的驗證，允許填寫0
             
             if defect_quantity > work_quantity:
                 messages.error(request, '不良品數量不能超過工作數量')
